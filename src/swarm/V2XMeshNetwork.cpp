@@ -1,8 +1,13 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// V2XMeshNetwork.cpp  —  Swarm comms, leader election, formation control
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// V2XMeshNetwork.cpp  â€”  Swarm comms, leader election, formation control
 // Drone Swarm Sensor Fusion  |  Phase 3
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include "swarm/V2XMeshNetwork.hpp"
+#include "swarm/SwarmSecurity.hpp"
 #include <cstring>
 #include <stdexcept>
 #include <algorithm>
@@ -26,6 +31,7 @@ constexpr double kAvoidanceEps = 1e-6;
 constexpr double kTwoPi = 6.28318530717958647692;
 constexpr double kDegToRad = 0.01745329251994329577;
 constexpr double kDeadlockEscapeSpeed = 0.8;
+constexpr size_t kHeartbeatPayloadSize = 1 + (sizeof(float) * 6) + 1;
 
 Eigen::Vector3d deterministic_separation_axis(uint32_t local_id, uint32_t peer_id) {
     const uint32_t mixed = (local_id * 2654435761u) ^ (peer_id * 2246822519u);
@@ -51,13 +57,13 @@ double closing_speed_along(const Eigen::Vector3d& relative_position,
 
 } // namespace
 
-// ── Wire format header (little-endian) ──────────────────────────────────────
+// â”€â”€ Wire format header (little-endian) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // [4B magic][4B src_id][4B dst_id][4B seq][8B timestamp][1B type][1B hop]
 // [1B ttl][1B pad][2B payload_len][payload...]
 static constexpr uint32_t kMagic = 0x56325831; // "V2X1"
 static constexpr size_t   kHdrSize = 30;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 std::vector<uint8_t> SwarmMessage::serialize() const {
     std::vector<uint8_t> out;
     out.reserve(kHdrSize + payload.size());
@@ -134,18 +140,18 @@ std::optional<SwarmMessage> SwarmMessage::deserialize(const uint8_t* data, size_
     return msg;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // PeerInfo
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 bool PeerInfo::is_stale(double timeout_s) const {
     const double now = std::chrono::duration<double>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
     return (now - last_seen_ts) > timeout_s;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // V2XMeshNetwork
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 V2XMeshNetwork::V2XMeshNetwork(uint32_t local_id,
                                  std::string multicast_group,
                                  uint16_t port)
@@ -217,7 +223,7 @@ void V2XMeshNetwork::stop() {
                   tx_count_, rx_count_, packet_loss_pct_);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 bool V2XMeshNetwork::broadcast(SwarmMessage::Type type,
                                 std::vector<uint8_t> payload) {
     SwarmMessage msg;
@@ -231,7 +237,9 @@ bool V2XMeshNetwork::broadcast(SwarmMessage::Type type,
     msg.payload     = std::move(payload);
     msg.payload_len = static_cast<uint16_t>(msg.payload.size());
 
-    const auto bytes = msg.serialize();
+    const auto bytes = (security_ && security_->enabled())
+        ? security_->seal(msg)
+        : msg.serialize();
     if (bytes.size() > kMaxPayload) return false;
 
 #ifdef __linux__
@@ -268,7 +276,9 @@ bool V2XMeshNetwork::unicast(uint32_t dst,
     msg.payload     = std::move(payload);
     msg.payload_len = static_cast<uint16_t>(msg.payload.size());
 
-    const auto bytes = msg.serialize();
+    const auto bytes = (security_ && security_->enabled())
+        ? security_->seal(msg)
+        : msg.serialize();
     if (bytes.size() > kMaxPayload) return false;
 
 #ifdef __linux__
@@ -315,7 +325,7 @@ bool V2XMeshNetwork::send_formation(const FormationCommand& cmd) {
     return broadcast(SwarmMessage::Type::FORMATION_CMD, std::move(payload));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 void V2XMeshNetwork::recv_loop() {
     std::vector<uint8_t> buf(kMaxPayload);
 
@@ -334,7 +344,15 @@ void V2XMeshNetwork::recv_loop() {
         }
 
         ++rx_count_;
-        auto msg = SwarmMessage::deserialize(buf.data(), static_cast<size_t>(n));
+        std::optional<SwarmMessage> msg;
+        if (security_ && security_->enabled()) {
+            msg = security_->open(buf.data(), static_cast<size_t>(n));
+            if (!msg.has_value() && logger_) {
+                logger_->warn("V2X secure frame rejected: {}", security_->last_error());
+            }
+        } else {
+            msg = SwarmMessage::deserialize(buf.data(), static_cast<size_t>(n));
+        }
         if (msg && msg->src_id != local_id_) {  // ignore own broadcasts
             handle_message(*msg);
             if (msg_cb_) msg_cb_(*msg);
@@ -345,7 +363,7 @@ void V2XMeshNetwork::recv_loop() {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 void V2XMeshNetwork::heartbeat_loop() {
     while (running_.load()) {
         broadcast(SwarmMessage::Type::HEARTBEAT, build_heartbeat_payload());
@@ -355,22 +373,54 @@ void V2XMeshNetwork::heartbeat_loop() {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 void V2XMeshNetwork::handle_heartbeat(const SwarmMessage& msg) {
-    std::lock_guard lock(peers_mutex_);
-    auto& peer         = peers_[msg.src_id];
-    peer.id            = msg.src_id;
-    peer.last_seen_ts  = msg.timestamp;
-    peer.seq_last      = msg.seq_num;
-    peer.reachable     = true;
-    // Parse battery / role from payload if present
-    if (msg.payload.size() >= 5) {
-        peer.role        = static_cast<DroneRole>(msg.payload[0]);
-        float bat;
-        std::memcpy(&bat, &msg.payload[1], 4);
-        peer.battery_pct = bat;
+    std::optional<PeerInfo> updated_peer;
+    bool force_re_election = false;
+    {
+        std::lock_guard lock(peers_mutex_);
+        auto& peer         = peers_[msg.src_id];
+        peer.id            = msg.src_id;
+        peer.last_seen_ts  = msg.timestamp;
+        peer.seq_last      = msg.seq_num;
+        peer.reachable     = true;
+
+        if (msg.payload.size() >= kHeartbeatPayloadSize) {
+            peer.role = static_cast<DroneRole>(msg.payload[0]);
+            size_t offset = 1;
+            auto read_metric = [&](float& value) {
+                std::memcpy(&value, msg.payload.data() + offset, sizeof(float));
+                offset += sizeof(float);
+            };
+            read_metric(peer.health.battery_pct);
+            read_metric(peer.health.motor_health);
+            read_metric(peer.health.link_quality);
+            read_metric(peer.health.cpu_headroom);
+            read_metric(peer.health.thermal_headroom);
+            read_metric(peer.health.leadership_score);
+            peer.health.emergency_fault = (msg.payload[offset] != 0);
+            peer.battery_pct = peer.health.battery_pct;
+        } else if (msg.payload.size() >= 5) {
+            peer.role = static_cast<DroneRole>(msg.payload[0]);
+            std::memcpy(&peer.battery_pct, &msg.payload[1], sizeof(float));
+            peer.health.battery_pct = peer.battery_pct;
+            peer.health.leadership_score = compute_leadership_score(peer.health);
+        }
+
+        if (peer.role == DroneRole::LEADER) {
+            leader_id_.store(peer.id);
+            force_re_election = should_force_re_election(peer);
+        }
+        updated_peer = peer;
     }
-    if (peer_cb_) peer_cb_(peer);
+
+    if (updated_peer && peer_cb_) {
+        peer_cb_(*updated_peer);
+    }
+    if (force_re_election) {
+        logger_->warn("V2X: leader {} degraded, triggering MCSS re-election", msg.src_id);
+        trigger_election();
+    }
 }
 
 void V2XMeshNetwork::handle_message(const SwarmMessage& msg) {
@@ -383,57 +433,90 @@ void V2XMeshNetwork::handle_message(const SwarmMessage& msg) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Bully-style leader election
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// MCSS-style leader election
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 void V2XMeshNetwork::trigger_election() {
     if (election_ongoing_.exchange(true)) return;
     logger_->info("V2X election triggered by node {}", local_id_);
 
-    // Broadcast candidacy
-    std::vector<uint8_t> payload(4);
+    auto health = local_health();
+    health.leadership_score = compute_leadership_score(health);
+    set_local_health(health);
+
+    std::vector<uint8_t> payload(sizeof(uint32_t) + sizeof(float));
     std::memcpy(payload.data(), &local_id_, 4);
+    std::memcpy(payload.data() + sizeof(uint32_t), &health.leadership_score, sizeof(float));
     broadcast(SwarmMessage::Type::LEADER_ELECT, payload);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    // Tally: become leader if we have the highest ID among reachable nodes
-    uint32_t max_id = local_id_;
+    uint32_t best_id = local_id_;
+    float best_score = health.leadership_score;
+    float best_battery = health.battery_pct;
     {
         std::lock_guard lock(peers_mutex_);
         for (const auto& [id, peer] : peers_) {
-            if (peer.reachable && id > max_id) max_id = id;
+            if (!peer.reachable) continue;
+
+            const bool better_score = peer.health.leadership_score > best_score;
+            const bool better_battery = std::abs(peer.health.leadership_score - best_score) < 1e-4f
+                && peer.health.battery_pct > best_battery;
+            const bool tie_break = std::abs(peer.health.leadership_score - best_score) < 1e-4f
+                && std::abs(peer.health.battery_pct - best_battery) < 1e-4f
+                && id > best_id;
+            if (better_score || better_battery || tie_break) {
+                best_id = id;
+                best_score = peer.health.leadership_score;
+                best_battery = peer.health.battery_pct;
+            }
         }
     }
 
-    if (max_id == local_id_) {
+    if (best_id == local_id_) {
         role_.store(DroneRole::LEADER);
         leader_id_.store(local_id_);
-        logger_->info("V2X: node {} elected LEADER", local_id_);
+        logger_->info("V2X: node {} elected LEADER with score {:.3f}", local_id_, best_score);
     } else {
         role_.store(DroneRole::FOLLOWER);
-        leader_id_.store(max_id);
-        logger_->info("V2X: node {} is FOLLOWER (leader={})", local_id_, max_id);
+        leader_id_.store(best_id);
+        logger_->info("V2X: node {} is FOLLOWER (leader={} score {:.3f})",
+                      local_id_, best_id, best_score);
     }
     election_ongoing_.store(false);
 }
 
 void V2XMeshNetwork::handle_election(const SwarmMessage& msg) {
-    if (msg.payload.size() < 4) return;
+    if (msg.payload.size() < sizeof(uint32_t)) return;
     uint32_t candidate_id;
-    std::memcpy(&candidate_id, msg.payload.data(), 4);
+    std::memcpy(&candidate_id, msg.payload.data(), sizeof(uint32_t));
 
-    if (candidate_id > local_id_) {
-        // Higher ID wins — step down if we were leader
-        if (role_.load() == DroneRole::LEADER) {
-            role_.store(DroneRole::FOLLOWER);
-            leader_id_.store(candidate_id);
-            logger_->info("V2X: stepping down, new leader={}", candidate_id);
-        }
+    float candidate_score = 0.0f;
+    if (msg.payload.size() >= sizeof(uint32_t) + sizeof(float)) {
+        std::memcpy(&candidate_score, msg.payload.data() + sizeof(uint32_t), sizeof(float));
+    }
+
+    {
+        std::lock_guard lock(peers_mutex_);
+        auto& peer = peers_[candidate_id];
+        peer.id = candidate_id;
+        peer.reachable = true;
+        peer.last_seen_ts = msg.timestamp;
+        peer.health.leadership_score = candidate_score;
+    }
+
+    const auto local = local_health();
+    const bool remote_wins = (candidate_score > local.leadership_score)
+        || (std::abs(candidate_score - local.leadership_score) < 1e-4f
+            && candidate_id > local_id_);
+    if (remote_wins && role_.load() == DroneRole::LEADER) {
+        role_.store(DroneRole::FOLLOWER);
+        leader_id_.store(candidate_id);
+        logger_->info("V2X: stepping down, new leader={} score={:.3f}",
+                      candidate_id, candidate_score);
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 void V2XMeshNetwork::handle_pose_update(const SwarmMessage& msg) {
     if (msg.payload.size() < 24) return;
     Eigen::Vector3d pos;
@@ -449,21 +532,34 @@ void V2XMeshNetwork::handle_pose_update(const SwarmMessage& msg) {
     peer.last_seen_ts = msg.timestamp;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// peer liveness and leader-loss detection
 void V2XMeshNetwork::expire_stale_peers() {
-    std::lock_guard lock(peers_mutex_);
-    for (auto& [id, peer] : peers_) {
-        if (peer.is_stale(kPeerTimeout_s)) {
-            peer.reachable = false;
-            logger_->warn("V2X: peer {} marked unreachable (last seen {:.1f}s ago)",
-                          id, std::chrono::duration<double>(
-                              std::chrono::steady_clock::now().time_since_epoch()).count()
-                          - peer.last_seen_ts);
+    bool leader_lost = false;
+    {
+        std::lock_guard lock(peers_mutex_);
+        for (auto& [id, peer] : peers_) {
+            if (peer.is_stale(kPeerTimeout_s)) {
+                peer.reachable = false;
+                logger_->warn("V2X: peer {} marked unreachable (last seen {:.1f}s ago)",
+                              id, std::chrono::duration<double>(
+                                  std::chrono::steady_clock::now().time_since_epoch()).count()
+                              - peer.last_seen_ts);
+                if (leader_id_.load() == id) {
+                    leader_lost = true;
+                }
+            }
         }
+    }
+
+    if (leader_lost) {
+        leader_id_.store(0);
+        role_.store(DroneRole::CANDIDATE);
+        logger_->warn("V2X: current leader lost, triggering decentralized re-election");
+        trigger_election();
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// active peer snapshot
 std::vector<PeerInfo> V2XMeshNetwork::active_peers() const {
     std::lock_guard lock(peers_mutex_);
     std::vector<PeerInfo> out;
@@ -480,16 +576,66 @@ size_t V2XMeshNetwork::peer_count() const {
 }
 
 std::vector<uint8_t> V2XMeshNetwork::build_heartbeat_payload() const {
-    std::vector<uint8_t> p(5);
+    const auto health = local_health();
+    std::vector<uint8_t> p(kHeartbeatPayloadSize);
     p[0] = static_cast<uint8_t>(role_.load());
-    float bat = 87.5f;  // In production: read from BMS
-    std::memcpy(&p[1], &bat, 4);
+    size_t offset = 1;
+    auto write_metric = [&](float value) {
+        std::memcpy(p.data() + offset, &value, sizeof(float));
+        offset += sizeof(float);
+    };
+    write_metric(health.battery_pct);
+    write_metric(health.motor_health);
+    write_metric(health.link_quality);
+    write_metric(health.cpu_headroom);
+    write_metric(health.thermal_headroom);
+    write_metric(health.leadership_score);
+    p[offset] = static_cast<uint8_t>(health.emergency_fault ? 1 : 0);
     return p;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
+void V2XMeshNetwork::configure_security(SwarmSecurityConfig cfg) {
+    security_ = std::make_unique<SwarmSecurityContext>(local_id_, std::move(cfg));
+}
+bool V2XMeshNetwork::security_enabled() const {
+    return security_ && security_->enabled();
+}
+void V2XMeshNetwork::set_local_health(SwarmHealthMetrics health) {
+    health.battery_pct = std::clamp(health.battery_pct, 0.0f, 100.0f);
+    health.motor_health = std::clamp(health.motor_health, 0.0f, 1.0f);
+    health.link_quality = std::clamp(health.link_quality, 0.0f, 1.0f);
+    health.cpu_headroom = std::clamp(health.cpu_headroom, 0.0f, 1.0f);
+    health.thermal_headroom = std::clamp(health.thermal_headroom, 0.0f, 1.0f);
+    health.leadership_score = compute_leadership_score(health);
+    std::lock_guard lock(health_mutex_);
+    local_health_ = health;
+}
+SwarmHealthMetrics V2XMeshNetwork::local_health() const {
+    std::lock_guard lock(health_mutex_);
+    return local_health_;
+}
+float V2XMeshNetwork::compute_leadership_score(const SwarmHealthMetrics& health) {
+    if (health.emergency_fault) {
+        return 0.0f;
+    }
+    const float battery_norm = std::clamp(health.battery_pct / 100.0f, 0.0f, 1.0f);
+    const float score =
+        (0.32f * battery_norm) +
+        (0.28f * std::clamp(health.motor_health, 0.0f, 1.0f)) +
+        (0.18f * std::clamp(health.link_quality, 0.0f, 1.0f)) +
+        (0.12f * std::clamp(health.cpu_headroom, 0.0f, 1.0f)) +
+        (0.10f * std::clamp(health.thermal_headroom, 0.0f, 1.0f));
+    return std::clamp(score, 0.0f, 1.0f);
+}
+bool V2XMeshNetwork::should_force_re_election(const PeerInfo& peer) const {
+    return peer.health.emergency_fault
+        || peer.health.motor_health < 0.35f
+        || peer.health.link_quality < 0.25f
+        || peer.health.battery_pct < 18.0f
+        || peer.health.leadership_score < 0.40f;
+}
+// -----------------------------------------------------------------------------
 // LeaderFollowerController
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Eigen::Vector3d LeaderFollowerController::compute_target(
         const Eigen::Vector3d& leader_pos,
         const FormationCommand& cmd,
@@ -713,3 +859,8 @@ std::vector<AvoidanceObstacle> LeaderFollowerController::obstacles_from_lidar(
 }
 
 } // namespace drone::swarm
+
+
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

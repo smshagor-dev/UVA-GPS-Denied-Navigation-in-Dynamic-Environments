@@ -1,5 +1,10 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #pragma once
 
+#include "autonomy/ExperienceMemory.hpp"
 #include "hal/JetsonHAL.hpp"
 #include "sensors/CameraSensor.hpp"
 #include "vio/EKFEstimator.hpp"
@@ -9,6 +14,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 
 namespace drone::autonomy {
 
@@ -59,6 +65,9 @@ struct DecisionContext {
     vio::PoseEstimate pose;
     hal::SystemStats system;
     std::optional<sensors::CameraFrame> frame;
+    std::optional<MemoryPrior> memory_prior;
+    std::optional<Eigen::Vector3d> tdoa_position;
+    double tdoa_confidence{0.0};
     size_t swarm_peer_count{0};
     bool swarm_follower{false};
     bool inference_ready{false};
@@ -112,3 +121,9 @@ private:
 };
 
 } // namespace drone::autonomy
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

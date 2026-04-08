@@ -1,7 +1,11 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// EKFEstimator.cpp  —  Error-State EKF implementation
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// EKFEstimator.cpp  â€”  Error-State EKF implementation
 // Drone Swarm Sensor Fusion  |  Phase 2
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include "vio/EKFEstimator.hpp"
 #include <Eigen/Cholesky>
 #include <Eigen/SVD>
@@ -11,7 +15,7 @@ namespace drone::vio {
 
 static constexpr double kGravity = 9.81;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 EKFEstimator::EKFEstimator(EKFConfig cfg) : cfg_(cfg) {
     logger_ = spdlog::get("EKF");
     if (!logger_) logger_ = spdlog::stdout_color_mt("EKF");
@@ -24,7 +28,7 @@ EKFEstimator::EKFEstimator(EKFConfig cfg) : cfg_(cfg) {
     Q_imu_.block<3,3>(9,9) = Eigen::Matrix3d::Identity() * cfg_.sigma_nbg * cfg_.sigma_nbg;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 void EKFEstimator::reset(const Eigen::Vector3d& p0,
                           const Eigen::Quaterniond& q0,
                           const Eigen::Vector3d& v0) {
@@ -49,9 +53,9 @@ void EKFEstimator::reset(const Eigen::Vector3d& p0,
     logger_->info("EKF reset. p0=[{:.3f},{:.3f},{:.3f}]", p0.x(), p0.y(), p0.z());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // IMU Propagation  (error-state EKF prediction step)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 void EKFEstimator::propagate_imu(const Eigen::Vector3d& accel_mps2,
                                   const Eigen::Vector3d& gyro_rads,
                                   double dt) {
@@ -64,7 +68,7 @@ void EKFEstimator::propagate_imu(const Eigen::Vector3d& accel_mps2,
 
     const Eigen::Matrix3d R = q_.toRotationMatrix();
 
-    // ── Nominal state integration (mid-point / Runge-Kutta 2) ────────────
+    // â”€â”€ Nominal state integration (mid-point / Runge-Kutta 2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const Eigen::Vector3d g_world{0, 0, -kGravity};
 
     // Half-step quaternion
@@ -80,7 +84,7 @@ void EKFEstimator::propagate_imu(const Eigen::Vector3d& accel_mps2,
     q_ = propagate_quat(q_, w, dt);
     q_.normalize();
 
-    // ── Error-state covariance propagation ───────────────────────────────
+    // â”€â”€ Error-state covariance propagation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const FMat F = compute_F(a, R, dt);
     const GMat G = compute_G(R);
 
@@ -95,9 +99,9 @@ void EKFEstimator::propagate_imu(const Eigen::Vector3d& accel_mps2,
     timestamp_ += dt;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Vision Update  (feature reprojection)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 void EKFEstimator::update_vision(const std::vector<Eigen::Vector2d>& z_pixels,
                                   const std::vector<Eigen::Vector3d>& p_world,
                                   const Eigen::Matrix3d& K) {
@@ -121,20 +125,20 @@ void EKFEstimator::update_vision(const std::vector<Eigen::Vector2d>& z_pixels,
         const double u_hat = fx * Xc / Zc + cx;
         const double v_hat = fy * Yc / Zc + cy;
 
-        // Jacobian H (2×15) of [u,v] w.r.t. error state
+        // Jacobian H (2Ã—15) of [u,v] w.r.t. error state
         // Only position (cols 0:2) and attitude (cols 6:8) terms are nonzero
         Eigen::Matrix<double, 2, 15> H = Eigen::Matrix<double, 2, 15>::Zero();
 
-        // ∂[u,v]/∂p_c
+        // âˆ‚[u,v]/âˆ‚p_c
         Eigen::Matrix<double, 2, 3> J_proj;
         J_proj << fx/Zc,  0,     -fx*Xc/(Zc*Zc),
                   0,      fy/Zc, -fy*Yc/(Zc*Zc);
 
-        // ∂p_c/∂pos (= -R^T)
+        // âˆ‚p_c/âˆ‚pos (= -R^T)
         const Eigen::Matrix3d dpc_dpos = -R.transpose();
         H.block<2,3>(0,0) = J_proj * dpc_dpos;
 
-        // ∂p_c/∂θ (= [p_w - pos]×  in body frame... skew sym)
+        // âˆ‚p_c/âˆ‚Î¸ (= [p_w - pos]Ã—  in body frame... skew sym)
         Eigen::Matrix3d skew_pw;
         const Eigen::Vector3d dv = p_world[i] - pos_;
         skew_pw << 0, -dv.z(), dv.y(),
@@ -181,7 +185,7 @@ void EKFEstimator::update_vision(const std::vector<Eigen::Vector2d>& z_pixels,
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 void EKFEstimator::update_depth(double z_depth_m, double sigma_m) {
     if (!initialized_) return;
     std::lock_guard lock(mtx_);
@@ -201,7 +205,7 @@ void EKFEstimator::update_depth(double z_depth_m, double sigma_m) {
     P_     = 0.5 * (P_ + P_.transpose());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 void EKFEstimator::update_zupt() {
     if (!initialized_) return;
     std::lock_guard lock(mtx_);
@@ -218,11 +222,12 @@ void EKFEstimator::update_zupt() {
     const auto dx = K_gain * innov;
 
     vel_  += dx.segment<3>(3);
+    vel_.setZero();
     P_    -= K_gain * H * P_;
     P_     = 0.5 * (P_ + P_.transpose());
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PoseEstimate EKFEstimator::state() const {
     std::lock_guard lock(mtx_);
     PoseEstimate est;
@@ -236,28 +241,28 @@ PoseEstimate EKFEstimator::state() const {
     return est;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Private helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 FMat EKFEstimator::compute_F(const Eigen::Vector3d& a_body,
                                const Eigen::Matrix3d& R,
                                double dt) const {
     FMat F = FMat::Identity();
 
-    // ∂pos/∂vel
+    // âˆ‚pos/âˆ‚vel
     F.block<3,3>(0,3) = Eigen::Matrix3d::Identity() * dt;
 
-    // ∂vel/∂θ  (a_body skew)
+    // âˆ‚vel/âˆ‚Î¸  (a_body skew)
     Eigen::Matrix3d skew_a;
     skew_a << 0,       -a_body.z(), a_body.y(),
               a_body.z(), 0,       -a_body.x(),
              -a_body.y(), a_body.x(), 0;
     F.block<3,3>(3,6) = -R * skew_a * dt;
 
-    // ∂vel/∂ba
+    // âˆ‚vel/âˆ‚ba
     F.block<3,3>(3,9) = -R * dt;
 
-    // ∂θ/∂bg
+    // âˆ‚Î¸/âˆ‚bg
     F.block<3,3>(6,12) = -Eigen::Matrix3d::Identity() * dt;
 
     return F;
@@ -265,8 +270,8 @@ FMat EKFEstimator::compute_F(const Eigen::Vector3d& a_body,
 
 GMat EKFEstimator::compute_G(const Eigen::Matrix3d& R) const {
     GMat G = GMat::Zero();
-    G.block<3,3>(3,0) = -R;   // accel noise → velocity
-    G.block<3,3>(6,3) = -Eigen::Matrix3d::Identity(); // gyro noise → attitude
+    G.block<3,3>(3,0) = -R;   // accel noise â†’ velocity
+    G.block<3,3>(6,3) = -Eigen::Matrix3d::Identity(); // gyro noise â†’ attitude
     G.block<3,3>(9,6) = Eigen::Matrix3d::Identity();  // accel bias drive
     G.block<3,3>(12,9)= Eigen::Matrix3d::Identity();  // gyro  bias drive
     return G;
@@ -293,3 +298,6 @@ Eigen::Vector3d EKFEstimator::quat_to_rotvec(const Eigen::Quaterniond& q) {
 }
 
 } // namespace drone::vio
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

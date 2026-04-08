@@ -1,8 +1,12 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #pragma once
-// ─────────────────────────────────────────────────────────────────────────────
-// LidarSensor.hpp  —  LiDAR interface (Velodyne VLP-16 / RPLIDAR A3)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// LidarSensor.hpp  â€”  LiDAR interface (Velodyne VLP-16 / RPLIDAR A3)
 // Drone Swarm Sensor Fusion  |  Phase 2
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include "sensors/SensorBase.hpp"
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -13,7 +17,7 @@ namespace drone::sensors {
 using PointCloud    = pcl::PointCloud<pcl::PointXYZI>;
 using PointCloudPtr = PointCloud::Ptr;
 
-// ─── LiDAR Measurement ──────────────────────────────────────────────────────
+// â”€â”€â”€ LiDAR Measurement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct LidarMeasurement : SensorMeasurement {
     PointCloudPtr cloud;           // raw scan
     uint32_t      num_points{0};
@@ -22,7 +26,7 @@ struct LidarMeasurement : SensorMeasurement {
     float         angular_res_deg{0.1f};
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class LidarSensor : public SensorBase {
 public:
     explicit LidarSensor(std::string id, std::string endpoint = "192.168.1.201:2368")
@@ -43,7 +47,7 @@ public:
         data_cb_ = std::move(cb);
     }
 
-    // ── Filtering ─────────────────────────────────────────────────────────
+    // â”€â”€ Filtering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void set_voxel_leaf_size(float leaf) { voxel_leaf_ = leaf; }
     void set_range_filter(float min_m, float max_m) {
         range_min_ = min_m;
@@ -69,3 +73,9 @@ private:
 };
 
 } // namespace drone::sensors
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

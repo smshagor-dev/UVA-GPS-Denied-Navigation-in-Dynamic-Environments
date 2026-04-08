@@ -1,14 +1,19 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// test_ekf.cpp  —  GoogleTest suite for EKFEstimator
-// ─────────────────────────────────────────────────────────────────────────────
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// test_ekf.cpp  â€”  GoogleTest suite for EKFEstimator
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include <gtest/gtest.h>
 #include "vio/EKFEstimator.hpp"
 #include <Eigen/Core>
 #include <cmath>
+#include <numbers>
 
 using namespace drone::vio;
 
-// ─── Helper: propagate N IMU samples at constant acceleration ────────────────
+// â”€â”€â”€ Helper: propagate N IMU samples at constant acceleration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 static PoseEstimate propagate_constant(
         EKFEstimator& ekf,
         const Eigen::Vector3d& accel,
@@ -19,7 +24,7 @@ static PoseEstimate propagate_constant(
     return ekf.state();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class EKFTest : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -30,7 +35,7 @@ protected:
     EKFEstimator ekf_;
 };
 
-// ── 1. After reset, state should be identity/zero ─────────────────────────
+// â”€â”€ 1. After reset, state should be identity/zero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEST_F(EKFTest, ResetYieldsZeroState) {
     auto s = ekf_.state();
     EXPECT_TRUE(s.position.isZero(1e-10));
@@ -40,7 +45,7 @@ TEST_F(EKFTest, ResetYieldsZeroState) {
     EXPECT_NEAR(s.orientation.x(), 0.0, 1e-10);
 }
 
-// ── 2. Free-fall: 1 second of gravity should give ~4.9 m/s downward ──────
+// â”€â”€ 2. Free-fall: 1 second of gravity should give ~4.9 m/s downward â”€â”€â”€â”€â”€â”€
 TEST_F(EKFTest, FreeFallVelocity) {
     // In body frame, gravity sensed as +9.81 upward (reaction force)
     // For a truly free-falling IMU the accel reading is zero.
@@ -54,9 +59,9 @@ TEST_F(EKFTest, FreeFallVelocity) {
     EXPECT_NEAR(s.velocity.z(), -9.81, 0.05);
 }
 
-// ── 3. Constant velocity: no accel (minus gravity compensation) ───────────
+// â”€â”€ 3. Constant velocity: no accel (minus gravity compensation) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEST_F(EKFTest, ConstantVelocityPositionGrowth) {
-    // Stationary on ground: accel ≈ [0,0,+g] in world frame
+    // Stationary on ground: accel â‰ˆ [0,0,+g] in world frame
     const Eigen::Vector3d accel_static{0, 0, 9.81};
     const Eigen::Vector3d gyro_zero{0, 0, 0};
     const double dt = 0.0025;
@@ -67,13 +72,13 @@ TEST_F(EKFTest, ConstantVelocityPositionGrowth) {
     EXPECT_NEAR(s.position.norm(), 0.0, 0.05);
 }
 
-// ── 4. Pure rotation about Z axis ────────────────────────────────────────
+// â”€â”€ 4. Pure rotation about Z axis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEST_F(EKFTest, PureYawRotation) {
-    const double yaw_rate_rads = M_PI / 4.0;  // 45 deg/s
+    const double yaw_rate_rads = std::numbers::pi_v<double> / 4.0;  // 45 deg/s
     const Eigen::Vector3d accel_static{0, 0, 9.81};
     const Eigen::Vector3d gyro{0, 0, yaw_rate_rads};
     const double dt = 0.0025;
-    const int    steps = 400;  // 1 second → 45 degrees
+    const int    steps = 400;  // 1 second â†’ 45 degrees
 
     auto s = propagate_constant(ekf_, accel_static, gyro, dt, steps);
     const auto euler = s.euler_zyx_deg();
@@ -81,7 +86,7 @@ TEST_F(EKFTest, PureYawRotation) {
     EXPECT_NEAR(euler(1),  0.0, 1.0);  // pitch
 }
 
-// ── 5. ZUPT should drive velocity to zero ────────────────────────────────
+// â”€â”€ 5. ZUPT should drive velocity to zero â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEST_F(EKFTest, ZUPTClearsVelocity) {
     // Give it some velocity first
     ekf_.reset(Eigen::Vector3d::Zero(),
@@ -93,7 +98,7 @@ TEST_F(EKFTest, ZUPTClearsVelocity) {
     EXPECT_NEAR(s.velocity.norm(), 0.0, 0.01);
 }
 
-// ── 6. Depth update should correct z position ────────────────────────────
+// â”€â”€ 6. Depth update should correct z position â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEST_F(EKFTest, DepthUpdateCorrection) {
     // propagate briefly then check depth correction
     propagate_constant(ekf_,
@@ -106,7 +111,7 @@ TEST_F(EKFTest, DepthUpdateCorrection) {
     EXPECT_NEAR(s.position.z(), true_depth, 0.2);
 }
 
-// ── 7. Covariance must remain symmetric positive-definite ─────────────────
+// â”€â”€ 7. Covariance must remain symmetric positive-definite â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEST_F(EKFTest, CovarianceRemainsValid) {
     propagate_constant(ekf_,
         Eigen::Vector3d{0.1, 0.2, 9.81},
@@ -119,7 +124,7 @@ TEST_F(EKFTest, CovarianceRemainsValid) {
         EXPECT_GT(s.pos_std(i), 0.0) << "pos_std[" << i << "] <= 0";
 }
 
-// ── 8. Vision update with known point should reduce position uncertainty ──
+// â”€â”€ 8. Vision update with known point should reduce position uncertainty â”€â”€
 TEST_F(EKFTest, VisionUpdateReducesUncertainty) {
     propagate_constant(ekf_,
         Eigen::Vector3d{0,0,9.81}, Eigen::Vector3d::Zero(),
@@ -145,8 +150,11 @@ TEST_F(EKFTest, VisionUpdateReducesUncertainty) {
     EXPECT_LE(s_after.pos_std.sum(), s_before.pos_std.sum() + 1e-6);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

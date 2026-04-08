@@ -1,9 +1,13 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #pragma once
-// ─────────────────────────────────────────────────────────────────────────────
-// JetsonHAL.hpp  —  Hardware Abstraction Layer
-// Jetson Nano / Raspberry Pi 4  ↔  ESP32-CAM / LiDAR / IMU
-// Drone Swarm Sensor Fusion  |  Phase 2 — Hardware Integration
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// JetsonHAL.hpp  â€”  Hardware Abstraction Layer
+// Jetson Nano / Raspberry Pi 4  â†”  ESP32-CAM / LiDAR / IMU
+// Drone Swarm Sensor Fusion  |  Phase 2 â€” Hardware Integration
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include <functional>
 #include <memory>
 #include <string>
@@ -12,20 +16,20 @@
 
 namespace drone::hal {
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Platform detection
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 enum class Platform { UNKNOWN, JETSON_NANO, JETSON_ORIN, RPI4, RPI5, X86_SIM };
 Platform detect_platform();
 std::string_view to_string(Platform p);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ESP32CamInterface  —  RTSP / UDP frame receiver from ESP32-CAM
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ESP32CamInterface  â€”  RTSP / UDP frame receiver from ESP32-CAM
 //
 // ESP32-CAM firmware (see /firmware/esp32_cam/) streams:
-//   - RTSP at rtsp://<ip>:554/stream (H264, 30fps, 640×480)
+//   - RTSP at rtsp://<ip>:554/stream (H264, 30fps, 640Ã—480)
 //   - OR raw MJPEG over UDP port 1234 for low-latency path
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class ESP32CamInterface {
 public:
     enum class StreamMode { RTSP, UDP_MJPEG };
@@ -54,7 +58,7 @@ public:
     // Blocking grab (use in acquisition thread)
     bool     grab_frame(cv::Mat& out, double& timestamp_sec);
 
-    // Async path — callback on each new frame
+    // Async path â€” callback on each new frame
     void     set_frame_callback(FrameCallback cb);
     void     start_async();
     void     stop_async();
@@ -84,9 +88,9 @@ private:
     std::shared_ptr<spdlog::logger> logger_{spdlog::get("HAL_ESP32")};
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// I2CDevice  —  Generic I2C r/w wrapper (Linux /dev/i2c-N)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// I2CDevice  â€”  Generic I2C r/w wrapper (Linux /dev/i2c-N)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class I2CDevice {
 public:
     explicit I2CDevice(std::string bus = "/dev/i2c-1", uint8_t addr = 0x68);
@@ -109,9 +113,9 @@ private:
     std::shared_ptr<spdlog::logger> logger_{spdlog::get("I2C")};
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// UARTInterface  —  UART for RPLIDAR A3 / serial debug
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// UARTInterface  â€”  UART for RPLIDAR A3 / serial debug
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class UARTInterface {
 public:
     explicit UARTInterface(std::string device = "/dev/ttyUSB0", int baud = 115200);
@@ -132,9 +136,9 @@ private:
     std::shared_ptr<spdlog::logger> logger_{spdlog::get("UART")};
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SystemMonitor  —  CPU, GPU, memory, battery stats (Jetson/RPi)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SystemMonitor  â€”  CPU, GPU, memory, battery stats (Jetson/RPi)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct SystemStats {
     float cpu_pct{0};
     float gpu_pct{0};         // Jetson only
@@ -145,8 +149,16 @@ struct SystemStats {
     float battery_v{0};
     float battery_pct{0};
     float wifi_rssi_dbm{-100};
+    float motor_health{1.0f};
+    float motor_temp_c{0.0f};
 };
 
 SystemStats read_system_stats();
 
 } // namespace drone::hal
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

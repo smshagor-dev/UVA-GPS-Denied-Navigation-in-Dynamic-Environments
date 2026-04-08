@@ -1,9 +1,16 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// IMUSensor.cpp  —  IMU acquisition, calibration, and I2C integration
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// IMUSensor.cpp  â€”  IMU acquisition, calibration, and I2C integration
 // Drone Swarm Sensor Fusion  |  Phase 2
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include "sensors/IMUSensor.hpp"
+#include <cmath>
 #include <cstring>
+#include <numbers>
+#include <random>
 #include <stdexcept>
 
 // Linux I2C
@@ -26,10 +33,11 @@ static constexpr uint8_t MPU_ACCEL_XOUT  = 0x3B;
 static constexpr uint8_t MPU_GYRO_XOUT   = 0x43;
 static constexpr uint8_t MPU_TEMP_OUT    = 0x41;
 
-static constexpr double kAccelScale_2G  = 9.81 / 16384.0;  // m/s²/LSB
-static constexpr double kGyroScale_250  = (250.0 / 32768.0) * (M_PI / 180.0); // rad/s/LSB
+static constexpr double kAccelScale_2G  = 9.81 / 16384.0;  // m/sÂ²/LSB
+static constexpr double kGyroScale_250  =
+    (250.0 / 32768.0) * (std::numbers::pi_v<double> / 180.0); // rad/s/LSB
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 bool IMUSensor::initialize() {
     set_state(SensorState::INITIALIZING);
 
@@ -65,16 +73,16 @@ bool IMUSensor::initialize() {
     uint8_t dlpf[2] = {MPU_CONFIG, 0x02};
     ::write(fd_, dlpf, 2);
 
-    // Gyro range: ±250 deg/s
+    // Gyro range: Â±250 deg/s
     uint8_t gyro_cfg[2] = {MPU_GYRO_CONFIG, 0x00};
     ::write(fd_, gyro_cfg, 2);
 
-    // Accel range: ±2g
+    // Accel range: Â±2g
     uint8_t accel_cfg[2] = {MPU_ACCEL_CONFIG, 0x00};
     ::write(fd_, accel_cfg, 2);
 #else
     // Simulation mode on non-Linux (x86 dev/CI)
-    logger_->warn("[{}] Non-Linux platform — running in simulation mode", id_);
+    logger_->warn("[{}] Non-Linux platform â€” running in simulation mode", id_);
 #endif
 
     poll_rate_hz_ = 400;
@@ -83,7 +91,7 @@ bool IMUSensor::initialize() {
     return true;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 void IMUSensor::poll() {
     ImuMeasurement m = read_raw();
     m = apply_calibration(m);
@@ -100,7 +108,7 @@ void IMUSensor::poll() {
     if (data_cb_) data_cb_(m);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 ImuMeasurement IMUSensor::read_raw() {
     ImuMeasurement m;
     m.timestamp = now_sec();
@@ -151,16 +159,16 @@ simulate:
     return m;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 ImuMeasurement IMUSensor::apply_calibration(ImuMeasurement m) const {
     m.accel_mps2 = accel_scale_ * (m.accel_mps2 - accel_bias_);
     m.gyro_rads  = m.gyro_rads - gyro_bias_;
     return m;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 bool IMUSensor::calibrate_static(uint32_t n_samples) {
-    logger_->info("[{}] Starting static calibration ({} samples)…", id_, n_samples);
+    logger_->info("[{}] Starting static calibration ({} samples)â€¦", id_, n_samples);
 
     if (state() != SensorState::RUNNING) {
         if (!initialize()) return false;
@@ -189,7 +197,7 @@ bool IMUSensor::calibrate_static(uint32_t n_samples) {
     return true;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 bool IMUSensor::reconfigure(const std::string& config_json) {
     // In production: parse JSON, update noise model / range / filter
     logger_->info("[{}] reconfigure: {}", id_, config_json);
@@ -197,3 +205,6 @@ bool IMUSensor::reconfigure(const std::string& config_json) {
 }
 
 } // namespace drone::sensors
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

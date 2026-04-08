@@ -1,9 +1,13 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #pragma once
-// ─────────────────────────────────────────────────────────────────────────────
-// KeyframeManager.hpp  —  Keyframe-based SLAM + swarm map sharing
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// KeyframeManager.hpp  â€”  Keyframe-based SLAM + swarm map sharing
 // Only feature descriptors & 3D points are shared; raw frames stay local.
-// Drone Swarm Sensor Fusion  |  Phase 3 — SLAM
-// ─────────────────────────────────────────────────────────────────────────────
+// Drone Swarm Sensor Fusion  |  Phase 3 â€” SLAM
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include "swarm/V2XMeshNetwork.hpp"
 #include <opencv2/core.hpp>
 #include <opencv2/features2d.hpp>
@@ -18,10 +22,11 @@
 #include <string>
 #include <vector>
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace drone::slam {
 
-// ─── Map point ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Map point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct MapPoint {
     uint64_t        id;
     Eigen::Vector3d pos_world;  // 3D world position
@@ -34,7 +39,7 @@ struct MapPoint {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-// ─── Keyframe ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Keyframe â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct Keyframe {
     uint64_t   id;
     uint32_t   drone_id;
@@ -61,25 +66,25 @@ struct Keyframe {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// KeyframeSelector  —  decides when a new keyframe should be created
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// KeyframeSelector  â€”  decides when a new keyframe should be created
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct KeyframeSelectionPolicy {
     float   min_translation_m{0.4f};   // min travel before new KF
     float   min_rotation_deg{10.0f};   // min rotation before new KF
     float   max_point_overlap{0.9f};   // max covisibility with last KF
     double  min_time_s{0.5};           // minimum time interval
-    size_t  min_tracked_features{20};  // must track ≥ N features
+    size_t  min_tracked_features{20};  // must track â‰¥ N features
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class KeyframeManager {
 public:
     explicit KeyframeManager(uint32_t drone_id,
                               std::shared_ptr<swarm::V2XMeshNetwork> net,
                               KeyframeSelectionPolicy policy = {});
 
-    // ── Add a new observation ─────────────────────────────────────────────
+    // â”€â”€ Add a new observation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     //   Returns new Keyframe ID if one was created, else std::nullopt
     std::optional<uint64_t> try_add_frame(
         const cv::Mat&                image,
@@ -87,22 +92,22 @@ public:
         const Eigen::Quaterniond&     ori,
         double                        timestamp);
 
-    // ── Local map ──────────────────────────────────────────────────────────
+    // â”€â”€ Local map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     [[nodiscard]] std::vector<MapPoint>  get_local_map_points() const;
     [[nodiscard]] std::vector<Keyframe>  get_recent_keyframes(size_t n = 10) const;
     [[nodiscard]] size_t                 keyframe_count() const;
     [[nodiscard]] size_t                 map_point_count() const;
 
-    // ── Swarm sharing ─────────────────────────────────────────────────────
+    // â”€â”€ Swarm sharing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void share_latest_keyframe();   // encode + broadcast via V2X
     void on_remote_keyframe(const swarm::SwarmMessage& msg);  // ingest
 
-    // ── Loop closure hint ─────────────────────────────────────────────────
+    // â”€â”€ Loop closure hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     //   Returns candidate Keyframe IDs that may close a loop
     [[nodiscard]] std::vector<uint64_t> find_loop_closure_candidates(
         const cv::Mat& query_desc, size_t top_k = 5) const;
 
-    // ── Persistence ───────────────────────────────────────────────────────
+    // â”€â”€ Persistence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     bool save_map(const std::string& filepath) const;
     bool load_map(const std::string& filepath);
 
@@ -154,3 +159,9 @@ private:
 };
 
 } // namespace drone::slam
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

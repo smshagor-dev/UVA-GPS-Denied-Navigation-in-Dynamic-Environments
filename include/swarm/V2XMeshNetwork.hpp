@@ -1,9 +1,13 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #pragma once
-// ─────────────────────────────────────────────────────────────────────────────
-// V2XMeshNetwork.hpp  —  Decentralized mesh networking for drone swarm
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// V2XMeshNetwork.hpp  â€”  Decentralized mesh networking for drone swarm
 // Leader-Follower topology over Fast-DDS / UDP multicast fallback
-// Drone Swarm Sensor Fusion  |  Phase 3 — Swarm V2X
-// ─────────────────────────────────────────────────────────────────────────────
+// Drone Swarm Sensor Fusion  |  Phase 3 â€” Swarm V2X
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <atomic>
@@ -17,14 +21,28 @@
 #include <unordered_map>
 #include <vector>
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "sensors/LidarSensor.hpp"
 
 namespace drone::swarm {
 
-// ─────────────────────────────────────────────────────────────────────────────
+struct SwarmSecurityConfig;
+class SwarmSecurityContext;
+
+struct SwarmHealthMetrics {
+    float battery_pct{100.0f};
+    float motor_health{1.0f};
+    float link_quality{1.0f};
+    float cpu_headroom{1.0f};
+    float thermal_headroom{1.0f};
+    float leadership_score{0.0f};
+    bool emergency_fault{false};
+};
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // DroneRole
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 enum class DroneRole : uint8_t {
     CANDIDATE = 0,  // not yet in swarm
     FOLLOWER  = 1,
@@ -42,9 +60,9 @@ inline std::string_view to_string(DroneRole r) {
     return "UNKNOWN";
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SwarmMessage  —  wire format for all inter-drone traffic
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SwarmMessage  â€”  wire format for all inter-drone traffic
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct SwarmMessage {
     enum class Type : uint8_t {
         HEARTBEAT       = 0,
@@ -71,9 +89,9 @@ struct SwarmMessage {
     static std::optional<SwarmMessage> deserialize(const uint8_t* data, size_t len);
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PeerInfo  —  known state of another drone
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// PeerInfo  â€”  known state of another drone
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct PeerInfo {
     uint32_t    id{0};
     DroneRole   role{DroneRole::CANDIDATE};
@@ -84,6 +102,7 @@ struct PeerInfo {
     double      last_seen_ts{0.0};
     uint32_t    seq_last{0};
     bool        reachable{true};
+    SwarmHealthMetrics health{};
 
     [[nodiscard]] bool is_stale(double timeout_s = 2.0) const;
 
@@ -99,9 +118,9 @@ struct AvoidanceObstacle {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FormationCommand  —  issued by leader to all followers
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// FormationCommand  â€”  issued by leader to all followers
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct FormationCommand {
     enum class Formation : uint8_t { LINE, VEE, DIAMOND, WEDGE, FREE };
 
@@ -114,7 +133,7 @@ struct FormationCommand {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class V2XMeshNetwork {
 public:
     using MessageCallback  = std::function<void(const SwarmMessage&)>;
@@ -125,31 +144,36 @@ public:
                              uint16_t    port            = 7400);
     ~V2XMeshNetwork();
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────
+    // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     bool start();
     void stop();
 
-    // ── Outbound ──────────────────────────────────────────────────────────
+    // â”€â”€ Outbound â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     bool broadcast(SwarmMessage::Type type, std::vector<uint8_t> payload = {});
     bool unicast  (uint32_t dst, SwarmMessage::Type type, std::vector<uint8_t> payload);
+    void configure_security(SwarmSecurityConfig cfg);
+    [[nodiscard]] bool security_enabled() const;
+    void set_local_health(SwarmHealthMetrics health);
+    [[nodiscard]] SwarmHealthMetrics local_health() const;
+    [[nodiscard]] static float compute_leadership_score(const SwarmHealthMetrics& health);
 
-    // ── Leader election (Bully algorithm variant) ─────────────────────────
+    // â”€â”€ Leader election (Bully algorithm variant) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void trigger_election();
     [[nodiscard]] DroneRole local_role() const { return role_.load(); }
     [[nodiscard]] uint32_t  leader_id()  const { return leader_id_.load(); }
 
-    // ── Formation control ─────────────────────────────────────────────────
+    // â”€â”€ Formation control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     bool send_formation(const FormationCommand& cmd);  // LEADER only
 
-    // ── Peer registry ─────────────────────────────────────────────────────
+    // â”€â”€ Peer registry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     [[nodiscard]] std::vector<PeerInfo> active_peers() const;
     [[nodiscard]] size_t                peer_count()   const;
 
-    // ── Callbacks ─────────────────────────────────────────────────────────
+    // â”€â”€ Callbacks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void on_message(MessageCallback cb) { msg_cb_  = std::move(cb); }
     void on_peer_update(PeerCallback cb){ peer_cb_ = std::move(cb); }
 
-    // ── Metrics ───────────────────────────────────────────────────────────
+    // â”€â”€ Metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     [[nodiscard]] float    avg_latency_ms()   const { return avg_latency_ms_; }
     [[nodiscard]] uint32_t tx_count()         const { return tx_count_; }
     [[nodiscard]] uint32_t rx_count()         const { return rx_count_; }
@@ -165,6 +189,7 @@ private:
     void handle_heartbeat(const SwarmMessage& msg);
     void handle_election(const SwarmMessage& msg);
     void handle_pose_update(const SwarmMessage& msg);
+    [[nodiscard]] bool should_force_re_election(const PeerInfo& peer) const;
 
     std::vector<uint8_t> build_heartbeat_payload() const;
 
@@ -178,6 +203,8 @@ private:
     std::atomic<DroneRole> role_{DroneRole::CANDIDATE};
     std::atomic<uint32_t>  leader_id_{0};
     std::atomic<bool>      election_ongoing_{false};
+    mutable std::mutex      health_mutex_;
+    SwarmHealthMetrics      local_health_{};
 
     mutable std::mutex                          peers_mutex_;
     std::unordered_map<uint32_t, PeerInfo>      peers_;
@@ -185,6 +212,7 @@ private:
     std::thread recv_thread_;
     std::thread heartbeat_thread_;
     std::atomic<bool> running_{false};
+    std::unique_ptr<SwarmSecurityContext> security_;
 
     MessageCallback msg_cb_;
     PeerCallback    peer_cb_;
@@ -203,9 +231,9 @@ private:
     static constexpr size_t kMaxPayload{65507};
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LeaderFollowerController  —  Formation geometry and waypoint following
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// LeaderFollowerController  â€”  Formation geometry and waypoint following
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class LeaderFollowerController {
 public:
     explicit LeaderFollowerController(uint32_t drone_id,
@@ -219,7 +247,7 @@ public:
         const FormationCommand& cmd,
         uint32_t follower_index) const;
 
-    // P-controller step → velocity command (m/s)
+    // P-controller step â†’ velocity command (m/s)
     [[nodiscard]] Eigen::Vector3d velocity_command(
         const Eigen::Vector3d& current_pos,
         const Eigen::Vector3d& current_velocity,
@@ -260,3 +288,9 @@ private:
 };
 
 } // namespace drone::swarm
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

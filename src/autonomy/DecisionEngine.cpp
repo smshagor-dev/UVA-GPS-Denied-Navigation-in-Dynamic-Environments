@@ -1,4 +1,9 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #include "autonomy/DecisionEngine.hpp"
+#include "utils/RuntimeLogging.hpp"
 
 #include <algorithm>
 #include <array>
@@ -39,15 +44,38 @@ std::string lowercase(std::string_view value) {
     return out;
 }
 
+double caution_scale(const DecisionContext& ctx) {
+    if (!ctx.memory_prior.has_value() || !ctx.memory_prior->recommend_caution) {
+        return 1.0;
+    }
+    return std::clamp(1.0 - (ctx.memory_prior->risk_score * 0.18), 0.55, 0.90);
+}
+
 } // namespace
 
 DecisionEngine::DecisionEngine(DecisionConfig cfg)
-    : cfg_(cfg) {}
+    : cfg_(cfg) {
+    drone::utils::get_or_create_logger("AI")->info(
+        "DecisionEngine initialized min_conf={} track_conf={} low_bat={} critical_bat={}",
+        cfg_.min_detection_confidence,
+        cfg_.target_track_confidence,
+        cfg_.low_battery_pct,
+        cfg_.critical_battery_pct);
+}
 
 DecisionCommand DecisionEngine::update(const DecisionContext& ctx) {
+    auto logger = drone::utils::get_or_create_logger("AI");
+    logger->debug("DecisionEngine::update battery={} inference_ready={} follower={} detections={} peers={}",
+                  ctx.system.battery_pct,
+                  ctx.inference_ready,
+                  ctx.swarm_follower,
+                  ctx.frame.has_value() ? ctx.frame->detections.size() : 0,
+                  ctx.swarm_peer_count);
     if (!home_initialized_) {
         home_position_ = ctx.pose.position;
         home_initialized_ = true;
+        logger->info("DecisionEngine home anchor initialized [{:.2f},{:.2f},{:.2f}]",
+                     home_position_.x(), home_position_.y(), home_position_.z());
     }
 
     if (ctx.system.battery_pct > 0.0f && ctx.system.battery_pct <= cfg_.critical_battery_pct) {
@@ -58,6 +86,14 @@ DecisionCommand DecisionEngine::update(const DecisionContext& ctx) {
     if (ctx.system.battery_pct > 0.0f && ctx.system.battery_pct <= cfg_.low_battery_pct) {
         mode_ = BehaviorMode::RETURN_HOME;
         return build_return_home(ctx);
+    }
+
+    if (ctx.memory_prior.has_value() &&
+        ctx.memory_prior->recommend_caution &&
+        ctx.swarm_follower &&
+        (!ctx.frame.has_value() || ctx.frame->detections.empty())) {
+        mode_ = BehaviorMode::HOLD_POSITION;
+        return build_hold(ctx, "Fleet memory marked this sector as risky, follower holding slot");
     }
 
     if (!ctx.inference_ready || !ctx.frame.has_value()) {
@@ -99,6 +135,7 @@ DecisionCommand DecisionEngine::update(const DecisionContext& ctx) {
 }
 
 void DecisionEngine::reset() {
+    drone::utils::get_or_create_logger("AI")->info("DecisionEngine reset");
     mode_ = BehaviorMode::HOLD_POSITION;
     home_position_.setZero();
     home_initialized_ = false;
@@ -107,6 +144,8 @@ void DecisionEngine::reset() {
 
 std::optional<PerceptionFocus> DecisionEngine::select_primary_detection(
         const sensors::CameraFrame& frame) const {
+    auto logger = drone::utils::get_or_create_logger("AI");
+    logger->debug("DecisionEngine::select_primary_detection detections={}", frame.detections.size());
     std::optional<PerceptionFocus> best;
 
     for (const auto& detection : frame.detections) {
@@ -135,10 +174,17 @@ std::optional<PerceptionFocus> DecisionEngine::select_primary_detection(
         }
     }
 
+    if (best.has_value()) {
+        logger->debug("DecisionEngine focus label={} score={:.3f} area={:.3f}",
+                      best->detection.label, best->score, best->normalized_area);
+    } else {
+        logger->debug("DecisionEngine no detection passed selection gate");
+    }
     return best;
 }
 
 DecisionCommand DecisionEngine::build_emergency_land(const DecisionContext& ctx) const {
+    drone::utils::get_or_create_logger("AI")->warn("DecisionEngine emergency land battery={}", ctx.system.battery_pct);
     DecisionCommand command;
     command.mode = BehaviorMode::EMERGENCY_LAND;
     command.requires_operator_attention = true;
@@ -148,10 +194,15 @@ DecisionCommand DecisionEngine::build_emergency_land(const DecisionContext& ctx)
 }
 
 DecisionCommand DecisionEngine::build_return_home(const DecisionContext& ctx) const {
+    drone::utils::get_or_create_logger("AI")->info("DecisionEngine return-home battery={} tdoa_conf={:.2f}",
+                                                   ctx.system.battery_pct, ctx.tdoa_confidence);
     DecisionCommand command;
     command.mode = BehaviorMode::RETURN_HOME;
 
     Eigen::Vector3d to_home = home_position_ - ctx.pose.position;
+    if (ctx.tdoa_position.has_value() && ctx.tdoa_confidence >= 0.45) {
+        to_home = home_position_ - ((ctx.pose.position * 0.45) + (*ctx.tdoa_position * 0.55));
+    }
     to_home.z() = std::clamp(static_cast<double>(cfg_.nominal_altitude_m) - ctx.pose.position.z(),
                              -0.8, 0.8);
 
@@ -165,6 +216,9 @@ DecisionCommand DecisionEngine::build_return_home(const DecisionContext& ctx) co
 }
 
 DecisionCommand DecisionEngine::build_hold(const DecisionContext& ctx, std::string summary) const {
+    drone::utils::get_or_create_logger("AI")->debug("DecisionEngine hold velocity=[{:.2f},{:.2f},{:.2f}] reason={}",
+                                                    ctx.pose.velocity.x(), ctx.pose.velocity.y(), ctx.pose.velocity.z(),
+                                                    summary);
     DecisionCommand command;
     command.mode = BehaviorMode::HOLD_POSITION;
     command.desired_velocity = -ctx.pose.velocity * 0.35;
@@ -173,22 +227,31 @@ DecisionCommand DecisionEngine::build_hold(const DecisionContext& ctx, std::stri
 }
 
 DecisionCommand DecisionEngine::build_search(const DecisionContext& ctx) const {
+    drone::utils::get_or_create_logger("AI")->debug("DecisionEngine search miss_count={} caution={}",
+                                                    target_miss_count_, caution_scale(ctx));
     DecisionCommand command;
     command.mode = BehaviorMode::SEARCH;
+    const double speed_scale = caution_scale(ctx);
 
     const double altitude_error = static_cast<double>(cfg_.nominal_altitude_m) - ctx.pose.position.z();
     command.desired_velocity =
-        body_forward(ctx.pose) * cfg_.max_search_speed_mps +
+        body_forward(ctx.pose) * (cfg_.max_search_speed_mps * speed_scale) +
         body_up(ctx.pose) * std::clamp(altitude_error * 0.18, -0.5, 0.5);
 
-    command.desired_velocity = clamp_speed(command.desired_velocity, cfg_.max_search_speed_mps);
+    command.desired_velocity = clamp_speed(command.desired_velocity, cfg_.max_search_speed_mps * speed_scale);
     command.desired_yaw_rate_rads = (target_miss_count_ % 2 == 0) ? 0.18 : -0.18;
-    command.summary = "No validated target, continuing autonomous search sweep";
+    command.summary = ctx.memory_prior.has_value() && ctx.memory_prior->recommend_caution
+        ? "No validated target, searching cautiously using learned fleet risk prior"
+        : "No validated target, continuing autonomous search sweep";
     return command;
 }
 
 DecisionCommand DecisionEngine::build_track(const DecisionContext& ctx,
                                             const PerceptionFocus& focus) const {
+    drone::utils::get_or_create_logger("AI")->info("DecisionEngine track label={} conf={:.3f} area={:.3f}",
+                                                   focus.detection.label,
+                                                   focus.detection.confidence,
+                                                   focus.normalized_area);
     DecisionCommand command;
     command.mode = BehaviorMode::TRACK_TARGET;
     command.focus = focus;
@@ -196,13 +259,16 @@ DecisionCommand DecisionEngine::build_track(const DecisionContext& ctx,
 
     const float desired_area = 0.12f;
     const float area_error = desired_area - focus.normalized_area;
+    const double speed_scale = caution_scale(ctx);
 
     Eigen::Vector3d velocity =
-        body_forward(ctx.pose) * std::clamp(area_error * 8.0f, -0.3f, cfg_.max_track_speed_mps) +
+        body_forward(ctx.pose) * std::clamp(area_error * 8.0f,
+                                            -0.3f,
+                                            cfg_.max_track_speed_mps * static_cast<float>(speed_scale)) +
         body_right(ctx.pose) * std::clamp(focus.image_offset.x() * 2.2f, -1.0f, 1.0f) +
         body_up(ctx.pose) * std::clamp(-focus.image_offset.y() * 1.6f, -0.8f, 0.8f);
 
-    command.desired_velocity = clamp_speed(velocity, cfg_.max_track_speed_mps);
+    command.desired_velocity = clamp_speed(velocity, cfg_.max_track_speed_mps * speed_scale);
     command.desired_yaw_rate_rads = std::clamp(static_cast<double>(focus.image_offset.x()) * 1.8, -0.9, 0.9);
 
     std::ostringstream oss;
@@ -215,6 +281,8 @@ DecisionCommand DecisionEngine::build_track(const DecisionContext& ctx,
 
 DecisionCommand DecisionEngine::build_avoid(const DecisionContext& ctx,
                                             const PerceptionFocus& focus) const {
+    drone::utils::get_or_create_logger("AI")->warn("DecisionEngine avoid label={} score={:.3f} area={:.3f}",
+                                                   focus.detection.label, focus.score, focus.normalized_area);
     DecisionCommand command;
     command.mode = BehaviorMode::AVOID_OBSTACLE;
     command.focus = focus;
@@ -226,9 +294,10 @@ DecisionCommand DecisionEngine::build_avoid(const DecisionContext& ctx,
         -body_right(ctx.pose) * std::clamp(static_cast<double>(focus.image_offset.x()) * 3.0, -1.2, 1.2) +
         body_up(ctx.pose) * std::clamp(altitude_error * 0.15, 0.0, 0.9);
 
-    command.desired_velocity = clamp_speed(velocity, cfg_.max_avoid_speed_mps);
+    command.desired_velocity = clamp_speed(velocity, cfg_.max_avoid_speed_mps * caution_scale(ctx));
     command.desired_yaw_rate_rads = -std::clamp(static_cast<double>(focus.image_offset.x()) * 1.6, -1.0, 1.0);
-    command.requires_operator_attention = focus.normalized_area > 0.25f;
+    command.requires_operator_attention =
+        is_hazard_label(focus.detection.label) || focus.normalized_area >= 0.20f;
 
     std::ostringstream oss;
     oss << "Avoiding " << focus.detection.label
@@ -238,9 +307,9 @@ DecisionCommand DecisionEngine::build_avoid(const DecisionContext& ctx,
 }
 
 bool DecisionEngine::is_hazard_label(std::string_view label) {
-    static const std::array<std::string_view, 11> hazards = {{
+    static const std::array<std::string_view, 10> hazards = {{
         "person", "car", "truck", "bus", "motorcycle", "bicycle",
-        "bird", "drone", "dog", "animal", "tree"
+        "bird", "dog", "animal", "tree"
     }};
     const auto lowered = lowercase(label);
     return std::find(hazards.begin(), hazards.end(), lowered) != hazards.end();
@@ -255,3 +324,6 @@ bool DecisionEngine::is_target_label(std::string_view label) {
 }
 
 } // namespace drone::autonomy
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

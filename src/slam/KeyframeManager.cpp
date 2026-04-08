@@ -1,3 +1,7 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #include "slam/KeyframeManager.hpp"
 
 #include <algorithm>
@@ -464,7 +468,7 @@ bool KeyframeManager::save_map(const std::string& filepath) const {
         out.write(reinterpret_cast<const char*>(&cols), sizeof(cols));
         out.write(reinterpret_cast<const char*>(&type), sizeof(type));
         if (!mp.descriptor.empty()) {
-            out.write(reinterpret_cast<const char*>(mp.descriptor.data()),
+            out.write(reinterpret_cast<const char*>(mp.descriptor.data),
                       static_cast<std::streamsize>(mp.descriptor.total() * mp.descriptor.elemSize()));
         }
     }
@@ -556,7 +560,7 @@ bool KeyframeManager::load_map(const std::string& filepath) {
         }
         if (rows > 0 && cols > 0) {
             mp.descriptor.create(rows, cols, type);
-            in.read(reinterpret_cast<char*>(mp.descriptor.data()),
+            in.read(reinterpret_cast<char*>(mp.descriptor.data),
                     static_cast<std::streamsize>(mp.descriptor.total() * mp.descriptor.elemSize()));
         }
         if (!in) {
@@ -793,3 +797,6 @@ std::optional<Keyframe> KeyframeManager::decode_keyframe(const uint8_t* data, si
 }
 
 } // namespace drone::slam
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

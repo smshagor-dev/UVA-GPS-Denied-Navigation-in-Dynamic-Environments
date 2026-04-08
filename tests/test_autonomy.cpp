@@ -1,3 +1,7 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #include <gtest/gtest.h>
 
 #include "autonomy/DecisionEngine.hpp"
@@ -62,7 +66,7 @@ TEST(DecisionEngine, AvoidsLargeCentralHazard) {
 TEST(DecisionEngine, ReturnsHomeOnLowBattery) {
     autonomy::DecisionEngine engine;
     auto ctx = make_context();
-    engine.update(ctx); // initialize home
+    static_cast<void>(engine.update(ctx)); // initialize home
 
     ctx.pose.position = Eigen::Vector3d(5.0, 0.0, 8.0);
     ctx.system.battery_pct = 12.0f;
@@ -85,7 +89,41 @@ TEST(DecisionEngine, FollowerHoldsWhenNoActionableDetection) {
     EXPECT_LT(command.desired_velocity.x(), 0.0);
 }
 
+TEST(DecisionEngine, UsesMemoryPriorToSlowSearchBehavior) {
+    autonomy::DecisionEngine engine;
+    auto ctx = make_context();
+    ctx.frame = sensors::CameraFrame{};
+
+    autonomy::MemoryPrior prior;
+    prior.risk_score = 0.9;
+    prior.recommend_caution = true;
+    ctx.memory_prior = prior;
+
+    const auto command = engine.update(ctx);
+    EXPECT_EQ(command.mode, autonomy::BehaviorMode::SEARCH);
+    EXPECT_LT(command.desired_velocity.norm(), 1.2);
+    EXPECT_NE(command.summary.find("cautiously"), std::string::npos);
+}
+
+TEST(DecisionEngine, UsesTdoaReferenceForReturnHome) {
+    autonomy::DecisionEngine engine;
+    auto ctx = make_context();
+    static_cast<void>(engine.update(ctx));
+
+    ctx.pose.position = Eigen::Vector3d(5.0, 0.0, 8.0);
+    ctx.system.battery_pct = 12.0f;
+    ctx.tdoa_position = Eigen::Vector3d(8.0, 0.0, 8.0);
+    ctx.tdoa_confidence = 0.8;
+
+    const auto command = engine.update(ctx);
+    EXPECT_EQ(command.mode, autonomy::BehaviorMode::RETURN_HOME);
+    EXPECT_LT(command.desired_velocity.x(), 0.0);
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

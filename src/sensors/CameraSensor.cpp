@@ -1,5 +1,10 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #include "sensors/CameraSensor.hpp"
 
+#include <opencv2/calib3d.hpp>
 #include <opencv2/dnn.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
@@ -9,6 +14,10 @@
 namespace drone::sensors {
 
 bool CameraSensor::initialize() {
+    if (logger_) {
+        logger_->info("[{}] initialize stream={} resolution={}x{}",
+                      id_, stream_url_, intrinsics_.width, intrinsics_.height);
+    }
     precompute_undistort_maps();
     cap_.open(stream_url_);
     if (!cap_.isOpened()) {
@@ -23,17 +32,26 @@ bool CameraSensor::initialize() {
 }
 
 bool CameraSensor::reconfigure(const std::string&) {
+    if (logger_) {
+        logger_->info("[{}] reconfigure camera intrinsics", id_);
+    }
     precompute_undistort_maps();
     return true;
 }
 
 void CameraSensor::poll() {
     if (!cap_.isOpened()) {
+        if (logger_) {
+            logger_->warn("[{}] poll skipped because stream is not opened", id_);
+        }
         return;
     }
 
     cv::Mat raw;
     if (!cap_.read(raw) || raw.empty()) {
+        if (logger_) {
+            logger_->debug("[{}] frame read failed or empty", id_);
+        }
         return;
     }
 
@@ -43,6 +61,11 @@ void CameraSensor::poll() {
     frame.frame_id = ++frame_counter_;
     frame.image = undistort(raw);
     frame.detections = run_inference(frame.image);
+
+    if (logger_) {
+        logger_->debug("[{}] frame={} detections={}",
+                       id_, frame.frame_id, frame.detections.size());
+    }
 
     {
         std::lock_guard lock(data_mutex_);
@@ -58,11 +81,18 @@ void CameraSensor::poll() {
 bool CameraSensor::load_yolo_model(const std::string& engine_path,
                                    float conf_thresh,
                                    float nms_thresh) {
+    if (logger_) {
+        logger_->info("[{}] load_yolo_model path={} conf={} nms={}",
+                      id_, engine_path, conf_thresh, nms_thresh);
+    }
     conf_thresh_ = conf_thresh;
     nms_thresh_ = nms_thresh;
 
     if (!std::filesystem::exists(engine_path)) {
         inference_ready_ = false;
+        if (logger_) {
+            logger_->warn("[{}] YOLO model not found at {}", id_, engine_path);
+        }
         return false;
     }
 
@@ -73,14 +103,23 @@ bool CameraSensor::load_yolo_model(const std::string& engine_path,
     try {
         dnn_net_ = cv::dnn::readNet(engine_path);
         inference_ready_ = !dnn_net_.empty();
+        if (logger_) {
+            logger_->info("[{}] OpenCV DNN fallback model load {}", id_, inference_ready_ ? "succeeded" : "failed");
+        }
     } catch (...) {
         inference_ready_ = false;
+        if (logger_) {
+            logger_->error("[{}] OpenCV DNN fallback model load threw exception", id_);
+        }
     }
     return inference_ready_;
 #endif
 }
 
 void CameraSensor::precompute_undistort_maps() {
+    if (logger_) {
+        logger_->debug("[{}] precompute undistort maps", id_);
+    }
     cv::Mat K = (cv::Mat_<double>(3, 3) <<
         intrinsics_.fx, 0.0, intrinsics_.cx,
         0.0, intrinsics_.fy, intrinsics_.cy,
@@ -109,6 +148,9 @@ cv::Mat CameraSensor::undistort(const cv::Mat& raw) const {
 
 std::vector<Detection> CameraSensor::run_inference(const cv::Mat& frame) {
     if (!inference_ready_) {
+        if (logger_) {
+            logger_->debug("[{}] run_inference skipped because inference is disabled", id_);
+        }
         return {};
     }
 
@@ -120,7 +162,13 @@ std::vector<Detection> CameraSensor::run_inference(const cv::Mat& frame) {
 }
 
 std::vector<Detection> CameraSensor::run_inference_dnn_fallback(const cv::Mat&) {
+    if (logger_) {
+        logger_->debug("[{}] run_inference_dnn_fallback placeholder invoked", id_);
+    }
     return {};
 }
 
 } // namespace drone::sensors
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

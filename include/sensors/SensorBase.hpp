@@ -1,8 +1,12 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #pragma once
-// ─────────────────────────────────────────────────────────────────────────────
-// SensorBase.hpp  —  Abstract base for all drone sensors
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SensorBase.hpp  â€”  Abstract base for all drone sensors
 // Drone Swarm Sensor Fusion  |  Phase 2: Core C++ Sensor Engine
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -13,10 +17,11 @@
 #include <thread>
 
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace drone::sensors {
 
-// ─── Timestamp alias ────────────────────────────────────────────────────────
+// â”€â”€â”€ Timestamp alias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
 using Timestamp = double; // seconds since epoch
 
@@ -26,7 +31,7 @@ inline Timestamp now_sec() {
         .count();
 }
 
-// ─── Sensor health states ────────────────────────────────────────────────────
+// â”€â”€â”€ Sensor health states â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 enum class SensorState : uint8_t {
     UNINITIALIZED = 0,
     INITIALIZING,
@@ -48,22 +53,22 @@ inline std::string_view to_string(SensorState s) {
     return "UNKNOWN";
 }
 
-// ─── Generic sensor measurement ─────────────────────────────────────────────
+// â”€â”€â”€ Generic sensor measurement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct SensorMeasurement {
     Timestamp   timestamp{0.0};
     SensorState quality{SensorState::RUNNING};
-    float       confidence{1.0f};  // 0.0 – 1.0
+    float       confidence{1.0f};  // 0.0 â€“ 1.0
     std::string source_id;
 };
 
-// ─── Callback types ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Callback types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 template <typename T>
 using DataCallback = std::function<void(const T&)>;
 using ErrorCallback = std::function<void(const std::string&)>;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SensorBase  —  CRTP-free abstract interface
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// SensorBase  â€”  CRTP-free abstract interface
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class SensorBase {
 public:
     explicit SensorBase(std::string sensor_id, std::string sensor_type)
@@ -84,23 +89,23 @@ public:
     SensorBase(SensorBase&&)                 = default;
     SensorBase& operator=(SensorBase&&)      = default;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────
+    // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     virtual bool initialize()                = 0;
     virtual bool start();
     virtual void stop();
     virtual bool reconfigure(const std::string& config_json) = 0;
 
-    // ── Data access (non-blocking, returns std::optional) ─────────────────
+    // â”€â”€ Data access (non-blocking, returns std::optional) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     virtual void poll() = 0;  // called periodically by sensor thread
 
-    // ── Status ────────────────────────────────────────────────────────────
+    // â”€â”€ Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     [[nodiscard]] SensorState   state()        const noexcept { return state_.load(); }
     [[nodiscard]] std::string_view sensor_id() const noexcept { return id_; }
     [[nodiscard]] std::string_view sensor_type() const noexcept { return type_; }
     [[nodiscard]] float         dropout_rate() const noexcept { return dropout_rate_; }
     [[nodiscard]] uint64_t      sample_count() const noexcept { return sample_count_; }
 
-    // ── Error callback ────────────────────────────────────────────────────
+    // â”€â”€ Error callback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void set_error_callback(ErrorCallback cb) {
         std::lock_guard lock(cb_mutex_);
         error_cb_ = std::move(cb);
@@ -109,7 +114,7 @@ public:
 protected:
     void set_state(SensorState s) {
         state_.store(s);
-        logger_->info("[{}] state → {}", id_, to_string(s));
+        logger_->info("[{}] state â†’ {}", id_, to_string(s));
     }
 
     void report_error(const std::string& msg) {
@@ -140,7 +145,7 @@ protected:
     uint32_t  poll_rate_hz_{100};
 };
 
-// ─── Inline implementations ──────────────────────────────────────────────────
+// â”€â”€â”€ Inline implementations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 inline bool SensorBase::start() {
     if (running_.exchange(true)) return true; // already running
     set_state(SensorState::RUNNING);
@@ -170,3 +175,9 @@ inline void SensorBase::stop() {
 }
 
 } // namespace drone::sensors
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

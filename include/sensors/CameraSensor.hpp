@@ -1,10 +1,16 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #pragma once
-// ─────────────────────────────────────────────────────────────────────────────
-// CameraSensor.hpp  —  ESP32-CAM via RTSP/UDP + YOLOv8n TRT inference
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// CameraSensor.hpp  â€”  ESP32-CAM via RTSP/UDP + YOLOv8n TRT inference
 // Drone Swarm Sensor Fusion  |  Phase 2
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include "sensors/SensorBase.hpp"
 #include <opencv2/core.hpp>
+#include <opencv2/dnn.hpp>
+#include <opencv2/videoio.hpp>
 #include <optional>
 #include <vector>
 
@@ -15,7 +21,7 @@
 
 namespace drone::sensors {
 
-// ─── Detection result ────────────────────────────────────────────────────────
+// â”€â”€â”€ Detection result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct Detection {
     int   class_id{-1};
     float confidence{0.0f};
@@ -23,7 +29,7 @@ struct Detection {
     std::string label;
 };
 
-// ─── Camera frame ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Camera frame â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct CameraFrame : SensorMeasurement {
     cv::Mat              image;         // BGR, undistorted
     cv::Mat              depth_map;     // optional monocular depth estimate
@@ -32,7 +38,7 @@ struct CameraFrame : SensorMeasurement {
     double               exposure_ms{0.0};
 };
 
-// ─── Camera intrinsics ───────────────────────────────────────────────────────
+// â”€â”€â”€ Camera intrinsics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct CameraIntrinsics {
     double fx{800}, fy{800};  // focal lengths (px)
     double cx{320}, cy{240};  // principal point
@@ -40,7 +46,7 @@ struct CameraIntrinsics {
     int    width{640}, height{480};
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class CameraSensor : public SensorBase {
 public:
     explicit CameraSensor(std::string id, std::string stream_url,
@@ -63,14 +69,14 @@ public:
         data_cb_ = std::move(cb);
     }
 
-    // ── TensorRT YOLOv8n ──────────────────────────────────────────────────
+    // â”€â”€ TensorRT YOLOv8n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     bool load_yolo_model(const std::string& engine_path,
                          float conf_thresh = 0.45f,
                          float nms_thresh  = 0.5f);
 
     [[nodiscard]] bool inference_enabled() const { return inference_ready_; }
 
-    // ── Undistortion ──────────────────────────────────────────────────────
+    // â”€â”€ Undistortion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void precompute_undistort_maps();
 
 private:
@@ -113,3 +119,9 @@ private:
 };
 
 } // namespace drone::sensors
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

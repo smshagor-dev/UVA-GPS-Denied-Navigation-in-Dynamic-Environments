@@ -1,6 +1,10 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// test_sensors.cpp  —  GoogleTest suite for sensor subsystem
-// ─────────────────────────────────────────────────────────────────────────────
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// test_sensors.cpp  â€”  GoogleTest suite for sensor subsystem
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include <gtest/gtest.h>
 #include "sensors/SensorBase.hpp"
 #include "sensors/IMUSensor.hpp"
@@ -8,7 +12,7 @@
 
 using namespace drone::sensors;
 
-// ─── Minimal concrete sensor for testing the base class ──────────────────────
+// â”€â”€â”€ Minimal concrete sensor for testing the base class â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class MockSensor : public SensorBase {
 public:
     explicit MockSensor(std::string id)
@@ -27,7 +31,7 @@ public:
     int poll_calls_{0};
 };
 
-// ─── SensorBase lifecycle ─────────────────────────────────────────────────────
+// â”€â”€â”€ SensorBase lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEST(SensorBase, InitialStateIsUninitialized) {
     MockSensor s("test_sensor");
     EXPECT_EQ(s.state(), SensorState::UNINITIALIZED);
@@ -85,7 +89,7 @@ TEST(SensorBase, ErrorCallbackFires) {
     EXPECT_TRUE(cb_fired);
 }
 
-// ─── IMUSensor construction ───────────────────────────────────────────────────
+// â”€â”€â”€ IMUSensor construction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEST(IMUSensor, ConstructWithDefaults) {
     auto imu = std::make_shared<IMUSensor>("imu0");
     EXPECT_EQ(imu->sensor_id(), "imu0");
@@ -104,14 +108,14 @@ TEST(IMUSensor, DrainBufferReturnsEmptyBeforeInit) {
     EXPECT_TRUE(buf.empty());
 }
 
-// ─── LidarSensor construction ─────────────────────────────────────────────────
+// â”€â”€â”€ LidarSensor construction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEST(LidarSensor, ConstructAndState) {
     LidarSensor lidar("lidar0", "127.0.0.1:2368");
     EXPECT_EQ(lidar.sensor_type(), "LiDAR");
     EXPECT_FALSE(lidar.latest().has_value());
 }
 
-// ─── SensorState string conversion ───────────────────────────────────────────
+// â”€â”€â”€ SensorState string conversion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 TEST(SensorState, ToStringAllValues) {
     EXPECT_EQ(to_string(SensorState::UNINITIALIZED), "UNINITIALIZED");
     EXPECT_EQ(to_string(SensorState::RUNNING),       "RUNNING");
@@ -120,8 +124,11 @@ TEST(SensorState, ToStringAllValues) {
     EXPECT_EQ(to_string(SensorState::DISCONNECTED),  "DISCONNECTED");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake

@@ -1,7 +1,11 @@
-#!/usr/bin/env python3
-# ─────────────────────────────────────────────────────────────────────────────
-# drone_setup.py  —  Automated Build / Flash / Environment Setup Script
-# Drone Swarm Sensor Fusion  |  Phase 1 — Build System
+﻿#!/usr/bin/env python3
+# System Designer and Developer: Md Shahanur Islam Shagor
+# Project: UVA GPS Denied Navigation in Dynamic Environments
+# Technology: C++, Python, Go, CMake
+
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# drone_setup.py  â€”  Automated Build / Flash / Environment Setup Script
+# Drone Swarm Sensor Fusion  |  Phase 1 â€” Build System
 #
 # Usage:
 #   python3 scripts/drone_setup.py --help
@@ -12,7 +16,7 @@
 #   python3 scripts/drone_setup.py run --id=1     # launch drone_node
 #   python3 scripts/drone_setup.py gui            # launch PySide6 dashboard
 #   python3 scripts/drone_setup.py all            # full pipeline
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 from __future__ import annotations
 
 import argparse
@@ -25,7 +29,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-# ─── ANSI colors ─────────────────────────────────────────────────────────────
+# â”€â”€â”€ ANSI colors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class C:
     RED    = "\033[91m"
     GREEN  = "\033[92m"
@@ -34,23 +38,23 @@ class C:
     BOLD   = "\033[1m"
     RESET  = "\033[0m"
 
-def ok(msg: str)   -> None: print(f"{C.GREEN}  ✔  {C.RESET}{msg}")
-def err(msg: str)  -> None: print(f"{C.RED}  ✘  {C.RESET}{msg}")
-def info(msg: str) -> None: print(f"{C.CYAN}  ▶  {C.RESET}{msg}")
-def warn(msg: str) -> None: print(f"{C.YELLOW}  ⚠  {C.RESET}{msg}")
+def ok(msg: str)   -> None: print(f"{C.GREEN}  âœ”  {C.RESET}{msg}")
+def err(msg: str)  -> None: print(f"{C.RED}  âœ˜  {C.RESET}{msg}")
+def info(msg: str) -> None: print(f"{C.CYAN}  â–¶  {C.RESET}{msg}")
+def warn(msg: str) -> None: print(f"{C.YELLOW}  âš   {C.RESET}{msg}")
 def hdr(msg: str)  -> None:
     w = 60
-    print(f"\n{C.BOLD}{C.CYAN}{'─'*w}")
+    print(f"\n{C.BOLD}{C.CYAN}{'â”€'*w}")
     print(f"  {msg}")
-    print(f"{'─'*w}{C.RESET}")
+    print(f"{'â”€'*w}{C.RESET}")
 
-# ─── Paths ───────────────────────────────────────────────────────────────────
+# â”€â”€â”€ Paths â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 ROOT       = Path(__file__).resolve().parent.parent
 BUILD_DIR  = ROOT / "build"
 FIRMWARE   = ROOT / "firmware" / "esp32_cam"
 GUI_SCRIPT = ROOT / "gui" / "dashboard.py"
 
-# ─── Detect platform ─────────────────────────────────────────────────────────
+# â”€â”€â”€ Detect platform â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def detect_platform() -> str:
     machine = platform.machine().lower()
     if "aarch64" in machine:
@@ -62,7 +66,7 @@ def detect_platform() -> str:
 
 PLAT = detect_platform()
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def run(cmd: str | list, cwd: Optional[Path] = None,
         check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
     """Run a shell command with live output or captured output."""
@@ -89,16 +93,17 @@ def run(cmd: str | list, cwd: Optional[Path] = None,
             sys.exit(1)
         return e
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # STEP 1: Environment Setup
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def cmd_setup(args: argparse.Namespace) -> None:
-    hdr("STEP 1 — Environment & Dependency Setup")
+    hdr("STEP 1 â€” Environment & Dependency Setup")
 
     # Python packages
     python_pkgs = [
         "pyside6>=6.6",
         "pyqtgraph>=0.13",
+        "PyOpenGL>=3.1",
         "numpy>=1.24",
         "opencv-python>=4.8",
         "pyserial>=3.5",
@@ -107,7 +112,7 @@ def cmd_setup(args: argparse.Namespace) -> None:
         "rich",
     ]
 
-    info("Installing Python dependencies…")
+    info("Installing Python dependenciesâ€¦")
     run([sys.executable, "-m", "pip", "install", "--upgrade"] + python_pkgs)
     ok("Python packages installed")
 
@@ -136,20 +141,20 @@ def _setup_linux(args: argparse.Namespace) -> None:
         APT_PKGS += ["nvidia-jetpack", "tensorrt"]
         warn("TensorRT: ensure JetPack SDK is installed via NVIDIA SDK Manager")
 
-    info("Installing system packages (requires sudo)…")
+    info("Installing system packages (requires sudo)â€¦")
     run(["sudo", "apt-get", "update", "-qq"])
     run(["sudo", "apt-get", "install", "-y"] + APT_PKGS)
     ok("System packages installed")
 
     # Fast-DDS
-    info("Building Fast-DDS from source (this may take a few minutes)…")
+    info("Building Fast-DDS from source (this may take a few minutes)â€¦")
     _install_fastdds()
 
 
 def _install_fastdds() -> None:
     fastdds_dir = ROOT / ".deps" / "Fast-DDS"
     if fastdds_dir.exists():
-        ok("Fast-DDS source already present — skipping clone")
+        ok("Fast-DDS source already present â€” skipping clone")
     else:
         fastdds_dir.parent.mkdir(parents=True, exist_ok=True)
         run(["git", "clone", "--depth=1", "--branch", "v2.13.0",
@@ -186,16 +191,16 @@ def _check_dependencies() -> None:
             all_ok = False
 
     if not all_ok:
-        warn("Some dependencies missing — build may fail")
+        warn("Some dependencies missing â€” build may fail")
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # STEP 2: Build
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def cmd_build(args: argparse.Namespace) -> None:
-    hdr("STEP 2 — CMake Build")
+    hdr("STEP 2 â€” CMake Build")
 
     if args.clean and BUILD_DIR.exists():
-        info("Cleaning build directory…")
+        info("Cleaning build directoryâ€¦")
         shutil.rmtree(BUILD_DIR)
         ok("Build directory cleaned")
 
@@ -214,11 +219,11 @@ def cmd_build(args: argparse.Namespace) -> None:
             "-DCMAKE_TOOLCHAIN_FILE=cmake/jetson_toolchain.cmake",
         ]
 
-    info(f"Configuring CMake ({build_type})…")
+    info(f"Configuring CMake ({build_type})â€¦")
     run(cmake_args, cwd=BUILD_DIR)
 
     jobs = args.jobs or os.cpu_count() or 4
-    info(f"Building with {jobs} parallel jobs…")
+    info(f"Building with {jobs} parallel jobsâ€¦")
     t0 = time.time()
     run(["ninja", f"-j{jobs}"], cwd=BUILD_DIR)
     elapsed = time.time() - t0
@@ -231,11 +236,11 @@ def cmd_build(args: argparse.Namespace) -> None:
         err("drone_node binary not found after build!")
         sys.exit(1)
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # STEP 3: Flash ESP32-CAM
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def cmd_flash(args: argparse.Namespace) -> None:
-    hdr("STEP 3 — ESP32-CAM Flash")
+    hdr("STEP 3 â€” ESP32-CAM Flash")
 
     port = args.port or _detect_serial_port()
     if not port:
@@ -248,7 +253,7 @@ def cmd_flash(args: argparse.Namespace) -> None:
     if shutil.which("arduino-cli"):
         _flash_arduino_cli(port)
     else:
-        warn("arduino-cli not found — attempting esptool.py with pre-built binary")
+        warn("arduino-cli not found â€” attempting esptool.py with pre-built binary")
         _flash_esptool(port)
 
 
@@ -261,7 +266,7 @@ def _detect_serial_port() -> Optional[str]:
 
 
 def _flash_arduino_cli(port: str) -> None:
-    info("Installing ESP32 board package…")
+    info("Installing ESP32 board packageâ€¦")
     run(["arduino-cli", "core", "install", "esp32:esp32@2.0.14"])
 
     libs = [
@@ -271,12 +276,12 @@ def _flash_arduino_cli(port: str) -> None:
     for lib in libs:
         run(["arduino-cli", "lib", "install", lib])
 
-    info("Compiling firmware…")
+    info("Compiling firmwareâ€¦")
     run(["arduino-cli", "compile",
          "--fqbn", "esp32:esp32:ai_thinker",
          str(FIRMWARE)])
 
-    info(f"Uploading to {port}…")
+    info(f"Uploading to {port}â€¦")
     run(["arduino-cli", "upload",
          "--fqbn", "esp32:esp32:ai_thinker",
          "--port", port,
@@ -304,11 +309,11 @@ def _flash_esptool(port: str) -> None:
          "0x1000", str(firmware_bin)])
     ok("Firmware flashed via esptool.py")
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # STEP 4: Run drone_node
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def cmd_run(args: argparse.Namespace) -> None:
-    hdr("STEP 4 — Launch Drone Node")
+    hdr("STEP 4 â€” Launch Drone Node")
 
     binary = BUILD_DIR / "drone_node"
     if not binary.exists():
@@ -326,11 +331,11 @@ def cmd_run(args: argparse.Namespace) -> None:
     info(f"Launching: {' '.join(cmd)}")
     os.execv(str(binary), cmd)  # replace process (handles Ctrl-C cleanly)
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # STEP 5: Launch GUI
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def cmd_gui(args: argparse.Namespace) -> None:
-    hdr("STEP 5 — PySide6 Dashboard")
+    hdr("STEP 5 â€” PySide6 Dashboard")
 
     if not GUI_SCRIPT.exists():
         err(f"GUI script not found: {GUI_SCRIPT}")
@@ -338,12 +343,12 @@ def cmd_gui(args: argparse.Namespace) -> None:
 
     os.execv(sys.executable, [sys.executable, str(GUI_SCRIPT)])
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # CLI
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Drone Swarm Sensor Fusion — Automation Script",
+        description="Drone Swarm Sensor Fusion â€” Automation Script",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -382,7 +387,7 @@ Examples:
     sub.add_parser("gui", help="Launch PySide6 dashboard")
 
     # all
-    ap = sub.add_parser("all", help="setup → build → flash → run")
+    ap = sub.add_parser("all", help="setup â†’ build â†’ flash â†’ run")
     ap.add_argument("--port",  default=None)
     ap.add_argument("--id",    default="1")
     ap.add_argument("--esp32", default="192.168.4.1")
@@ -390,10 +395,10 @@ Examples:
 
     args = parser.parse_args()
 
-    print(f"\n{C.BOLD}{'═'*60}")
-    print(f"   GPS-Denied Drone Swarm — Automation Script")
+    print(f"\n{C.BOLD}{'â•'*60}")
+    print(f"   GPS-Denied Drone Swarm â€” Automation Script")
     print(f"   Platform: {PLAT.upper()}  |  Python {sys.version.split()[0]}")
-    print(f"{'═'*60}{C.RESET}\n")
+    print(f"{'â•'*60}{C.RESET}\n")
 
     dispatch = {
         "setup" : cmd_setup,
@@ -409,7 +414,7 @@ Examples:
         cmd_setup(args)
         cmd_build(args)
         cmd_flash(args)
-        # don't auto-run — user should review first
+        # don't auto-run â€” user should review first
         ok("Pipeline complete. Run manually: python3 scripts/drone_setup.py run")
     elif args.command in dispatch:
         dispatch[args.command](args)
@@ -419,3 +424,9 @@ Examples:
 
 if __name__ == "__main__":
     main()
+# System Designer and Developer: Md Shahanur Islam Shagor
+# Project: UVA GPS Denied Navigation in Dynamic Environments
+# Technology: C++, Python, Go, CMake
+# System Designer and Developer: Md Shahanur Islam Shagor
+# Project: UVA GPS Denied Navigation in Dynamic Environments
+# Technology: C++, Python, Go, CMake

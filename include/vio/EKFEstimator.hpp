@@ -1,28 +1,34 @@
+﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+
 #pragma once
-// ─────────────────────────────────────────────────────────────────────────────
-// EKFEstimator.hpp  —  Extended Kalman Filter for Visual-Inertial Odometry
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// EKFEstimator.hpp  â€”  Extended Kalman Filter for Visual-Inertial Odometry
 // State: [pos(3), vel(3), quat(4), ba(3), bg(3)] = 16-dim
-// Drone Swarm Sensor Fusion  |  Phase 2 — VIO Pipeline
-// ─────────────────────────────────────────────────────────────────────────────
+// Drone Swarm Sensor Fusion  |  Phase 2 â€” VIO Pipeline
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <chrono>
 #include <mutex>
+#include <numbers>
 #include <optional>
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 namespace drone::vio {
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // State vector layout  (16-dim)
 //   [0:2]  position      p  (m, world frame)
 //   [3:5]  velocity      v  (m/s, world frame)
-//   [6:9]  quaternion    q  (w,x,y,z  — world←body)
-//   [10:12] accel bias   ba (m/s²)
+//   [6:9]  quaternion    q  (w,x,y,z  â€” worldâ†body)
+//   [10:12] accel bias   ba (m/sÂ²)
 //   [13:15] gyro bias    bg (rad/s)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 constexpr int kStateDim    = 16;
-constexpr int kErrorDim    = 15;  // error-state (quaternion → 3-param)
+constexpr int kErrorDim    = 15;  // error-state (quaternion â†’ 3-param)
 constexpr int kImuNoiseDim = 12;  // na, ng, nba, nbg (3 each)
 
 using StateVec     = Eigen::Matrix<double, kStateDim,    1>;
@@ -32,10 +38,10 @@ using FMat         = Eigen::Matrix<double, kErrorDim, kErrorDim>;
 using GMat         = Eigen::Matrix<double, kErrorDim, kImuNoiseDim>;
 using QNoiseMat    = Eigen::Matrix<double, kImuNoiseDim, kImuNoiseDim>;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct EKFConfig {
     // IMU noise parameters
-    double sigma_na{0.02};     // accel noise  (m/s²)
+    double sigma_na{0.02};     // accel noise  (m/sÂ²)
     double sigma_ng{0.005};    // gyro  noise  (rad/s)
     double sigma_nba{1.0e-4};  // accel bias walk
     double sigma_nbg{1.0e-5};  // gyro  bias walk
@@ -51,13 +57,13 @@ struct EKFConfig {
     double init_ba_std{0.01};
     double init_bg_std{0.001};
 
-    // Outlier rejection gate (chi² threshold, 3 dof)
+    // Outlier rejection gate (chiÂ² threshold, 3 dof)
     double mahal_gate{7.815};
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Pose output
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 struct PoseEstimate {
     double           timestamp{0.0};
     Eigen::Vector3d  position{Eigen::Vector3d::Zero()};
@@ -72,29 +78,30 @@ struct PoseEstimate {
     // Derived
     [[nodiscard]] Eigen::Matrix3d R_wb() const { return orientation.toRotationMatrix(); }
     [[nodiscard]] Eigen::Vector3d euler_zyx_deg() const {
-        return orientation.toRotationMatrix().eulerAngles(2,1,0) * (180.0/M_PI);
+        return orientation.toRotationMatrix().eulerAngles(2,1,0) *
+               (180.0 / std::numbers::pi_v<double>);
     }
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class EKFEstimator {
 public:
     explicit EKFEstimator(EKFConfig cfg = {});
 
-    // ── Initialize with known pose ─────────────────────────────────────────
+    // â”€â”€ Initialize with known pose â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void reset(const Eigen::Vector3d& p0       = Eigen::Vector3d::Zero(),
                const Eigen::Quaterniond& q0    = Eigen::Quaterniond::Identity(),
                const Eigen::Vector3d& v0       = Eigen::Vector3d::Zero());
 
-    // ── IMU propagation ───────────────────────────────────────────────────
+    // â”€â”€ IMU propagation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     //   Call at IMU rate (~400 Hz).  dt in seconds.
     void propagate_imu(const Eigen::Vector3d& accel_mps2,
                        const Eigen::Vector3d& gyro_rads,
                        double dt);
 
-    // ── Camera update (feature-based) ────────────────────────────────────
+    // â”€â”€ Camera update (feature-based) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     //   z_pixels: Nx2 observed pixel coordinates
     //   p_world:  Nx3 corresponding 3-D map points
     //   K:        3x3 camera intrinsic matrix
@@ -102,13 +109,13 @@ public:
                        const std::vector<Eigen::Vector3d>& p_world,
                        const Eigen::Matrix3d& K);
 
-    // ── Depth update (from LiDAR plane fit) ───────────────────────────────
+    // â”€â”€ Depth update (from LiDAR plane fit) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void update_depth(double z_depth_m, double sigma_m = 0.05);
 
-    // ── Zero velocity update (on ground detection) ────────────────────────
+    // â”€â”€ Zero velocity update (on ground detection) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     void update_zupt();
 
-    // ── Query ─────────────────────────────────────────────────────────────
+    // â”€â”€ Query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     [[nodiscard]] PoseEstimate state() const;
     [[nodiscard]] double       total_drift_m() const { return total_drift_; }
     [[nodiscard]] bool         is_initialized() const { return initialized_; }
@@ -116,7 +123,7 @@ public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
-    // ── Core EKF math ──────────────────────────────────────────────────────
+    // â”€â”€ Core EKF math â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     FMat compute_F(const Eigen::Vector3d& accel_body,
                    const Eigen::Matrix3d& R_wb,
                    double dt) const;
@@ -155,3 +162,9 @@ private:
 };
 
 } // namespace drone::vio
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
+// System Designer and Developer: Md Shahanur Islam Shagor
+// Project: UVA GPS Denied Navigation in Dynamic Environments
+// Technology: C++, Python, Go, CMake
