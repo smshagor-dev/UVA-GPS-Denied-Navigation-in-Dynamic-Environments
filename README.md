@@ -135,43 +135,43 @@ Use Go where very large fleet orchestration and network concurrency matter:
 
 ```text
 drone_swarm/
-â”œâ”€â”€ CMakeLists.txt
-â”œâ”€â”€ go.mod
-â”œâ”€â”€ main.py
-â”œâ”€â”€ README.md
-â”œâ”€â”€ cmd/
-â”‚   â””â”€â”€ control-plane/
-â”‚       â””â”€â”€ main.go
-â”œâ”€â”€ docs/
-â”‚   â””â”€â”€ GO_SWARM_ARCHITECTURE.md
-â”œâ”€â”€ gui/
-â”‚   â””â”€â”€ dashboard.py
-â”œâ”€â”€ include/
-â”‚   â”œâ”€â”€ autonomy/
-â”‚   â”œâ”€â”€ hal/
-â”‚   â”œâ”€â”€ localization/
-â”‚   â”œâ”€â”€ sensors/
-â”‚   â”œâ”€â”€ slam/
-â”‚   â”œâ”€â”€ swarm/
-â”‚   â””â”€â”€ vio/
-â”œâ”€â”€ internal/
-â”‚   â””â”€â”€ controlplane/
-â”‚       â”œâ”€â”€ server.go
-â”‚       â”œâ”€â”€ state.go
-â”‚       â””â”€â”€ types.go
-â”œâ”€â”€ scripts/
-â”‚   â””â”€â”€ drone_setup.py
-â”œâ”€â”€ src/
-â”‚   â”œâ”€â”€ autonomy/
-â”‚   â”œâ”€â”€ hal/
-â”‚   â”œâ”€â”€ localization/
-â”‚   â”œâ”€â”€ sensors/
-â”‚   â”œâ”€â”€ slam/
-â”‚   â”œâ”€â”€ swarm/
-â”‚   â”œâ”€â”€ vio/
-â”‚   â”œâ”€â”€ drone_bridge.cpp
-â”‚   â””â”€â”€ main.cpp
-â””â”€â”€ tests/
+  CMakeLists.txt
+  go.mod
+  main.py
+  README.md
+cmd/
+  control-plane/
+    main.go
+docs/
+  GO_SWARM_ARCHITECTURE.md
+gui/
+  dashboard.py
+include/
+  autonomy/
+  hal/
+  localization/
+  sensors/
+  slam/
+  swarm/
+  vio/
+ internal/
+controlplane/
+  server.go
+  state.go
+  types.go
+scripts/
+  drone_setup.py
+src/
+  autonomy/
+  hal/
+  localization/
+  sensors/
+  slam/
+  swarm/
+  vio/
+drone_bridge.cpp
+main.cpp
+tests/
 ```
 
 ## 6. Main Runtime Components

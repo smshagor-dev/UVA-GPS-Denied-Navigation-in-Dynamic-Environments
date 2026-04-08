@@ -187,6 +187,9 @@ CMAKE_STATIC_LINKER_FLAGS_RELEASE:STRING=
 // during RELWITHDEBINFO builds.
 CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO:STRING=
 
+//No help, variable specified on the command line.
+CMAKE_TOOLCHAIN_FILE:UNINITIALIZED=C:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake
+
 //If this value is on, makefiles will be generated without the
 // .SILENT directive, and all commands will be echoed to the console
 // during the make.  This is useful for debugging only. With Visual
@@ -204,6 +207,9 @@ DroneSwarmSensorFusion_SOURCE_DIR:STATIC=C:/Users/Shagor/OneDrive/Desktop/Final 
 
 //The directory containing a CMake configuration file for Eigen3.
 Eigen3_DIR:PATH=Eigen3_DIR-NOTFOUND
+
+//No help, variable specified on the command line.
+VCPKG_TARGET_TRIPLET:UNINITIALIZED=x64-windows
 
 
 ########################
