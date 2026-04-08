@@ -3,9 +3,10 @@
 // Technology: C++, Python, Go, CMake
 
  
-// test_v2x.cpp  â€”  GoogleTest suite for V2X Mesh / Leader-Follower
+// test_v2x.cpp    GoogleTest suite for V2X Mesh / Leader-Follower
  
 #include <gtest/gtest.h>
+#include "sensors/LidarSensor.hpp"
 #include "swarm/V2XMeshNetwork.hpp"
 #include <cmath>
 #include <thread>
@@ -15,7 +16,7 @@
 
 using namespace drone::swarm;
 
-// â”€â”€ SwarmMessage serialization round-trip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  SwarmMessage serialization round-trip 
 TEST(SwarmMessage, SerializeDeserializeRoundTrip) {
     SwarmMessage msg;
     msg.src_id      = 42;
@@ -57,7 +58,7 @@ TEST(SwarmMessage, EmptyPayloadSerializes) {
     EXPECT_TRUE(back->payload.empty());
 }
 
-// â”€â”€ PeerInfo staleness â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  PeerInfo staleness 
 TEST(PeerInfo, StaleCheckWithOldTimestamp) {
     PeerInfo peer;
     peer.last_seen_ts = 0.0;  // epoch (very old)
@@ -72,7 +73,7 @@ TEST(PeerInfo, FreshPeerNotStale) {
     EXPECT_FALSE(peer.is_stale(2.0));
 }
 
-// â”€â”€ LeaderFollowerController formation geometry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  LeaderFollowerController formation geometry â”€
 TEST(LeaderFollower, DiamondFormationOffsets) {
     // Without a live network, we test the geometry math directly
     // by instantiating with a null network (geometry is pure math)
@@ -80,7 +81,7 @@ TEST(LeaderFollower, DiamondFormationOffsets) {
     cmd.shape      = FormationCommand::Formation::DIAMOND;
     cmd.spacing_m  = 3.0f;
 
-    // Diamond: follower 0 â†’ right, 1 â†’ left, 2 â†’ back-right, 3 â†’ back-left
+    // Diamond: follower 0  right, 1  left, 2  back-right, 3  back-left
     // Leader at origin
     const Eigen::Vector3d leader{0, 0, 5};
 
@@ -133,8 +134,8 @@ TEST(LeaderFollower, VelocityCommandUsesAvoidanceWhenPeerBlocksPath) {
 TEST(LeaderFollower, LidarObstaclesAreConvertedAndRepelled) {
     LeaderFollowerController controller(5, nullptr);
 
-    sensors::LidarMeasurement scan;
-    scan.cloud = sensors::PointCloudPtr(new sensors::PointCloud());
+    drone::sensors::LidarMeasurement scan;
+    scan.cloud = drone::sensors::PointCloudPtr(new drone::sensors::PointCloud());
     scan.cloud->push_back(pcl::PointXYZI{1.0f, 0.0f, 0.0f, 1.0f});
     scan.cloud->push_back(pcl::PointXYZI{1.2f, 0.1f, 0.0f, 1.0f});
 
@@ -192,7 +193,7 @@ TEST(LeaderFollower, DeadlockGetsTangentialEscape) {
     EXPECT_GT(std::abs(command.y()), 0.1);
 }
 
-// â”€â”€ DroneRole string conversion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  DroneRole string conversion 
 TEST(DroneRole, ToStringAllRoles) {
     EXPECT_EQ(to_string(DroneRole::CANDIDATE), "CANDIDATE");
     EXPECT_EQ(to_string(DroneRole::FOLLOWER),  "FOLLOWER");
@@ -200,7 +201,7 @@ TEST(DroneRole, ToStringAllRoles) {
     EXPECT_EQ(to_string(DroneRole::RELAY),     "RELAY");
 }
 
-// â”€â”€ V2XMeshNetwork construction (no network binding in unit test) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  V2XMeshNetwork construction (no network binding in unit test) â”€
 TEST(V2XMeshNetwork, ConstructionDoesNotCrash) {
     V2XMeshNetwork net(99, "239.255.0.1", 7400);
     EXPECT_EQ(net.peer_count(), 0u);

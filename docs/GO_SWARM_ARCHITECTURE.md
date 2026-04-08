@@ -320,28 +320,28 @@ Recommended structure:
 
 ```text
 drone_swarm/
-â”œâ”€â”€ cmd/
-â”‚   â”œâ”€â”€ telemetry-gateway/
-â”‚   â”œâ”€â”€ command-dispatcher/
-â”‚   â”œâ”€â”€ swarm-coordinator/
-â”‚   â”œâ”€â”€ dashboard-api/
-â”‚   â””â”€â”€ mission-service/
-â”œâ”€â”€ internal/
-â”‚   â”œâ”€â”€ bus/
-â”‚   â”œâ”€â”€ fleetstate/
-â”‚   â”œâ”€â”€ telemetry/
-â”‚   â”œâ”€â”€ commands/
-â”‚   â”œâ”€â”€ missions/
-â”‚   â”œâ”€â”€ auth/
-â”‚   â””â”€â”€ alerts/
-â”œâ”€â”€ proto/
-â”‚   â”œâ”€â”€ telemetry.proto
-â”‚   â”œâ”€â”€ commands.proto
-â”‚   â”œâ”€â”€ fleet.proto
-â”‚   â””â”€â”€ mission.proto
-â””â”€â”€ deployments/
-    â”œâ”€â”€ docker-compose/
-    â””â”€â”€ k8s/
+â”œ cmd/
+â”‚   â”œ telemetry-gateway/
+â”‚   â”œ command-dispatcher/
+â”‚   â”œ swarm-coordinator/
+â”‚   â”œ dashboard-api/
+â”‚   â”” mission-service/
+â”œ internal/
+â”‚   â”œ bus/
+â”‚   â”œ fleetstate/
+â”‚   â”œ telemetry/
+â”‚   â”œ commands/
+â”‚   â”œ missions/
+â”‚   â”œ auth/
+â”‚   â”” alerts/
+â”œ proto/
+â”‚   â”œ telemetry.proto
+â”‚   â”œ commands.proto
+â”‚   â”œ fleet.proto
+â”‚   â”” mission.proto
+â”” deployments/
+    â”œ docker-compose/
+    â”” k8s/
 ```
 
 Keep current code as:

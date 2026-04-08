@@ -3,7 +3,7 @@
 // Technology: C++, Python, Go, CMake
 
  
-// test_sensors.cpp  â€”  GoogleTest suite for sensor subsystem
+// test_sensors.cpp    GoogleTest suite for sensor subsystem
  
 #include <gtest/gtest.h>
 #include "sensors/SensorBase.hpp"
@@ -12,7 +12,7 @@
 
 using namespace drone::sensors;
 
-// â”€â”€â”€ Minimal concrete sensor for testing the base class â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Minimal concrete sensor for testing the base class â”€
 class MockSensor : public SensorBase {
 public:
     explicit MockSensor(std::string id)
@@ -31,7 +31,7 @@ public:
     int poll_calls_{0};
 };
 
-// â”€â”€â”€ SensorBase lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  SensorBase lifecycle 
 TEST(SensorBase, InitialStateIsUninitialized) {
     MockSensor s("test_sensor");
     EXPECT_EQ(s.state(), SensorState::UNINITIALIZED);
@@ -89,7 +89,7 @@ TEST(SensorBase, ErrorCallbackFires) {
     EXPECT_TRUE(cb_fired);
 }
 
-// â”€â”€â”€ IMUSensor construction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  IMUSensor construction 
 TEST(IMUSensor, ConstructWithDefaults) {
     auto imu = std::make_shared<IMUSensor>("imu0");
     EXPECT_EQ(imu->sensor_id(), "imu0");
@@ -108,14 +108,14 @@ TEST(IMUSensor, DrainBufferReturnsEmptyBeforeInit) {
     EXPECT_TRUE(buf.empty());
 }
 
-// â”€â”€â”€ LidarSensor construction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  LidarSensor construction â”€
 TEST(LidarSensor, ConstructAndState) {
     LidarSensor lidar("lidar0", "127.0.0.1:2368");
     EXPECT_EQ(lidar.sensor_type(), "LiDAR");
     EXPECT_FALSE(lidar.latest().has_value());
 }
 
-// â”€â”€â”€ SensorState string conversion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  SensorState string conversion â”€
 TEST(SensorState, ToStringAllValues) {
     EXPECT_EQ(to_string(SensorState::UNINITIALIZED), "UNINITIALIZED");
     EXPECT_EQ(to_string(SensorState::RUNNING),       "RUNNING");

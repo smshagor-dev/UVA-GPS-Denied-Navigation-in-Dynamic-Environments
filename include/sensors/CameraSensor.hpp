@@ -4,7 +4,7 @@
 
 #pragma once
  
-// CameraSensor.hpp  â€”  ESP32-CAM via RTSP/UDP + YOLOv8n TRT inference
+// CameraSensor.hpp    ESP32-CAM via RTSP/UDP + YOLOv8n TRT inference
 // Drone Swarm Sensor Fusion  |  Phase 2
  
 #include "sensors/SensorBase.hpp"
@@ -21,7 +21,7 @@
 
 namespace drone::sensors {
 
-// â”€â”€â”€ Detection result â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Detection result 
 struct Detection {
     int   class_id{-1};
     float confidence{0.0f};
@@ -29,7 +29,7 @@ struct Detection {
     std::string label;
 };
 
-// â”€â”€â”€ Camera frame â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Camera frame 
 struct CameraFrame : SensorMeasurement {
     cv::Mat              image;         // BGR, undistorted
     cv::Mat              depth_map;     // optional monocular depth estimate
@@ -38,7 +38,7 @@ struct CameraFrame : SensorMeasurement {
     double               exposure_ms{0.0};
 };
 
-// â”€â”€â”€ Camera intrinsics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Camera intrinsics â”€
 struct CameraIntrinsics {
     double fx{800}, fy{800};  // focal lengths (px)
     double cx{320}, cy{240};  // principal point
@@ -69,14 +69,14 @@ public:
         data_cb_ = std::move(cb);
     }
 
-    // â”€â”€ TensorRT YOLOv8n â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  TensorRT YOLOv8n 
     bool load_yolo_model(const std::string& engine_path,
                          float conf_thresh = 0.45f,
                          float nms_thresh  = 0.5f);
 
     [[nodiscard]] bool inference_enabled() const { return inference_ready_; }
 
-    // â”€â”€ Undistortion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Undistortion 
     void precompute_undistort_maps();
 
 private:

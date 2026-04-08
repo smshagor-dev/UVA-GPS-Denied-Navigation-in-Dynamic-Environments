@@ -4,7 +4,7 @@
 
 #pragma once
  
-// LidarSensor.hpp  â€”  LiDAR interface (Velodyne VLP-16 / RPLIDAR A3)
+// LidarSensor.hpp    LiDAR interface (Velodyne VLP-16 / RPLIDAR A3)
 // Drone Swarm Sensor Fusion  |  Phase 2
  
 #include "sensors/SensorBase.hpp"
@@ -17,7 +17,7 @@ namespace drone::sensors {
 using PointCloud    = pcl::PointCloud<pcl::PointXYZI>;
 using PointCloudPtr = PointCloud::Ptr;
 
-// â”€â”€â”€ LiDAR Measurement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  LiDAR Measurement 
 struct LidarMeasurement : SensorMeasurement {
     PointCloudPtr cloud;           // raw scan
     uint32_t      num_points{0};
@@ -47,7 +47,7 @@ public:
         data_cb_ = std::move(cb);
     }
 
-    // â”€â”€ Filtering â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Filtering 
     void set_voxel_leaf_size(float leaf) { voxel_leaf_ = leaf; }
     void set_range_filter(float min_m, float max_m) {
         range_min_ = min_m;

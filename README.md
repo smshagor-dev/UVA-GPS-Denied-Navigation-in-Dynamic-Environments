@@ -1,4 +1,4 @@
-﻿# System Designer and Developer: Md Shahanur Islam Shagor
+# System Designer and Developer: Md Shahanur Islam Shagor
 # Project: UVA GPS Denied Navigation in Dynamic Environments
 # Technology: C++, Python, Go, CMake
 
@@ -8,11 +8,11 @@ High-performance multi-drone software stack for operating a swarm in GPS-denied 
 
 This project combines:
 
-- `C++20` for onboard real-time perception, estimation, and safety-critical control
+- `C++20` for onboard real-time perception, estimation, and safety-oriented control
 - `Python / PySide6` for the live monitoring and operator control dashboard
-- `Go` for the fleet-scale control plane required for 1000+ drones
+- `Go` for the fleet-scale control plane and digital-twin style backend
 
-The system is designed for environments where GNSS is weak, jammed, or unavailable, and the drones must rely on `IMU + camera + LiDAR + V2X mesh` to localize, coordinate, and execute missions.
+The system is designed for environments where GNSS is weak, jammed, or unavailable, and drones must rely on `IMU + camera + LiDAR + V2X mesh` to localize, coordinate, and execute missions.
 
 ## 1. Project Goal
 
@@ -23,50 +23,51 @@ The goal of this project is to build a scalable drone swarm stack that can:
 - avoid static and dynamic obstacles
 - elect leaders and maintain formations
 - coordinate missions across many drones
-- expose the full fleet state to an operator dashboard
+- expose full fleet state to an operator dashboard
 
-At small scale, one drone can run the full onboard pipeline and be monitored locally.
+At small scale, one drone can run the onboard pipeline and be monitored locally.
 
-At large scale, the same onboard logic can be connected to a `Go control plane` so that `1000+` drones can be grouped into clusters, scheduled, commanded, monitored, and audited centrally.
+At larger scale, the same onboard logic can connect to the `Go control plane` so drones can be grouped into clusters, commanded, monitored, and audited centrally.
 
 ## 2. Core Features
 
 ### Onboard C++ features
 
-- Error-state `EKF` for motion estimation
+- error-state `EKF` for motion estimation
 - `VIO` pipeline for camera + IMU based odometry
 - `TDOA` localization module for anchor-based GPS-denied ranging fallback
-- keyframe-based `SLAM` map sharing
-- `YOLOv8n` object-detection driven autonomy
-- personal ML-style `ExperienceMemory` layer for per-drone historical risk summarization
-- `V2X` swarm networking with leader election and formations
-- decentralized `MCSS` leader election using battery, motor-health, link-quality, CPU headroom, and thermal headroom scoring
-- secure swarm transport with `AES-256` encryption, `PBKDF2` key derivation, `Ed25519` signatures, replay protection, and chain-linked leader command frames
-- collision avoidance with peer, LiDAR, relative velocity, and local-minima escape logic
-- local safety modes such as hold, return-home, and emergency-land
+- localization confidence scoring with degraded / lost-state detection
+- keyframe-based `SLAM` support
+- `ExperienceMemory` layer for per-drone historical risk summarization
+- `DecisionEngine` for autonomy decisions
+- built-in `V2X` swarm networking with optional native `Fast-DDS` transport when installed
+- secure swarm transport helpers in the swarm security module
+- local safety / degraded-mode behavior when hardware or optional dependencies are unavailable
 
 ### Fleet / backend features
 
 - telemetry ingest service
-- swarm registry and drone discovery
-- mission scheduling
-- formation assignment
-- command fan-out
-- health monitoring
-- event/log aggregation
-- digital twin state cache
-- dashboard API
+- fleet snapshot endpoint
+- mission scheduling endpoints
+- command fan-out endpoint
+- health monitoring endpoint
+- event/log aggregation endpoint
+- discovery endpoint
+- in-memory digital twin state store
 
 ### Dashboard features
 
-- dark-themed real-time PySide6 UI
+- dark-themed real-time `PySide6` UI
 - 3D swarm trajectory view
 - EKF drift plot
 - swarm status table
 - command console
 - CPU / GPU / battery / link health cards
-- direct `pybind11` mode for local lab use
+- localization source / confidence visibility
+- local `pybind11` mode when bridge builds are available
 - `Go backend` mode for fleet-scale use
+- simulation fallback when neither backend path is available
+- persistent Python dashboard datastore for settings, command history, and last fleet snapshot restore
 
 ## 3. System Architecture
 
@@ -76,7 +77,7 @@ At large scale, the same onboard logic can be connected to a `Go control plane` 
                   |  3D map | drift | health | cmd   |
                   +-----------------+----------------+
                                     |
-                       HTTP / WebSocket / gRPC
+                       HTTP / WebSocket-like polling
                                     |
                   +----------------------------------+
                   |         Go Control Plane         |
@@ -88,7 +89,7 @@ At large scale, the same onboard logic can be connected to a `Go control plane` 
                                     |
         +---------------------------------------------------------+
         |                  Drone Node (C++20)                     |
-        | sensors -> VIO / EKF / TDOA -> autonomy -> secure swarm -> safety |
+        | sensors -> VIO / EKF / TDOA -> autonomy -> swarm -> safety |
         +---------------------------------------------------------+
             |          |            |            |
           IMU        Camera       LiDAR        V2X Mesh
@@ -106,22 +107,20 @@ Use C++ where latency and determinism matter:
 - TDOA multilateration
 - LiDAR processing
 - onboard autonomy
-- secure inter-drone transport
-- collision avoidance
-- flight safety logic
+- local safety logic
 
 ### Python
 
 Use Python where operator productivity and rich desktop UI matter:
 
-- PySide6 dashboard
+- `PySide6` dashboard
 - visualization
 - rapid operator tool iteration
-- bridge/debug workflows
+- local bridge/debug workflows
 
 ### Go
 
-Use Go where very large fleet orchestration and network concurrency matter:
+Use Go where fleet orchestration and concurrent network I/O matter:
 
 - control plane
 - telemetry ingest
@@ -139,11 +138,15 @@ drone_swarm/
   go.mod
   main.py
   README.md
+  CONTRIBUTE.md
+  DEPLOYMENT.md
 cmd/
   control-plane/
     main.go
 docs/
   GO_SWARM_ARCHITECTURE.md
+firmware/
+  esp32_cam/
 gui/
   dashboard.py
 include/
@@ -154,11 +157,11 @@ include/
   slam/
   swarm/
   vio/
- internal/
-controlplane/
-  server.go
-  state.go
-  types.go
+internal/
+  controlplane/
+    server.go
+    state.go
+    types.go
 scripts/
   drone_setup.py
 src/
@@ -169,8 +172,8 @@ src/
   slam/
   swarm/
   vio/
-drone_bridge.cpp
-main.cpp
+  drone_bridge.cpp
+  main.cpp
 tests/
 ```
 
@@ -183,13 +186,16 @@ Main onboard drone node.
 Responsibilities:
 
 - initialize sensors
-- start VIO / EKF
-- initialize TDOA anchors / ranging fallback
+- start `VIO / EKF`
+- initialize TDOA anchors
 - maintain per-drone experience memory
-- start swarm networking
 - run autonomy loop
 - publish health, memory, TDOA, and decision logs
-- enforce secure swarm message acceptance / rejection rules
+- enable swarm networking through built-in UDP transport and native `Fast-DDS` transport when available
+
+Important note:
+
+The current runtime path supports demo-generated TDOA, CSV playback, UDP text ingest, and serial UWB-style ingest. If no external measurements are provided, it still falls back to synthetic demo measurements.
 
 ### 6.2 `src/drone_bridge.cpp`
 
@@ -199,7 +205,7 @@ Responsibilities:
 
 - expose VIO pose
 - expose system stats
-- expose swarm commands and formation control
+- expose optional swarm controls
 
 ### 6.3 `gui/dashboard.py`
 
@@ -208,9 +214,10 @@ Operator dashboard.
 Responsibilities:
 
 - show real-time drone state
-- issue election / formation / emergency commands
+- issue formation / hold / return-home / emergency commands
 - render trajectories and drift
 - connect either to local `pybind11` or the Go control plane
+- fall back to simulation when needed
 
 ### 6.4 `cmd/control-plane/main.go`
 
@@ -218,9 +225,10 @@ Fleet backend entrypoint.
 
 Responsibilities:
 
-- start integrated control-plane server
+- start the integrated control-plane server
 - expose fleet API endpoints
 - support telemetry ingest and command routing
+- seed a digital-twin style fleet snapshot for demo use
 
 ### 6.5 `main.py`
 
@@ -229,8 +237,8 @@ Project launcher.
 Responsibilities:
 
 - start Go control plane if available
-- start C++ drone node
-- start Python dashboard
+- start C++ drone node if available
+- start the Python dashboard
 - shut all processes down together
 
 ## 7. Estimation and Control Calculations
@@ -253,16 +261,6 @@ Where:
 - `b_a` = accelerometer bias
 - `b_g` = gyroscope bias
 
-Typical dimensions:
-
-- position: `3`
-- velocity: `3`
-- quaternion: `4`
-- accel bias: `3`
-- gyro bias: `3`
-
-Total nominal state size: `16`
-
 ### 7.2 IMU propagation
 
 At each IMU step:
@@ -275,8 +273,6 @@ p_k+1 = p_k + v_k * dt + 0.5 * (R(q_k) * a_corrected + g) * dt^2
 q_k+1 = q_k boxplus (w_corrected * dt)
 ```
 
-This allows high-rate prediction even when camera updates are sparse.
-
 ### 7.3 Visual update
 
 Camera / VIO updates correct drift by minimizing innovation:
@@ -288,8 +284,6 @@ x = x + K r
 P = (I - K H) P
 ```
 
-This is the core reason the project can operate without GPS.
-
 ### 7.4 TDOA localization
 
 If synchronized anchors or ranging radios are available, the drone can estimate position from time-difference-of-arrival:
@@ -298,20 +292,7 @@ If synchronized anchors or ranging radios are available, the drone can estimate 
 d_i - d_ref = c * (t_i - t_ref)
 ```
 
-Where:
-
-- `d_i` = range to anchor `i`
-- `d_ref` = range to the reference anchor
-- `c` = propagation speed of the signal
-- `t_i - t_ref` = arrival-time difference
-
-The current implementation uses iterative least-squares / Gauss-Newton multilateration across `4+` anchors.
-
-This gives the stack a second GPS-denied localization path:
-
-- primary path: `VIO + EKF`
-- secondary path: `TDOA anchor geometry`
-- autonomy support path: return-home and caution logic can use TDOA confidence
+The current implementation uses iterative least-squares / Gauss-Newton style multilateration across multiple anchors.
 
 ### 7.5 Formation control
 
@@ -321,13 +302,7 @@ For a follower drone:
 v_cmd = k_p * (p_target - p_current)
 ```
 
-Then collision avoidance is blended:
-
-```text
-v_total = v_tracking + v_avoid
-```
-
-Where `v_avoid` comes from peer repulsion, static LiDAR obstacles, relative velocity hazard weighting, and tangential escape when local minima occurs.
+Collision avoidance is then blended into the final velocity command.
 
 ### 7.6 Relative-velocity avoidance
 
@@ -339,21 +314,17 @@ closing_speed = -(v_rel dot d_hat)
 time_to_collision = distance / closing_speed
 ```
 
-If `time_to_collision` is below a prediction horizon, avoidance weight is increased.
+If `time_to_collision` falls below a prediction horizon, avoidance weight is increased.
 
-This is better than only checking distance because two fast drones may still collide even if current separation seems acceptable.
+### 7.7 Experience memory / risk prior
 
-### 7.7 Personal ML memory / experience prior
-
-The onboard autonomy now maintains a lightweight historical memory per drone:
+The onboard autonomy maintains a lightweight historical memory per drone:
 
 ```text
 memory = f(drift trend, battery burn, obstacle frequency, target frequency, dominant labels)
 ```
 
-This is an embedded ML-style summarization layer rather than a heavy neural network. It stores what the drone repeatedly experiences and turns that into a usable risk prior.
-
-Per drone, the memory layer computes:
+Per drone, the memory layer summarizes:
 
 - `drift_trend_m_per_min`
 - `battery_burn_pct_per_min`
@@ -361,12 +332,6 @@ Per drone, the memory layer computes:
 - `target_frequency`
 - `dominant_label`
 - `risk_score`
-
-The high-level AI uses this to:
-
-- slow down search in risky sectors
-- keep followers more conservative when repeated hazards are observed
-- preserve context across autonomy loop iterations
 
 ### 7.8 Drift monitoring
 
@@ -376,130 +341,63 @@ Dashboard drift graph tracks EKF drift over time:
 drift = || p_estimated - p_reference ||
 ```
 
-Reference may come from loop closure, anchor reset, or trusted pose checkpoints depending on deployment mode.
-
 ### 7.9 Secure swarm communication
 
-To reduce drone hijack risk, the swarm transport now applies a secure envelope around inter-drone traffic.
+The swarm security module provides secure-envelope style handling for inter-drone traffic, including:
 
-Framework elements:
+- payload protection helpers
+- sender authenticity checks
+- replay rejection logic
+- chain-linked command validation concepts
 
-- `AES-256` encrypted payload transport
-- `PBKDF2-SHA256` key derivation from the shared swarm secret
-- `Ed25519` signatures for sender authenticity
-- replay rejection using monotonic secure sequence tracking
-- tamper rejection using authenticated message checks
-- chain-linked leader command frames for formation / mission / stop commands
+These features are present in the codebase. Swarm traffic can run on the built-in UDP transport everywhere, and can additionally use native `Fast-DDS` transport when that package is installed.
 
-The sync model uses a triple digest:
+## 8. Scaling Considerations
 
-- `SHA-1` for the accepted past-frame commitment
-- `SHA-256` for the present-frame payload commitment
-- `SHA3-256` for the future-commitment check
+The project is designed to scale beyond a lab demo.
 
-If those sync proofs do not match, the frame is rejected and the sender is not trusted for that message.
+### 8.1 Why the Go backend matters
 
-Leader-to-follower high-priority messages such as:
+If many drones send frequent updates, the dashboard should not connect directly to every drone.
 
-- `FORMATION_CMD`
-- `LEADER_ELECT`
-- `MISSION_SYNC`
-- `EMERGENCY_STOP`
+Instead:
 
-are also wrapped in a ledger-style hash chain so that a broken command history is rejected instead of replayed.
-
-## 8. Scaling Calculations for 1000+ Drones
-
-The project is designed to scale far beyond a lab demo. The numbers below explain why the Go control plane is needed.
-
-### 8.1 Flat dashboard polling is not enough
-
-If one dashboard tries to directly manage `1000` drones and each drone sends `20 Hz` state updates:
-
-```text
-1000 drones * 20 updates/s = 20,000 updates/s
-```
-
-If each normalized telemetry payload is roughly `300 bytes`:
-
-```text
-20,000 * 300 bytes = 6,000,000 bytes/s
-```
-
-That is about:
-
-```text
-~6 MB/s raw telemetry
-~48 Mb/s before protocol overhead, bursts, logs, and retries
-```
-
-This is exactly why the dashboard should not directly talk to every drone.
+- drones publish or forward telemetry
+- the Go backend aggregates fleet state
+- the dashboard reads from a single backend API
 
 ### 8.2 Clustered swarm strategy
 
-Treating 1000 drones as one flat swarm is operationally expensive. A better model is clustered control.
-
-If one cluster contains `20 drones`:
-
-```text
-1000 / 20 = 50 clusters
-```
-
-Then:
+A clustered model scales better than one flat swarm:
 
 - one cluster leader can summarize local state
 - formation changes can be pushed per cluster
 - health alerts can be aggregated per cluster
-- operator UI can drill down from fleet -> cluster -> drone
-
-### 8.3 Leader count
-
-With one primary leader and one backup per cluster:
-
-```text
-50 clusters * 2 key nodes = 100 high-priority leadership roles
-```
-
-This is much easier to manage than trying to coordinate 1000 peers equally.
-
-### 8.4 Telemetry aggregation benefit
-
-If the Go control plane stores full telemetry internally but publishes only `2 Hz` dashboard summaries:
-
-```text
-1000 drones * 2 updates/s = 2,000 dashboard-visible updates/s
-```
-
-That is a `10x` reduction from the raw `20,000 updates/s` ingest rate.
-
-This is one of the main architectural wins of the Go backend.
+- the operator UI can drill down from fleet -> cluster -> drone
 
 ## 9. Go Control Plane Responsibilities
 
-The repository already contains a Go control-plane skeleton under:
+The repository contains a Go control-plane implementation under:
 
 - `cmd/control-plane`
 - `internal/controlplane`
 
-The design covers these fleet-scale roles:
-
-- `central control plane`
-- `telemetry ingest server`
-- `swarm registry / drone discovery service`
-- `mission scheduler`
-- `formation assignment / fleet orchestration`
-- `health monitoring backend`
-- `command fan-out service`
-- `WebSocket / gRPC style dashboard gateway`
-- `log aggregation and event pipeline`
-- `digital twin / live state cache`
-
 Current implementation status:
 
 - integrated HTTP control-plane service is present
-- telemetry, mission, command, health, event, and discovery endpoints are present
+- telemetry, fleet, mission, command, health, event, and discovery endpoints are present
 - in-memory digital twin state store is present
 - dashboard can connect to the backend using `--backend-url`
+
+Current API routes:
+
+- `GET /api/v1/fleet`
+- `POST /api/v1/telemetry`
+- `POST /api/v1/commands`
+- `GET,POST /api/v1/missions`
+- `GET /api/v1/health`
+- `GET /api/v1/events`
+- `GET /api/v1/discovery`
 
 ## 10. Dashboard Operating Modes
 
@@ -507,7 +405,7 @@ Current implementation status:
 
 Use when testing one machine or one drone:
 
-- dashboard reads from `pybind11`
+- dashboard reads from `pybind11` if `drone_bridge` is importable
 - local C++ process provides pose / stats directly
 
 ### Fleet mode
@@ -518,12 +416,29 @@ Use when testing many drones:
 - backend provides aggregated fleet state
 - dashboard should not directly open per-drone connections
 
+### Simulation fallback mode
+
+Use when the bridge module or backend is unavailable:
+
+- dashboard synthesizes fleet activity for UI validation
+- useful for design/demo work without full runtime dependencies
+
+### Persistent dashboard state
+
+The Python dashboard now keeps a local datastore so the next launch can restore:
+
+- recent command history
+- last selected drone
+- last known fleet snapshot
+- last used backend URL
+- local mission overrides and added simulated drones
+
 ## 11. Launch Options
 
 ### Option A: unified launcher
 
-```bash
-set DRONE_SWARM_SECRET=replace-with-strong-shared-secret
+```powershell
+$env:DRONE_SWARM_SECRET="replace-with-strong-shared-secret"
 python main.py
 ```
 
@@ -536,7 +451,7 @@ What it does:
 
 Useful flags:
 
-```bash
+```powershell
 python main.py --dry-run
 python main.py --skip-go
 python main.py --skip-cpp
@@ -547,26 +462,26 @@ python main.py --skip-gui
 
 #### 1. Go control plane
 
-```bash
+```powershell
 go run ./cmd/control-plane
 ```
 
 #### 2. C++ drone node
 
-```bash
-set DRONE_SWARM_SECRET=replace-with-strong-shared-secret
-build-dashboard/drone_node.exe --id=1 --esp32=192.168.4.1 --lidar=192.168.1.201:2368
+```powershell
+$env:DRONE_SWARM_SECRET="replace-with-strong-shared-secret"
+build\Release\drone_node.exe --id=1 --esp32=192.168.4.1 --lidar=192.168.1.201:2368 --tdoa-csv=tdoa_measurements.csv
 ```
 
 #### 3. Dashboard in fleet mode
 
-```bash
+```powershell
 python gui/dashboard.py --backend-url http://127.0.0.1:8080
 ```
 
 #### 4. Dashboard in local mode
 
-```bash
+```powershell
 python gui/dashboard.py
 ```
 
@@ -574,17 +489,22 @@ python gui/dashboard.py
 
 ### C++
 
-Main dependencies:
+Main required dependencies:
 
 - `Eigen3`
 - `OpenCV`
 - `PCL`
 - `spdlog`
-- `pybind11`
+
+Optional dependencies:
+
+- `pybind11` is auto-fetched if not already installed
+- native `Fast-DDS` transport is enabled when the package is installed
+- `TensorRT` is only available on systems with NVIDIA runtime support
 
 ### Python
 
-Main dependencies:
+Main dashboard dependencies:
 
 - `PySide6`
 - `pyqtgraph`
@@ -597,14 +517,6 @@ Main requirement:
 
 - `Go 1.22+`
 
-Note:
-
-The current Windows environment used during development may have C++ and Python ready while `go` is not installed on `PATH`. In that case:
-
-- C++ node can still run
-- dashboard can still run
-- control plane code exists but `go run` will require Go installation
-
 ## 13. Hardware Targets
 
 Recommended onboard hardware:
@@ -616,10 +528,9 @@ Recommended onboard hardware:
 Typical sensors:
 
 - `ESP32-CAM`
-- `RPLIDAR A3` or similar LiDAR
-- `MPU-6050` / `ICM-42688-P`
-- ESC / motor telemetry or a dedicated motor-health sensor feed
-- thermal sensor where needed
+- LiDAR such as `RPLIDAR`
+- IMU devices such as `MPU-6050` or `ICM-42688-P`
+- ESC / motor telemetry feed
 
 ## 14. Current Engineering Status
 
@@ -629,42 +540,58 @@ Implemented in the repository:
 - autonomy decision engine
 - experience-memory driven decision bias
 - TDOA multilateration module
-- secure swarm crypto envelope with AES-256 / PBKDF2 / Ed25519
-- swarm formation and avoidance logic
-- pybind11 bridge
-- real-time PySide6 dashboard
-- Go control-plane skeleton
+- external TDOA CSV / UDP / serial ingest paths for real measurement playback/integration
+- localization confidence, source tracking, and degraded/lost navigation modes
+- secure swarm security module
+- built-in swarm networking path with native `Fast-DDS` support when installed
+- `pybind11` bridge with local Windows build support
+- real-time `PySide6` dashboard
+- Go control-plane service
 - unified process launcher
+- loop-relocalization hook and map-planner waypoint generation
+- OpenCV DNN fallback inference path for non-TensorRT machines
 
 Known limitations:
 
-- Fast-DDS may be unavailable on some Windows setups, so V2X may fall back or be partially disabled
-- Go backend source is integrated, but local execution still depends on Go toolchain availability
-- current Go backend is an integrated service, not yet split into independent production microservices
-- current `main.cpp` runtime path uses demo/synthetic TDOA measurements derived from the current pose; real UWB / RF anchor packet ingest still needs hardware integration
+- native `TensorRT` still requires an NVIDIA GPU/runtime and is not available on AMD-only machines
+- local C++ builds still depend on native packages being installed and discoverable by CMake
+- if external TDOA/UWB data is not supplied, `main.cpp` still falls back to synthetic demo measurements
+- several checked-in build folders may be stale across path or machine changes
+- `scripts/drone_setup.py` is mainly Linux/Jetson oriented
 
-Recent verification completed:
+Verification completed in this workspace on `2026-04-08`:
 
-- `build-tests/drone_node.exe` builds successfully
-- `build-tests/tests/test_autonomy.exe` passes
-- `build-tests/tests/test_navigation_intelligence.exe` passes
-- `build-tests/tests/test_swarm_security.exe` passes
+- `python -m py_compile main.py gui/dashboard.py scripts/drone_setup.py` passed
+- `go test ./...` passed
+- `cmake -S . -B build-runtime-check -DBUILD_TESTS=OFF` passed
+- `cmake --build build-runtime-check --config Release --target drone_node drone_bridge` passed
+- `drone_bridge` imported successfully from the built module with Windows DLL directories added
+- `test_autonomy.exe` passed
+- `test_navigation_intelligence.exe` passed
+- native `Fast-DDS` transport was detected after local package installation
+
+What that means:
+
+- Python, Go, and the main C++ runtime path are currently healthy in this workspace
+- native `Fast-DDS` transport is now available on this machine
+- `TensorRT` remains hardware-dependent rather than code-blocked
+- old stale build outputs should still not be treated as reliable proof of current build health
 
 ## 15. Roadmap
 
 Next logical steps:
 
-1. add protobuf / gRPC contracts between drone node and Go backend
-2. publish C++ telemetry directly to Go telemetry ingest
-3. add persistent stores such as Redis + PostgreSQL / ClickHouse
-4. replace synthetic TDOA demo measurements with real UWB / RF anchor packet ingest
-5. add WebSocket streaming for the fleet dashboard
-6. split Go backend into deployable services
-7. add mission replay, audit, and operator auth
+1. automate Windows DLL-path setup for local `drone_bridge` imports
+2. package serial UWB vendor parsers for specific hardware models
+3. add more automated Go/API tests
+4. deepen loop closure and global map optimization
+5. continue maturing the backend toward production deployment patterns
 
 ## 16. Related Documents
 
-- `docs/GO_SWARM_ARCHITECTURE.md`
+- [docs/GO_SWARM_ARCHITECTURE.md](/d:/Final%20Project/drone_swarm/docs/GO_SWARM_ARCHITECTURE.md)
+- [CONTRIBUTE.md](/d:/Final%20Project/drone_swarm/CONTRIBUTE.md)
+- [DEPLOYMENT.md](/d:/Final%20Project/drone_swarm/DEPLOYMENT.md)
 
 ## 17. Summary
 
@@ -674,20 +601,10 @@ It combines:
 
 - onboard estimation and autonomy in `C++`
 - real-time operator visualization in `Python`
-- large-fleet orchestration in `Go`
+- fleet orchestration in `Go`
 
-That split is the main reason the project can grow from:
+That split lets the project support:
 
-- `1 local drone`
-
-to
-
-- `1000+ coordinated drones`
-
-without collapsing under UI load, telemetry volume, or control complexity.
-# System Designer and Developer: Md Shahanur Islam Shagor
-# Project: UVA GPS Denied Navigation in Dynamic Environments
-# Technology: C++, Python, Go, CMake
-# System Designer and Developer: Md Shahanur Islam Shagor
-# Project: UVA GPS Denied Navigation in Dynamic Environments
-# Technology: C++, Python, Go, CMake
+- local single-drone workflows
+- backend-connected multi-drone monitoring
+- future scaling toward larger coordinated fleets

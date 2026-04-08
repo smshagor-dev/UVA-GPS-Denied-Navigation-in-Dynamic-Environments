@@ -9,6 +9,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
 
+#include <algorithm>
 #include <filesystem>
 
 namespace drone::sensors {
@@ -161,11 +162,92 @@ std::vector<Detection> CameraSensor::run_inference(const cv::Mat& frame) {
 #endif
 }
 
-std::vector<Detection> CameraSensor::run_inference_dnn_fallback(const cv::Mat&) {
-    if (logger_) {
-        logger_->debug("[{}] run_inference_dnn_fallback placeholder invoked", id_);
+std::vector<Detection> CameraSensor::run_inference_dnn_fallback(const cv::Mat& frame) {
+    if (dnn_net_.empty()) {
+        return {};
     }
-    return {};
+
+    cv::Mat blob = cv::dnn::blobFromImage(
+        frame,
+        1.0 / 255.0,
+        cv::Size(640, 640),
+        cv::Scalar(),
+        true,
+        false);
+
+    if (blob.empty()) {
+        return {};
+    }
+
+    dnn_net_.setInput(blob);
+    std::vector<cv::Mat> outputs;
+    dnn_net_.forward(outputs, dnn_net_.getUnconnectedOutLayersNames());
+    if (outputs.empty()) {
+        return {};
+    }
+
+    cv::Mat out = outputs.front();
+    if (out.dims == 3 && out.size[1] < out.size[2]) {
+        out = out.reshape(1, out.size[2]);
+    } else if (out.dims == 3) {
+        cv::transpose(out.reshape(1, out.size[1]), out);
+    }
+    if (out.cols < 6) {
+        return {};
+    }
+
+    std::vector<int> class_ids;
+    std::vector<float> confidences;
+    std::vector<cv::Rect> boxes;
+
+    for (int row = 0; row < out.rows; ++row) {
+        const float* data = out.ptr<float>(row);
+        if (!data) {
+            continue;
+        }
+
+        const int class_count = out.cols - 4;
+        cv::Mat scores(1, class_count, CV_32F, const_cast<float*>(data + 4));
+        cv::Point class_id_point;
+        double max_class_score = 0.0;
+        cv::minMaxLoc(scores, nullptr, &max_class_score, nullptr, &class_id_point);
+        if (max_class_score < conf_thresh_) {
+            continue;
+        }
+
+        const float cx = data[0];
+        const float cy = data[1];
+        const float w = data[2];
+        const float h = data[3];
+        boxes.emplace_back(
+            static_cast<int>((cx - (w * 0.5f)) * static_cast<float>(intrinsics_.width) / 640.0f),
+            static_cast<int>((cy - (h * 0.5f)) * static_cast<float>(intrinsics_.height) / 640.0f),
+            static_cast<int>(w * static_cast<float>(intrinsics_.width) / 640.0f),
+            static_cast<int>(h * static_cast<float>(intrinsics_.height) / 640.0f));
+        confidences.push_back(static_cast<float>(max_class_score));
+        class_ids.push_back(class_id_point.x);
+    }
+
+    std::vector<int> keep;
+    cv::dnn::NMSBoxes(boxes, confidences, conf_thresh_, nms_thresh_, keep);
+
+    std::vector<Detection> detections;
+    detections.reserve(keep.size());
+    for (const int index : keep) {
+        const auto& box = boxes[static_cast<size_t>(index)];
+        Detection detection;
+        detection.class_id = class_ids[static_cast<size_t>(index)];
+        detection.confidence = confidences[static_cast<size_t>(index)];
+        detection.label = "class_" + std::to_string(detection.class_id);
+        detection.bbox = cv::Rect2f(
+            std::clamp(static_cast<float>(box.x) / static_cast<float>(intrinsics_.width), 0.0f, 1.0f),
+            std::clamp(static_cast<float>(box.y) / static_cast<float>(intrinsics_.height), 0.0f, 1.0f),
+            std::clamp(static_cast<float>(box.width) / static_cast<float>(intrinsics_.width), 0.0f, 1.0f),
+            std::clamp(static_cast<float>(box.height) / static_cast<float>(intrinsics_.height), 0.0f, 1.0f));
+        detections.push_back(std::move(detection));
+    }
+
+    return detections;
 }
 
 } // namespace drone::sensors

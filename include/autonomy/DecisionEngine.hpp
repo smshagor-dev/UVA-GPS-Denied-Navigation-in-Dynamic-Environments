@@ -24,7 +24,11 @@ enum class BehaviorMode : uint8_t {
     TRACK_TARGET,
     AVOID_OBSTACLE,
     RETURN_HOME,
-    EMERGENCY_LAND
+    EMERGENCY_LAND,
+    HOVER_AND_SCAN,
+    SAFE_RETURN_BY_ANCHOR,
+    LOCALIZATION_DEGRADED,
+    LOCALIZATION_LOST
 };
 
 inline std::string_view to_string(BehaviorMode mode) {
@@ -35,6 +39,10 @@ inline std::string_view to_string(BehaviorMode mode) {
     case BehaviorMode::AVOID_OBSTACLE:return "AVOID_OBSTACLE";
     case BehaviorMode::RETURN_HOME:   return "RETURN_HOME";
     case BehaviorMode::EMERGENCY_LAND:return "EMERGENCY_LAND";
+    case BehaviorMode::HOVER_AND_SCAN:return "HOVER_AND_SCAN";
+    case BehaviorMode::SAFE_RETURN_BY_ANCHOR:return "SAFE_RETURN_BY_ANCHOR";
+    case BehaviorMode::LOCALIZATION_DEGRADED:return "LOCALIZATION_DEGRADED";
+    case BehaviorMode::LOCALIZATION_LOST:return "LOCALIZATION_LOST";
     }
     return "UNKNOWN";
 }
@@ -49,8 +57,12 @@ struct DecisionConfig {
     float max_track_speed_mps{2.0f};
     float max_avoid_speed_mps{2.6f};
     float max_return_speed_mps{1.8f};
+    float max_recovery_speed_mps{0.9f};
     float nominal_altitude_m{8.0f};
     float safe_altitude_m{12.0f};
+    float degraded_localization_threshold{0.58f};
+    float lost_localization_threshold{0.22f};
+    float tdoa_recovery_confidence{0.55f};
 };
 
 struct PerceptionFocus {
@@ -68,6 +80,14 @@ struct DecisionContext {
     std::optional<MemoryPrior> memory_prior;
     std::optional<Eigen::Vector3d> tdoa_position;
     double tdoa_confidence{0.0};
+    double localization_confidence{1.0};
+    std::string localization_source{"vision-inertial"};
+    bool localization_degraded{false};
+    bool localization_lost{false};
+    double sync_confidence{1.0};
+    size_t visible_anchor_count{0};
+    size_t relocalization_count{0};
+    bool camera_tracking_nominal{true};
     size_t swarm_peer_count{0};
     bool swarm_follower{false};
     bool inference_ready{false};
@@ -106,6 +126,10 @@ private:
     [[nodiscard]] DecisionCommand build_return_home(const DecisionContext& ctx) const;
     [[nodiscard]] DecisionCommand build_hold(const DecisionContext& ctx, std::string summary) const;
     [[nodiscard]] DecisionCommand build_search(const DecisionContext& ctx) const;
+    [[nodiscard]] DecisionCommand build_hover_and_scan(const DecisionContext& ctx) const;
+    [[nodiscard]] DecisionCommand build_safe_return_by_anchor(const DecisionContext& ctx) const;
+    [[nodiscard]] DecisionCommand build_localization_degraded(const DecisionContext& ctx) const;
+    [[nodiscard]] DecisionCommand build_localization_lost(const DecisionContext& ctx) const;
     [[nodiscard]] DecisionCommand build_track(const DecisionContext& ctx,
                                               const PerceptionFocus& focus) const;
     [[nodiscard]] DecisionCommand build_avoid(const DecisionContext& ctx,

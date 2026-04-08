@@ -3,9 +3,9 @@
 // Technology: C++, Python, Go, CMake
 
 #pragma once
-// JetsonHAL.hpp  â€”  Hardware Abstraction Layer
+// JetsonHAL.hpp    Hardware Abstraction Layer
 // Jetson Nano / Raspberry Pi 4  â†”  ESP32-CAM / LiDAR / IMU
-// Drone Swarm Sensor Fusion  |  Phase 2 â€” Hardware Integration
+// Drone Swarm Sensor Fusion  |  Phase 2  Hardware Integration
 #include <functional>
 #include <memory>
 #include <string>
@@ -20,7 +20,7 @@ Platform detect_platform();
 std::string_view to_string(Platform p);
 
  
-// ESP32CamInterface  â€”  RTSP / UDP frame receiver from ESP32-CAM
+// ESP32CamInterface    RTSP / UDP frame receiver from ESP32-CAM
 //
 // ESP32-CAM firmware (see /firmware/esp32_cam/) streams:
 //   - RTSP at rtsp://<ip>:554/stream (H264, 30fps, 640Ã—480)
@@ -54,7 +54,7 @@ public:
     // Blocking grab (use in acquisition thread)
     bool     grab_frame(cv::Mat& out, double& timestamp_sec);
 
-    // Async path â€” callback on each new frame
+    // Async path  callback on each new frame
     void     set_frame_callback(FrameCallback cb);
     void     start_async();
     void     stop_async();
@@ -85,7 +85,7 @@ private:
 };
 
  
-// I2CDevice  â€”  Generic I2C r/w wrapper (Linux /dev/i2c-N)
+// I2CDevice    Generic I2C r/w wrapper (Linux /dev/i2c-N)
  
 class I2CDevice {
 public:
@@ -110,7 +110,7 @@ private:
 };
 
  
-// UARTInterface  â€”  UART for RPLIDAR A3 / serial debug
+// UARTInterface    UART for RPLIDAR A3 / serial debug
  
 class UARTInterface {
 public:
@@ -133,7 +133,7 @@ private:
 };
 
  
-// SystemMonitor  â€”  CPU, GPU, memory, battery stats (Jetson/RPi)
+// SystemMonitor    CPU, GPU, memory, battery stats (Jetson/RPi)
  
 struct SystemStats {
     float cpu_pct{0};

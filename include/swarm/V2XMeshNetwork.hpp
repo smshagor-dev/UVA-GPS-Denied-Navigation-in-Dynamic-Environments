@@ -4,9 +4,9 @@
 
 #pragma once
  
-// V2XMeshNetwork.hpp  â€”  Decentralized mesh networking for drone swarm
+// V2XMeshNetwork.hpp    Decentralized mesh networking for drone swarm
 // Leader-Follower topology over Fast-DDS / UDP multicast fallback
-// Drone Swarm Sensor Fusion  |  Phase 3 â€” Swarm V2X
+// Drone Swarm Sensor Fusion  |  Phase 3  Swarm V2X
  
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -61,7 +61,7 @@ inline std::string_view to_string(DroneRole r) {
 }
 
  
-// SwarmMessage  â€”  wire format for all inter-drone traffic
+// SwarmMessage    wire format for all inter-drone traffic
  
 struct SwarmMessage {
     enum class Type : uint8_t {
@@ -90,7 +90,7 @@ struct SwarmMessage {
 };
 
  
-// PeerInfo  â€”  known state of another drone
+// PeerInfo    known state of another drone
  
 struct PeerInfo {
     uint32_t    id{0};
@@ -119,7 +119,7 @@ struct AvoidanceObstacle {
 };
 
  
-// FormationCommand  â€”  issued by leader to all followers
+// FormationCommand    issued by leader to all followers
  
 struct FormationCommand {
     enum class Formation : uint8_t { LINE, VEE, DIAMOND, WEDGE, FREE };
@@ -144,11 +144,11 @@ public:
                              uint16_t    port            = 7400);
     ~V2XMeshNetwork();
 
-    // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Lifecycle 
     bool start();
     void stop();
 
-    // â”€â”€ Outbound â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Outbound â”€
     bool broadcast(SwarmMessage::Type type, std::vector<uint8_t> payload = {});
     bool unicast  (uint32_t dst, SwarmMessage::Type type, std::vector<uint8_t> payload);
     void configure_security(SwarmSecurityConfig cfg);
@@ -157,23 +157,23 @@ public:
     [[nodiscard]] SwarmHealthMetrics local_health() const;
     [[nodiscard]] static float compute_leadership_score(const SwarmHealthMetrics& health);
 
-    // â”€â”€ Leader election (Bully algorithm variant) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Leader election (Bully algorithm variant) â”€
     void trigger_election();
     [[nodiscard]] DroneRole local_role() const { return role_.load(); }
     [[nodiscard]] uint32_t  leader_id()  const { return leader_id_.load(); }
 
-    // â”€â”€ Formation control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Formation control â”€
     bool send_formation(const FormationCommand& cmd);  // LEADER only
 
-    // â”€â”€ Peer registry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Peer registry 
     [[nodiscard]] std::vector<PeerInfo> active_peers() const;
     [[nodiscard]] size_t                peer_count()   const;
 
-    // â”€â”€ Callbacks â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Callbacks 
     void on_message(MessageCallback cb) { msg_cb_  = std::move(cb); }
     void on_peer_update(PeerCallback cb){ peer_cb_ = std::move(cb); }
 
-    // â”€â”€ Metrics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Metrics 
     [[nodiscard]] float    avg_latency_ms()   const { return avg_latency_ms_; }
     [[nodiscard]] uint32_t tx_count()         const { return tx_count_; }
     [[nodiscard]] uint32_t rx_count()         const { return rx_count_; }
@@ -232,7 +232,7 @@ private:
 };
 
  
-// LeaderFollowerController  â€”  Formation geometry and waypoint following
+// LeaderFollowerController    Formation geometry and waypoint following
  
 class LeaderFollowerController {
 public:
@@ -247,7 +247,7 @@ public:
         const FormationCommand& cmd,
         uint32_t follower_index) const;
 
-    // P-controller step â†’ velocity command (m/s)
+    // P-controller step  velocity command (m/s)
     [[nodiscard]] Eigen::Vector3d velocity_command(
         const Eigen::Vector3d& current_pos,
         const Eigen::Vector3d& current_velocity,

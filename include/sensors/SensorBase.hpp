@@ -4,7 +4,7 @@
 
 #pragma once
  
-// SensorBase.hpp  â€”  Abstract base for all drone sensors
+// SensorBase.hpp    Abstract base for all drone sensors
 // Drone Swarm Sensor Fusion  |  Phase 2: Core C++ Sensor Engine
  
 #include <atomic>
@@ -21,7 +21,7 @@
 
 namespace drone::sensors {
 
-// â”€â”€â”€ Timestamp alias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Timestamp alias 
 using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
 using Timestamp = double; // seconds since epoch
 
@@ -31,7 +31,7 @@ inline Timestamp now_sec() {
         .count();
 }
 
-// â”€â”€â”€ Sensor health states â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Sensor health states â”€
 enum class SensorState : uint8_t {
     UNINITIALIZED = 0,
     INITIALIZING,
@@ -53,7 +53,7 @@ inline std::string_view to_string(SensorState s) {
     return "UNKNOWN";
 }
 
-// â”€â”€â”€ Generic sensor measurement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Generic sensor measurement 
 struct SensorMeasurement {
     Timestamp   timestamp{0.0};
     SensorState quality{SensorState::RUNNING};
@@ -61,13 +61,13 @@ struct SensorMeasurement {
     std::string source_id;
 };
 
-// â”€â”€â”€ Callback types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Callback types â”€
 template <typename T>
 using DataCallback = std::function<void(const T&)>;
 using ErrorCallback = std::function<void(const std::string&)>;
 
  
-// SensorBase  â€”  CRTP-free abstract interface
+// SensorBase    CRTP-free abstract interface
  
 class SensorBase {
 public:
@@ -89,23 +89,23 @@ public:
     SensorBase(SensorBase&&)                 = default;
     SensorBase& operator=(SensorBase&&)      = default;
 
-    // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Lifecycle 
     virtual bool initialize()                = 0;
     virtual bool start();
     virtual void stop();
     virtual bool reconfigure(const std::string& config_json) = 0;
 
-    // â”€â”€ Data access (non-blocking, returns std::optional) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Data access (non-blocking, returns std::optional) 
     virtual void poll() = 0;  // called periodically by sensor thread
 
-    // â”€â”€ Status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Status 
     [[nodiscard]] SensorState   state()        const noexcept { return state_.load(); }
     [[nodiscard]] std::string_view sensor_id() const noexcept { return id_; }
     [[nodiscard]] std::string_view sensor_type() const noexcept { return type_; }
     [[nodiscard]] float         dropout_rate() const noexcept { return dropout_rate_; }
     [[nodiscard]] uint64_t      sample_count() const noexcept { return sample_count_; }
 
-    // â”€â”€ Error callback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Error callback â”€
     void set_error_callback(ErrorCallback cb) {
         std::lock_guard lock(cb_mutex_);
         error_cb_ = std::move(cb);
@@ -114,7 +114,7 @@ public:
 protected:
     void set_state(SensorState s) {
         state_.store(s);
-        logger_->info("[{}] state â†’ {}", id_, to_string(s));
+        logger_->info("[{}] state  {}", id_, to_string(s));
     }
 
     void report_error(const std::string& msg) {
@@ -145,7 +145,7 @@ protected:
     uint32_t  poll_rate_hz_{100};
 };
 
-// â”€â”€â”€ Inline implementations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Inline implementations 
 inline bool SensorBase::start() {
     if (running_.exchange(true)) return true; // already running
     set_state(SensorState::RUNNING);

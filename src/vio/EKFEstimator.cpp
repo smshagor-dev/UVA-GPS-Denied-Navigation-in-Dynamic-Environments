@@ -3,12 +3,13 @@
 // Technology: C++, Python, Go, CMake
 
  
-// EKFEstimator.cpp  â€”  Error-State EKF implementation
+// EKFEstimator.cpp    Error-State EKF implementation
 // Drone Swarm Sensor Fusion  |  Phase 2
  
 #include "vio/EKFEstimator.hpp"
 #include <Eigen/Cholesky>
 #include <Eigen/SVD>
+#include <algorithm>
 #include <cmath>
 
 namespace drone::vio {
@@ -50,6 +51,8 @@ void EKFEstimator::reset(const Eigen::Vector3d& p0,
     timestamp_   = 0.0;
     total_drift_ = 0.0;
     initialized_ = true;
+    last_vision_update_ts_ = -1.0;
+    last_depth_update_ts_ = -1.0;
     logger_->info("EKF reset. p0=[{:.3f},{:.3f},{:.3f}]", p0.x(), p0.y(), p0.z());
 }
 
@@ -68,7 +71,7 @@ void EKFEstimator::propagate_imu(const Eigen::Vector3d& accel_mps2,
 
     const Eigen::Matrix3d R = q_.toRotationMatrix();
 
-    // â”€â”€ Nominal state integration (mid-point / Runge-Kutta 2) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Nominal state integration (mid-point / Runge-Kutta 2) 
     const Eigen::Vector3d g_world{0, 0, -kGravity};
 
     // Half-step quaternion
@@ -84,7 +87,7 @@ void EKFEstimator::propagate_imu(const Eigen::Vector3d& accel_mps2,
     q_ = propagate_quat(q_, w, dt);
     q_.normalize();
 
-    // â”€â”€ Error-state covariance propagation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Error-state covariance propagation â”€
     const FMat F = compute_F(a, R, dt);
     const GMat G = compute_G(R);
 
@@ -95,6 +98,7 @@ void EKFEstimator::propagate_imu(const Eigen::Vector3d& accel_mps2,
 
     // Symmetrize to prevent numerical drift
     P_ = 0.5 * (P_ + P_.transpose());
+    total_drift_ = P_.diagonal().head<3>().cwiseSqrt().norm();
 
     timestamp_ += dt;
 }
@@ -115,6 +119,7 @@ void EKFEstimator::update_vision(const std::vector<Eigen::Vector2d>& z_pixels,
     const double cx = K(0,2), cy = K(1,2);
     const double sigma2 = cfg_.sigma_px * cfg_.sigma_px;
 
+    bool accepted_update = false;
     for (size_t i = 0; i < z_pixels.size(); ++i) {
         // Project map point into current camera frame
         const Eigen::Vector3d p_c = R.transpose() * (p_world[i] - pos_);
@@ -182,6 +187,12 @@ void EKFEstimator::update_vision(const std::vector<Eigen::Vector2d>& z_pixels,
             Eigen::Matrix<double,15,15>::Identity() - K_gain * H;
         P_ = I_KH * P_ * I_KH.transpose() + K_gain * R_meas * K_gain.transpose();
         P_ = 0.5 * (P_ + P_.transpose());
+        total_drift_ = P_.diagonal().head<3>().cwiseSqrt().norm();
+        accepted_update = true;
+    }
+
+    if (accepted_update) {
+        last_vision_update_ts_ = timestamp_;
     }
 }
 
@@ -203,6 +214,8 @@ void EKFEstimator::update_depth(double z_depth_m, double sigma_m) {
     vel_  += dx.segment<3>(3);
     P_    -= K_gain * H * P_;
     P_     = 0.5 * (P_ + P_.transpose());
+    total_drift_ = P_.diagonal().head<3>().cwiseSqrt().norm();
+    last_depth_update_ts_ = timestamp_;
 }
 
  
@@ -225,6 +238,7 @@ void EKFEstimator::update_zupt() {
     vel_.setZero();
     P_    -= K_gain * H * P_;
     P_     = 0.5 * (P_ + P_.transpose());
+    total_drift_ = P_.diagonal().head<3>().cwiseSqrt().norm();
 }
 
  
@@ -238,6 +252,42 @@ PoseEstimate EKFEstimator::state() const {
     est.accel_bias  = ba_;
     est.gyro_bias   = bg_;
     est.pos_std     = P_.diagonal().head<3>().cwiseSqrt();
+    est.drift_m     = total_drift_;
+
+    const double uncertainty_norm = est.pos_std.norm();
+    const double vision_age = (last_vision_update_ts_ >= 0.0)
+        ? std::max(0.0, timestamp_ - last_vision_update_ts_)
+        : 1.0e9;
+    const double depth_age = (last_depth_update_ts_ >= 0.0)
+        ? std::max(0.0, timestamp_ - last_depth_update_ts_)
+        : 1.0e9;
+
+    double confidence = std::clamp(1.0 - (uncertainty_norm / 2.5), 0.0, 1.0);
+    if (vision_age > 0.8) {
+        confidence *= 0.78;
+    }
+    if (vision_age > 1.6) {
+        confidence *= 0.62;
+    }
+    if (depth_age < 0.6) {
+        confidence = std::min(1.0, confidence + 0.08);
+    }
+
+    est.localization_confidence = std::clamp(confidence, 0.0, 1.0);
+    est.localization_degraded =
+        est.localization_confidence < 0.58 || uncertainty_norm > 0.85 || vision_age > 1.2;
+    est.localization_lost =
+        est.localization_confidence < 0.22 || uncertainty_norm > 1.8 || vision_age > 3.5;
+
+    if (vision_age < 0.5 && depth_age < 0.7) {
+        est.localization_source = "vision-depth-fused";
+    } else if (vision_age < 0.8) {
+        est.localization_source = "vision-inertial";
+    } else if (depth_age < 0.7) {
+        est.localization_source = "lidar-aided-inertial";
+    } else {
+        est.localization_source = "imu-dead-reckoning";
+    }
     return est;
 }
 
@@ -270,8 +320,8 @@ FMat EKFEstimator::compute_F(const Eigen::Vector3d& a_body,
 
 GMat EKFEstimator::compute_G(const Eigen::Matrix3d& R) const {
     GMat G = GMat::Zero();
-    G.block<3,3>(3,0) = -R;   // accel noise â†’ velocity
-    G.block<3,3>(6,3) = -Eigen::Matrix3d::Identity(); // gyro noise â†’ attitude
+    G.block<3,3>(3,0) = -R;   // accel noise  velocity
+    G.block<3,3>(6,3) = -Eigen::Matrix3d::Identity(); // gyro noise  attitude
     G.block<3,3>(9,6) = Eigen::Matrix3d::Identity();  // accel bias drive
     G.block<3,3>(12,9)= Eigen::Matrix3d::Identity();  // gyro  bias drive
     return G;

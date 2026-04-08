@@ -22,9 +22,13 @@ struct MemoryPrior {
     double battery_burn_pct_per_min{0.0};
     double obstacle_frequency{0.0};
     double target_frequency{0.0};
+    double localization_confidence_avg{1.0};
+    double localization_dropout_frequency{0.0};
+    double low_feature_frequency{0.0};
     double risk_score{0.0};
     bool recommend_caution{false};
     std::string dominant_label;
+    std::string dominant_localization_source;
 };
 
 class ExperienceMemory {
@@ -41,6 +45,9 @@ public:
                  const hal::SystemStats& system,
                  const std::optional<sensors::CameraFrame>& frame,
                  size_t swarm_peer_count,
+                 double localization_confidence,
+                 std::string_view localization_source,
+                 bool localization_lost,
                  double now_s);
 
     [[nodiscard]] MemoryPrior summarize(uint32_t drone_id) const;
@@ -55,7 +62,11 @@ private:
         size_t swarm_peer_count{0};
         size_t hazard_count{0};
         size_t target_count{0};
+        size_t detection_count{0};
+        double localization_confidence{1.0};
+        bool localization_lost{false};
         std::string primary_label;
+        std::string localization_source;
     };
 
     [[nodiscard]] MemoryPrior summarize_queue(const std::deque<Observation>& queue) const;

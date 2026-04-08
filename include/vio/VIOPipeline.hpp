@@ -4,7 +4,7 @@
 
 #pragma once
  
-// VIOPipeline.hpp  â€”  Visual-Inertial Odometry orchestrator
+// VIOPipeline.hpp    Visual-Inertial Odometry orchestrator
 // Manages the EKF, feature tracking, and multi-sensor data flow
 // Drone Swarm Sensor Fusion  |  Phase 2
  
@@ -17,17 +17,35 @@
 #include <condition_variable>
 #include <functional>
 #include <queue>
+#include <string>
 #include <thread>
 #include <variant>
 
 namespace drone::vio {
 
-// â”€â”€â”€ Variant message for sensor event queue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Variant message for sensor event queue 
 using SensorEvent = std::variant<
     sensors::ImuMeasurement,
     sensors::CameraFrame,
     sensors::LidarMeasurement
 >;
+
+struct RuntimeTelemetry {
+    double localization_confidence_trend{0.0};
+    double sync_confidence{1.0};
+    double imu_camera_offset_ms{0.0};
+    double peer_clock_offset_ms{0.0};
+    double occupancy_ratio{0.0};
+    double anchor_visibility_ratio{0.0};
+    double tdoa_weight{0.0};
+    double tdoa_confidence{0.0};
+    size_t relocalization_count{0};
+    size_t visible_anchor_count{0};
+    size_t planned_waypoint_count{0};
+    uint64_t last_relocalized_keyframe{0};
+    std::string localization_state{"nominal"};
+    std::string localization_source{"vision-inertial"};
+};
 
  
 class VIOPipeline {
@@ -39,25 +57,33 @@ public:
 
     ~VIOPipeline() { stop(); }
 
-    // â”€â”€ Sensor registration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Sensor registration 
     void attach_imu   (std::shared_ptr<sensors::IMUSensor>    imu);
     void attach_camera(std::shared_ptr<sensors::CameraSensor> cam);
     void attach_lidar (std::shared_ptr<sensors::LidarSensor>  lidar);
 
-    // â”€â”€ Pipeline control â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Pipeline control 
     bool start();
     void stop();
     void reset();
 
-    // â”€â”€ State query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  State query â”€
     [[nodiscard]] PoseEstimate  current_pose() const { return ekf_.state(); }
     [[nodiscard]] double        drift_m()      const { return ekf_.total_drift_m(); }
+    [[nodiscard]] RuntimeTelemetry runtime_telemetry() const {
+        std::lock_guard lock(runtime_mutex_);
+        return runtime_telemetry_;
+    }
 
-    // â”€â”€ Output callback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Output callback 
     void set_pose_callback(PoseCallback cb) { pose_cb_ = std::move(cb); }
 
-    // â”€â”€ Configuration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Configuration 
     void set_camera_matrix(const Eigen::Matrix3d& K) { K_ = K; }
+    void set_runtime_telemetry(RuntimeTelemetry telemetry) {
+        std::lock_guard lock(runtime_mutex_);
+        runtime_telemetry_ = std::move(telemetry);
+    }
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -85,6 +111,8 @@ private:
     Eigen::Matrix3d  K_{Eigen::Matrix3d::Identity()};
     PoseCallback     pose_cb_;
     double           last_imu_ts_{-1.0};
+    mutable std::mutex runtime_mutex_;
+    RuntimeTelemetry runtime_telemetry_{};
 
     std::shared_ptr<spdlog::logger> logger_{spdlog::get("VIO")};
 };

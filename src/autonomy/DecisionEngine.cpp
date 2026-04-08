@@ -51,6 +51,10 @@ double caution_scale(const DecisionContext& ctx) {
     return std::clamp(1.0 - (ctx.memory_prior->risk_score * 0.18), 0.55, 0.90);
 }
 
+double localization_scale(const DecisionContext& ctx) {
+    return std::clamp(ctx.localization_confidence, 0.35, 1.0);
+}
+
 } // namespace
 
 DecisionEngine::DecisionEngine(DecisionConfig cfg)
@@ -83,9 +87,35 @@ DecisionCommand DecisionEngine::update(const DecisionContext& ctx) {
         return build_emergency_land(ctx);
     }
 
+    if (ctx.localization_lost || ctx.localization_confidence <= cfg_.lost_localization_threshold) {
+        if (ctx.tdoa_position.has_value() &&
+            ctx.tdoa_confidence >= cfg_.tdoa_recovery_confidence &&
+            ctx.visible_anchor_count > 0) {
+            mode_ = BehaviorMode::SAFE_RETURN_BY_ANCHOR;
+            return build_safe_return_by_anchor(ctx);
+        }
+
+        if (!ctx.camera_tracking_nominal || ctx.sync_confidence < 0.45 || ctx.relocalization_count == 0) {
+            mode_ = BehaviorMode::HOVER_AND_SCAN;
+            return build_hover_and_scan(ctx);
+        }
+
+        mode_ = BehaviorMode::LOCALIZATION_LOST;
+        return build_localization_lost(ctx);
+    }
+
     if (ctx.system.battery_pct > 0.0f && ctx.system.battery_pct <= cfg_.low_battery_pct) {
         mode_ = BehaviorMode::RETURN_HOME;
         return build_return_home(ctx);
+    }
+
+    if (ctx.localization_degraded || ctx.localization_confidence <= cfg_.degraded_localization_threshold) {
+        if (!ctx.camera_tracking_nominal || ctx.sync_confidence < 0.55) {
+            mode_ = BehaviorMode::HOVER_AND_SCAN;
+            return build_hover_and_scan(ctx);
+        }
+        mode_ = BehaviorMode::LOCALIZATION_DEGRADED;
+        return build_localization_degraded(ctx);
     }
 
     if (ctx.memory_prior.has_value() &&
@@ -231,7 +261,7 @@ DecisionCommand DecisionEngine::build_search(const DecisionContext& ctx) const {
                                                     target_miss_count_, caution_scale(ctx));
     DecisionCommand command;
     command.mode = BehaviorMode::SEARCH;
-    const double speed_scale = caution_scale(ctx);
+    const double speed_scale = caution_scale(ctx) * localization_scale(ctx);
 
     const double altitude_error = static_cast<double>(cfg_.nominal_altitude_m) - ctx.pose.position.z();
     command.desired_velocity =
@@ -243,6 +273,98 @@ DecisionCommand DecisionEngine::build_search(const DecisionContext& ctx) const {
     command.summary = ctx.memory_prior.has_value() && ctx.memory_prior->recommend_caution
         ? "No validated target, searching cautiously using learned fleet risk prior"
         : "No validated target, continuing autonomous search sweep";
+    return command;
+}
+
+DecisionCommand DecisionEngine::build_hover_and_scan(const DecisionContext& ctx) const {
+    drone::utils::get_or_create_logger("AI")->warn(
+        "DecisionEngine hover-scan loc_conf={:.2f} sync={:.2f} camera_nominal={}",
+        ctx.localization_confidence,
+        ctx.sync_confidence,
+        ctx.camera_tracking_nominal);
+    DecisionCommand command;
+    command.mode = BehaviorMode::HOVER_AND_SCAN;
+    command.requires_operator_attention = ctx.localization_confidence < 0.3;
+    command.desired_velocity =
+        (-ctx.pose.velocity * 0.55) +
+        body_up(ctx.pose) * std::clamp(
+            static_cast<double>(cfg_.safe_altitude_m - 1.0f) - ctx.pose.position.z(),
+            -0.15,
+            0.25);
+    command.desired_velocity = clamp_speed(command.desired_velocity, cfg_.max_recovery_speed_mps * 0.65);
+    command.desired_yaw_rate_rads = ctx.swarm_follower ? 0.08 : 0.22;
+    command.summary = "Localization unstable, hovering and scanning for relocalization";
+    return command;
+}
+
+DecisionCommand DecisionEngine::build_safe_return_by_anchor(const DecisionContext& ctx) const {
+    drone::utils::get_or_create_logger("AI")->warn(
+        "DecisionEngine safe-return anchor_count={} tdoa_conf={:.2f}",
+        ctx.visible_anchor_count,
+        ctx.tdoa_confidence);
+    DecisionCommand command;
+    command.mode = BehaviorMode::SAFE_RETURN_BY_ANCHOR;
+    command.requires_operator_attention = true;
+
+    Eigen::Vector3d recovery = *ctx.tdoa_position - ctx.pose.position;
+    recovery.z() = std::clamp(
+        static_cast<double>(cfg_.safe_altitude_m) - ctx.pose.position.z(),
+        -0.25,
+        0.45);
+    command.desired_velocity = clamp_speed(recovery, cfg_.max_recovery_speed_mps);
+    command.summary = "Localization lost, returning via visible anchor geometry";
+    return command;
+}
+
+DecisionCommand DecisionEngine::build_localization_degraded(const DecisionContext& ctx) const {
+    drone::utils::get_or_create_logger("AI")->warn(
+        "DecisionEngine degraded localization conf={:.2f} source={}",
+        ctx.localization_confidence,
+        ctx.localization_source);
+    DecisionCommand command;
+    command.mode = BehaviorMode::LOCALIZATION_DEGRADED;
+    command.requires_operator_attention = ctx.localization_confidence < 0.45;
+
+    const double altitude_error = static_cast<double>(cfg_.nominal_altitude_m) - ctx.pose.position.z();
+    command.desired_velocity =
+        (-ctx.pose.velocity * 0.45) +
+        body_up(ctx.pose) * std::clamp(altitude_error * 0.15, -0.25, 0.25);
+    command.desired_velocity = clamp_speed(command.desired_velocity, cfg_.max_recovery_speed_mps);
+    command.desired_yaw_rate_rads = ctx.swarm_follower ? 0.0 : 0.12;
+    command.summary = ctx.tdoa_confidence < 0.2
+        ? "Localization degraded, cautious dead-reckoning while anchor aid is unavailable"
+        : "Localization degraded, slowing down and stabilizing for recovery using " + ctx.localization_source;
+    return command;
+}
+
+DecisionCommand DecisionEngine::build_localization_lost(const DecisionContext& ctx) const {
+    drone::utils::get_or_create_logger("AI")->error(
+        "DecisionEngine localization lost conf={:.2f} tdoa_conf={:.2f}",
+        ctx.localization_confidence,
+        ctx.tdoa_confidence);
+    DecisionCommand command;
+    command.mode = BehaviorMode::LOCALIZATION_LOST;
+    command.requires_operator_attention = true;
+
+    if (ctx.tdoa_position.has_value() && ctx.tdoa_confidence >= cfg_.tdoa_recovery_confidence) {
+        Eigen::Vector3d recovery = *ctx.tdoa_position - ctx.pose.position;
+        recovery.z() = std::clamp(
+            static_cast<double>(cfg_.safe_altitude_m) - ctx.pose.position.z(),
+            -0.3,
+            0.5);
+        command.desired_velocity = clamp_speed(recovery, cfg_.max_recovery_speed_mps);
+        command.summary = "Localization lost, using TDOA recovery anchor";
+        return command;
+    }
+
+    command.desired_velocity =
+        (-ctx.pose.velocity * 0.6) +
+        body_up(ctx.pose) * std::clamp(
+            static_cast<double>(cfg_.safe_altitude_m - 1.5f) - ctx.pose.position.z(),
+            -0.2,
+            0.35);
+    command.desired_velocity = clamp_speed(command.desired_velocity, cfg_.max_recovery_speed_mps * 0.8);
+    command.summary = "Localization lost, holding for relocalization and operator intervention";
     return command;
 }
 
@@ -259,7 +381,7 @@ DecisionCommand DecisionEngine::build_track(const DecisionContext& ctx,
 
     const float desired_area = 0.12f;
     const float area_error = desired_area - focus.normalized_area;
-    const double speed_scale = caution_scale(ctx);
+    const double speed_scale = caution_scale(ctx) * localization_scale(ctx);
 
     Eigen::Vector3d velocity =
         body_forward(ctx.pose) * std::clamp(area_error * 8.0f,
@@ -294,7 +416,8 @@ DecisionCommand DecisionEngine::build_avoid(const DecisionContext& ctx,
         -body_right(ctx.pose) * std::clamp(static_cast<double>(focus.image_offset.x()) * 3.0, -1.2, 1.2) +
         body_up(ctx.pose) * std::clamp(altitude_error * 0.15, 0.0, 0.9);
 
-    command.desired_velocity = clamp_speed(velocity, cfg_.max_avoid_speed_mps * caution_scale(ctx));
+    command.desired_velocity =
+        clamp_speed(velocity, cfg_.max_avoid_speed_mps * caution_scale(ctx) * localization_scale(ctx));
     command.desired_yaw_rate_rads = -std::clamp(static_cast<double>(focus.image_offset.x()) * 1.6, -1.0, 1.0);
     command.requires_operator_attention =
         is_hazard_label(focus.detection.label) || focus.normalized_area >= 0.20f;

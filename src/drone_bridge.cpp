@@ -3,8 +3,8 @@
 // Technology: C++, Python, Go, CMake
 
  
-// drone_bridge.cpp  â€”  pybind11 module exposing C++ core to Python GUI
-// Drone Swarm Sensor Fusion  |  Phase 4 â€” GUI Bridge
+// drone_bridge.cpp    pybind11 module exposing C++ core to Python GUI
+// Drone Swarm Sensor Fusion  |  Phase 4  GUI Bridge
  
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -15,18 +15,15 @@
 #include "vio/VIOPipeline.hpp"
 #include "vio/EKFEstimator.hpp"
 #include "hal/JetsonHAL.hpp"
-
-#ifdef DRONE_HAS_FASTDDS
 #include "swarm/V2XMeshNetwork.hpp"
-#endif
 
 namespace py = pybind11;
 using namespace drone;
 
 PYBIND11_MODULE(drone_bridge, m) {
-    m.doc() = "GPS-Denied Drone Swarm â€” Python â†” C++ Bridge (pybind11)";
+    m.doc() = "GPS-Denied Drone Swarm  Python â†” C++ Bridge (pybind11)";
 
-    // â”€â”€ EKFConfig â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  EKFConfig 
     py::class_<vio::EKFConfig>(m, "EKFConfig")
         .def(py::init<>())
         .def_readwrite("sigma_na",       &vio::EKFConfig::sigma_na)
@@ -36,21 +33,45 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def_readwrite("sigma_px",       &vio::EKFConfig::sigma_px)
         .def_readwrite("mahal_gate",     &vio::EKFConfig::mahal_gate);
 
-    // â”€â”€ PoseEstimate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  PoseEstimate 
     py::class_<vio::PoseEstimate>(m, "PoseEstimate")
         .def(py::init<>())
         .def_readwrite("timestamp",   &vio::PoseEstimate::timestamp)
         .def_readwrite("position",    &vio::PoseEstimate::position)
         .def_readwrite("velocity",    &vio::PoseEstimate::velocity)
         .def_readwrite("pos_std",     &vio::PoseEstimate::pos_std)
+        .def_readwrite("drift_m",     &vio::PoseEstimate::drift_m)
+        .def_readwrite("localization_confidence", &vio::PoseEstimate::localization_confidence)
+        .def_readwrite("localization_source", &vio::PoseEstimate::localization_source)
+        .def_readwrite("localization_degraded", &vio::PoseEstimate::localization_degraded)
+        .def_readwrite("localization_lost", &vio::PoseEstimate::localization_lost)
         .def("euler_zyx_deg",         &vio::PoseEstimate::euler_zyx_deg)
         .def("__repr__", [](const vio::PoseEstimate& p) {
-            return py::str("PoseEstimate(t={:.3f}, pos=[{:.3f},{:.3f},{:.3f}])")
+            return py::str("PoseEstimate(t={:.3f}, pos=[{:.3f},{:.3f},{:.3f}], conf={:.2f}, source={})")
                 .format(p.timestamp,
-                        p.position.x(), p.position.y(), p.position.z());
+                        p.position.x(), p.position.y(), p.position.z(),
+                        p.localization_confidence,
+                        p.localization_source);
         });
 
-    // â”€â”€ SystemStats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    py::class_<vio::RuntimeTelemetry>(m, "RuntimeTelemetry")
+        .def(py::init<>())
+        .def_readwrite("localization_confidence_trend", &vio::RuntimeTelemetry::localization_confidence_trend)
+        .def_readwrite("sync_confidence", &vio::RuntimeTelemetry::sync_confidence)
+        .def_readwrite("imu_camera_offset_ms", &vio::RuntimeTelemetry::imu_camera_offset_ms)
+        .def_readwrite("peer_clock_offset_ms", &vio::RuntimeTelemetry::peer_clock_offset_ms)
+        .def_readwrite("occupancy_ratio", &vio::RuntimeTelemetry::occupancy_ratio)
+        .def_readwrite("anchor_visibility_ratio", &vio::RuntimeTelemetry::anchor_visibility_ratio)
+        .def_readwrite("tdoa_weight", &vio::RuntimeTelemetry::tdoa_weight)
+        .def_readwrite("tdoa_confidence", &vio::RuntimeTelemetry::tdoa_confidence)
+        .def_readwrite("relocalization_count", &vio::RuntimeTelemetry::relocalization_count)
+        .def_readwrite("visible_anchor_count", &vio::RuntimeTelemetry::visible_anchor_count)
+        .def_readwrite("planned_waypoint_count", &vio::RuntimeTelemetry::planned_waypoint_count)
+        .def_readwrite("last_relocalized_keyframe", &vio::RuntimeTelemetry::last_relocalized_keyframe)
+        .def_readwrite("localization_state", &vio::RuntimeTelemetry::localization_state)
+        .def_readwrite("localization_source", &vio::RuntimeTelemetry::localization_source);
+
+    //  SystemStats 
     py::class_<hal::SystemStats>(m, "SystemStats")
         .def(py::init<>())
         .def_readwrite("cpu_pct",        &hal::SystemStats::cpu_pct)
@@ -61,12 +82,11 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def_readwrite("battery_pct",    &hal::SystemStats::battery_pct)
         .def_readwrite("wifi_rssi_dbm",  &hal::SystemStats::wifi_rssi_dbm);
 
-    // â”€â”€ Free function: read_system_stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Free function: read_system_stats 
     m.def("read_system_stats", &hal::read_system_stats,
           "Read current CPU, GPU, memory, battery, and RSSI stats");
 
-#ifdef DRONE_HAS_FASTDDS
-    // â”€â”€ DroneRole â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  DroneRole 
     py::enum_<swarm::DroneRole>(m, "DroneRole")
         .value("CANDIDATE", swarm::DroneRole::CANDIDATE)
         .value("FOLLOWER",  swarm::DroneRole::FOLLOWER)
@@ -100,7 +120,7 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def_readwrite("leader_target", &swarm::FormationCommand::leader_target)
         .def_readwrite("velocity_mps",  &swarm::FormationCommand::velocity_mps);
 
-    // â”€â”€ PeerInfo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  PeerInfo 
     py::class_<swarm::PeerInfo>(m, "PeerInfo")
         .def(py::init<>())
         .def_readwrite("id",           &swarm::PeerInfo::id)
@@ -112,7 +132,7 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def_readwrite("last_seen_ts", &swarm::PeerInfo::last_seen_ts)
         .def_readwrite("reachable",    &swarm::PeerInfo::reachable);
 
-    // â”€â”€ V2XMeshNetwork â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  V2XMeshNetwork 
     py::class_<swarm::V2XMeshNetwork,
                std::shared_ptr<swarm::V2XMeshNetwork>>(m, "V2XMeshNetwork")
         .def(py::init<uint32_t, std::string, uint16_t>(),
@@ -133,9 +153,8 @@ PYBIND11_MODULE(drone_bridge, m) {
              &swarm::V2XMeshNetwork::broadcast,
              py::arg("type"),
              py::arg("payload") = std::vector<uint8_t>{});
-#endif
 
-    // â”€â”€ VIOPipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  VIOPipeline â”€
     // Note: sensors are started separately on the C++ side;
     // the Python GUI interacts with the pipeline in read-only query mode.
     py::class_<vio::VIOPipeline,
@@ -143,13 +162,15 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def(py::init<vio::EKFConfig>(), py::arg("cfg") = vio::EKFConfig{})
         .def("current_pose", &vio::VIOPipeline::current_pose)
         .def("drift_m",      &vio::VIOPipeline::drift_m)
+        .def("runtime_telemetry", &vio::VIOPipeline::runtime_telemetry)
         .def("set_pose_callback", &vio::VIOPipeline::set_pose_callback)
         .def("reset",        &vio::VIOPipeline::reset);
 
-    // â”€â”€ Version info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Version info 
     m.attr("__version__") = "2.0.0";
-    m.attr("BUILD_FASTDDS") =
-#ifdef DRONE_HAS_FASTDDS
+    m.attr("BUILD_SWARM_V2X") = true;
+    m.attr("BUILD_FASTDDS_TRANSPORT") =
+#ifdef DRONE_HAS_FASTDDS_TRANSPORT
         true;
 #else
         false;

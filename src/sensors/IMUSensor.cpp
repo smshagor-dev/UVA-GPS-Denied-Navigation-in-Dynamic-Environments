@@ -3,7 +3,7 @@
 // Technology: C++, Python, Go, CMake
 
  
-// IMUSensor.cpp  â€”  IMU acquisition, calibration, and I2C integration
+// IMUSensor.cpp    IMU acquisition, calibration, and I2C integration
 // Drone Swarm Sensor Fusion  |  Phase 2
  
 #include "sensors/IMUSensor.hpp"
@@ -82,7 +82,7 @@ bool IMUSensor::initialize() {
     ::write(fd_, accel_cfg, 2);
 #else
     // Simulation mode on non-Linux (x86 dev/CI)
-    logger_->warn("[{}] Non-Linux platform â€” running in simulation mode", id_);
+    logger_->warn("[{}] Non-Linux platform  running in simulation mode", id_);
 #endif
 
     poll_rate_hz_ = 400;

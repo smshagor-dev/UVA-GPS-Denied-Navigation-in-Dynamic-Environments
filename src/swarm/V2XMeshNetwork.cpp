@@ -3,7 +3,7 @@
 // Technology: C++, Python, Go, CMake
 
  
-// V2XMeshNetwork.cpp  â€”  Swarm comms, leader election, formation control
+// V2XMeshNetwork.cpp    Swarm comms, leader election, formation control
 // Drone Swarm Sensor Fusion  |  Phase 3
  
 #include "swarm/V2XMeshNetwork.hpp"
@@ -16,7 +16,12 @@
 #include <cmath>
 #include <limits>
 
-#ifdef __linux__
+#ifdef _WIN32
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#pragma comment(lib, "Ws2_32.lib")
+#elif defined(__linux__)
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -57,7 +62,7 @@ double closing_speed_along(const Eigen::Vector3d& relative_position,
 
 } // namespace
 
-// â”€â”€ Wire format header (little-endian) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Wire format header (little-endian) 
 // [4B magic][4B src_id][4B dst_id][4B seq][8B timestamp][1B type][1B hop]
 // [1B ttl][1B pad][2B payload_len][payload...]
 static constexpr uint32_t kMagic = 0x56325831; // "V2X1"
@@ -167,7 +172,34 @@ V2XMeshNetwork::~V2XMeshNetwork() { stop(); }
 bool V2XMeshNetwork::start() {
     if (running_.exchange(true)) return true;
 
-#ifdef __linux__
+#ifdef _WIN32
+    WSADATA wsa_data;
+    if (WSAStartup(MAKEWORD(2, 2), &wsa_data) != 0) {
+        running_.store(false);
+        return false;
+    }
+
+    sock_ = static_cast<int>(::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+    if (sock_ < 0) {
+        running_.store(false);
+        return false;
+    }
+
+    BOOL yes = TRUE;
+    ::setsockopt(sock_, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&yes), sizeof(yes));
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port_);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (::bind(sock_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+        stop();
+        return false;
+    }
+
+    u_long non_blocking = 1;
+    ::ioctlsocket(static_cast<SOCKET>(sock_), FIONBIO, &non_blocking);
+#elif defined(__linux__)
     // Create UDP socket
     sock_ = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_ < 0) {
@@ -212,7 +244,10 @@ bool V2XMeshNetwork::start() {
 void V2XMeshNetwork::stop() {
     if (!running_.exchange(false)) return;
 
-#ifdef __linux__
+#ifdef _WIN32
+    if (sock_ >= 0) { ::closesocket(static_cast<SOCKET>(sock_)); sock_ = -1; }
+    WSACleanup();
+#elif defined(__linux__)
     if (sock_ >= 0) { ::close(sock_); sock_ = -1; }
 #endif
 
@@ -242,15 +277,25 @@ bool V2XMeshNetwork::broadcast(SwarmMessage::Type type,
         : msg.serialize();
     if (bytes.size() > kMaxPayload) return false;
 
-#ifdef __linux__
+#if defined(_WIN32) || defined(__linux__)
     sockaddr_in dest{};
     dest.sin_family      = AF_INET;
     dest.sin_port        = htons(port_);
     dest.sin_addr.s_addr = ::inet_addr(multicast_group_.c_str());
 
+#ifdef _WIN32
+    const int sent = ::sendto(
+        static_cast<SOCKET>(sock_),
+        reinterpret_cast<const char*>(bytes.data()),
+        static_cast<int>(bytes.size()),
+        0,
+        reinterpret_cast<const sockaddr*>(&dest),
+        sizeof(dest));
+#else
     const ssize_t sent = ::sendto(
         sock_, bytes.data(), bytes.size(), 0,
         reinterpret_cast<sockaddr*>(&dest), sizeof(dest));
+#endif
 
     if (sent < 0) {
         logger_->warn("V2X broadcast failed (type={})", static_cast<int>(type));
@@ -281,15 +326,25 @@ bool V2XMeshNetwork::unicast(uint32_t dst,
         : msg.serialize();
     if (bytes.size() > kMaxPayload) return false;
 
-#ifdef __linux__
+#if defined(_WIN32) || defined(__linux__)
     sockaddr_in dest{};
     dest.sin_family      = AF_INET;
     dest.sin_port        = htons(port_);
     dest.sin_addr.s_addr = ::inet_addr(multicast_group_.c_str());
 
+#ifdef _WIN32
+    const int sent = ::sendto(
+        static_cast<SOCKET>(sock_),
+        reinterpret_cast<const char*>(bytes.data()),
+        static_cast<int>(bytes.size()),
+        0,
+        reinterpret_cast<const sockaddr*>(&dest),
+        sizeof(dest));
+#else
     const ssize_t sent = ::sendto(
         sock_, bytes.data(), bytes.size(), 0,
         reinterpret_cast<sockaddr*>(&dest), sizeof(dest));
+#endif
 
     if (sent < 0) {
         logger_->warn("V2X unicast failed (dst={} type={})", dst, static_cast<int>(type));
@@ -330,13 +385,23 @@ void V2XMeshNetwork::recv_loop() {
     std::vector<uint8_t> buf(kMaxPayload);
 
     while (running_.load()) {
-#ifdef __linux__
+#if defined(_WIN32) || defined(__linux__)
         sockaddr_in sender{};
+#ifdef _WIN32
+        int sender_len = sizeof(sender);
+#else
         socklen_t   sender_len = sizeof(sender);
+#endif
 
+#ifdef _WIN32
+        const int n = ::recvfrom(
+            static_cast<SOCKET>(sock_), reinterpret_cast<char*>(buf.data()), static_cast<int>(buf.size()), 0,
+            reinterpret_cast<sockaddr*>(&sender), &sender_len);
+#else
         const ssize_t n = ::recvfrom(
             sock_, buf.data(), buf.size(), MSG_DONTWAIT,
             reinterpret_cast<sockaddr*>(&sender), &sender_len);
+#endif
 
         if (n <= 0) {
             std::this_thread::sleep_for(std::chrono::microseconds(500));

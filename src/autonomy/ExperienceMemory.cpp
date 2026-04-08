@@ -42,6 +42,9 @@ void ExperienceMemory::observe(uint32_t drone_id,
                                const hal::SystemStats& system,
                                const std::optional<sensors::CameraFrame>& frame,
                                size_t swarm_peer_count,
+                               double localization_confidence,
+                               std::string_view localization_source,
+                               bool localization_lost,
                                double now_s) {
     auto logger = drone::utils::get_or_create_logger("MEMORY");
     Observation obs;
@@ -49,9 +52,13 @@ void ExperienceMemory::observe(uint32_t drone_id,
     obs.drift_m = pose.pos_std.norm();
     obs.battery_pct = system.battery_pct;
     obs.swarm_peer_count = swarm_peer_count;
+    obs.localization_confidence = localization_confidence;
+    obs.localization_lost = localization_lost;
+    obs.localization_source = lowercase(localization_source);
 
     if (frame.has_value() && !frame->detections.empty()) {
         const auto& detections = frame->detections;
+        obs.detection_count = detections.size();
         const auto primary = std::max_element(detections.begin(), detections.end(),
             [](const auto& lhs, const auto& rhs) { return lhs.confidence < rhs.confidence; });
         if (primary != detections.end()) {
@@ -120,30 +127,56 @@ MemoryPrior ExperienceMemory::summarize_queue(const std::deque<Observation>& que
     size_t hazards = 0;
     size_t targets = 0;
     size_t with_labels = 0;
+    size_t localization_dropouts = 0;
+    size_t low_feature_observations = 0;
+    double localization_conf_sum = 0.0;
     std::unordered_map<std::string, size_t> label_histogram;
+    std::unordered_map<std::string, size_t> localization_histogram;
     for (const auto& obs : queue) {
         hazards += obs.hazard_count;
         targets += obs.target_count;
+        localization_conf_sum += obs.localization_confidence;
+        if (obs.localization_lost || obs.localization_confidence < 0.35) {
+            ++localization_dropouts;
+        }
+        if (obs.detection_count == 0) {
+            ++low_feature_observations;
+        }
         if (!obs.primary_label.empty()) {
             ++label_histogram[obs.primary_label];
             ++with_labels;
+        }
+        if (!obs.localization_source.empty()) {
+            ++localization_histogram[obs.localization_source];
         }
     }
 
     const double denom = std::max(static_cast<double>(queue.size()), 1.0);
     prior.obstacle_frequency = static_cast<double>(hazards) / denom;
     prior.target_frequency = static_cast<double>(targets) / denom;
+    prior.localization_confidence_avg = localization_conf_sum / denom;
+    prior.localization_dropout_frequency = static_cast<double>(localization_dropouts) / denom;
+    prior.low_feature_frequency = static_cast<double>(low_feature_observations) / denom;
 
     auto dominant = std::max_element(label_histogram.begin(), label_histogram.end(),
         [](const auto& lhs, const auto& rhs) { return lhs.second < rhs.second; });
     if (dominant != label_histogram.end()) {
         prior.dominant_label = dominant->first;
     }
+    auto dominant_localization = std::max_element(
+        localization_histogram.begin(), localization_histogram.end(),
+        [](const auto& lhs, const auto& rhs) { return lhs.second < rhs.second; });
+    if (dominant_localization != localization_histogram.end()) {
+        prior.dominant_localization_source = dominant_localization->first;
+    }
 
     prior.risk_score =
         std::clamp(prior.obstacle_frequency * 0.32
                  + std::max(0.0, prior.drift_trend_m_per_min) * 0.85
-                 + std::max(0.0, prior.battery_burn_pct_per_min) * 0.06,
+                 + std::max(0.0, prior.battery_burn_pct_per_min) * 0.06
+                 + prior.localization_dropout_frequency * 0.70
+                 + prior.low_feature_frequency * 0.22
+                 + std::max(0.0, 0.70 - prior.localization_confidence_avg) * 0.55,
                    0.0, 1.5);
     prior.recommend_caution = prior.risk_score >= cfg_.caution_risk_threshold;
     return prior;

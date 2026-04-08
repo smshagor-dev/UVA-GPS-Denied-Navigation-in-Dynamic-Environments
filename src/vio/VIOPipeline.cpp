@@ -3,7 +3,7 @@
 // Technology: C++, Python, Go, CMake
 
  
-// VIOPipeline.cpp  â€”  Multi-sensor orchestration with lock-free event queue
+// VIOPipeline.cpp    Multi-sensor orchestration with lock-free event queue
 // Drone Swarm Sensor Fusion  |  Phase 2
  
 #include "vio/VIOPipeline.hpp"
@@ -65,7 +65,7 @@ void VIOPipeline::enqueue(SensorEvent evt) {
         // Drop oldest if queue is overflowing (back-pressure protection)
         if (event_queue_.size() > 2000) {
             event_queue_.pop();
-            if (logger_) logger_->warn("VIO queue overflow â€” dropping oldest event");
+            if (logger_) logger_->warn("VIO queue overflow  dropping oldest event");
         }
         event_queue_.push(std::move(evt));
     }

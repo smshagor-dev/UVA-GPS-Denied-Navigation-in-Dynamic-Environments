@@ -26,6 +26,29 @@ LOG_DIR = ROOT / "logs" / "launcher"
 logger = logging.getLogger(__name__)
 
 
+def load_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.exists():
+        return values
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            values[key] = value
+    return values
+
+
+def bootstrap_env() -> None:
+    for env_path in (ROOT / ".env", ROOT / ".env.local"):
+        loaded = load_env_file(env_path)
+        for key, value in loaded.items():
+            os.environ.setdefault(key, value)
+
+
 @dataclass
 class ManagedProcess:
     name: str
@@ -42,12 +65,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-cpp", action="store_true", help="skip C++ drone node startup")
     parser.add_argument("--skip-gui", action="store_true", help="skip PySide6 dashboard startup")
     parser.add_argument("--dry-run", action="store_true", help="print commands without executing them")
-    parser.add_argument("--drone-id", type=int, default=1, help="local drone id for drone_node")
-    parser.add_argument("--esp32", default="192.168.4.1", help="ESP32 camera IP for drone_node")
-    parser.add_argument("--lidar", default="192.168.1.201:2368", help="LiDAR endpoint for drone_node")
-    parser.add_argument("--go-port", type=int, default=8080, help="Go control-plane port")
-    parser.add_argument("--dashboard-poll-hz", type=int, default=20, help="dashboard polling rate")
-    parser.add_argument("--dashboard-ids", default="1,2,3,4,5", help="comma-separated drone ids for dashboard")
+    parser.add_argument("--drone-id", type=int, default=int(os.environ.get("DRONE_NODE_ID", "1")), help="local drone id for drone_node")
+    parser.add_argument("--esp32", default=os.environ.get("DRONE_ESP32_IP", "192.168.4.1"), help="ESP32 camera IP for drone_node")
+    parser.add_argument("--lidar", default=os.environ.get("DRONE_LIDAR_ENDPOINT", "192.168.1.201:2368"), help="LiDAR endpoint for drone_node")
+    parser.add_argument("--go-port", type=int, default=int(os.environ.get("DRONE_GO_PORT", "8080")), help="Go control-plane port")
+    parser.add_argument("--dashboard-poll-hz", type=int, default=int(os.environ.get("DRONE_DASHBOARD_POLL_HZ", "20")), help="dashboard polling rate")
+    parser.add_argument("--dashboard-ids", default=os.environ.get("DRONE_DASHBOARD_IDS", "1,2,3,4,5"), help="comma-separated drone ids for dashboard")
     return parser.parse_args()
 
 
@@ -153,6 +176,7 @@ def print_plan(processes: list[ManagedProcess]) -> None:
 
 def main() -> int:
     try:
+        bootstrap_env()
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         root = logging.getLogger()
         root.setLevel(logging.DEBUG)
@@ -240,9 +264,11 @@ def main() -> int:
 
         env = os.environ.copy()
         env.setdefault("PYTHONUNBUFFERED", "1")
+        if env.get("DRONE_BACKEND_URL"):
+            go_url = env["DRONE_BACKEND_URL"]
 
         if any(p.name == "go-control-plane" for p in processes):
-            env["DRONE_SWARM_ADDR"] = f":{args.go_port}"
+            env.setdefault("DRONE_SWARM_ADDR", f":{args.go_port}")
 
         started: list[ManagedProcess] = []
         try:

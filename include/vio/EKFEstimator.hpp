@@ -4,9 +4,9 @@
 
 #pragma once
  
-// EKFEstimator.hpp  â€”  Extended Kalman Filter for Visual-Inertial Odometry
+// EKFEstimator.hpp    Extended Kalman Filter for Visual-Inertial Odometry
 // State: [pos(3), vel(3), quat(4), ba(3), bg(3)] = 16-dim
-// Drone Swarm Sensor Fusion  |  Phase 2 â€” VIO Pipeline
+// Drone Swarm Sensor Fusion  |  Phase 2  VIO Pipeline
  
 #include <Eigen/Core>
 #include <Eigen/Geometry>
@@ -14,6 +14,7 @@
 #include <mutex>
 #include <numbers>
 #include <optional>
+#include <string>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
@@ -23,12 +24,12 @@ namespace drone::vio {
 // State vector layout  (16-dim)
 //   [0:2]  position      p  (m, world frame)
 //   [3:5]  velocity      v  (m/s, world frame)
-//   [6:9]  quaternion    q  (w,x,y,z  â€” worldâ†body)
+//   [6:9]  quaternion    q  (w,x,y,z   world body)
 //   [10:12] accel bias   ba (m/sÂ²)
 //   [13:15] gyro bias    bg (rad/s)
  
 constexpr int kStateDim    = 16;
-constexpr int kErrorDim    = 15;  // error-state (quaternion â†’ 3-param)
+constexpr int kErrorDim    = 15;  // error-state (quaternion  3-param)
 constexpr int kImuNoiseDim = 12;  // na, ng, nba, nbg (3 each)
 
 using StateVec     = Eigen::Matrix<double, kStateDim,    1>;
@@ -74,11 +75,16 @@ struct PoseEstimate {
 
     // Uncertainty (diagonal of position block)
     Eigen::Vector3d pos_std{Eigen::Vector3d::Ones() * 0.1};
+    double          drift_m{0.0};
+    double          localization_confidence{1.0};
+    std::string     localization_source{"imu-dead-reckoning"};
+    bool            localization_degraded{false};
+    bool            localization_lost{false};
 
     // Derived
     [[nodiscard]] Eigen::Matrix3d R_wb() const { return orientation.toRotationMatrix(); }
     [[nodiscard]] Eigen::Vector3d euler_zyx_deg() const {
-        return orientation.toRotationMatrix().eulerAngles(2,1,0) *
+        return orientation.toRotationMatrix().canonicalEulerAngles(2,1,0) *
                (180.0 / std::numbers::pi_v<double>);
     }
 
@@ -90,18 +96,18 @@ class EKFEstimator {
 public:
     explicit EKFEstimator(EKFConfig cfg = {});
 
-    // â”€â”€ Initialize with known pose â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Initialize with known pose 
     void reset(const Eigen::Vector3d& p0       = Eigen::Vector3d::Zero(),
                const Eigen::Quaterniond& q0    = Eigen::Quaterniond::Identity(),
                const Eigen::Vector3d& v0       = Eigen::Vector3d::Zero());
 
-    // â”€â”€ IMU propagation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  IMU propagation 
     //   Call at IMU rate (~400 Hz).  dt in seconds.
     void propagate_imu(const Eigen::Vector3d& accel_mps2,
                        const Eigen::Vector3d& gyro_rads,
                        double dt);
 
-    // â”€â”€ Camera update (feature-based) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Camera update (feature-based) 
     //   z_pixels: Nx2 observed pixel coordinates
     //   p_world:  Nx3 corresponding 3-D map points
     //   K:        3x3 camera intrinsic matrix
@@ -109,13 +115,13 @@ public:
                        const std::vector<Eigen::Vector3d>& p_world,
                        const Eigen::Matrix3d& K);
 
-    // â”€â”€ Depth update (from LiDAR plane fit) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Depth update (from LiDAR plane fit) â”€
     void update_depth(double z_depth_m, double sigma_m = 0.05);
 
-    // â”€â”€ Zero velocity update (on ground detection) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Zero velocity update (on ground detection) 
     void update_zupt();
 
-    // â”€â”€ Query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Query â”€
     [[nodiscard]] PoseEstimate state() const;
     [[nodiscard]] double       total_drift_m() const { return total_drift_; }
     [[nodiscard]] bool         is_initialized() const { return initialized_; }
@@ -123,7 +129,7 @@ public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
-    // â”€â”€ Core EKF math â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Core EKF math 
     FMat compute_F(const Eigen::Vector3d& accel_body,
                    const Eigen::Matrix3d& R_wb,
                    double dt) const;
@@ -154,6 +160,8 @@ private:
     double timestamp_{0.0};
     double total_drift_{0.0};
     bool   initialized_{false};
+    double last_vision_update_ts_{-1.0};
+    double last_depth_update_ts_{-1.0};
 
     EKFConfig cfg_;
     mutable std::mutex mtx_;

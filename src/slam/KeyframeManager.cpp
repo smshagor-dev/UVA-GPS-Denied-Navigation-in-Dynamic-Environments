@@ -225,7 +225,9 @@ std::optional<uint64_t> KeyframeManager::try_add_frame(const cv::Mat& image,
     last_kf_ts_ = timestamp;
 
     const auto loop_candidates = find_loop_closure_candidates(kf.descriptors, 3);
+    last_loop_candidate_count_.store(loop_candidates.size());
     if (!loop_candidates.empty() && logger_) {
+        relocalization_count_.fetch_add(1);
         logger_->info("SLAM keyframe {} has {} loop-closure candidates",
                       kf.id, loop_candidates.size());
     }
@@ -271,6 +273,19 @@ size_t KeyframeManager::keyframe_count() const {
 size_t KeyframeManager::map_point_count() const {
     std::lock_guard lock(map_mutex_);
     return map_points_.size();
+}
+
+KeyframeManager::Status KeyframeManager::status() const {
+    std::lock_guard lock(map_mutex_);
+    return Status{
+        keyframes_.size(),
+        remote_keyframes_.size(),
+        map_points_.size(),
+        last_loop_candidate_count_.load(),
+        relocalization_count_.load(),
+        last_relocalization_confidence_.load(),
+        last_relocalized_keyframe_.load(),
+    };
 }
 
 void KeyframeManager::share_latest_keyframe() {
@@ -417,6 +432,73 @@ std::vector<uint64_t> KeyframeManager::find_loop_closure_candidates(const cv::Ma
     for (const auto& candidate : scored) {
         out.push_back(candidate.id);
     }
+    return out;
+}
+
+std::optional<KeyframeManager::RelocalizationResult> KeyframeManager::attempt_relocalization(
+        const cv::Mat& image,
+        const Eigen::Vector3d& pose_guess,
+        const Eigen::Quaterniond& orientation_guess) const {
+    if (image.empty()) {
+        return std::nullopt;
+    }
+
+    cv::Mat gray;
+    if (image.channels() == 1) {
+        gray = image;
+    } else {
+        cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+    }
+
+    std::vector<cv::KeyPoint> keypoints;
+    cv::Mat descriptors;
+    orb_->detectAndCompute(gray, cv::noArray(), keypoints, descriptors);
+    if (descriptors.empty()) {
+        return std::nullopt;
+    }
+
+    struct BestMatch {
+        uint64_t keyframe_id{0};
+        uint32_t drone_id{0};
+        size_t score{0};
+        Eigen::Vector3d position{Eigen::Vector3d::Zero()};
+        Eigen::Quaterniond orientation{Eigen::Quaterniond::Identity()};
+    } best;
+
+    {
+        std::lock_guard lock(map_mutex_);
+        auto consider = [&](const auto& frames) {
+            for (const auto& frame : frames) {
+                const size_t score = descriptor_match_score(matcher_, descriptors, frame.descriptors);
+                if (score > best.score) {
+                    best.keyframe_id = frame.id;
+                    best.drone_id = frame.drone_id;
+                    best.score = score;
+                    best.position = frame.position;
+                    best.orientation = frame.orientation;
+                }
+            }
+        };
+        consider(keyframes_);
+        consider(remote_keyframes_);
+    }
+
+    if (best.score < 18) {
+        return std::nullopt;
+    }
+
+    RelocalizationResult out;
+    out.matched_keyframe_id = make_global_keyframe_id(best.drone_id, best.keyframe_id);
+    out.confidence = std::clamp(static_cast<double>(best.score) / 80.0, 0.0, 1.0);
+    out.corrected_position = (best.position * 0.7) + (pose_guess * 0.3);
+    out.corrected_orientation = best.orientation.slerp(0.3, orientation_guess).normalized();
+
+    last_relocalization_confidence_.store(out.confidence);
+    last_relocalized_keyframe_.store(out.matched_keyframe_id);
+    if (out.confidence >= 0.45) {
+        relocalization_count_.fetch_add(1);
+    }
+
     return out;
 }
 

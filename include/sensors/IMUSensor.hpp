@@ -4,7 +4,7 @@
 
 #pragma once
  
-// IMUSensor.hpp  â€”  IMU (MPU-6050 / ICM-42688-P) sensor interface
+// IMUSensor.hpp    IMU (MPU-6050 / ICM-42688-P) sensor interface
 // Drone Swarm Sensor Fusion  |  Phase 2
  
 #include "sensors/SensorBase.hpp"
@@ -15,7 +15,7 @@
 
 namespace drone::sensors {
 
-// â”€â”€â”€ IMU Measurement â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  IMU Measurement 
 struct ImuMeasurement : SensorMeasurement {
     Eigen::Vector3d accel_mps2{0, 0, 0};   // m/sÂ²  (body frame)
     Eigen::Vector3d gyro_rads{0, 0, 0};    // rad/s (body frame)
@@ -25,7 +25,7 @@ struct ImuMeasurement : SensorMeasurement {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-// â”€â”€â”€ IMU Noise & Bias Model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  IMU Noise & Bias Model 
 struct ImuNoiseModel {
     double accel_noise_density{2.0e-3};   // m/sÂ²/âˆšHz  (datasheet)
     double gyro_noise_density{1.6e-4};    // rad/s/âˆšHz
@@ -44,12 +44,12 @@ public:
         , device_path_(std::move(device_path))
         , i2c_addr_(i2c_addr) {}
 
-    // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Lifecycle 
     bool initialize() override;
     bool reconfigure(const std::string& config_json) override;
     void poll() override;
 
-    // â”€â”€ Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Data 
     [[nodiscard]] std::optional<ImuMeasurement> latest() const {
         std::lock_guard lock(data_mutex_);
         return latest_;
@@ -68,7 +68,7 @@ public:
         data_cb_ = std::move(cb);
     }
 
-    // â”€â”€ Calibration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Calibration â”€
     // Collect N static samples to estimate bias
     bool calibrate_static(uint32_t samples = 2000);
     [[nodiscard]] const Eigen::Vector3d& accel_bias() const { return accel_bias_; }

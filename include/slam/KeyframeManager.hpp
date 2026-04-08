@@ -4,9 +4,9 @@
 
 #pragma once
  
-// KeyframeManager.hpp  â€”  Keyframe-based SLAM + swarm map sharing
+// KeyframeManager.hpp    Keyframe-based SLAM + swarm map sharing
 // Only feature descriptors & 3D points are shared; raw frames stay local.
-// Drone Swarm Sensor Fusion  |  Phase 3 â€” SLAM
+// Drone Swarm Sensor Fusion  |  Phase 3  SLAM
  
 #include "swarm/V2XMeshNetwork.hpp"
 #include <opencv2/core.hpp>
@@ -26,7 +26,7 @@
 
 namespace drone::slam {
 
-// â”€â”€â”€ Map point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Map point 
 struct MapPoint {
     uint64_t        id;
     Eigen::Vector3d pos_world;  // 3D world position
@@ -39,7 +39,7 @@ struct MapPoint {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
-// â”€â”€â”€ Keyframe â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//  Keyframe â”€
 struct Keyframe {
     uint64_t   id;
     uint32_t   drone_id;
@@ -67,7 +67,7 @@ struct Keyframe {
 };
 
  
-// KeyframeSelector  â€”  decides when a new keyframe should be created
+// KeyframeSelector    decides when a new keyframe should be created
  
 struct KeyframeSelectionPolicy {
     float   min_translation_m{0.4f};   // min travel before new KF
@@ -80,11 +80,30 @@ struct KeyframeSelectionPolicy {
  
 class KeyframeManager {
 public:
+    struct RelocalizationResult {
+        Eigen::Vector3d corrected_position{Eigen::Vector3d::Zero()};
+        Eigen::Quaterniond corrected_orientation{Eigen::Quaterniond::Identity()};
+        double confidence{0.0};
+        uint64_t matched_keyframe_id{0};
+
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    };
+
+    struct Status {
+        size_t local_keyframes{0};
+        size_t remote_keyframes{0};
+        size_t map_points{0};
+        size_t loop_candidates{0};
+        uint32_t relocalization_count{0};
+        double last_relocalization_confidence{0.0};
+        uint64_t last_relocalized_keyframe{0};
+    };
+
     explicit KeyframeManager(uint32_t drone_id,
                               std::shared_ptr<swarm::V2XMeshNetwork> net,
                               KeyframeSelectionPolicy policy = {});
 
-    // â”€â”€ Add a new observation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Add a new observation 
     //   Returns new Keyframe ID if one was created, else std::nullopt
     std::optional<uint64_t> try_add_frame(
         const cv::Mat&                image,
@@ -92,22 +111,27 @@ public:
         const Eigen::Quaterniond&     ori,
         double                        timestamp);
 
-    // â”€â”€ Local map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Local map â”€
     [[nodiscard]] std::vector<MapPoint>  get_local_map_points() const;
     [[nodiscard]] std::vector<Keyframe>  get_recent_keyframes(size_t n = 10) const;
     [[nodiscard]] size_t                 keyframe_count() const;
     [[nodiscard]] size_t                 map_point_count() const;
+    [[nodiscard]] Status                 status() const;
 
-    // â”€â”€ Swarm sharing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Swarm sharing 
     void share_latest_keyframe();   // encode + broadcast via V2X
     void on_remote_keyframe(const swarm::SwarmMessage& msg);  // ingest
 
-    // â”€â”€ Loop closure hint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Loop closure hint â”€
     //   Returns candidate Keyframe IDs that may close a loop
     [[nodiscard]] std::vector<uint64_t> find_loop_closure_candidates(
         const cv::Mat& query_desc, size_t top_k = 5) const;
+    [[nodiscard]] std::optional<RelocalizationResult> attempt_relocalization(
+        const cv::Mat& image,
+        const Eigen::Vector3d& pose_guess,
+        const Eigen::Quaterniond& orientation_guess) const;
 
-    // â”€â”€ Persistence â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //  Persistence â”€
     bool save_map(const std::string& filepath) const;
     bool load_map(const std::string& filepath);
 
@@ -142,6 +166,10 @@ private:
 
     std::atomic<uint64_t> kf_counter_{0};
     std::atomic<uint64_t> mp_counter_{0};
+    mutable std::atomic<uint32_t> relocalization_count_{0};
+    mutable std::atomic<size_t>   last_loop_candidate_count_{0};
+    mutable std::atomic<double>   last_relocalization_confidence_{0.0};
+    mutable std::atomic<uint64_t> last_relocalized_keyframe_{0};
 
     // Feature detector/descriptor
     cv::Ptr<cv::ORB>         orb_;

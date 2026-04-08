@@ -3,7 +3,7 @@
 // Technology: C++, Python, Go, CMake
 
  
-// JetsonHAL.cpp  â€”  Hardware abstraction: I2C, UART, ESP32-CAM, system stats
+// JetsonHAL.cpp    Hardware abstraction: I2C, UART, ESP32-CAM, system stats
 // Drone Swarm Sensor Fusion  |  Phase 2
  
 #include "hal/JetsonHAL.hpp"
@@ -124,7 +124,7 @@ SystemStats read_system_stats() {
 
     // CPU temperature (Jetson/RPi thermal zone)
     s.cpu_temp_c = read_sysfs_float(
-        "/sys/class/thermal/thermal_zone0/temp", 0.001f);  // millideg â†’ deg
+        "/sys/class/thermal/thermal_zone0/temp", 0.001f);  // millideg  deg
 
     // Jetson GPU
     if (detect_platform() == Platform::JETSON_NANO ||

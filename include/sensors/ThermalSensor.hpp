@@ -4,7 +4,7 @@
 
 #pragma once
  
-// ThermalSensor.hpp  â€”  MLX90640 32Ã—24 IR thermal array
+// ThermalSensor.hpp    MLX90640 32Ã—24 IR thermal array
 // Drone Swarm Sensor Fusion  |  Phase 2
  
 #include "sensors/SensorBase.hpp"

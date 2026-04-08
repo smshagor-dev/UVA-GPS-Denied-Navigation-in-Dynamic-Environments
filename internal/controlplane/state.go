@@ -1,4 +1,4 @@
-﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// System Designer and Developer: Md Shahanur Islam Shagor
 // Project: UVA GPS Denied Navigation in Dynamic Environments
 // Technology: C++, Python, Go, CMake
 
@@ -12,6 +12,23 @@ import (
 	"sync"
 	"time"
 )
+
+func asFloat64(value any) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	default:
+		return 0, false
+	}
+}
 
 type FleetState struct {
 	mu            sync.RWMutex
@@ -83,7 +100,7 @@ func (s *FleetState) Snapshot() FleetSnapshot {
 		if drone.Role == "LEADER" && leaderID == 0 {
 			leaderID = drone.DroneID
 		}
-		if drone.BatteryPct < 15 || drone.CPUTempC > 82 || !drone.Reachable {
+		if drone.BatteryPct < 15 || drone.CPUTempC > 82 || !drone.Reachable || drone.LocalizationState == "lost" || drone.SyncConfidence < 0.35 {
 			critical++
 		}
 		cluster := clusterAgg[drone.ClusterID]
@@ -241,20 +258,34 @@ func (s *FleetState) AddDrone(droneID int, clusterID string) DroneTelemetry {
 		role = "LEADER"
 	}
 	telemetry := DroneTelemetry{
-		DroneID:      droneID,
-		ClusterID:    clusterID,
-		Role:         role,
-		Connectivity: "Mesh",
-		Reachable:    true,
-		Position:     [3]float64{float64(droneID % 20), float64((droneID / 20) % 10), 8.0 + float64(droneID%3)},
-		Velocity:     [3]float64{0.0, 0.0, 0.0},
-		DriftM:       0.05,
-		BatteryPct:   96.0,
-		RSSIDBm:      -50.0,
-		CPUTempC:     54.0,
-		GPULoadPct:   38.0,
-		MissionState: "standby",
-		Timestamp:    time.Now().UTC(),
+		DroneID:                droneID,
+		ClusterID:              clusterID,
+		Role:                   role,
+		Connectivity:           "Mesh",
+		Reachable:              true,
+		Position:               [3]float64{float64(droneID % 20), float64((droneID / 20) % 10), 8.0 + float64(droneID%3)},
+		Velocity:               [3]float64{0.0, 0.0, 0.0},
+		AttitudeRPY:            [3]float64{0.0, 0.0, 0.0},
+		ThrustVector:           [3]float64{0.0, 0.0, 9.81},
+		CommandedAltitudeM:     8.0,
+		CommandedSpeedMPS:      3.0,
+		DriftM:                 0.05,
+		BatteryPct:             96.0,
+		RSSIDBm:                -50.0,
+		CPUTempC:               54.0,
+		GPULoadPct:             38.0,
+		MissionState:           "standby",
+		LocalizationSource:     "vision-inertial",
+		LocalizationState:      "nominal",
+		LocalizationConfidence: 0.92,
+		TDOAConfidence:         0.66,
+		ConfidenceTrend:        0.03,
+		RelocalizationCount:    0,
+		VisibleAnchorCount:     5,
+		OccupancyRatio:         0.14,
+		SyncConfidence:         0.93,
+		IMUCameraOffsetMS:      2.1,
+		Timestamp:              time.Now().UTC(),
 	}
 	s.UpsertTelemetry(telemetry)
 	log.Printf("FleetState.AddDrone created drone=%d cluster=%s role=%s", telemetry.DroneID, telemetry.ClusterID, telemetry.Role)
@@ -289,6 +320,12 @@ func (s *FleetState) ApplyCommand(action string, clusterID string, targetIDs []i
 				continue
 			}
 		}
+		if altitude, ok := asFloat64(payload["altitude_m"]); ok && altitude > 0 {
+			drone.CommandedAltitudeM = altitude
+		}
+		if speed, ok := asFloat64(payload["velocity_mps"]); ok && speed > 0 {
+			drone.CommandedSpeedMPS = speed
+		}
 
 		switch action {
 		case "formation":
@@ -304,8 +341,16 @@ func (s *FleetState) ApplyCommand(action string, clusterID string, targetIDs []i
 			drone.MissionState = "return-home"
 		case "emergency_land":
 			drone.MissionState = "emergency-land"
+		case "fly":
+			drone.MissionState = "fly"
+		case "land":
+			drone.MissionState = "land"
 		case "election":
 			drone.MissionState = "leader-election"
+		case "remove_drone":
+			delete(s.drones, id)
+			affected++
+			continue
 		default:
 			continue
 		}

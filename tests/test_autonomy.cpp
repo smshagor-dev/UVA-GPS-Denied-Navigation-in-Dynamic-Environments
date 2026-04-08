@@ -29,6 +29,8 @@ autonomy::DecisionContext make_context() {
     ctx.pose.position = Eigen::Vector3d(0.0, 0.0, 8.0);
     ctx.pose.orientation = Eigen::Quaterniond::Identity();
     ctx.system.battery_pct = 70.0f;
+    ctx.localization_confidence = 0.95;
+    ctx.localization_source = "vision-inertial";
     ctx.now_s = 10.0;
     return ctx;
 }
@@ -118,6 +120,46 @@ TEST(DecisionEngine, UsesTdoaReferenceForReturnHome) {
     const auto command = engine.update(ctx);
     EXPECT_EQ(command.mode, autonomy::BehaviorMode::RETURN_HOME);
     EXPECT_LT(command.desired_velocity.x(), 0.0);
+}
+
+TEST(DecisionEngine, EntersLocalizationDegradedModeWhenConfidenceDrops) {
+    autonomy::DecisionEngine engine;
+    auto ctx = make_context();
+    ctx.localization_confidence = 0.42;
+    ctx.localization_degraded = true;
+    ctx.sync_confidence = 0.9;
+
+    const auto command = engine.update(ctx);
+    EXPECT_EQ(command.mode, autonomy::BehaviorMode::LOCALIZATION_DEGRADED);
+    EXPECT_NE(command.summary.find("Localization degraded"), std::string::npos);
+}
+
+TEST(DecisionEngine, EntersLocalizationLostModeAndUsesTdoaRecovery) {
+    autonomy::DecisionEngine engine;
+    auto ctx = make_context();
+    ctx.localization_confidence = 0.12;
+    ctx.localization_lost = true;
+    ctx.tdoa_position = Eigen::Vector3d(2.0, 0.0, 8.0);
+    ctx.tdoa_confidence = 0.9;
+    ctx.visible_anchor_count = 3;
+
+    const auto command = engine.update(ctx);
+    EXPECT_EQ(command.mode, autonomy::BehaviorMode::SAFE_RETURN_BY_ANCHOR);
+    EXPECT_GT(command.desired_velocity.x(), 0.0);
+    EXPECT_TRUE(command.requires_operator_attention);
+}
+
+TEST(DecisionEngine, HoversAndScansWhenLocalizationAndSyncArePoor) {
+    autonomy::DecisionEngine engine;
+    auto ctx = make_context();
+    ctx.localization_confidence = 0.18;
+    ctx.localization_lost = true;
+    ctx.sync_confidence = 0.3;
+    ctx.camera_tracking_nominal = false;
+
+    const auto command = engine.update(ctx);
+    EXPECT_EQ(command.mode, autonomy::BehaviorMode::HOVER_AND_SCAN);
+    EXPECT_NE(command.summary.find("hovering and scanning"), std::string::npos);
 }
 
 int main(int argc, char** argv) {
