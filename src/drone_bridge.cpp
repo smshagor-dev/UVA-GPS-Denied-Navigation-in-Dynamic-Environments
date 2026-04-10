@@ -69,7 +69,14 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def_readwrite("planned_waypoint_count", &vio::RuntimeTelemetry::planned_waypoint_count)
         .def_readwrite("last_relocalized_keyframe", &vio::RuntimeTelemetry::last_relocalized_keyframe)
         .def_readwrite("localization_state", &vio::RuntimeTelemetry::localization_state)
-        .def_readwrite("localization_source", &vio::RuntimeTelemetry::localization_source);
+        .def_readwrite("localization_source", &vio::RuntimeTelemetry::localization_source)
+        .def_readwrite("security_state", &vio::RuntimeTelemetry::security_state)
+        .def_readwrite("security_summary", &vio::RuntimeTelemetry::security_summary)
+        .def_readwrite("remote_command_allowed", &vio::RuntimeTelemetry::remote_command_allowed)
+        .def_readwrite("telemetry_uplink_allowed", &vio::RuntimeTelemetry::telemetry_uplink_allowed)
+        .def_readwrite("link_integrity_score", &vio::RuntimeTelemetry::link_integrity_score)
+        .def_readwrite("last_remote_command_status", &vio::RuntimeTelemetry::last_remote_command_status)
+        .def_readwrite("health_flags", &vio::RuntimeTelemetry::health_flags);
 
     //  SystemStats 
     py::class_<hal::SystemStats>(m, "SystemStats")

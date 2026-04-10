@@ -20,6 +20,7 @@
 #include <string>
 #include <thread>
 #include <variant>
+#include <vector>
 
 namespace drone::vio {
 
@@ -45,6 +46,13 @@ struct RuntimeTelemetry {
     uint64_t last_relocalized_keyframe{0};
     std::string localization_state{"nominal"};
     std::string localization_source{"vision-inertial"};
+    std::string security_state{"TRUSTED"};
+    std::string security_summary{"All trust signals nominal"};
+    bool remote_command_allowed{true};
+    bool telemetry_uplink_allowed{true};
+    double link_integrity_score{1.0};
+    std::string last_remote_command_status{"no remote command"};
+    std::vector<std::string> health_flags{};
 };
 
  

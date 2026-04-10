@@ -78,6 +78,7 @@ def find_drone_node() -> Path | None:
     candidates = [
         ROOT / "build-dashboard" / "drone_node.exe",
         ROOT / "build" / "drone_node.exe",
+        ROOT / "build" / "Release" / "drone_node.exe",
         ROOT / "build-full" / "drone_node.exe",
     ]
     for candidate in candidates:
@@ -87,10 +88,6 @@ def find_drone_node() -> Path | None:
 
 
 def find_go_launcher() -> list[str] | None:
-    go = shutil.which("go")
-    if go:
-        return [go, "run", "./cmd/control-plane"]
-
     exe_candidates = [
         ROOT / "build-go" / "control-plane.exe",
         ROOT / "bin" / "control-plane.exe",
@@ -99,6 +96,11 @@ def find_go_launcher() -> list[str] | None:
     for candidate in exe_candidates:
         if candidate.exists():
             return [str(candidate)]
+
+    go = shutil.which("go")
+    if go:
+        return [go, "run", "./cmd/control-plane"]
+
     return None
 
 
@@ -201,7 +203,11 @@ def main() -> int:
         logger.info("launcher args=%s", args)
 
         processes: list[ManagedProcess] = []
-        go_url = f"http://127.0.0.1:{args.go_port}"
+        env = os.environ.copy()
+        env.setdefault("PYTHONUNBUFFERED", "1")
+        tls_enabled = env.get("DRONE_TLS_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
+        default_scheme = "https" if tls_enabled else "http"
+        go_url = env.get("DRONE_BACKEND_URL", f"{default_scheme}://127.0.0.1:{args.go_port}")
 
         if not args.skip_go:
             go_cmd = find_go_launcher()
@@ -261,11 +267,6 @@ def main() -> int:
         print_plan(processes)
         if args.dry_run:
             return 0
-
-        env = os.environ.copy()
-        env.setdefault("PYTHONUNBUFFERED", "1")
-        if env.get("DRONE_BACKEND_URL"):
-            go_url = env["DRONE_BACKEND_URL"]
 
         if any(p.name == "go-control-plane" for p in processes):
             env.setdefault("DRONE_SWARM_ADDR", f":{args.go_port}")

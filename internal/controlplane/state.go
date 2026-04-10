@@ -35,6 +35,7 @@ type FleetState struct {
 	drones        map[int]DroneTelemetry
 	missions      map[string]MissionPlan
 	commands      []CommandEnvelope
+	approvals     map[string]PendingApproval
 	events        []EventRecord
 	clusterForm   map[string]string
 	clusterLeader map[string]int
@@ -45,6 +46,7 @@ func NewFleetState() *FleetState {
 	return &FleetState{
 		drones:        make(map[int]DroneTelemetry),
 		missions:      make(map[string]MissionPlan),
+		approvals:     make(map[string]PendingApproval),
 		clusterForm:   make(map[string]string),
 		clusterLeader: make(map[string]int),
 	}
@@ -100,7 +102,7 @@ func (s *FleetState) Snapshot() FleetSnapshot {
 		if drone.Role == "LEADER" && leaderID == 0 {
 			leaderID = drone.DroneID
 		}
-		if drone.BatteryPct < 15 || drone.CPUTempC > 82 || !drone.Reachable || drone.LocalizationState == "lost" || drone.SyncConfidence < 0.35 {
+		if drone.BatteryPct < 15 || drone.CPUTempC > 82 || !drone.Reachable || drone.LocalizationState == "lost" || drone.SyncConfidence < 0.35 || (drone.SecurityState != "" && drone.SecurityState != "TRUSTED" && drone.SecurityState != "DEGRADED_LINK") {
 			critical++
 		}
 		cluster := clusterAgg[drone.ClusterID]
@@ -227,6 +229,57 @@ func (s *FleetState) AddEvent(event EventRecord) {
 	}
 }
 
+func (s *FleetState) SavePendingApproval(approval PendingApproval) {
+	log.Printf("FleetState.SavePendingApproval id=%s action=%s", approval.ApprovalID, approval.Action)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	for id, item := range s.approvals {
+		if !item.ExpiresAt.IsZero() && item.ExpiresAt.Before(now) {
+			delete(s.approvals, id)
+		}
+	}
+	s.approvals[approval.ApprovalID] = approval
+}
+
+func (s *FleetState) PendingApproval(approvalID string) (PendingApproval, bool) {
+	log.Printf("FleetState.PendingApproval id=%s", approvalID)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	for id, item := range s.approvals {
+		if !item.ExpiresAt.IsZero() && item.ExpiresAt.Before(now) {
+			delete(s.approvals, id)
+		}
+	}
+	item, ok := s.approvals[approvalID]
+	return item, ok
+}
+
+func (s *FleetState) DeletePendingApproval(approvalID string) {
+	log.Printf("FleetState.DeletePendingApproval id=%s", approvalID)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.approvals, approvalID)
+}
+
+func (s *FleetState) PendingApprovals() []PendingApproval {
+	log.Printf("FleetState.PendingApprovals requested")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	out := make([]PendingApproval, 0, len(s.approvals))
+	for id, item := range s.approvals {
+		if !item.ExpiresAt.IsZero() && item.ExpiresAt.Before(now) {
+			delete(s.approvals, id)
+			continue
+		}
+		out = append(out, item)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
+	return out
+}
+
 func (s *FleetState) Events() []EventRecord {
 	log.Printf("FleetState.Events requested")
 	s.mu.RLock()
@@ -258,34 +311,40 @@ func (s *FleetState) AddDrone(droneID int, clusterID string) DroneTelemetry {
 		role = "LEADER"
 	}
 	telemetry := DroneTelemetry{
-		DroneID:                droneID,
-		ClusterID:              clusterID,
-		Role:                   role,
-		Connectivity:           "Mesh",
-		Reachable:              true,
-		Position:               [3]float64{float64(droneID % 20), float64((droneID / 20) % 10), 8.0 + float64(droneID%3)},
-		Velocity:               [3]float64{0.0, 0.0, 0.0},
-		AttitudeRPY:            [3]float64{0.0, 0.0, 0.0},
-		ThrustVector:           [3]float64{0.0, 0.0, 9.81},
-		CommandedAltitudeM:     8.0,
-		CommandedSpeedMPS:      3.0,
-		DriftM:                 0.05,
-		BatteryPct:             96.0,
-		RSSIDBm:                -50.0,
-		CPUTempC:               54.0,
-		GPULoadPct:             38.0,
-		MissionState:           "standby",
-		LocalizationSource:     "vision-inertial",
-		LocalizationState:      "nominal",
-		LocalizationConfidence: 0.92,
-		TDOAConfidence:         0.66,
-		ConfidenceTrend:        0.03,
-		RelocalizationCount:    0,
-		VisibleAnchorCount:     5,
-		OccupancyRatio:         0.14,
-		SyncConfidence:         0.93,
-		IMUCameraOffsetMS:      2.1,
-		Timestamp:              time.Now().UTC(),
+		DroneID:                 droneID,
+		ClusterID:               clusterID,
+		Role:                    role,
+		Connectivity:            "Mesh",
+		Reachable:               true,
+		Position:                [3]float64{float64(droneID % 20), float64((droneID / 20) % 10), 8.0 + float64(droneID%3)},
+		Velocity:                [3]float64{0.0, 0.0, 0.0},
+		AttitudeRPY:             [3]float64{0.0, 0.0, 0.0},
+		ThrustVector:            [3]float64{0.0, 0.0, 9.81},
+		CommandedAltitudeM:      8.0,
+		CommandedSpeedMPS:       3.0,
+		DriftM:                  0.05,
+		BatteryPct:              96.0,
+		RSSIDBm:                 -50.0,
+		CPUTempC:                54.0,
+		GPULoadPct:              38.0,
+		MissionState:            "standby",
+		LocalizationSource:      "vision-inertial",
+		LocalizationState:       "nominal",
+		LocalizationConfidence:  0.92,
+		TDOAConfidence:          0.66,
+		ConfidenceTrend:         0.03,
+		RelocalizationCount:     0,
+		VisibleAnchorCount:      5,
+		OccupancyRatio:          0.14,
+		SyncConfidence:          0.93,
+		IMUCameraOffsetMS:       2.1,
+		SecurityState:           "TRUSTED",
+		SecuritySummary:         "All trust signals nominal",
+		RemoteCommandAllowed:    true,
+		TelemetryUplinkAllowed:  true,
+		LinkIntegrityScore:      0.90,
+		LastRemoteCommandStatus: "no remote command",
+		Timestamp:               time.Now().UTC(),
 	}
 	s.UpsertTelemetry(telemetry)
 	log.Printf("FleetState.AddDrone created drone=%d cluster=%s role=%s", telemetry.DroneID, telemetry.ClusterID, telemetry.Role)

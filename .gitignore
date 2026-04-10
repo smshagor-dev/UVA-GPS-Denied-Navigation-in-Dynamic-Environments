@@ -4,6 +4,11 @@ __pycache__/
 gui/__pycache__/
 scripts/__pycache__/
 logs/
+certs/*.crt
+certs/*.key
+certs/*.pem
+certs/*.p12
+certs/*.srl
 *.pyc
 *.pyo
 *.pyd

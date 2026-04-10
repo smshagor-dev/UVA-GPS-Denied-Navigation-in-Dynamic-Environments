@@ -95,7 +95,99 @@ Example:
 $env:DRONE_SWARM_SECRET="replace-with-a-strong-shared-secret"
 ```
 
-If unset, the node currently falls back to a development secret and logs a warning. That is fine for demos and not acceptable for shared environments.
+If unset, the node currently falls back to a development secret only in `lab` mode. In `field` and `production` mode, startup now fails unless a non-placeholder secret is provided.
+
+### Signed Command Security
+
+Use these variables to enable signed dashboard-to-control-plane commands:
+
+- `DRONE_SECURITY_PROFILE`
+- `DRONE_REQUIRE_SIGNED_COMMANDS`
+- `DRONE_OPERATOR_ID`
+- `DRONE_OPERATOR_ROLE`
+- `DRONE_OPERATOR_SECRET`
+- `DRONE_OPERATOR_CREDENTIALS`
+- `DRONE_COMMAND_TTL_SEC`
+- `DRONE_MAX_COMMAND_SKEW_SEC`
+- `DRONE_COMMAND_NONCE_RETENTION_SEC`
+
+Recommended hardened setup:
+
+```powershell
+$env:DRONE_SECURITY_PROFILE="production"
+$env:DRONE_OPERATOR_ID="operator-console-1"
+$env:DRONE_OPERATOR_ROLE="operator"
+$env:DRONE_OPERATOR_SECRET="replace-with-a-strong-operator-secret"
+$env:DRONE_OPERATOR_CREDENTIALS="operator-console-1:operator:replace-with-a-strong-operator-secret;operator-console-2:commander:replace-with-a-second-strong-secret"
+$env:DRONE_SWARM_SECRET="replace-with-a-strong-shared-secret"
+```
+
+In `field` and `production` mode, the Go control plane now rejects unsigned, expired, replayed, or badly signed commands.
+Critical commands also require a second distinct authenticated operator when multi-operator credentials are configured.
+
+### TLS / mTLS Transport
+
+Use these variables to harden dashboard-to-control-plane transport:
+
+- `DRONE_TLS_ENABLED`
+- `DRONE_TLS_CERT_FILE`
+- `DRONE_TLS_KEY_FILE`
+- `DRONE_TLS_CA_FILE`
+- `DRONE_TLS_REQUIRE_CLIENT_CERT`
+- `DRONE_TLS_CLIENT_CERT_FILE`
+- `DRONE_TLS_CLIENT_KEY_FILE`
+- `DRONE_TLS_SKIP_VERIFY`
+
+Example hardened transport:
+
+```powershell
+python scripts/generate_tls_certs.py --force
+
+$env:DRONE_OPERATOR_ID="operator-console-1"
+$env:DRONE_TLS_ENABLED="true"
+$env:DRONE_TLS_CERT_FILE="certs/server.crt"
+$env:DRONE_TLS_KEY_FILE="certs/server.key"
+$env:DRONE_TLS_CA_FILE="certs/ca.crt"
+$env:DRONE_TLS_REQUIRE_CLIENT_CERT="true"
+$env:DRONE_TLS_CLIENT_CERT_FILE="certs/operator-client.crt"
+$env:DRONE_TLS_CLIENT_KEY_FILE="certs/operator-client.key"
+$env:DRONE_BACKEND_URL="https://127.0.0.1:8080"
+```
+
+When `DRONE_TLS_ENABLED=true`, the control plane serves HTTPS with TLS 1.3 minimum. If `DRONE_TLS_REQUIRE_CLIENT_CERT=true`, the client must present a certificate signed by `DRONE_TLS_CA_FILE`.
+The generated operator client certificate common name must match `DRONE_OPERATOR_ID` when command signing and mTLS are both enabled.
+
+### Onboard Drone Security State
+
+The C++ runtime now computes an onboard security state each control loop. In hardened conditions it can degrade into:
+
+- `DEGRADED_LINK`
+- `CONTROL_PLANE_UNTRUSTED`
+- `ISOLATED_AUTONOMY`
+- `SAFE_RETURN`
+- `LAND_IMMEDIATELY`
+
+This state is derived from link quality, sync confidence, localization loss, emergency faults, and hardened-profile trust posture. In bridge mode it is exposed to the dashboard through runtime telemetry fields including `security_state`, `security_summary`, `link_integrity_score`, and `health_flags`.
+Secure swarm messages now also flow through a drone-side remote command inbox. The node evaluates each inbound command locally and can reject non-critical remote commands when its onboard security state blocks external control.
+
+### Native C++ Telemetry Uplink
+
+The drone node can now publish telemetry directly to the Go control plane:
+
+- `DRONE_BACKEND_URL`
+- `DRONE_ENABLE_BACKEND_TELEMETRY`
+- `DRONE_BACKEND_TELEMETRY_INTERVAL_MS`
+
+Example:
+
+```powershell
+$env:DRONE_BACKEND_URL="http://127.0.0.1:8080"
+$env:DRONE_ENABLE_BACKEND_TELEMETRY="true"
+$env:DRONE_BACKEND_TELEMETRY_INTERVAL_MS="1000"
+build\Release\drone_node.exe --id=1 --esp32=192.168.4.1 --lidar=192.168.1.201:2368
+```
+
+This uplink includes onboard security posture fields such as `security_state`, `security_summary`, `link_integrity_score`, and `health_flags`. The current C++ client is intended for direct local/backend telemetry posting and does not yet present a client certificate for mTLS-enforced drone identity.
 
 ### Drone / Sensor Connection Variables
 

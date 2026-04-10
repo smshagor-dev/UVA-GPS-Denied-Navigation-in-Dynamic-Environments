@@ -201,6 +201,7 @@ set(CORE_SOURCES
     src/sensors/CameraSensor.cpp
     src/sensors/LidarSensor.cpp
     src/sensors/MotorSensor.cpp
+    src/telemetry/ControlPlaneTelemetryClient.cpp
     src/vio/EKFEstimator.cpp
     src/vio/VIOPipeline.cpp
     src/slam/KeyframeManager.cpp

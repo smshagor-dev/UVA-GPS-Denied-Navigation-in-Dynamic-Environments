@@ -6,6 +6,7 @@
 // test_v2x.cpp    GoogleTest suite for V2X Mesh / Leader-Follower
  
 #include <gtest/gtest.h>
+#include "security/CommandPolicy.hpp"
 #include "sensors/LidarSensor.hpp"
 #include "swarm/V2XMeshNetwork.hpp"
 #include <cmath>
@@ -206,6 +207,31 @@ TEST(V2XMeshNetwork, ConstructionDoesNotCrash) {
     V2XMeshNetwork net(99, "239.255.0.1", 7400);
     EXPECT_EQ(net.peer_count(), 0u);
     EXPECT_EQ(net.local_role(), DroneRole::CANDIDATE);
+}
+
+TEST(CommandPolicy, EmergencyLandAlwaysAccepted) {
+    drone::security::DroneSecurityAssessment security;
+    security.state = drone::security::DroneSecurityState::ISOLATED_AUTONOMY;
+    security.remote_command_allowed = false;
+
+    drone::security::RemoteCommandEnvelope cmd;
+    cmd.action = drone::security::RemoteCommandAction::EMERGENCY_LAND;
+    cmd.critical = true;
+
+    const auto decision = drone::security::evaluate_remote_command(security, cmd);
+    EXPECT_TRUE(decision.accepted);
+}
+
+TEST(CommandPolicy, NonCriticalCommandRejectedWhenRemoteControlBlocked) {
+    drone::security::DroneSecurityAssessment security;
+    security.state = drone::security::DroneSecurityState::CONTROL_PLANE_UNTRUSTED;
+    security.remote_command_allowed = false;
+
+    drone::security::RemoteCommandEnvelope cmd;
+    cmd.action = drone::security::RemoteCommandAction::RETURN_HOME;
+
+    const auto decision = drone::security::evaluate_remote_command(security, cmd);
+    EXPECT_FALSE(decision.accepted);
 }
 
  

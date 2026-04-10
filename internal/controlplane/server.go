@@ -20,16 +20,23 @@ import (
 )
 
 type Server struct {
-	addr  string
-	state *FleetState
-	http  *http.Server
+	addr        string
+	state       *FleetState
+	http        *http.Server
+	security    SecurityConfig
+	tls         TLSConfig
+	commandAuth *CommandSecurityValidator
 }
 
-func NewServer(addr string) *Server {
+func NewServer(addr string, security SecurityConfig, tlsCfg TLSConfig) *Server {
 	state := NewFleetState()
+	securityCfg := security.normalized()
 	s := &Server{
-		addr:  addr,
-		state: state,
+		addr:        addr,
+		state:       state,
+		security:    securityCfg,
+		tls:         tlsCfg,
+		commandAuth: NewCommandSecurityValidator(securityCfg),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/telemetry", s.withRecovery(s.handleTelemetry))
@@ -38,6 +45,7 @@ func NewServer(addr string) *Server {
 	mux.HandleFunc("/api/v1/missions", s.withRecovery(s.handleMissions))
 	mux.HandleFunc("/api/v1/health", s.withRecovery(s.handleHealth))
 	mux.HandleFunc("/api/v1/events", s.withRecovery(s.handleEvents))
+	mux.HandleFunc("/api/v1/approvals", s.withRecovery(s.handleApprovals))
 	mux.HandleFunc("/api/v1/discovery", s.withRecovery(s.handleDiscovery))
 	s.http = &http.Server{
 		Addr:              addr,
@@ -53,6 +61,19 @@ func NewServer(addr string) *Server {
 }
 
 func (s *Server) Start() error {
+	if s.tls.Enabled {
+		tlsCfg, err := s.tls.ServerTLSConfig()
+		if err != nil {
+			return err
+		}
+		s.http.TLSConfig = tlsCfg
+		log.Printf("go control-plane listening with tls on %s client_cert_required=%t", s.addr, s.tls.RequireClientCert)
+		err = s.http.ListenAndServeTLS(s.tls.CertFile, s.tls.KeyFile)
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	}
 	log.Printf("go control-plane listening on %s", s.addr)
 	err := s.http.ListenAndServe()
 	if errors.Is(err, http.ErrServerClosed) {
@@ -73,34 +94,40 @@ func (s *Server) seedDigitalTwin(n int) {
 			role = "LEADER"
 		}
 		s.state.UpsertTelemetry(DroneTelemetry{
-			DroneID:                i,
-			ClusterID:              clusterID,
-			Role:                   role,
-			Connectivity:           "Mesh",
-			Reachable:              true,
-			Position:               [3]float64{float64(i % 20), float64((i / 20) % 10), 8.0 + float64(i%3)},
-			Velocity:               [3]float64{0.2, 0.1, 0.0},
-			AttitudeRPY:            [3]float64{0.0, 0.0, 0.0},
-			ThrustVector:           [3]float64{0.0, 0.0, 9.81},
-			CommandedAltitudeM:     8.0 + float64(i%3)*0.5,
-			CommandedSpeedMPS:      3.0,
-			DriftM:                 0.08 + math.Mod(float64(i), 7)*0.01,
-			BatteryPct:             92.0 - math.Mod(float64(i), 20),
-			RSSIDBm:                -48.0 - math.Mod(float64(i), 8),
-			CPUTempC:               58.0 + math.Mod(float64(i), 10),
-			GPULoadPct:             42.0 + math.Mod(float64(i), 18),
-			MissionState:           "patrol",
-			LocalizationSource:     "vision-depth-fused",
-			LocalizationState:      "nominal",
-			LocalizationConfidence: 0.90 - math.Mod(float64(i), 5)*0.04,
-			TDOAConfidence:         0.68 - math.Mod(float64(i), 4)*0.05,
-			ConfidenceTrend:        0.02 - math.Mod(float64(i), 3)*0.01,
-			RelocalizationCount:    (i - 1) / 22,
-			VisibleAnchorCount:     5 - (i % 3),
-			OccupancyRatio:         0.10 + math.Mod(float64(i), 6)*0.02,
-			SyncConfidence:         0.96 - math.Mod(float64(i), 5)*0.05,
-			IMUCameraOffsetMS:      1.2 + math.Mod(float64(i), 4)*0.7,
-			Timestamp:              time.Now().UTC(),
+			DroneID:                 i,
+			ClusterID:               clusterID,
+			Role:                    role,
+			Connectivity:            "Mesh",
+			Reachable:               true,
+			Position:                [3]float64{float64(i % 20), float64((i / 20) % 10), 8.0 + float64(i%3)},
+			Velocity:                [3]float64{0.2, 0.1, 0.0},
+			AttitudeRPY:             [3]float64{0.0, 0.0, 0.0},
+			ThrustVector:            [3]float64{0.0, 0.0, 9.81},
+			CommandedAltitudeM:      8.0 + float64(i%3)*0.5,
+			CommandedSpeedMPS:       3.0,
+			DriftM:                  0.08 + math.Mod(float64(i), 7)*0.01,
+			BatteryPct:              92.0 - math.Mod(float64(i), 20),
+			RSSIDBm:                 -48.0 - math.Mod(float64(i), 8),
+			CPUTempC:                58.0 + math.Mod(float64(i), 10),
+			GPULoadPct:              42.0 + math.Mod(float64(i), 18),
+			MissionState:            "patrol",
+			LocalizationSource:      "vision-depth-fused",
+			LocalizationState:       "nominal",
+			LocalizationConfidence:  0.90 - math.Mod(float64(i), 5)*0.04,
+			TDOAConfidence:          0.68 - math.Mod(float64(i), 4)*0.05,
+			ConfidenceTrend:         0.02 - math.Mod(float64(i), 3)*0.01,
+			RelocalizationCount:     (i - 1) / 22,
+			VisibleAnchorCount:      5 - (i % 3),
+			OccupancyRatio:          0.10 + math.Mod(float64(i), 6)*0.02,
+			SyncConfidence:          0.96 - math.Mod(float64(i), 5)*0.05,
+			IMUCameraOffsetMS:       1.2 + math.Mod(float64(i), 4)*0.7,
+			SecurityState:           "TRUSTED",
+			SecuritySummary:         "All trust signals nominal",
+			RemoteCommandAllowed:    true,
+			TelemetryUplinkAllowed:  true,
+			LinkIntegrityScore:      0.92 - math.Mod(float64(i), 5)*0.06,
+			LastRemoteCommandStatus: "no remote command",
+			Timestamp:               time.Now().UTC(),
 		})
 	}
 	s.state.RegisterMission(MissionPlan{
@@ -168,33 +195,161 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 		return
 	}
-	var payload struct {
-		Action  string         `json:"action"`
-		Payload map[string]any `json:"payload"`
-	}
+	peerIdentity := RequestPeerIdentity(r)
+	var payload commandRequest
 	if err := decodeJSONBody(r, &payload); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 		return
 	}
-	payload.Action = strings.TrimSpace(strings.ToLower(payload.Action))
-	if payload.Action == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "action is required"})
+	validated, err := s.commandAuth.Validate(payload, time.Now().UTC())
+	if err != nil {
+		s.state.AddEvent(EventRecord{
+			Type:      "security",
+			Message:   fmt.Sprintf("command rejected: %v", err),
+			Timestamp: time.Now().UTC(),
+			Data: map[string]any{
+				"remote_addr":      r.RemoteAddr,
+				"action":           strings.TrimSpace(strings.ToLower(payload.Action)),
+				"peer_common_name": peerIdentity.CommonName,
+			},
+		})
+		status := http.StatusBadRequest
+		if strings.Contains(strings.ToLower(err.Error()), "required") ||
+			strings.Contains(strings.ToLower(err.Error()), "signature") ||
+			strings.Contains(strings.ToLower(err.Error()), "operator") ||
+			strings.Contains(strings.ToLower(err.Error()), "nonce replay") ||
+			strings.Contains(strings.ToLower(err.Error()), "expired") {
+			status = http.StatusUnauthorized
+		}
+		writeJSON(w, status, map[string]any{"error": err.Error()})
 		return
 	}
-	if payload.Payload == nil {
-		payload.Payload = map[string]any{}
+	if validated.Authenticated && s.tls.RequireClientCert {
+		operatorID := strings.TrimPrefix(validated.IssuedBy, "operator:")
+		if !peerIdentity.Verified {
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "verified client certificate is required"})
+			return
+		}
+		if !peerIdentity.Matches(operatorID) {
+			s.state.AddEvent(EventRecord{
+				Type:      "security",
+				Message:   "command rejected: operator identity does not match client certificate",
+				Timestamp: time.Now().UTC(),
+				Data: map[string]any{
+					"remote_addr":      r.RemoteAddr,
+					"operator_id":      operatorID,
+					"peer_common_name": peerIdentity.CommonName,
+					"peer_fingerprint": peerIdentity.FingerprintSHA256,
+				},
+			})
+			writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "operator identity does not match client certificate"})
+			return
+		}
+	}
+	if !RoleAllowsAction(validated.IssuerRole, validated.Action) {
+		s.state.AddEvent(EventRecord{
+			Type:      "security",
+			Message:   "command rejected: role is not authorized for action",
+			Timestamp: time.Now().UTC(),
+			Data: map[string]any{
+				"remote_addr":      r.RemoteAddr,
+				"action":           validated.Action,
+				"issued_by":        validated.IssuedBy,
+				"issuer_role":      validated.IssuerRole,
+				"peer_common_name": peerIdentity.CommonName,
+			},
+		})
+		writeJSON(w, http.StatusForbidden, map[string]any{"error": fmt.Sprintf("role %q is not authorized for action %q", validated.IssuerRole, validated.Action)})
+		return
+	}
+	validatedPayloadJSON, err := canonicalPayloadExcludingApproval(validated.Payload)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+		return
+	}
+	if CommandRequiresApproval(validated.Action) {
+		approvalID, _ := validated.Payload["approval_id"].(string)
+		approvalID = strings.TrimSpace(approvalID)
+		if approvalID == "" {
+			pending := PendingApproval{
+				ApprovalID:    fmt.Sprintf("approval-%d", time.Now().UnixNano()),
+				Action:        validated.Action,
+				Payload:       payloadWithoutApproval(validated.Payload),
+				PayloadJSON:   validatedPayloadJSON,
+				IssuedBy:      validated.IssuedBy,
+				IssuerRole:    validated.IssuerRole,
+				ApprovedBy:    []string{validated.IssuedBy},
+				CreatedAt:     time.Now().UTC(),
+				ExpiresAt:     time.Now().UTC().Add(2 * time.Minute),
+				ApprovalState: "pending-second-operator",
+			}
+			s.state.SavePendingApproval(pending)
+			s.state.AddEvent(EventRecord{
+				Type:      "approval",
+				Message:   fmt.Sprintf("%s awaiting second operator approval", strings.ToUpper(validated.Action)),
+				Timestamp: time.Now().UTC(),
+				Data: map[string]any{
+					"approval_id": pending.ApprovalID,
+					"action":      pending.Action,
+					"issued_by":   pending.IssuedBy,
+					"issuer_role": pending.IssuerRole,
+					"approved_by": pending.ApprovedBy,
+					"expires_at":  pending.ExpiresAt.Format(time.RFC3339Nano),
+				},
+			})
+			writeJSON(w, http.StatusAccepted, map[string]any{
+				"message":           fmt.Sprintf("%s requires second-operator approval; a different authenticated operator must confirm", validated.Action),
+				"approval_required": true,
+				"approval_id":       pending.ApprovalID,
+				"expires_at":        pending.ExpiresAt,
+				"approval_state":    pending.ApprovalState,
+			})
+			return
+		}
+		pending, ok := s.state.PendingApproval(approvalID)
+		if !ok {
+			writeJSON(w, http.StatusConflict, map[string]any{"error": "approval request not found or expired"})
+			return
+		}
+		if pending.Action != validated.Action || pending.PayloadJSON != validatedPayloadJSON {
+			writeJSON(w, http.StatusConflict, map[string]any{"error": "approval confirmation does not match pending request"})
+			return
+		}
+		if validated.IssuedBy == pending.IssuedBy {
+			writeJSON(w, http.StatusConflict, map[string]any{"error": "critical approval requires a second distinct authenticated operator"})
+			return
+		}
+		pending.ApprovedBy = appendUniqueApprovalActor(pending.ApprovedBy, validated.IssuedBy)
+		s.state.DeletePendingApproval(approvalID)
+		s.state.AddEvent(EventRecord{
+			Type:      "approval",
+			Message:   fmt.Sprintf("%s second-operator approval confirmed", strings.ToUpper(validated.Action)),
+			Timestamp: time.Now().UTC(),
+			Data: map[string]any{
+				"approval_id": approvalID,
+				"action":      validated.Action,
+				"issued_by":   validated.IssuedBy,
+				"issuer_role": validated.IssuerRole,
+				"approved_by": pending.ApprovedBy,
+			},
+		})
 	}
 	cmd := CommandEnvelope{
-		CommandID: fmt.Sprintf("cmd-%d", time.Now().UnixNano()),
-		Action:    payload.Action,
-		Payload:   payload.Payload,
-		IssuedBy:  "dashboard",
-		IssuedAt:  time.Now().UTC(),
+		CommandID:       fmt.Sprintf("cmd-%d", time.Now().UnixNano()),
+		Action:          validated.Action,
+		Payload:         validated.Payload,
+		IssuedBy:        validated.IssuedBy,
+		IssuerRole:      validated.IssuerRole,
+		IssuedAt:        validated.IssuedAt,
+		ExpiresAt:       validated.ExpiresAt,
+		Nonce:           validated.Nonce,
+		Authenticated:   validated.Authenticated,
+		SecurityProfile: s.security.Profile,
 	}
-	if clusterID, ok := payload.Payload["cluster_id"].(string); ok {
+	if clusterID, ok := validated.Payload["cluster_id"].(string); ok {
 		cmd.ClusterID = strings.TrimSpace(clusterID)
 	}
-	if rawTargets, ok := payload.Payload["target_ids"].([]any); ok {
+	if rawTargets, ok := validated.Payload["target_ids"].([]any); ok {
 		for _, raw := range rawTargets {
 			if v, ok := raw.(float64); ok {
 				id := int(v)
@@ -207,11 +362,18 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 	s.state.RecordCommand(cmd)
 	s.state.AddEvent(EventRecord{
 		Type:      "command",
-		Message:   fmt.Sprintf("%s command queued", strings.ToUpper(payload.Action)),
+		Message:   fmt.Sprintf("%s command queued", strings.ToUpper(validated.Action)),
 		Timestamp: time.Now().UTC(),
-		Data:      map[string]any{"command_id": cmd.CommandID},
+		Data: map[string]any{
+			"command_id":       cmd.CommandID,
+			"authenticated":    cmd.Authenticated,
+			"issued_by":        cmd.IssuedBy,
+			"issuer_role":      cmd.IssuerRole,
+			"peer_common_name": peerIdentity.CommonName,
+			"peer_verified":    peerIdentity.Verified,
+		},
 	})
-	if shape, ok := payload.Payload["shape"].(string); ok && cmd.ClusterID != "" {
+	if shape, ok := validated.Payload["shape"].(string); ok && cmd.ClusterID != "" {
 		s.state.RegisterMission(MissionPlan{
 			MissionID: fmt.Sprintf("mission-%d", time.Now().UnixNano()),
 			Name:      "Formation Update",
@@ -220,9 +382,9 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 			Status:    "running",
 		})
 	}
-	if payload.Action == "add_drone" {
+	if validated.Action == "add_drone" {
 		droneID := 0
-		if raw, ok := payload.Payload["drone_id"]; ok {
+		if raw, ok := validated.Payload["drone_id"]; ok {
 			switch v := raw.(type) {
 			case float64:
 				droneID = int(v)
@@ -230,7 +392,7 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 				droneID = v
 			}
 		}
-		clusterID, _ := payload.Payload["cluster_id"].(string)
+		clusterID, _ := validated.Payload["cluster_id"].(string)
 		telemetry := s.state.AddDrone(droneID, clusterID)
 		writeJSON(w, http.StatusAccepted, map[string]any{
 			"message":    fmt.Sprintf("drone %d added to swarm", telemetry.DroneID),
@@ -238,11 +400,55 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	affected := s.state.ApplyCommand(payload.Action, cmd.ClusterID, cmd.TargetIDs, payload.Payload)
+	affected := s.state.ApplyCommand(validated.Action, cmd.ClusterID, cmd.TargetIDs, validated.Payload)
 	writeJSON(w, http.StatusAccepted, map[string]any{
-		"message":    fmt.Sprintf("%s accepted by command fan-out service for %d drone(s)", payload.Action, affected),
+		"message":    fmt.Sprintf("%s accepted by command fan-out service for %d drone(s)", validated.Action, affected),
 		"command_id": cmd.CommandID,
 	})
+}
+
+func CommandRequiresApproval(action string) bool {
+	switch strings.TrimSpace(strings.ToLower(action)) {
+	case "election", "emergency_land":
+		return true
+	default:
+		return false
+	}
+}
+
+func payloadWithoutApproval(payload map[string]any) map[string]any {
+	if payload == nil {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(payload))
+	for key, value := range payload {
+		if strings.EqualFold(strings.TrimSpace(key), "approval_id") {
+			continue
+		}
+		out[key] = value
+	}
+	return out
+}
+
+func canonicalPayloadExcludingApproval(payload map[string]any) (string, error) {
+	encoded, err := json.Marshal(payloadWithoutApproval(payload))
+	if err != nil {
+		return "", errors.New("payload normalization failed")
+	}
+	return string(encoded), nil
+}
+
+func appendUniqueApprovalActor(existing []string, actor string) []string {
+	actor = strings.TrimSpace(actor)
+	if actor == "" {
+		return existing
+	}
+	for _, item := range existing {
+		if strings.TrimSpace(item) == actor {
+			return existing
+		}
+	}
+	return append(existing, actor)
 }
 
 func (s *Server) handleMissions(w http.ResponseWriter, r *http.Request) {
@@ -289,6 +495,15 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		events = events[len(events)-limit:]
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"events": events})
+}
+
+func (s *Server) handleApprovals(w http.ResponseWriter, r *http.Request) {
+	log.Printf("handleApprovals method=%s remote=%s", r.Method, r.RemoteAddr)
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"approvals": s.state.PendingApprovals()})
 }
 
 func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {

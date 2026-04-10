@@ -108,6 +108,7 @@ def cmd_setup(args: argparse.Namespace) -> None:
         "opencv-python>=4.8",
         "pyserial>=3.5",
         "esptool>=4.6",
+        "cryptography>=45.0",
         "spdlog",
         "rich",
     ]

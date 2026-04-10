@@ -476,8 +476,37 @@ build\Release\drone_node.exe --id=1 --esp32=192.168.4.1 --lidar=192.168.1.201:23
 #### 3. Dashboard in fleet mode
 
 ```powershell
+$env:DRONE_OPERATOR_ID="operator-console-1"
+$env:DRONE_OPERATOR_ROLE="operator"
+$env:DRONE_OPERATOR_SECRET="replace-with-a-strong-operator-secret"
 python gui/dashboard.py --backend-url http://127.0.0.1:8080
 ```
+
+For hardened HTTPS or mTLS fleet mode:
+
+```powershell
+$env:DRONE_OPERATOR_ID="operator-console-1"
+$env:DRONE_OPERATOR_ROLE="operator"
+$env:DRONE_TLS_ENABLED="true"
+$env:DRONE_TLS_CA_FILE="certs/ca.crt"
+$env:DRONE_TLS_CLIENT_CERT_FILE="certs/operator-client.crt"
+$env:DRONE_TLS_CLIENT_KEY_FILE="certs/operator-client.key"
+python gui/dashboard.py --backend-url https://127.0.0.1:8080
+```
+
+Before first hardened run, generate local certificates:
+
+```powershell
+python scripts/generate_tls_certs.py --force
+```
+
+The generated operator client certificate uses common name `operator-console-1` by default. In mTLS mode, that identity must match `DRONE_OPERATOR_ID` or command submission will be rejected.
+Role-based command authorization is also enforced by the control plane through `DRONE_OPERATOR_ROLE`. Use `operator` for standard mission control, `commander` for election privileges, and `maintenance` for maintenance-only actions.
+For multi-operator approval workflows, configure the control-plane with `DRONE_OPERATOR_CREDENTIALS` using `operator_id:role:secret;...`. Critical actions such as `election` and `emergency_land` now require a second distinct authenticated operator to approve the exact same request.
+
+The onboard C++ runtime now also evaluates a drone security state from link integrity, timing trust, localization loss, and hardened-profile trust posture. In bridge mode this is exposed as `security_state`, `security_summary`, `link_integrity_score`, and health flags to the dashboard.
+It also keeps a drone-side remote command inbox and policy gate: secure swarm commands such as formation hold, mission sync, and emergency stop are accepted or rejected on the drone itself based on the current onboard security state.
+The node can now also post native telemetry directly to the Go backend when `DRONE_ENABLE_BACKEND_TELEMETRY=true`, which lets the backend/dashboard receive the drone's onboard security posture without depending on the Python bridge.
 
 #### 4. Dashboard in local mode
 

@@ -2,6 +2,7 @@ package controlplane
 
 import (
 	"math"
+	"encoding/json"
 	"testing"
 )
 
@@ -95,5 +96,36 @@ func TestIntegrateDroneKinematicsMovesTowardTarget(t *testing.T) {
 	}
 	if math.IsNaN(attitude[0]) || math.IsNaN(attitude[1]) || math.IsNaN(attitude[2]) {
 		t.Fatalf("unexpected NaN attitude %+v", attitude)
+	}
+}
+
+func TestCommandRequiresApprovalForCriticalActions(t *testing.T) {
+	if !CommandRequiresApproval("election") {
+		t.Fatal("expected election to require approval")
+	}
+	if !CommandRequiresApproval("emergency_land") {
+		t.Fatal("expected emergency_land to require approval")
+	}
+	if CommandRequiresApproval("fly") {
+		t.Fatal("did not expect fly to require approval")
+	}
+}
+
+func TestPayloadWithoutApprovalRemovesApprovalID(t *testing.T) {
+	payload := map[string]any{
+		"approval_id": "approval-123",
+		"cluster_id":  "cluster-01",
+		"target_ids":  []int{1, 2},
+	}
+	sanitized := payloadWithoutApproval(payload)
+	if _, ok := sanitized["approval_id"]; ok {
+		t.Fatal("approval_id should be stripped")
+	}
+	encoded, err := json.Marshal(sanitized)
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+	if string(encoded) == "" {
+		t.Fatal("expected sanitized payload to remain serializable")
 	}
 }
