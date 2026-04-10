@@ -85,6 +85,34 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "dashboard"
 STORE_PATH = DATA_DIR / "dashboard.sqlite3"
 
 
+def _rgba(hex_color: str, alpha: float) -> tuple[int, int, int, int]:
+    color = QColor(hex_color)
+    return (color.red(), color.green(), color.blue(), max(0, min(255, int(alpha * 255))))
+
+
+def style_plot_widget(widget: pg.PlotWidget, left_label: str, bottom_label: str = "Time (s)") -> pg.LegendItem:
+    widget.setBackground(PANEL_ALT)
+    widget.showGrid(x=True, y=True, alpha=0.18)
+    widget.setMouseEnabled(x=False, y=False)
+    widget.setMenuEnabled(False)
+    widget.setAntialiasing(True)
+    widget.getPlotItem().setClipToView(True)
+    widget.getPlotItem().setDownsampling(mode="peak")
+    widget.getPlotItem().layout.setContentsMargins(12, 10, 12, 12)
+    widget.getPlotItem().vb.setDefaultPadding(0.04)
+    widget.setLabel("left", left_label, color=TEXT_DIM)
+    widget.setLabel("bottom", bottom_label, color=TEXT_DIM)
+    widget.getAxis("left").setPen(pg.mkPen(color=_rgba(BORDER, 0.9), width=1))
+    widget.getAxis("bottom").setPen(pg.mkPen(color=_rgba(BORDER, 0.9), width=1))
+    widget.getAxis("left").setTextPen(pg.mkPen(TEXT_DIM))
+    widget.getAxis("bottom").setTextPen(pg.mkPen(TEXT_DIM))
+    legend = widget.addLegend(offset=(-14, 14))
+    legend.anchor((1, 0), (1, 0))
+    legend.setBrush(pg.mkBrush(_rgba(PANEL_BG, 0.88)))
+    legend.setPen(pg.mkPen(_rgba(BORDER, 0.9)))
+    return legend
+
+
 def load_env_file(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
     if not path.exists():
@@ -1597,23 +1625,27 @@ class Map3DView(gl.GLViewWidget):
     def __init__(self) -> None:
         super().__init__()
         self.setBackgroundColor(pg.mkColor(DARK_BG))
-        self.opts['center'] = pg.Vector(0.0, 0.0, 5.0)
-        self.setCameraPosition(distance=35, elevation=35, azimuth=45)
+        self.opts["center"] = pg.Vector(0.0, 0.0, 6.0)
+        self.setCameraPosition(distance=26, elevation=24, azimuth=38)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         grid = gl.GLGridItem()
-        grid.setSize(40, 40)
+        grid.setSize(56, 56)
         grid.setSpacing(2, 2)
+        grid.translate(0, 0, -0.02)
         self.addItem(grid)
 
         axis = gl.GLAxisItem()
-        axis.setSize(3.0, 3.0, 3.0)
+        axis.setSize(4.0, 4.0, 4.0)
         self.addItem(axis)
 
-        self._scatter = gl.GLScatterPlotItem(pos=np.zeros((1, 3)), size=10)
+        self._scatter = gl.GLScatterPlotItem(pos=np.zeros((1, 3)), size=12, pxMode=True)
         self.addItem(self._scatter)
         self._histories: dict[int, deque[tuple[float, float, float]]] = {}
         self._trails: dict[int, gl.GLLinePlotItem] = {}
         self._max_points = 240
+        self._camera_center = np.array([0.0, 0.0, 6.0], dtype=float)
+        self._camera_distance = 26.0
 
     def ingest(self, states: list[DroneState]) -> None:
         if not states:
@@ -1629,6 +1661,7 @@ class Map3DView(gl.GLViewWidget):
             else:
                 colors.append((0.15, 0.78, 0.85, 1.0))
         self._scatter.setData(pos=positions, color=np.array(colors), size=11)
+        self._update_camera_frame(positions)
 
         for state in states:
             if state.drone_id not in self._histories:
@@ -1642,22 +1675,35 @@ class Map3DView(gl.GLViewWidget):
                 color = np.tile(np.array([[0.22, 0.74, 0.97, 0.45]]), (trail.shape[0], 1))
                 self._trails[state.drone_id].setData(pos=trail, color=color)
 
+    def _update_camera_frame(self, positions: np.ndarray) -> None:
+        mins = positions.min(axis=0)
+        maxs = positions.max(axis=0)
+        center = (mins + maxs) / 2.0
+        span = np.maximum(maxs - mins, np.array([10.0, 10.0, 6.0]))
+        target_center = np.array([center[0], center[1], max(4.0, center[2] * 0.7 + 3.0)], dtype=float)
+        target_distance = float(max(24.0, np.linalg.norm(span[:2]) * 1.1 + span[2] * 1.8))
+
+        self._camera_center = 0.85 * self._camera_center + 0.15 * target_center
+        self._camera_distance = 0.85 * self._camera_distance + 0.15 * target_distance
+        self.opts["center"] = pg.Vector(*self._camera_center)
+        self.setCameraPosition(
+            distance=self._camera_distance,
+            elevation=22,
+            azimuth=38,
+        )
+
 
 class DriftGraph(pg.PlotWidget):
     def __init__(self, drone_ids: list[int], poll_hz: int) -> None:
         super().__init__()
-        self.setBackground(PANEL_ALT)
-        self.showGrid(x=True, y=True, alpha=0.2)
-        self.setLabel("left", "EKF Error (m)", color=TEXT_DIM)
-        self.setLabel("bottom", "Time (s)", color=TEXT_DIM)
-        self.addLegend(offset=(12, 12))
+        self._legend = style_plot_widget(self, "EKF Error (m)")
         self._window = 360
         self._poll_hz = max(poll_hz, 1)
         self._t0 = time.time()
         self._history: dict[int, deque[float]] = {drone_id: deque(maxlen=self._window) for drone_id in drone_ids}
-        self._palette = [CYAN, MAGENTA, SUCCESS, WARN, ACCENT_ALT, "#A78BFA"]
+        self._palette = [CYAN, MAGENTA, SUCCESS, WARN, ACCENT_ALT, "#A78BFA", ACCENT, "#F97316"]
         self._curves = {
-            drone_id: self.plot(pen=pg.mkPen(self._palette[idx % len(self._palette)], width=2), name=f"Drone {drone_id}")
+            drone_id: self.plot(pen=pg.mkPen(self._palette[idx % len(self._palette)], width=2), name=f"D{drone_id}")
             for idx, drone_id in enumerate(drone_ids)
         }
 
@@ -1669,7 +1715,7 @@ class DriftGraph(pg.PlotWidget):
                 color = self._palette[len(self._curves) % len(self._palette)]
                 self._curves[state.drone_id] = self.plot(
                     pen=pg.mkPen(color, width=2),
-                    name=f"Drone {state.drone_id}",
+                    name=f"D{state.drone_id}",
                 )
             self._history[state.drone_id].append(state.drift_m)
             series = np.array(self._history[state.drone_id], dtype=float)
@@ -1681,18 +1727,14 @@ class DriftGraph(pg.PlotWidget):
 class MCSSScoreGraph(pg.PlotWidget):
     def __init__(self, drone_ids: list[int], poll_hz: int) -> None:
         super().__init__()
-        self.setBackground(PANEL_ALT)
-        self.showGrid(x=True, y=True, alpha=0.2)
-        self.setLabel("left", "Leader Score", color=TEXT_DIM)
-        self.setLabel("bottom", "Time (s)", color=TEXT_DIM)
-        self.addLegend(offset=(12, 12))
+        self._legend = style_plot_widget(self, "Leader Score")
         self._window = 360
         self._poll_hz = max(poll_hz, 1)
         self._t0 = time.time()
         self._history: dict[int, deque[float]] = {drone_id: deque(maxlen=self._window) for drone_id in drone_ids}
-        self._palette = [CYAN, MAGENTA, SUCCESS, WARN, ACCENT_ALT, "#A78BFA"]
+        self._palette = [CYAN, MAGENTA, SUCCESS, WARN, ACCENT_ALT, "#A78BFA", ACCENT, "#F97316"]
         self._curves = {
-            drone_id: self.plot(pen=pg.mkPen(self._palette[idx % len(self._palette)], width=2), name=f"Drone {drone_id}")
+            drone_id: self.plot(pen=pg.mkPen(self._palette[idx % len(self._palette)], width=2), name=f"D{drone_id}")
             for idx, drone_id in enumerate(drone_ids)
         }
 
@@ -1702,7 +1744,7 @@ class MCSSScoreGraph(pg.PlotWidget):
             if state.drone_id not in self._history:
                 self._history[state.drone_id] = deque(maxlen=self._window)
                 color = self._palette[len(self._curves) % len(self._palette)]
-                self._curves[state.drone_id] = self.plot(pen=pg.mkPen(color, width=2), name=f"Drone {state.drone_id}")
+                self._curves[state.drone_id] = self.plot(pen=pg.mkPen(color, width=2), name=f"D{state.drone_id}")
             self._history[state.drone_id].append(state.leadership_score)
             series = np.array(self._history[state.drone_id], dtype=float)
             x = np.linspace(max(0.0, now - len(series) / self._poll_hz), now, len(series))
@@ -1711,11 +1753,7 @@ class MCSSScoreGraph(pg.PlotWidget):
 class NetworkHealthGraph(pg.PlotWidget):
     def __init__(self, poll_hz: int) -> None:
         super().__init__()
-        self.setBackground(PANEL_ALT)
-        self.showGrid(x=True, y=True, alpha=0.2)
-        self.setLabel("left", "Network Latency & Loss", color=TEXT_DIM)
-        self.setLabel("bottom", "Time (s)", color=TEXT_DIM)
-        self.addLegend(offset=(12, 12))
+        self._legend = style_plot_widget(self, "Network Latency & Loss")
         self._window = 360
         self._poll_hz = max(poll_hz, 1)
         self._t0 = time.time()
@@ -1741,11 +1779,7 @@ class NetworkHealthGraph(pg.PlotWidget):
 class ComputeLoadGraph(pg.PlotWidget):
     def __init__(self, poll_hz: int) -> None:
         super().__init__()
-        self.setBackground(PANEL_ALT)
-        self.showGrid(x=True, y=True, alpha=0.2)
-        self.setLabel("left", "Compute (Temp & Load)", color=TEXT_DIM)
-        self.setLabel("bottom", "Time (s)", color=TEXT_DIM)
-        self.addLegend(offset=(12, 12))
+        self._legend = style_plot_widget(self, "Compute (Temp & Load)")
         self._window = 360
         self._poll_hz = max(poll_hz, 1)
         self._t0 = time.time()
@@ -2333,20 +2367,9 @@ class DashboardWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         central = QWidget()
-        outer = QVBoxLayout(central)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(0)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet(f"QScrollArea {{ background: {DARK_BG}; border: none; }}")
-        content = QWidget()
-        root = QVBoxLayout(content)
+        root = QVBoxLayout(central)
         root.setContentsMargins(16, 14, 16, 14)
         root.setSpacing(14)
-        scroll.setWidget(content)
-        outer.addWidget(scroll)
         self.setCentralWidget(central)
 
         header = QHBoxLayout()
@@ -2400,21 +2423,67 @@ class DashboardWindow(QMainWindow):
             cards.addWidget(card, 0, idx)
         root.addLayout(cards)
 
-        self._body = QGridLayout()
-        self._body.setHorizontalSpacing(14)
-        self._body.setVerticalSpacing(14)
+        self._body_frame = QWidget()
+        self._body_shell = QHBoxLayout(self._body_frame)
+        self._body_shell.setContentsMargins(0, 0, 0, 0)
+        self._body_shell.setSpacing(14)
+
+        self._left_panel = QWidget()
+        self._left_layout = QVBoxLayout(self._left_panel)
+        self._left_layout.setContentsMargins(0, 0, 0, 0)
+        self._left_layout.setSpacing(14)
+
+        self._right_panel = QWidget()
+        self._right_layout = QVBoxLayout(self._right_panel)
+        self._right_layout.setContentsMargins(0, 0, 0, 0)
+        self._right_layout.setSpacing(14)
+
+        self._stack_panel = QWidget()
+        self._stack_layout = QVBoxLayout(self._stack_panel)
+        self._stack_layout.setContentsMargins(0, 0, 0, 0)
+        self._stack_layout.setSpacing(14)
+
+        self._left_scroll = QScrollArea()
+        self._left_scroll.setWidgetResizable(True)
+        self._left_scroll.setFrameShape(QFrame.NoFrame)
+        self._left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._left_scroll.setStyleSheet(f"QScrollArea {{ background: transparent; border: none; }}")
+        self._left_scroll.setWidget(self._left_panel)
+
+        self._right_scroll = QScrollArea()
+        self._right_scroll.setWidgetResizable(True)
+        self._right_scroll.setFrameShape(QFrame.NoFrame)
+        self._right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._right_scroll.setStyleSheet(f"QScrollArea {{ background: transparent; border: none; }}")
+        self._right_scroll.setWidget(self._right_panel)
+
+        self._stack_scroll = QScrollArea()
+        self._stack_scroll.setWidgetResizable(True)
+        self._stack_scroll.setFrameShape(QFrame.NoFrame)
+        self._stack_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._stack_scroll.setStyleSheet(f"QScrollArea {{ background: transparent; border: none; }}")
+        self._stack_scroll.setWidget(self._stack_panel)
 
         self._map_box = QGroupBox("3D Map View")
-        self._map_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self._map_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         map_layout = QVBoxLayout(self._map_box)
+        map_layout.setContentsMargins(10, 16, 10, 10)
         self._map = Map3DView()
-        self._map.setMinimumHeight(260)
+        self._map.setMinimumHeight(250)
+        self._map.setMaximumHeight(320)
         map_layout.addWidget(self._map)
 
         self._tabs = QTabWidget()
-        self._tabs.setStyleSheet(f"QTabWidget::pane {{ border: 1px solid {BORDER}; border-radius: 4px; }} QTabBar::tab {{ background: {PANEL_BG}; color: {TEXT_DIM}; padding: 8px 16px; border: 1px solid {BORDER}; }} QTabBar::tab:selected {{ background: {PANEL_ALT}; color: {TEXT}; border-bottom-color: {ACCENT}; font-weight: bold; }}")
-        self._tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._tabs.setMinimumHeight(200)
+        self._tabs.setStyleSheet(
+            f"QTabWidget::pane {{ border: 1px solid {BORDER}; border-radius: 6px; background: {PANEL_ALT}; top: -1px; }}"
+            f" QTabBar::tab {{ background: {PANEL_BG}; color: {TEXT_DIM}; padding: 10px 16px; border: 1px solid {BORDER};"
+            f" border-bottom: none; min-width: 110px; }}"
+            f" QTabBar::tab:selected {{ background: {PANEL_ALT}; color: {TEXT}; border-top: 1px solid {ACCENT}; font-weight: 700; }}"
+            f" QTabBar::tab:!selected:hover {{ color: {TEXT}; }}"
+        )
+        self._tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._tabs.setMinimumHeight(250)
+        self._tabs.setMaximumHeight(320)
 
         self._drift = DriftGraph(self._ids, self._poll_hz)
         self._mcss_graph = MCSSScoreGraph(self._ids, self._poll_hz)
@@ -2425,6 +2494,11 @@ class DashboardWindow(QMainWindow):
         self._tabs.addTab(self._mcss_graph, "MCSS Consensus")
         self._tabs.addTab(self._net_graph, "V2X Network")
         self._tabs.addTab(self._comp_graph, "Core Logic")
+        self._graph_box = QGroupBox("Telemetry Graphs")
+        self._graph_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        graph_layout = QVBoxLayout(self._graph_box)
+        graph_layout.setContentsMargins(10, 16, 10, 10)
+        graph_layout.addWidget(self._tabs)
 
         self._console = CommandConsole()
         self._console.set_operator_role(self._operator_role)
@@ -2478,7 +2552,7 @@ class DashboardWindow(QMainWindow):
         side_stack.setStretch(1, 1)
         self._side_widget = side_widget
 
-        root.addLayout(self._body, 1)
+        root.addWidget(self._body_frame, 1)
         self._update_responsive_layout()
 
         status = QStatusBar()
@@ -2489,47 +2563,52 @@ class DashboardWindow(QMainWindow):
 
     def _update_responsive_layout(self) -> None:
         compact = self.width() < 1280
-        if compact == self._compact_layout and self._body.count():
+        if compact == self._compact_layout and self._body_shell.count():
             return
         self._compact_layout = compact
 
-        while self._body.count():
-            item = self._body.takeAt(0)
+        while self._body_shell.count():
+            item = self._body_shell.takeAt(0)
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
 
+        for layout in (self._left_layout, self._right_layout, self._stack_layout):
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.setParent(None)
+
         if compact:
             self._map.setMinimumHeight(220)
             self._map.setMaximumHeight(280)
-            self._body.addWidget(self._map_box, 0, 0, 1, 1)
-            self._body.addWidget(self._tabs, 1, 0, 1, 1)
-            self._body.addWidget(self._console, 2, 0, 1, 1)
-            self._body.addWidget(self._table_container, 3, 0, 1, 1)
-            self._body.addWidget(self._side_widget, 4, 0, 1, 1)
-            self._body.setColumnStretch(0, 1)
-            self._body.setColumnStretch(1, 0)
-            self._body.setColumnStretch(2, 0)
-            self._body.setRowStretch(0, 1)
-            self._body.setRowStretch(1, 0)
-            self._body.setRowStretch(2, 0)
-            self._body.setRowStretch(3, 1)
-            self._body.setRowStretch(4, 1)
+            self._tabs.setMinimumHeight(240)
+            self._tabs.setMaximumHeight(300)
+            self._stack_layout.addWidget(self._map_box)
+            self._stack_layout.addWidget(self._graph_box)
+            self._stack_layout.addWidget(self._console)
+            self._stack_layout.addWidget(self._table_container)
+            self._stack_layout.addWidget(self._side_widget)
+            self._stack_layout.addStretch(1)
+            self._body_shell.addWidget(self._stack_scroll, 1)
             return
 
-        self._map.setMinimumHeight(260)
-        self._map.setMaximumHeight(340)
-        self._body.addWidget(self._map_box, 0, 0, 2, 1)
-        self._body.addWidget(self._tabs, 0, 1, 1, 1)
-        self._body.addWidget(self._console, 1, 1, 1, 1)
-        self._body.addWidget(self._table_container, 2, 0, 1, 1)
-        self._body.addWidget(self._side_widget, 2, 1, 1, 1)
-        self._body.setColumnStretch(0, 3)
-        self._body.setColumnStretch(1, 2)
-        self._body.setColumnStretch(2, 0)
-        self._body.setRowStretch(0, 2)
-        self._body.setRowStretch(1, 2)
-        self._body.setRowStretch(2, 2)
+        self._map.setMinimumHeight(250)
+        self._map.setMaximumHeight(320)
+        self._tabs.setMinimumHeight(250)
+        self._tabs.setMaximumHeight(320)
+        self._left_layout.addWidget(self._map_box)
+        self._left_layout.addWidget(self._table_container)
+        self._left_layout.addStretch(1)
+
+        self._right_layout.addWidget(self._graph_box)
+        self._right_layout.addWidget(self._console)
+        self._right_layout.addWidget(self._side_widget)
+        self._right_layout.addStretch(1)
+
+        self._body_shell.addWidget(self._left_scroll, 3)
+        self._body_shell.addWidget(self._right_scroll, 2)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
