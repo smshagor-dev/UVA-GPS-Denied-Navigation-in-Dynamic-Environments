@@ -38,6 +38,16 @@ struct ImuNoiseModel {
  
 class IMUSensor : public SensorBase {
 public:
+    struct TelemetryStats {
+        bool device_active{false};
+        bool simulated{false};
+        double sample_rate_hz{0.0};
+        double last_sample_age_ms{0.0};
+        Eigen::Vector3d accel_mps2{Eigen::Vector3d::Zero()};
+        Eigen::Vector3d gyro_rads{Eigen::Vector3d::Zero()};
+        std::string health{"unavailable"};
+    };
+
     explicit IMUSensor(std::string id, std::string device_path = "/dev/i2c-1",
                        uint8_t i2c_addr = 0x68)
         : SensorBase(std::move(id), "IMU")
@@ -74,6 +84,7 @@ public:
     [[nodiscard]] const Eigen::Vector3d& accel_bias() const { return accel_bias_; }
     [[nodiscard]] const Eigen::Vector3d& gyro_bias()  const { return gyro_bias_; }
     [[nodiscard]] const ImuNoiseModel&   noise_model() const { return noise_; }
+    [[nodiscard]] TelemetryStats telemetry_stats() const;
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -88,6 +99,9 @@ private:
     std::optional<ImuMeasurement>  latest_;
     std::deque<ImuMeasurement>     buffer_;
     static constexpr size_t        kBufferMax{4096};
+    double                         sample_rate_estimate_hz_{0.0};
+    double                         last_sample_timestamp_{0.0};
+    bool                           last_measurement_simulated_{false};
 
     Eigen::Vector3d accel_bias_{Eigen::Vector3d::Zero()};
     Eigen::Vector3d gyro_bias_{Eigen::Vector3d::Zero()};

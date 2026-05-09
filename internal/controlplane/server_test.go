@@ -11,7 +11,7 @@ import (
 )
 
 func TestApplyCommandFlyAndLandUpdateMissionAndTunables(t *testing.T) {
-	state := NewFleetState()
+	state := NewFleetState("production", false, 5*time.Second)
 	state.UpsertTelemetry(DroneTelemetry{
 		DroneID:            1,
 		ClusterID:          "cluster-01",
@@ -55,7 +55,7 @@ func TestApplyCommandFlyAndLandUpdateMissionAndTunables(t *testing.T) {
 }
 
 func TestApplyCommandManualMoveUpdatesRemoteTarget(t *testing.T) {
-	state := NewFleetState()
+	state := NewFleetState("simulation", true, 5*time.Second)
 	state.UpsertTelemetry(DroneTelemetry{
 		DroneID:              7,
 		ClusterID:            "cluster-01",
@@ -208,7 +208,7 @@ func TestPayloadWithoutApprovalRemovesApprovalID(t *testing.T) {
 }
 
 func TestTelemetrySecurityFieldsFlowIntoFleetSnapshot(t *testing.T) {
-	server := NewServer(":0", SecurityConfig{Profile: "lab"}, TLSConfig{})
+	server := NewServer(":0", SecurityConfig{Profile: "lab"}, TLSConfig{}, ServerConfig{})
 
 	body := `{
 		"drone_id": 21,
@@ -290,7 +290,7 @@ func TestTelemetrySecurityFieldsFlowIntoFleetSnapshot(t *testing.T) {
 }
 
 func TestAuditHashesChainAcrossEventsAndCommands(t *testing.T) {
-	state := NewFleetState()
+	state := NewFleetState("simulation", true, 5*time.Second)
 	firstEvent := EventRecord{
 		Type:      "security",
 		Message:   "initial event",

@@ -12,6 +12,8 @@
 #include <opencv2/dnn.hpp>
 #include <opencv2/videoio.hpp>
 #include <optional>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #ifdef DRONE_HAS_TENSORRT
@@ -28,6 +30,11 @@ struct Detection {
     cv::Rect2f bbox;        // normalized [0,1]
     std::string label;
 };
+
+[[nodiscard]] std::unordered_map<int, std::string> load_detector_label_map_json(const std::string& path);
+[[nodiscard]] std::string resolve_detector_label(
+    int class_id,
+    const std::unordered_map<int, std::string>& label_map);
 
 //  Camera frame 
 struct CameraFrame : SensorMeasurement {
@@ -49,6 +56,18 @@ struct CameraIntrinsics {
  
 class CameraSensor : public SensorBase {
 public:
+    struct TelemetryStats {
+        bool stream_active{false};
+        bool simulated{false};
+        double fps{0.0};
+        double frame_age_ms{0.0};
+        uint32_t dropped_frames{0};
+        int width{0};
+        int height{0};
+        uint32_t latest_frame_id{0};
+        std::string latest_frame_ref{};
+    };
+
     explicit CameraSensor(std::string id, std::string stream_url,
                           CameraIntrinsics intrinsics = {})
         : SensorBase(std::move(id), "Camera")
@@ -73,8 +92,10 @@ public:
     bool load_yolo_model(const std::string& engine_path,
                          float conf_thresh = 0.45f,
                          float nms_thresh  = 0.5f);
+    bool load_detector_labels(const std::string& labels_path);
 
     [[nodiscard]] bool inference_enabled() const { return inference_ready_; }
+    [[nodiscard]] TelemetryStats telemetry_stats() const;
 
     //  Undistortion 
     void precompute_undistort_maps();
@@ -92,11 +113,19 @@ private:
     std::optional<CameraFrame>  latest_;
     DataCallback<CameraFrame>   data_cb_;
     uint32_t                    frame_counter_{0};
+    double                      last_frame_timestamp_{0.0};
+    double                      fps_estimate_hz_{0.0};
+    uint32_t                    dropped_frames_{0};
+    uint32_t                    latest_frame_id_{0};
+    int                         latest_width_{0};
+    int                         latest_height_{0};
 
     // YOLOv8n inference
     bool    inference_ready_{false};
     float   conf_thresh_{0.45f};
     float   nms_thresh_{0.50f};
+    std::unordered_map<int, std::string> label_map_{};
+    std::string label_map_path_{};
 
 #ifdef DRONE_HAS_TENSORRT
     // TensorRT engine (Jetson Nano path)
@@ -114,7 +143,6 @@ private:
 #else
     // OpenCV DNN fallback (CPU/GPU)
     cv::dnn::Net dnn_net_;
-    std::vector<std::string> class_names_;
 #endif
 };
 

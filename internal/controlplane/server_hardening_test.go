@@ -18,7 +18,7 @@ func TestTelemetryRejectedWithoutVerifiedPeerInHardenedProfile(t *testing.T) {
 	server := NewServer(":0", SecurityConfig{Profile: "production"}, TLSConfig{
 		Enabled:           true,
 		RequireClientCert: true,
-	})
+	}, ServerConfig{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/telemetry", strings.NewReader(`{"drone_id":1}`))
 	rec := httptest.NewRecorder()
@@ -34,7 +34,7 @@ func TestMissionPostForbiddenInHardenedProfile(t *testing.T) {
 	server := NewServer(":0", SecurityConfig{Profile: "production"}, TLSConfig{
 		Enabled:           true,
 		RequireClientCert: true,
-	})
+	}, ServerConfig{})
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/missions", strings.NewReader(`{"mission_id":"m1","name":"test"}`))
 	rec := httptest.NewRecorder()
@@ -50,7 +50,7 @@ func TestApprovalsRequireVerifiedPeerOutsideLab(t *testing.T) {
 	server := NewServer(":0", SecurityConfig{Profile: "field"}, TLSConfig{
 		Enabled:           true,
 		RequireClientCert: true,
-	})
+	}, ServerConfig{})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/approvals", nil)
 	rec := httptest.NewRecorder()
@@ -71,7 +71,7 @@ func TestTelemetryRejectedWhenPeerNotInDeviceRegistry(t *testing.T) {
 	}, TLSConfig{
 		Enabled:           true,
 		RequireClientCert: true,
-	})
+	}, ServerConfig{})
 
 	req := newVerifiedPeerRequest(t, http.MethodPost, "/api/v1/telemetry", `{"drone_id":1,"cluster_id":"cluster-01"}`, "drone-node-unknown", time.Now().Add(72*time.Hour))
 	rec := httptest.NewRecorder()
@@ -93,7 +93,7 @@ func TestTelemetryRejectedWhenClientCertRotationIsDue(t *testing.T) {
 	}, TLSConfig{
 		Enabled:           true,
 		RequireClientCert: true,
-	})
+	}, ServerConfig{})
 
 	req := newVerifiedPeerRequest(t, http.MethodPost, "/api/v1/telemetry", `{"drone_id":1,"cluster_id":"cluster-01"}`, "drone-node-1", time.Now().Add(2*time.Hour))
 	rec := httptest.NewRecorder()
@@ -114,7 +114,7 @@ func TestApprovalsAllowRegisteredCommanderPeer(t *testing.T) {
 	}, TLSConfig{
 		Enabled:           true,
 		RequireClientCert: true,
-	})
+	}, ServerConfig{})
 
 	req := newVerifiedPeerRequest(t, http.MethodGet, "/api/v1/approvals", "", "operator-console-1", time.Now().Add(72*time.Hour))
 	rec := httptest.NewRecorder()

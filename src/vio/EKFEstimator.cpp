@@ -218,6 +218,42 @@ void EKFEstimator::update_depth(double z_depth_m, double sigma_m) {
     last_depth_update_ts_ = timestamp_;
 }
 
+void EKFEstimator::update_visual_pose(const Eigen::Vector3d& observed_position,
+                                      const Eigen::Vector3d& observed_velocity,
+                                      double sigma_position_m,
+                                      double sigma_velocity_mps) {
+    if (!initialized_) return;
+    std::lock_guard lock(mtx_);
+
+    Eigen::Matrix<double, 6, 15> H = Eigen::Matrix<double, 6, 15>::Zero();
+    H.block<3,3>(0,0) = Eigen::Matrix3d::Identity();
+    H.block<3,3>(3,3) = Eigen::Matrix3d::Identity();
+
+    Eigen::Matrix<double, 6, 6> R_meas = Eigen::Matrix<double, 6, 6>::Zero();
+    R_meas.block<3,3>(0,0) = Eigen::Matrix3d::Identity() * sigma_position_m * sigma_position_m;
+    R_meas.block<3,3>(3,3) = Eigen::Matrix3d::Identity() * sigma_velocity_mps * sigma_velocity_mps;
+
+    Eigen::Matrix<double, 6, 1> innov;
+    innov.segment<3>(0) = observed_position - pos_;
+    innov.segment<3>(3) = observed_velocity - vel_;
+
+    const Eigen::Matrix<double, 6, 6> S = H * P_ * H.transpose() + R_meas;
+    const Eigen::Matrix<double, 15, 6> K_gain = P_ * H.transpose() * S.inverse();
+    const auto dx = K_gain * innov;
+
+    pos_  += dx.segment<3>(0);
+    vel_  += dx.segment<3>(3);
+    ba_   += dx.segment<3>(9);
+    bg_   += dx.segment<3>(12);
+
+    const Eigen::Matrix<double,15,15> I_KH =
+        Eigen::Matrix<double,15,15>::Identity() - K_gain * H;
+    P_ = I_KH * P_ * I_KH.transpose() + K_gain * R_meas * K_gain.transpose();
+    P_ = 0.5 * (P_ + P_.transpose());
+    total_drift_ = P_.diagonal().head<3>().cwiseSqrt().norm();
+    last_vision_update_ts_ = timestamp_;
+}
+
  
 void EKFEstimator::update_zupt() {
     if (!initialized_) return;

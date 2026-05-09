@@ -294,7 +294,8 @@ def main() -> int:
         if not args.skip_gui:
             dashboard_cmd = [
                 sys.executable,
-                str(ROOT / "gui" / "dashboard.py"),
+                "-m",
+                "gui.dashboard",
                 "--ids",
                 args.dashboard_ids,
                 "--poll-hz",

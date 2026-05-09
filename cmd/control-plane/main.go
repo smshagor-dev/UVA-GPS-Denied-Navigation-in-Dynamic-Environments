@@ -105,8 +105,19 @@ func main() {
 		tlsCfg.RequireClientCert,
 		strings.TrimSpace(tlsCfg.CertFile),
 		strings.TrimSpace(tlsCfg.ClientCAFile))
+	serverCfg := controlplane.ServerConfig{
+		Mode:              strings.TrimSpace(strings.ToLower(os.Getenv("DRONE_BACKEND_MODE"))),
+		SimulationEnabled: parseBoolEnv("DRONE_BACKEND_SIMULATION_ENABLED", true),
+		StaleAfter:        time.Duration(parseIntEnv("DRONE_BACKEND_STALE_SEC", 5)) * time.Second,
+		DemoFleetSize:     parseIntEnv("DRONE_BACKEND_DEMO_FLEET_SIZE", 5),
+	}
+	log.Printf("control-plane runtime backend_mode=%s simulation_enabled=%t stale_after=%s demo_fleet_size=%d",
+		serverCfg.Mode,
+		serverCfg.SimulationEnabled,
+		serverCfg.StaleAfter,
+		serverCfg.DemoFleetSize)
 
-	server := controlplane.NewServer(addr, securityCfg, tlsCfg)
+	server := controlplane.NewServer(addr, securityCfg, tlsCfg, serverCfg)
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- server.Start()

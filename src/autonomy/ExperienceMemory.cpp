@@ -65,7 +65,7 @@ void ExperienceMemory::observe(uint32_t drone_id,
             obs.primary_label = lowercase(primary->label);
         }
         for (const auto& detection : detections) {
-            if (is_hazard_label(detection.label)) {
+            if (is_hazard_label(detection.label) || is_unknown_label(detection.label)) {
                 ++obs.hazard_count;
             }
             if (is_target_label(detection.label)) {
@@ -197,6 +197,11 @@ bool ExperienceMemory::is_target_label(std::string_view label) {
     }};
     const auto lowered = lowercase(label);
     return std::find(targets.begin(), targets.end(), lowered) != targets.end();
+}
+
+bool ExperienceMemory::is_unknown_label(std::string_view label) {
+    const auto lowered = lowercase(label);
+    return lowered.rfind("unknown_class_", 0) == 0;
 }
 
 } // namespace drone::autonomy

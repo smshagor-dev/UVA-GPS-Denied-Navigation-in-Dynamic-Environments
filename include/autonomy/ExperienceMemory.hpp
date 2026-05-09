@@ -72,6 +72,7 @@ private:
     [[nodiscard]] MemoryPrior summarize_queue(const std::deque<Observation>& queue) const;
     [[nodiscard]] static bool is_hazard_label(std::string_view label);
     [[nodiscard]] static bool is_target_label(std::string_view label);
+    [[nodiscard]] static bool is_unknown_label(std::string_view label);
 
     Config cfg_;
     std::unordered_map<uint32_t, std::deque<Observation>> history_;

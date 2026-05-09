@@ -150,6 +150,23 @@ TEST_F(EKFTest, VisionUpdateReducesUncertainty) {
     EXPECT_LE(s_after.pos_std.sum(), s_before.pos_std.sum() + 1e-6);
 }
 
+TEST_F(EKFTest, VisualPoseUpdateChangesState) {
+    propagate_constant(ekf_,
+        Eigen::Vector3d{0,0,9.81}, Eigen::Vector3d::Zero(),
+        0.0025, 200);
+
+    const auto before = ekf_.state();
+    ekf_.update_visual_pose(
+        before.position + Eigen::Vector3d{0.4, -0.2, 0.1},
+        Eigen::Vector3d{0.2, 0.0, 0.0},
+        0.15,
+        0.2);
+    const auto after = ekf_.state();
+
+    EXPECT_GT((after.position - before.position).norm(), 1.0e-3);
+    EXPECT_GT((after.velocity - before.velocity).norm(), 1.0e-3);
+}
+
  
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

@@ -8,13 +8,90 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
+#include <mutex>
+#include <string_view>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace drone::telemetry {
 
+struct SensorVector3 {
+    double x{0.0};
+    double y{0.0};
+    double z{0.0};
+};
+
+struct CameraTelemetryPayload {
+    std::string status{"unavailable"};
+    double fps{0.0};
+    double frame_age_ms{0.0};
+    std::string resolution{"N/A"};
+    int dropped_frames{0};
+    std::string source{"unavailable"};
+    std::string preview_url{};
+    std::string latest_frame_ref{};
+};
+
+struct IMUTelemetryPayload {
+    std::string status{"unavailable"};
+    double sample_rate_hz{0.0};
+    double last_sample_age_ms{0.0};
+    SensorVector3 accel{};
+    SensorVector3 gyro{};
+    std::string health{"unavailable"};
+    std::string source{"unavailable"};
+};
+
+struct LidarPoint2DPayload {
+    double x{0.0};
+    double y{0.0};
+    double intensity{0.0};
+};
+
+struct LidarTelemetryPayload {
+    std::string status{"unavailable"};
+    double packet_rate_hz{0.0};
+    double scan_age_ms{0.0};
+    int point_count{0};
+    std::vector<LidarPoint2DPayload> points_2d{};
+    double min_range_m{0.0};
+    double max_range_m{0.0};
+    std::string source{"unavailable"};
+};
+
+struct TDOAAnchorTelemetryPayload {
+    std::string id{};
+    double x{0.0};
+    double y{0.0};
+    double z{0.0};
+    bool visible{false};
+    double last_seen_ms{0.0};
+};
+
+struct TDOATelemetryPayload {
+    std::string status{"unavailable"};
+    std::string source{"unavailable"};
+    int visible_anchor_count{0};
+    std::vector<TDOAAnchorTelemetryPayload> anchors{};
+    SensorVector3 estimated_position{};
+    std::string calibration_warning{};
+};
+
+struct ReplayTelemetryPayload {
+    std::string status{"unavailable"};
+    bool active{false};
+    std::string file_name{};
+    double progress{0.0};
+    double current_time{0.0};
+    std::vector<double> confidence_series{};
+    std::string source{"unavailable"};
+};
+
 struct TelemetrySnapshot {
     uint32_t drone_id{0};
+    std::string source{"unavailable"};
     std::string cluster_id{"cluster-01"};
     std::string role{"FOLLOWER"};
     std::string connectivity{"Mesh"};
@@ -32,6 +109,7 @@ struct TelemetrySnapshot {
     double gpu_load_pct{0.0};
     std::string mission_state{"standby"};
     std::string localization_source{"vision-inertial"};
+    std::string localization_data_source{"unavailable"};
     std::string localization_state{"nominal"};
     double localization_confidence{1.0};
     double tdoa_confidence{0.0};
@@ -57,7 +135,14 @@ struct TelemetrySnapshot {
     uint64_t rollback_counter{0};
     bool maintenance_mode{false};
     std::string update_channel_state{"idle"};
+    std::string safety_state{"NORMAL"};
+    std::string safety_summary{"Nominal safety envelope"};
     std::vector<std::string> health_flags{};
+    CameraTelemetryPayload camera{};
+    IMUTelemetryPayload imu{};
+    LidarTelemetryPayload lidar{};
+    TDOATelemetryPayload tdoa{};
+    ReplayTelemetryPayload replay{};
 };
 
 class ControlPlaneTelemetryClient {
@@ -68,15 +153,6 @@ public:
         std::string client_pfx_file{};
         std::string client_pfx_password{};
     };
-
-    explicit ControlPlaneTelemetryClient(std::string backend_url, int interval_ms = 1000);
-
-    [[nodiscard]] bool enabled() const;
-    [[nodiscard]] bool should_publish(std::chrono::steady_clock::time_point now) const;
-    bool publish(const TelemetrySnapshot& snapshot, std::chrono::steady_clock::time_point now);
-    [[nodiscard]] std::string last_status() const { return last_status_; }
-
-private:
     struct ParsedEndpoint {
         bool https{false};
         std::string host{"127.0.0.1"};
@@ -85,16 +161,54 @@ private:
     };
 
     [[nodiscard]] static TLSRuntimeConfig load_tls_runtime_config();
+    struct HttpResponse {
+        bool transport_ok{false};
+        int status_code{0};
+        std::string status_text{};
+    };
+
+    using HeaderList = std::vector<std::pair<std::string, std::string>>;
+    using TransportFn = std::function<HttpResponse(
+        const ParsedEndpoint&,
+        std::string_view,
+        const HeaderList&,
+        int)>;
+
+    explicit ControlPlaneTelemetryClient(std::string backend_url,
+                                         std::string auth_token = {},
+                                         int interval_ms = 1000,
+                                         int timeout_ms = 1500,
+                                         TransportFn transport = {});
+
+    [[nodiscard]] bool enabled() const;
+    [[nodiscard]] bool should_publish(std::chrono::steady_clock::time_point now) const;
+    bool publish(const TelemetrySnapshot& snapshot, std::chrono::steady_clock::time_point now);
+    [[nodiscard]] std::string last_status() const;
+    [[nodiscard]] int consecutive_failures() const;
+    [[nodiscard]] static std::string serialize_payload(const TelemetrySnapshot& snapshot);
+
+private:
     [[nodiscard]] static ParsedEndpoint parse_backend_url(const std::string& backend_url);
-    [[nodiscard]] static std::string build_payload(const TelemetrySnapshot& snapshot);
+    [[nodiscard]] static HeaderList build_headers(std::string_view auth_token, uint32_t drone_id);
+    [[nodiscard]] static HttpResponse default_transport(const ParsedEndpoint& endpoint,
+                                                        std::string_view body,
+                                                        const HeaderList& headers,
+                                                        int timeout_ms);
+    [[nodiscard]] std::chrono::milliseconds current_backoff() const;
     void mark_result(bool ok, std::string status, std::chrono::steady_clock::time_point now);
 
     ParsedEndpoint endpoint_{};
     TLSRuntimeConfig tls_{};
     std::chrono::milliseconds interval_{1000};
+    std::chrono::milliseconds timeout_{1500};
     std::chrono::steady_clock::time_point last_attempt_{};
+    std::chrono::steady_clock::time_point next_retry_not_before_{};
     std::string last_status_{"disabled"};
+    std::string auth_token_{};
     bool enabled_{false};
+    int consecutive_failures_{0};
+    TransportFn transport_{};
+    mutable std::mutex state_mutex_{};
 };
 
 } // namespace drone::telemetry

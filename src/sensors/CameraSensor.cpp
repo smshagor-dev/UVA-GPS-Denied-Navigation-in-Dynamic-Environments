@@ -10,9 +10,65 @@
 #include <opencv2/videoio.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
+#include <fstream>
+#include <regex>
+#include <sstream>
 
 namespace drone::sensors {
+
+namespace {
+
+std::string lowercase(std::string_view value) {
+    std::string out(value.begin(), value.end());
+    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return out;
+}
+
+} // namespace
+
+std::unordered_map<int, std::string> load_detector_label_map_json(const std::string& path) {
+    std::unordered_map<int, std::string> label_map;
+    if (path.empty() || !std::filesystem::exists(path)) {
+        return label_map;
+    }
+
+    std::ifstream input(path);
+    if (!input.is_open()) {
+        return label_map;
+    }
+
+    std::stringstream buffer;
+    buffer << input.rdbuf();
+    const std::string content = buffer.str();
+
+    const std::regex pair_pattern("\"([0-9]+)\"\\s*:\\s*\"([^\"]+)\"", std::regex::icase);
+    std::sregex_iterator it(content.begin(), content.end(), pair_pattern);
+    std::sregex_iterator end;
+    for (; it != end; ++it) {
+        const auto& match = *it;
+        if (match.size() < 3) {
+            continue;
+        }
+        try {
+            const int class_id = std::stoi(match[1].str());
+            label_map[class_id] = lowercase(match[2].str());
+        } catch (...) {
+        }
+    }
+    return label_map;
+}
+
+std::string resolve_detector_label(int class_id,
+                                   const std::unordered_map<int, std::string>& label_map) {
+    if (const auto found = label_map.find(class_id); found != label_map.end() && !found->second.empty()) {
+        return found->second;
+    }
+    return "unknown_class_" + std::to_string(class_id);
+}
 
 bool CameraSensor::initialize() {
     if (logger_) {
@@ -40,6 +96,23 @@ bool CameraSensor::reconfigure(const std::string&) {
     return true;
 }
 
+CameraSensor::TelemetryStats CameraSensor::telemetry_stats() const {
+    std::lock_guard lock(data_mutex_);
+    TelemetryStats stats;
+    stats.stream_active = state() == SensorState::RUNNING && cap_.isOpened();
+    stats.simulated = false;
+    stats.fps = fps_estimate_hz_;
+    stats.frame_age_ms = latest_.has_value() ? std::max(0.0, (now_sec() - latest_->timestamp) * 1000.0) : 0.0;
+    stats.dropped_frames = dropped_frames_;
+    stats.width = latest_width_;
+    stats.height = latest_height_;
+    stats.latest_frame_id = latest_frame_id_;
+    if (latest_frame_id_ > 0) {
+        stats.latest_frame_ref = "frame-" + std::to_string(latest_frame_id_);
+    }
+    return stats;
+}
+
 void CameraSensor::poll() {
     if (!cap_.isOpened()) {
         if (logger_) {
@@ -50,6 +123,7 @@ void CameraSensor::poll() {
 
     cv::Mat raw;
     if (!cap_.read(raw) || raw.empty()) {
+        ++dropped_frames_;
         if (logger_) {
             logger_->debug("[{}] frame read failed or empty", id_);
         }
@@ -70,6 +144,16 @@ void CameraSensor::poll() {
 
     {
         std::lock_guard lock(data_mutex_);
+        if (last_frame_timestamp_ > 0.0) {
+            const double dt = frame.timestamp - last_frame_timestamp_;
+            if (dt > 1.0e-6) {
+                fps_estimate_hz_ = 1.0 / dt;
+            }
+        }
+        last_frame_timestamp_ = frame.timestamp;
+        latest_frame_id_ = frame.frame_id;
+        latest_width_ = frame.image.cols;
+        latest_height_ = frame.image.rows;
         latest_ = frame;
     }
 
@@ -115,6 +199,18 @@ bool CameraSensor::load_yolo_model(const std::string& engine_path,
     }
     return inference_ready_;
 #endif
+}
+
+bool CameraSensor::load_detector_labels(const std::string& labels_path) {
+    label_map_path_ = labels_path;
+    label_map_ = load_detector_label_map_json(labels_path);
+    if (logger_) {
+        logger_->info("[{}] detector label map path={} entries={}",
+                      id_,
+                      labels_path.empty() ? std::string("<none>") : labels_path,
+                      label_map_.size());
+    }
+    return !label_map_.empty();
 }
 
 void CameraSensor::precompute_undistort_maps() {
@@ -238,7 +334,7 @@ std::vector<Detection> CameraSensor::run_inference_dnn_fallback(const cv::Mat& f
         Detection detection;
         detection.class_id = class_ids[static_cast<size_t>(index)];
         detection.confidence = confidences[static_cast<size_t>(index)];
-        detection.label = "class_" + std::to_string(detection.class_id);
+        detection.label = resolve_detector_label(detection.class_id, label_map_);
         detection.bbox = cv::Rect2f(
             std::clamp(static_cast<float>(box.x) / static_cast<float>(intrinsics_.width), 0.0f, 1.0f),
             std::clamp(static_cast<float>(box.y) / static_cast<float>(intrinsics_.height), 0.0f, 1.0f),

@@ -118,6 +118,13 @@ DecisionCommand DecisionEngine::update(const DecisionContext& ctx) {
         return build_localization_degraded(ctx);
     }
 
+    if (ctx.lidar_obstacle_count > 0 &&
+        ctx.nearest_lidar_obstacle_m >= 0.0 &&
+        ctx.nearest_lidar_obstacle_m <= 2.2) {
+        mode_ = BehaviorMode::AVOID_OBSTACLE;
+        return build_lidar_avoid(ctx);
+    }
+
     if (ctx.memory_prior.has_value() &&
         ctx.memory_prior->recommend_caution &&
         ctx.swarm_follower &&
@@ -147,7 +154,9 @@ DecisionCommand DecisionEngine::update(const DecisionContext& ctx) {
 
     target_miss_count_ = 0;
 
-    if (is_hazard_label(focus->detection.label) || focus->score >= cfg_.critical_obstacle_score) {
+    if (is_hazard_label(focus->detection.label) ||
+        is_unknown_label(focus->detection.label) ||
+        focus->score >= cfg_.critical_obstacle_score) {
         mode_ = BehaviorMode::AVOID_OBSTACLE;
         return build_avoid(ctx, *focus);
     }
@@ -190,7 +199,8 @@ std::optional<PerceptionFocus> DecisionEngine::select_primary_detection(
         const float centered = std::clamp(1.0f - (offset.norm() * 1.4f), 0.0f, 1.0f);
         const float class_bias = is_hazard_label(detection.label)
             ? 1.25f
-            : (is_target_label(detection.label) ? 1.0f : 0.65f);
+            : (is_unknown_label(detection.label) ? 1.15f
+               : (is_target_label(detection.label) ? 1.0f : 0.65f));
 
         PerceptionFocus candidate;
         candidate.detection = detection;
@@ -420,11 +430,41 @@ DecisionCommand DecisionEngine::build_avoid(const DecisionContext& ctx,
         clamp_speed(velocity, cfg_.max_avoid_speed_mps * caution_scale(ctx) * localization_scale(ctx));
     command.desired_yaw_rate_rads = -std::clamp(static_cast<double>(focus.image_offset.x()) * 1.6, -1.0, 1.0);
     command.requires_operator_attention =
-        is_hazard_label(focus.detection.label) || focus.normalized_area >= 0.20f;
+        is_hazard_label(focus.detection.label) ||
+        is_unknown_label(focus.detection.label) ||
+        focus.normalized_area >= 0.20f;
 
     std::ostringstream oss;
     oss << "Avoiding " << focus.detection.label
         << " score=" << focus.score;
+    command.summary = oss.str();
+    return command;
+}
+
+DecisionCommand DecisionEngine::build_lidar_avoid(const DecisionContext& ctx) const {
+    drone::utils::get_or_create_logger("AI")->warn(
+        "DecisionEngine lidar avoid obstacle_count={} nearest={:.2f}m",
+        ctx.lidar_obstacle_count,
+        ctx.nearest_lidar_obstacle_m);
+    DecisionCommand command;
+    command.mode = BehaviorMode::AVOID_OBSTACLE;
+    command.requires_operator_attention = ctx.nearest_lidar_obstacle_m < 1.0;
+
+    const double obstacle_distance = std::max(0.1, ctx.nearest_lidar_obstacle_m);
+    const double escape_gain = std::clamp(2.5 / obstacle_distance, 0.8, 2.4);
+    Eigen::Vector3d velocity =
+        -body_forward(ctx.pose) * escape_gain +
+        body_up(ctx.pose) * std::clamp(
+            static_cast<double>(cfg_.safe_altitude_m) - ctx.pose.position.z(),
+            0.0,
+            0.7);
+    command.desired_velocity =
+        clamp_speed(velocity, cfg_.max_avoid_speed_mps * caution_scale(ctx) * localization_scale(ctx));
+    command.desired_yaw_rate_rads = ctx.swarm_follower ? 0.0 : 0.25;
+
+    std::ostringstream oss;
+    oss << "Avoiding LiDAR obstacle field nearest=" << ctx.nearest_lidar_obstacle_m
+        << "m count=" << ctx.lidar_obstacle_count;
     command.summary = oss.str();
     return command;
 }
@@ -444,6 +484,11 @@ bool DecisionEngine::is_target_label(std::string_view label) {
     }};
     const auto lowered = lowercase(label);
     return std::find(targets.begin(), targets.end(), lowered) != targets.end();
+}
+
+bool DecisionEngine::is_unknown_label(std::string_view label) {
+    const auto lowered = lowercase(label);
+    return lowered.rfind("unknown_class_", 0) == 0;
 }
 
 } // namespace drone::autonomy

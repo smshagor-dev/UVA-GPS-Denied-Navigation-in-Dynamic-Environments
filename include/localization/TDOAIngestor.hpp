@@ -32,10 +32,13 @@ public:
     bool start();
     void stop();
     [[nodiscard]] bool running() const { return running_; }
+    [[nodiscard]] Mode mode() const { return cfg_.mode; }
 
     [[nodiscard]] std::optional<std::vector<TDOALocalizer::Measurement>> poll();
     [[nodiscard]] size_t visible_anchor_count() const;
     [[nodiscard]] double visibility_ratio(size_t total_anchor_count) const;
+    [[nodiscard]] std::vector<uint32_t> visible_anchor_ids() const;
+    [[nodiscard]] double last_batch_timestamp_s() const { return last_batch_timestamp_s_; }
 
 private:
     bool open_udp_socket();
@@ -48,6 +51,7 @@ private:
     int udp_socket_{-1};
     size_t csv_cursor_{0};
     std::unordered_map<uint32_t, size_t> anchor_visibility_;
+    double last_batch_timestamp_s_{0.0};
 };
 
 } // namespace drone::localization

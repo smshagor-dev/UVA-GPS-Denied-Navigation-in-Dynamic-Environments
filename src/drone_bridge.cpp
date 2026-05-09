@@ -71,6 +71,7 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def_readwrite("last_relocalized_keyframe", &vio::RuntimeTelemetry::last_relocalized_keyframe)
         .def_readwrite("localization_state", &vio::RuntimeTelemetry::localization_state)
         .def_readwrite("localization_source", &vio::RuntimeTelemetry::localization_source)
+        .def_readwrite("localization_data_source", &vio::RuntimeTelemetry::localization_data_source)
         .def_readwrite("security_state", &vio::RuntimeTelemetry::security_state)
         .def_readwrite("security_summary", &vio::RuntimeTelemetry::security_summary)
         .def_readwrite("security_transition_reason", &vio::RuntimeTelemetry::security_transition_reason)
@@ -88,7 +89,13 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def_readwrite("maintenance_mode", &vio::RuntimeTelemetry::maintenance_mode)
         .def_readwrite("update_channel_state", &vio::RuntimeTelemetry::update_channel_state)
         .def_readwrite("last_remote_command_status", &vio::RuntimeTelemetry::last_remote_command_status)
-        .def_readwrite("health_flags", &vio::RuntimeTelemetry::health_flags);
+        .def_readwrite("health_flags", &vio::RuntimeTelemetry::health_flags)
+        .def_readwrite("tracked_feature_count", &vio::RuntimeTelemetry::tracked_feature_count)
+        .def_readwrite("inlier_ratio", &vio::RuntimeTelemetry::inlier_ratio)
+        .def_readwrite("reprojection_error", &vio::RuntimeTelemetry::reprojection_error)
+        .def_readwrite("visual_update_confidence", &vio::RuntimeTelemetry::visual_update_confidence)
+        .def_readwrite("visual_frontend_valid", &vio::RuntimeTelemetry::visual_frontend_valid)
+        .def_readwrite("visual_placeholder_active", &vio::RuntimeTelemetry::visual_placeholder_active);
 
     //  SystemStats 
     py::class_<hal::SystemStats>(m, "SystemStats")

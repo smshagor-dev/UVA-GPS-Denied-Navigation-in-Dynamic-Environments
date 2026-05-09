@@ -12,10 +12,12 @@
 #include "sensors/IMUSensor.hpp"
 #include "sensors/CameraSensor.hpp"
 #include "sensors/LidarSensor.hpp"
+#include "runtime/RuntimeMode.hpp"
 
 #include <atomic>
 #include <condition_variable>
 #include <functional>
+#include <opencv2/core.hpp>
 #include <queue>
 #include <string>
 #include <thread>
@@ -46,6 +48,7 @@ struct RuntimeTelemetry {
     uint64_t last_relocalized_keyframe{0};
     std::string localization_state{"nominal"};
     std::string localization_source{"vision-inertial"};
+    std::string localization_data_source{"unavailable"};
     std::string security_state{"TRUSTED"};
     std::string security_summary{"All trust signals nominal"};
     std::string security_transition_reason{"initial-trust"};
@@ -64,7 +67,45 @@ struct RuntimeTelemetry {
     std::string update_channel_state{"idle"};
     std::string last_remote_command_status{"no remote command"};
     std::vector<std::string> health_flags{};
+    size_t tracked_feature_count{0};
+    double inlier_ratio{0.0};
+    double reprojection_error{0.0};
+    double visual_update_confidence{0.0};
+    bool visual_frontend_valid{false};
+    bool visual_placeholder_active{false};
 };
+
+struct VisualFrontendMetrics {
+    size_t tracked_feature_count{0};
+    double inlier_ratio{0.0};
+    double reprojection_error{1.0e6};
+    double visual_update_confidence{0.0};
+    bool update_accepted{false};
+    bool used_placeholder{false};
+};
+
+struct VisualFrontendResult {
+    Eigen::Vector3d observed_position{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d observed_velocity{Eigen::Vector3d::Zero()};
+    Eigen::Quaterniond relative_orientation{Eigen::Quaterniond::Identity()};
+    VisualFrontendMetrics metrics{};
+
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
+
+[[nodiscard]] bool visual_placeholder_allowed(drone::runtime::RuntimeMode mode);
+[[nodiscard]] double compute_visual_update_confidence(const VisualFrontendMetrics& metrics);
+[[nodiscard]] VisualFrontendResult run_visual_frontend(
+    const cv::Mat& previous_gray,
+    const cv::Mat& current_gray,
+    const Eigen::Matrix3d& K,
+    const PoseEstimate& previous_pose,
+    const PoseEstimate& current_predicted_pose,
+    double dt_s);
+[[nodiscard]] VisualFrontendResult build_placeholder_visual_frontend_result(
+    const sensors::CameraFrame& frame,
+    const PoseEstimate& pose,
+    const Eigen::Matrix3d& K);
 
  
 class VIOPipeline {
@@ -85,9 +126,10 @@ public:
     bool start();
     void stop();
     void reset();
+    void set_runtime_mode(drone::runtime::RuntimeMode mode) { runtime_mode_ = mode; }
 
     //  State query â”€
-    [[nodiscard]] PoseEstimate  current_pose() const { return ekf_.state(); }
+    [[nodiscard]] PoseEstimate  current_pose() const;
     [[nodiscard]] double        drift_m()      const { return ekf_.total_drift_m(); }
     [[nodiscard]] RuntimeTelemetry runtime_telemetry() const {
         std::lock_guard lock(runtime_mutex_);
@@ -101,6 +143,12 @@ public:
     void set_camera_matrix(const Eigen::Matrix3d& K) { K_ = K; }
     void set_runtime_telemetry(RuntimeTelemetry telemetry) {
         std::lock_guard lock(runtime_mutex_);
+        telemetry.tracked_feature_count = runtime_telemetry_.tracked_feature_count;
+        telemetry.inlier_ratio = runtime_telemetry_.inlier_ratio;
+        telemetry.reprojection_error = runtime_telemetry_.reprojection_error;
+        telemetry.visual_update_confidence = runtime_telemetry_.visual_update_confidence;
+        telemetry.visual_frontend_valid = runtime_telemetry_.visual_frontend_valid;
+        telemetry.visual_placeholder_active = runtime_telemetry_.visual_placeholder_active;
         runtime_telemetry_ = std::move(telemetry);
     }
 
@@ -113,6 +161,7 @@ private:
     void handle(const sensors::ImuMeasurement& imu);
     void handle(const sensors::CameraFrame& frame);
     void handle(const sensors::LidarMeasurement&);
+    void apply_visual_quality_to_pose(PoseEstimate& pose) const;
 
     EKFEstimator ekf_;
 
@@ -130,6 +179,13 @@ private:
     Eigen::Matrix3d  K_{Eigen::Matrix3d::Identity()};
     PoseCallback     pose_cb_;
     double           last_imu_ts_{-1.0};
+    double           last_camera_ts_{-1.0};
+    cv::Mat          previous_gray_frame_;
+    PoseEstimate     previous_camera_pose_{};
+    bool             previous_camera_pose_valid_{false};
+    drone::runtime::RuntimeMode runtime_mode_{drone::runtime::RuntimeMode::SIMULATION};
+    mutable std::mutex visual_metrics_mutex_;
+    VisualFrontendMetrics last_visual_metrics_{};
     mutable std::mutex runtime_mutex_;
     RuntimeTelemetry runtime_telemetry_{};
 

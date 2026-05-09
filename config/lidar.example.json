@@ -1,0 +1,9 @@
+{
+  "host": "0.0.0.0",
+  "port": 2368,
+  "model": "generic_udp_cartesian_v1",
+  "frame_id": "lidar_front",
+  "min_range_m": 0.3,
+  "max_range_m": 80.0,
+  "required": true
+}

@@ -6,67 +6,153 @@ package controlplane
 
 import "time"
 
+type CameraTelemetry struct {
+	Status         string  `json:"status,omitempty"`
+	FPS            float64 `json:"fps,omitempty"`
+	FrameAgeMS     float64 `json:"frame_age_ms,omitempty"`
+	Resolution     string  `json:"resolution,omitempty"`
+	DroppedFrames  int     `json:"dropped_frames,omitempty"`
+	Source         string  `json:"source,omitempty"`
+	PreviewURL     string  `json:"preview_url,omitempty"`
+	LatestFrameRef string  `json:"latest_frame_ref,omitempty"`
+}
+
+type Vector3 struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	Z float64 `json:"z"`
+}
+
+type LidarPoint2D struct {
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	Intensity float64 `json:"intensity,omitempty"`
+}
+
+type IMUTelemetry struct {
+	Status          string  `json:"status,omitempty"`
+	SampleRateHz    float64 `json:"sample_rate_hz,omitempty"`
+	LastSampleAgeMS float64 `json:"last_sample_age_ms,omitempty"`
+	Accel           Vector3 `json:"accel"`
+	Gyro            Vector3 `json:"gyro"`
+	Health          string  `json:"health,omitempty"`
+	Source          string  `json:"source,omitempty"`
+}
+
+type LiDARTelemetry struct {
+	Status       string         `json:"status,omitempty"`
+	PacketRateHz float64        `json:"packet_rate_hz,omitempty"`
+	ScanAgeMS    float64        `json:"scan_age_ms,omitempty"`
+	PointCount   int            `json:"point_count,omitempty"`
+	Points2D     []LidarPoint2D `json:"points_2d,omitempty"`
+	MinRangeM    float64        `json:"min_range_m,omitempty"`
+	MaxRangeM    float64        `json:"max_range_m,omitempty"`
+	Source       string         `json:"source,omitempty"`
+}
+
+type TDOAAnchorTelemetry struct {
+	ID         string  `json:"id"`
+	X          float64 `json:"x"`
+	Y          float64 `json:"y"`
+	Z          float64 `json:"z"`
+	Visible    bool    `json:"visible"`
+	LastSeenMS float64 `json:"last_seen_ms,omitempty"`
+}
+
+type TDOATelemetry struct {
+	Status             string                `json:"status,omitempty"`
+	Source             string                `json:"source,omitempty"`
+	VisibleAnchorCount int                   `json:"visible_anchor_count,omitempty"`
+	Anchors            []TDOAAnchorTelemetry `json:"anchors,omitempty"`
+	EstimatedPosition  Vector3               `json:"estimated_position"`
+	CalibrationWarning string                `json:"calibration_warning,omitempty"`
+}
+
+type ReplayTelemetry struct {
+	Status           string    `json:"status,omitempty"`
+	Active           bool      `json:"active,omitempty"`
+	FileName         string    `json:"file_name,omitempty"`
+	Progress         float64   `json:"progress,omitempty"`
+	CurrentTime      float64   `json:"current_time,omitempty"`
+	ConfidenceSeries []float64 `json:"confidence_series,omitempty"`
+	Source           string    `json:"source,omitempty"`
+}
+
 type DroneTelemetry struct {
-	DroneID                  int        `json:"drone_id"`
-	ClusterID                string     `json:"cluster_id"`
-	Role                     string     `json:"role"`
-	Connectivity             string     `json:"connectivity"`
-	Reachable                bool       `json:"reachable"`
-	Position                 [3]float64 `json:"position"`
-	Velocity                 [3]float64 `json:"velocity"`
-	AttitudeRPY              [3]float64 `json:"attitude_rpy"`
-	ThrustVector             [3]float64 `json:"thrust_vector"`
-	CommandedAltitudeM       float64    `json:"commanded_altitude_m,omitempty"`
-	CommandedSpeedMPS        float64    `json:"commanded_speed_mps,omitempty"`
-	ManualTargetPosition     [3]float64 `json:"manual_target_position,omitempty"`
-	ManualControlActive      bool       `json:"manual_control_active,omitempty"`
-	DriftM                   float64    `json:"drift_m"`
-	BatteryPct               float64    `json:"battery_pct"`
-	RSSIDBm                  float64    `json:"rssi_dbm"`
-	CPUTempC                 float64    `json:"cpu_temp_c"`
-	GPULoadPct               float64    `json:"gpu_load_pct"`
-	MissionState             string     `json:"mission_state"`
-	LocalizationSource       string     `json:"localization_source,omitempty"`
-	LocalizationState        string     `json:"localization_state,omitempty"`
-	LocalizationConfidence   float64    `json:"localization_confidence,omitempty"`
-	TDOAConfidence           float64    `json:"tdoa_confidence,omitempty"`
-	ConfidenceTrend          float64    `json:"confidence_trend,omitempty"`
-	RelocalizationCount      int        `json:"relocalization_count,omitempty"`
-	VisibleAnchorCount       int        `json:"visible_anchor_count,omitempty"`
-	OccupancyRatio           float64    `json:"occupancy_ratio,omitempty"`
-	SyncConfidence           float64    `json:"sync_confidence,omitempty"`
-	IMUCameraOffsetMS        float64    `json:"imu_camera_offset_ms,omitempty"`
-	SecurityState            string     `json:"security_state,omitempty"`
-	SecuritySummary          string     `json:"security_summary,omitempty"`
-	SecurityTransitionReason string     `json:"security_transition_reason,omitempty"`
-	RemoteCommandAllowed     bool       `json:"remote_command_allowed,omitempty"`
-	TelemetryUplinkAllowed   bool       `json:"telemetry_uplink_allowed,omitempty"`
-	LinkIntegrityScore       float64    `json:"link_integrity_score,omitempty"`
-	TrustEpoch               int        `json:"trust_epoch,omitempty"`
-	LastAuthFailureAtS       float64    `json:"last_auth_failure_at_s,omitempty"`
-	TamperScore              float64    `json:"tamper_score,omitempty"`
-	FirmwareMeasurement      string     `json:"firmware_measurement,omitempty"`
-	FirmwareVersion          string     `json:"firmware_version,omitempty"`
-	SecureBootState          string     `json:"secure_boot_state,omitempty"`
-	BootTrustSummary         string     `json:"boot_trust_summary,omitempty"`
-	RollbackCounter          uint64     `json:"rollback_counter,omitempty"`
-	MaintenanceMode          bool       `json:"maintenance_mode,omitempty"`
-	UpdateChannelState       string     `json:"update_channel_state,omitempty"`
-	LastRemoteCommandStatus  string     `json:"last_remote_command_status,omitempty"`
-	HealthFlags              []string   `json:"health_flags,omitempty"`
-	Timestamp                time.Time  `json:"timestamp"`
+	DroneID                  int             `json:"drone_id"`
+	ClusterID                string          `json:"cluster_id"`
+	Role                     string          `json:"role"`
+	Source                   string          `json:"source,omitempty"`
+	Stale                    bool            `json:"stale,omitempty"`
+	Connectivity             string          `json:"connectivity"`
+	Reachable                bool            `json:"reachable"`
+	Position                 [3]float64      `json:"position"`
+	Velocity                 [3]float64      `json:"velocity"`
+	AttitudeRPY              [3]float64      `json:"attitude_rpy"`
+	ThrustVector             [3]float64      `json:"thrust_vector"`
+	CommandedAltitudeM       float64         `json:"commanded_altitude_m,omitempty"`
+	CommandedSpeedMPS        float64         `json:"commanded_speed_mps,omitempty"`
+	ManualTargetPosition     [3]float64      `json:"manual_target_position,omitempty"`
+	ManualControlActive      bool            `json:"manual_control_active,omitempty"`
+	DriftM                   float64         `json:"drift_m"`
+	BatteryPct               float64         `json:"battery_pct"`
+	RSSIDBm                  float64         `json:"rssi_dbm"`
+	CPUTempC                 float64         `json:"cpu_temp_c"`
+	GPULoadPct               float64         `json:"gpu_load_pct"`
+	MissionState             string          `json:"mission_state"`
+	LocalizationSource       string          `json:"localization_source,omitempty"`
+	LocalizationDataSource   string          `json:"localization_data_source,omitempty"`
+	LocalizationState        string          `json:"localization_state,omitempty"`
+	LocalizationConfidence   float64         `json:"localization_confidence,omitempty"`
+	TDOAConfidence           float64         `json:"tdoa_confidence,omitempty"`
+	ConfidenceTrend          float64         `json:"confidence_trend,omitempty"`
+	RelocalizationCount      int             `json:"relocalization_count,omitempty"`
+	VisibleAnchorCount       int             `json:"visible_anchor_count,omitempty"`
+	OccupancyRatio           float64         `json:"occupancy_ratio,omitempty"`
+	SyncConfidence           float64         `json:"sync_confidence,omitempty"`
+	IMUCameraOffsetMS        float64         `json:"imu_camera_offset_ms,omitempty"`
+	SecurityState            string          `json:"security_state,omitempty"`
+	SecuritySummary          string          `json:"security_summary,omitempty"`
+	SecurityTransitionReason string          `json:"security_transition_reason,omitempty"`
+	SafetyState              string          `json:"safety_state,omitempty"`
+	SafetySummary            string          `json:"safety_summary,omitempty"`
+	RemoteCommandAllowed     bool            `json:"remote_command_allowed,omitempty"`
+	TelemetryUplinkAllowed   bool            `json:"telemetry_uplink_allowed,omitempty"`
+	LinkIntegrityScore       float64         `json:"link_integrity_score,omitempty"`
+	TrustEpoch               int             `json:"trust_epoch,omitempty"`
+	LastAuthFailureAtS       float64         `json:"last_auth_failure_at_s,omitempty"`
+	TamperScore              float64         `json:"tamper_score,omitempty"`
+	FirmwareMeasurement      string          `json:"firmware_measurement,omitempty"`
+	FirmwareVersion          string          `json:"firmware_version,omitempty"`
+	SecureBootState          string          `json:"secure_boot_state,omitempty"`
+	BootTrustSummary         string          `json:"boot_trust_summary,omitempty"`
+	RollbackCounter          uint64          `json:"rollback_counter,omitempty"`
+	MaintenanceMode          bool            `json:"maintenance_mode,omitempty"`
+	UpdateChannelState       string          `json:"update_channel_state,omitempty"`
+	LastRemoteCommandStatus  string          `json:"last_remote_command_status,omitempty"`
+	HealthFlags              []string        `json:"health_flags,omitempty"`
+	Camera                   CameraTelemetry `json:"camera,omitempty"`
+	IMU                      IMUTelemetry    `json:"imu,omitempty"`
+	LiDAR                    LiDARTelemetry  `json:"lidar,omitempty"`
+	TDOA                     TDOATelemetry   `json:"tdoa,omitempty"`
+	Replay                   ReplayTelemetry `json:"replay,omitempty"`
+	Timestamp                time.Time       `json:"timestamp"`
 }
 
 type FleetSnapshot struct {
-	Drones         []DroneTelemetry `json:"drones"`
-	LeaderID       int              `json:"leader_id"`
-	AvgLatencyMS   float64          `json:"avg_latency_ms"`
-	PacketLossPct  float64          `json:"packet_loss_pct"`
-	CPUTempC       float64          `json:"cpu_temp_c"`
-	GPULoadPct     float64          `json:"gpu_load_pct"`
-	Timestamp      time.Time        `json:"timestamp"`
-	Clusters       []ClusterState   `json:"clusters"`
-	CriticalAlerts int              `json:"critical_alerts"`
+	Drones            []DroneTelemetry `json:"drones"`
+	LeaderID          int              `json:"leader_id"`
+	AvgLatencyMS      float64          `json:"avg_latency_ms"`
+	PacketLossPct     float64          `json:"packet_loss_pct"`
+	CPUTempC          float64          `json:"cpu_temp_c"`
+	GPULoadPct        float64          `json:"gpu_load_pct"`
+	Timestamp         time.Time        `json:"timestamp"`
+	Clusters          []ClusterState   `json:"clusters"`
+	CriticalAlerts    int              `json:"critical_alerts"`
+	BackendMode       string           `json:"backend_mode"`
+	SimulationEnabled bool             `json:"simulation_enabled"`
+	RealDroneCount    int              `json:"real_drone_count"`
+	StaleDroneCount   int              `json:"stale_drone_count"`
 }
 
 type ClusterState struct {
@@ -136,10 +222,14 @@ type DeviceRecord struct {
 }
 
 type HealthReport struct {
-	OnlineDrones   int       `json:"online_drones"`
-	TotalDrones    int       `json:"total_drones"`
-	CriticalAlerts int       `json:"critical_alerts"`
-	AvgBatteryPct  float64   `json:"avg_battery_pct"`
-	MaxCPUTempC    float64   `json:"max_cpu_temp_c"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	OnlineDrones      int       `json:"online_drones"`
+	TotalDrones       int       `json:"total_drones"`
+	CriticalAlerts    int       `json:"critical_alerts"`
+	AvgBatteryPct     float64   `json:"avg_battery_pct"`
+	MaxCPUTempC       float64   `json:"max_cpu_temp_c"`
+	UpdatedAt         time.Time `json:"updated_at"`
+	BackendMode       string    `json:"backend_mode"`
+	SimulationEnabled bool      `json:"simulation_enabled"`
+	RealDroneCount    int       `json:"real_drone_count"`
+	StaleDroneCount   int       `json:"stale_drone_count"`
 }

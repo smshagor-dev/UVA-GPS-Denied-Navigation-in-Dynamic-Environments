@@ -53,6 +53,7 @@ add_executable(test_autonomy
     ../src/autonomy/DecisionEngine.cpp
     ../src/autonomy/ExperienceMemory.cpp
     ../src/localization/TDOALocalizer.cpp
+    ../src/safety/SafetyManager.cpp
 )
 target_include_directories(test_autonomy PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
@@ -72,6 +73,7 @@ add_executable(test_navigation_intelligence
     ../src/localization/TDOAIngestor.cpp
     ../src/localization/TDOALocalizer.cpp
     ../src/localization/TimeSyncTracker.cpp
+    ../src/safety/SafetyManager.cpp
     ../src/slam/KeyframeManager.cpp
     ../src/slam/MapPlanner.cpp
     ../src/slam/OccupancyGridMap.cpp
@@ -127,6 +129,13 @@ target_link_libraries(test_boot_trust PRIVATE
     GTest::gtest_main
 )
 gtest_discover_tests(test_boot_trust DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+
+add_executable(test_telemetry test_telemetry.cpp)
+target_link_libraries(test_telemetry PRIVATE
+    sensor_fusion_core
+    GTest::gtest_main
+)
+gtest_discover_tests(test_telemetry DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
 
 if(HAS_FASTDDS_TRANSPORT)
     add_executable(test_v2x test_v2x.cpp)

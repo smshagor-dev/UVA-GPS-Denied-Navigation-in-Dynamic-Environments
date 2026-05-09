@@ -26,10 +26,46 @@ type Server struct {
 	security    SecurityConfig
 	tls         TLSConfig
 	commandAuth *CommandSecurityValidator
+	mode        string
 }
 
-func NewServer(addr string, security SecurityConfig, tlsCfg TLSConfig) *Server {
-	state := NewFleetState()
+type ServerConfig struct {
+	Mode              string
+	SimulationEnabled bool
+	StaleAfter        time.Duration
+	DemoFleetSize     int
+}
+
+func (cfg ServerConfig) normalized() ServerConfig {
+	mode := strings.TrimSpace(strings.ToLower(cfg.Mode))
+	if mode != "production" {
+		mode = "simulation"
+	}
+	demoFleetSize := cfg.DemoFleetSize
+	if demoFleetSize <= 0 {
+		demoFleetSize = 5
+	}
+	staleAfter := cfg.StaleAfter
+	if staleAfter <= 0 {
+		staleAfter = 5 * time.Second
+	}
+	simulationEnabled := cfg.SimulationEnabled
+	if mode == "simulation" {
+		simulationEnabled = true
+	} else {
+		simulationEnabled = false
+	}
+	return ServerConfig{
+		Mode:              mode,
+		SimulationEnabled: simulationEnabled,
+		StaleAfter:        staleAfter,
+		DemoFleetSize:     demoFleetSize,
+	}
+}
+
+func NewServer(addr string, security SecurityConfig, tlsCfg TLSConfig, cfg ServerConfig) *Server {
+	cfg = cfg.normalized()
+	state := NewFleetState(cfg.Mode, cfg.SimulationEnabled, cfg.StaleAfter)
 	securityCfg := security.normalized()
 	s := &Server{
 		addr:        addr,
@@ -37,6 +73,7 @@ func NewServer(addr string, security SecurityConfig, tlsCfg TLSConfig) *Server {
 		security:    securityCfg,
 		tls:         tlsCfg,
 		commandAuth: NewCommandSecurityValidator(securityCfg),
+		mode:        cfg.Mode,
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/telemetry", s.withRecovery(s.handleTelemetry))
@@ -55,8 +92,11 @@ func NewServer(addr string, security SecurityConfig, tlsCfg TLSConfig) *Server {
 		WriteTimeout:      5 * time.Second,
 		IdleTimeout:       30 * time.Second,
 	}
-	s.seedDigitalTwin(5)
-	go s.simulateFlightLoop()
+	log.Printf("control-plane backend mode=%s simulation_enabled=%t stale_after=%s", cfg.Mode, cfg.SimulationEnabled, cfg.StaleAfter)
+	if cfg.SimulationEnabled {
+		s.seedDigitalTwin(cfg.DemoFleetSize)
+		go s.simulateFlightLoop()
+	}
 	return s
 }
 
@@ -97,6 +137,7 @@ func (s *Server) seedDigitalTwin(n int) {
 			DroneID:                 i,
 			ClusterID:               clusterID,
 			Role:                    role,
+			Source:                  "simulation",
 			Connectivity:            "Mesh",
 			Reachable:               true,
 			Position:                [3]float64{float64(i % 20), float64((i / 20) % 10), 8.0 + float64(i%3)},
@@ -114,6 +155,7 @@ func (s *Server) seedDigitalTwin(n int) {
 			GPULoadPct:              42.0 + math.Mod(float64(i), 18),
 			MissionState:            "patrol",
 			LocalizationSource:      "vision-depth-fused",
+			LocalizationDataSource:  "simulation",
 			LocalizationState:       "nominal",
 			LocalizationConfidence:  0.90 - math.Mod(float64(i), 5)*0.04,
 			TDOAConfidence:          0.68 - math.Mod(float64(i), 4)*0.05,
@@ -136,7 +178,56 @@ func (s *Server) seedDigitalTwin(n int) {
 			MaintenanceMode:         false,
 			UpdateChannelState:      "idle",
 			LastRemoteCommandStatus: "no remote command",
-			Timestamp:               time.Now().UTC(),
+			Camera: CameraTelemetry{
+				Status:         "simulation",
+				FPS:            18.0,
+				FrameAgeMS:     42.0,
+				Resolution:     "1280x720",
+				DroppedFrames:  0,
+				Source:         "simulation",
+				LatestFrameRef: fmt.Sprintf("sim-frame-%d", i),
+			},
+			IMU: IMUTelemetry{
+				Status:          "simulation",
+				SampleRateHz:    100.0,
+				LastSampleAgeMS: 10.0,
+				Accel:           Vector3{X: 0.02, Y: 0.01, Z: 9.81},
+				Gyro:            Vector3{X: 0.0, Y: 0.0, Z: 0.03},
+				Health:          "simulation",
+				Source:          "simulation",
+			},
+			LiDAR: LiDARTelemetry{
+				Status:       "simulation",
+				PacketRateHz: 9.0,
+				ScanAgeMS:    55.0,
+				PointCount:   0,
+				MinRangeM:    0.3,
+				MaxRangeM:    20.0,
+				Source:       "simulation",
+			},
+			TDOA: TDOATelemetry{
+				Status:             "simulation",
+				Source:             "simulation",
+				VisibleAnchorCount: 4,
+				Anchors: []TDOAAnchorTelemetry{
+					{ID: "A0", X: 0, Y: 0, Z: 2.5, Visible: true, LastSeenMS: 30},
+					{ID: "A1", X: 8, Y: 0, Z: 2.5, Visible: true, LastSeenMS: 30},
+					{ID: "A2", X: 0, Y: 8, Z: 2.5, Visible: true, LastSeenMS: 30},
+					{ID: "A3", X: 8, Y: 8, Z: 2.5, Visible: true, LastSeenMS: 30},
+				},
+				EstimatedPosition:  Vector3{X: float64(i % 20), Y: float64((i / 20) % 10), Z: 8.0 + float64(i%3)},
+				CalibrationWarning: "simulation anchors active",
+			},
+			Replay: ReplayTelemetry{
+				Status:           "simulation",
+				Active:           false,
+				FileName:         "",
+				Progress:         0,
+				CurrentTime:      0,
+				ConfidenceSeries: []float64{},
+				Source:           "simulation",
+			},
+			Timestamp: time.Now().UTC(),
 		})
 	}
 	s.state.RegisterMission(MissionPlan{
@@ -173,6 +264,9 @@ func (s *Server) handleTelemetry(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, ok := s.requireAuthorizedPeer(w, r, "telemetry uplink", telemetry.ClusterID, "drone", "control-plane"); !ok {
 		return
+	}
+	if strings.TrimSpace(telemetry.Source) == "" {
+		telemetry.Source = "real"
 	}
 	s.state.UpsertTelemetry(telemetry)
 	s.state.AddEvent(EventRecord{

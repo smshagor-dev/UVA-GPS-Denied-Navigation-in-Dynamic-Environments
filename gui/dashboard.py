@@ -65,6 +65,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from gui.backend_status import compose_backend_mode, compose_operator_status, summarize_localization_data_source
+
 
 DARK_BG = "#05090F"
 PANEL_BG = "#0B111E"
@@ -79,6 +81,31 @@ WARN = "#F59E0B"
 DANGER = "#EF4444"
 CYAN = "#06B6D4"
 MAGENTA = "#D946EF" 
+EMERALD = "#34D399"
+GRAPHITE = "#08111B"
+SIM_PURPLE = "#8B5CF6"
+AMBER = "#FBBF24"
+
+SIDEBAR_SECTIONS = [
+    "Dashboard",
+    "Fleet Overview",
+    "Drone Nodes",
+    "Localization",
+    "Sensor Fusion",
+    "VIO/EKF",
+    "LiDAR Mapping",
+    "TDOA/UWB",
+    "Swarm Network",
+    "Missions",
+    "Telemetry",
+    "Safety & Security",
+    "Events & Logs",
+    "Bench Validation",
+    "Replay Analysis",
+    "System Health",
+    "Runtime Modes",
+    "Settings",
+]
 
 
 logger = logging.getLogger(__name__)
@@ -396,6 +423,14 @@ def safe_text(value: Any, default: str = "") -> str:
     return text or default
 
 
+def safe_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def safe_list(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
+
+
 def safe_vector3(values: Any, default: tuple[float, float, float] = (0.0, 0.0, 0.0)) -> tuple[float, float, float]:
     if not isinstance(values, (list, tuple)) or len(values) < 3:
         return default
@@ -491,6 +526,7 @@ class DashboardStore:
                     cpu_temp_c REAL NOT NULL,
                     gpu_load_pct REAL NOT NULL,
                     localization_source TEXT NOT NULL,
+                    localization_data_source TEXT NOT NULL DEFAULT 'unavailable',
                     localization_state TEXT NOT NULL,
                     localization_confidence REAL NOT NULL,
                     tdoa_confidence REAL NOT NULL,
@@ -514,6 +550,7 @@ class DashboardStore:
                 "ALTER TABLE latest_snapshot_states ADD COLUMN thrust_x REAL NOT NULL DEFAULT 0",
                 "ALTER TABLE latest_snapshot_states ADD COLUMN thrust_y REAL NOT NULL DEFAULT 0",
                 "ALTER TABLE latest_snapshot_states ADD COLUMN thrust_z REAL NOT NULL DEFAULT 9.81",
+                "ALTER TABLE latest_snapshot_states ADD COLUMN localization_data_source TEXT NOT NULL DEFAULT 'unavailable'",
             ):
                 try:
                     conn.execute(statement)
@@ -571,12 +608,12 @@ class DashboardStore:
                     attitude_roll, attitude_pitch, attitude_yaw,
                     thrust_x, thrust_y, thrust_z,
                     drift_m, battery_pct, connectivity, reachable, rssi_dbm,
-                    cpu_temp_c, gpu_load_pct, localization_source, localization_state,
+                    cpu_temp_c, gpu_load_pct, localization_source, localization_data_source, localization_state,
                     localization_confidence, tdoa_confidence, confidence_trend,
                     relocalization_count, visible_anchor_count, occupancy_ratio,
                     sync_confidence, imu_camera_offset_ms, motor_health,
                     leadership_score, election_ready, timestamp
-                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
@@ -604,6 +641,7 @@ class DashboardStore:
                         state.cpu_temp_c,
                         state.gpu_load_pct,
                         state.localization_source,
+                        state.localization_data_source,
                         state.localization_state,
                         state.localization_confidence,
                         state.tdoa_confidence,
@@ -654,6 +692,7 @@ class DashboardStore:
                 cpu_temp_c=safe_float(row["cpu_temp_c"]),
                 gpu_load_pct=safe_float(row["gpu_load_pct"]),
                 localization_source=safe_text(row["localization_source"], "vision-inertial"),
+                localization_data_source=safe_text(row["localization_data_source"], "unavailable"),
                 localization_state=safe_text(row["localization_state"], "nominal"),
                 localization_confidence=safe_float(row["localization_confidence"], 1.0),
                 tdoa_confidence=safe_float(row["tdoa_confidence"]),
@@ -781,9 +820,12 @@ class DroneState:
     commanded_speed_mps: float = 0.0
     manual_target_position: tuple[float, float, float] = (0.0, 0.0, 0.0)
     manual_control_active: bool = False
+    source: str = "real"
+    stale: bool = False
     attitude_rpy: tuple[float, float, float] = (0.0, 0.0, 0.0)
     thrust_vector: tuple[float, float, float] = (0.0, 0.0, 9.81)
     localization_source: str = "vision-inertial"
+    localization_data_source: str = "unavailable"
     localization_state: str = "nominal"
     localization_confidence: float = 1.0
     tdoa_confidence: float = 0.0
@@ -816,6 +858,16 @@ class DroneState:
     update_channel_state: str = "idle"
     last_remote_command_status: str = "no remote command"
     health_flags: list[str] = field(default_factory=list)
+    camera_status: str = "unavailable"
+    camera: dict[str, Any] = field(default_factory=dict)
+    imu_status: str = "unavailable"
+    imu: dict[str, Any] = field(default_factory=dict)
+    lidar_status: str = "unavailable"
+    lidar: dict[str, Any] = field(default_factory=dict)
+    tdoa_status: str = "unavailable"
+    tdoa: dict[str, Any] = field(default_factory=dict)
+    replay_status: str = "unavailable"
+    replay: dict[str, Any] = field(default_factory=dict)
     motor_health: float = 1.0
     leadership_score: float = 0.0
     election_ready: bool = True
@@ -838,6 +890,9 @@ class DashboardSnapshot:
     missions: list[dict[str, Any]] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
     services: list[str] = field(default_factory=list)
+    simulation_enabled: bool = False
+    real_drone_count: int = 0
+    stale_drone_count: int = 0
     timestamp: float = field(default_factory=time.time)
 
 
@@ -845,6 +900,131 @@ class DashboardSnapshot:
 class CommandRequest:
     action: str
     payload: dict[str, Any] = field(default_factory=dict)
+
+
+def mission_start_allowed(snapshot: DashboardSnapshot) -> bool:
+    states = snapshot.states
+    if not states:
+        return False
+    return (
+        snapshot.real_drone_count > 0
+        and snapshot.stale_drone_count == 0
+        and all(state.localization_confidence >= 0.65 for state in states)
+        and all(state.localization_data_source == "real" for state in states)
+        and all(state.remote_command_allowed for state in states)
+    )
+
+
+def parse_sensor_source(payload: dict[str, Any], fallback: str = "unavailable") -> str:
+    return safe_text(payload.get("source", fallback), fallback)
+
+
+def parse_camera_payload(payload: Any) -> tuple[str, dict[str, Any]]:
+    data = safe_dict(payload)
+    status = safe_text(data.get("status", "unavailable"), "unavailable")
+    return status, {
+        "status": status,
+        "fps": safe_float(data.get("fps", 0.0)),
+        "frame_age_ms": safe_float(data.get("frame_age_ms", 0.0)),
+        "resolution": safe_text(data.get("resolution", "N/A"), "N/A"),
+        "dropped_frames": safe_int(data.get("dropped_frames", 0), 0),
+        "source": parse_sensor_source(data),
+        "preview_url": safe_text(data.get("preview_url", ""), ""),
+        "latest_frame_ref": safe_text(data.get("latest_frame_ref", ""), ""),
+    }
+
+
+def parse_imu_payload(payload: Any) -> tuple[str, dict[str, Any]]:
+    data = safe_dict(payload)
+    accel = safe_dict(data.get("accel"))
+    gyro = safe_dict(data.get("gyro"))
+    status = safe_text(data.get("status", "unavailable"), "unavailable")
+    return status, {
+        "status": status,
+        "sample_rate_hz": safe_float(data.get("sample_rate_hz", 0.0)),
+        "last_sample_age_ms": safe_float(data.get("last_sample_age_ms", 0.0)),
+        "accel": (
+            safe_float(accel.get("x", 0.0)),
+            safe_float(accel.get("y", 0.0)),
+            safe_float(accel.get("z", 0.0)),
+        ),
+        "gyro": (
+            safe_float(gyro.get("x", 0.0)),
+            safe_float(gyro.get("y", 0.0)),
+            safe_float(gyro.get("z", 0.0)),
+        ),
+        "health": safe_text(data.get("health", "unknown"), "unknown"),
+        "source": parse_sensor_source(data),
+    }
+
+
+def parse_lidar_payload(payload: Any) -> tuple[str, dict[str, Any]]:
+    data = safe_dict(payload)
+    points = [
+        (
+            safe_float(item.get("x", 0.0)),
+            safe_float(item.get("y", 0.0)),
+            safe_float(item.get("intensity", 0.0)),
+        )
+        for item in safe_list(data.get("points_2d"))
+        if isinstance(item, dict)
+    ]
+    status = safe_text(data.get("status", "unavailable"), "unavailable")
+    return status, {
+        "status": status,
+        "packet_rate_hz": safe_float(data.get("packet_rate_hz", 0.0)),
+        "scan_age_ms": safe_float(data.get("scan_age_ms", 0.0)),
+        "point_count": safe_int(data.get("point_count", len(points)), len(points)),
+        "points_2d": points,
+        "min_range_m": safe_float(data.get("min_range_m", 0.0)),
+        "max_range_m": safe_float(data.get("max_range_m", 0.0)),
+        "source": parse_sensor_source(data),
+    }
+
+
+def parse_tdoa_payload(payload: Any) -> tuple[str, dict[str, Any]]:
+    data = safe_dict(payload)
+    anchors = [
+        {
+            "id": safe_text(item.get("id", "A?"), "A?"),
+            "x": safe_float(item.get("x", 0.0)),
+            "y": safe_float(item.get("y", 0.0)),
+            "z": safe_float(item.get("z", 0.0)),
+            "visible": bool(item.get("visible", False)),
+            "last_seen_ms": safe_float(item.get("last_seen_ms", 0.0)),
+        }
+        for item in safe_list(data.get("anchors"))
+        if isinstance(item, dict)
+    ]
+    estimated = safe_dict(data.get("estimated_position"))
+    status = safe_text(data.get("status", "unavailable"), "unavailable")
+    return status, {
+        "status": status,
+        "source": parse_sensor_source(data),
+        "visible_anchor_count": safe_int(data.get("visible_anchor_count", len([a for a in anchors if a["visible"]])), 0),
+        "anchors": anchors,
+        "estimated_position": (
+            safe_float(estimated.get("x", 0.0)),
+            safe_float(estimated.get("y", 0.0)),
+            safe_float(estimated.get("z", 0.0)),
+        ),
+        "calibration_warning": safe_text(data.get("calibration_warning", ""), ""),
+    }
+
+
+def parse_replay_payload(payload: Any) -> tuple[str, dict[str, Any]]:
+    data = safe_dict(payload)
+    series = [safe_float(value, 0.0) for value in safe_list(data.get("confidence_series"))]
+    status = safe_text(data.get("status", "unavailable"), "unavailable")
+    return status, {
+        "status": status,
+        "active": bool(data.get("active", False)),
+        "file_name": safe_text(data.get("file_name", ""), ""),
+        "progress": safe_float(data.get("progress", 0.0)),
+        "current_time": safe_float(data.get("current_time", 0.0)),
+        "confidence_series": series,
+        "source": parse_sensor_source(data),
+    }
 
 
 class GoControlPlaneClient:
@@ -869,70 +1049,13 @@ class GoControlPlaneClient:
         discovery_payload = self._get_json_cached("/api/v1/discovery", ttl_sec=5.0)
         drones = payload.get("drones", [])
         states = [
-            DroneState(
-                drone_id=safe_int(item.get("drone_id", 0), 0),
-                cluster_id=safe_text(item.get("cluster_id", "cluster-01"), "cluster-01"),
-                role=safe_text(item.get("role", "FOLLOWER"), "FOLLOWER"),
-                mission_state=safe_text(item.get("mission_state", "standby"), "standby"),
-                position=safe_vector3(item.get("position", [0.0, 0.0, 0.0])),
-                velocity=safe_vector3(item.get("velocity", [0.0, 0.0, 0.0])),
-                commanded_altitude_m=safe_float(item.get("commanded_altitude_m", 0.0)),
-                commanded_speed_mps=safe_float(item.get("commanded_speed_mps", 0.0)),
-                manual_target_position=safe_vector3(item.get("manual_target_position", [0.0, 0.0, 0.0])),
-                manual_control_active=bool(item.get("manual_control_active", False)),
-                attitude_rpy=safe_vector3(item.get("attitude_rpy", [0.0, 0.0, 0.0])),
-                thrust_vector=safe_vector3(item.get("thrust_vector", [0.0, 0.0, 9.81]), (0.0, 0.0, 9.81)),
-                drift_m=safe_float(item.get("drift_m", 0.0)),
-                battery_pct=safe_float(item.get("battery_pct", 0.0)),
-                connectivity=safe_text(item.get("connectivity", "Unknown"), "Unknown"),
-                reachable=bool(item.get("reachable", False)),
-                rssi_dbm=safe_float(item.get("rssi_dbm", -100.0), -100.0),
-                cpu_temp_c=safe_float(item.get("cpu_temp_c", 0.0)),
-                gpu_load_pct=safe_float(item.get("gpu_load_pct", 0.0)),
-                localization_source=safe_text(item.get("localization_source", "vision-inertial"), "vision-inertial"),
-                localization_state=safe_text(item.get("localization_state", "nominal"), "nominal"),
-                localization_confidence=safe_float(item.get("localization_confidence", 1.0), 1.0),
-                tdoa_confidence=safe_float(item.get("tdoa_confidence", 0.0), 0.0),
-                confidence_trend=safe_float(item.get("confidence_trend", 0.0), 0.0),
-                relocalization_count=safe_int(item.get("relocalization_count", 0), 0),
-                visible_anchor_count=safe_int(item.get("visible_anchor_count", 0), 0),
-                occupancy_ratio=safe_float(item.get("occupancy_ratio", 0.0), 0.0),
-                sync_confidence=safe_float(item.get("sync_confidence", 1.0), 1.0),
-                imu_camera_offset_ms=safe_float(item.get("imu_camera_offset_ms", 0.0), 0.0),
-                peer_clock_offset_ms=safe_float(item.get("peer_clock_offset_ms", 0.0), 0.0),
-                anchor_visibility_ratio=safe_float(item.get("anchor_visibility_ratio", 0.0), 0.0),
-                tdoa_weight=safe_float(item.get("tdoa_weight", 0.0), 0.0),
-                planned_waypoint_count=safe_int(item.get("planned_waypoint_count", 0), 0),
-                last_relocalized_keyframe=safe_int(item.get("last_relocalized_keyframe", 0), 0),
-                security_state=safe_text(item.get("security_state", "TRUSTED"), "TRUSTED"),
-                security_summary=safe_text(item.get("security_summary", "All trust signals nominal"), "All trust signals nominal"),
-                security_transition_reason=safe_text(item.get("security_transition_reason", "initial-trust"), "initial-trust"),
-                remote_command_allowed=bool(item.get("remote_command_allowed", True)),
-                telemetry_uplink_allowed=bool(item.get("telemetry_uplink_allowed", True)),
-                link_integrity_score=safe_float(item.get("link_integrity_score", 1.0), 1.0),
-                trust_epoch=safe_int(item.get("trust_epoch", 1), 1),
-                last_auth_failure_at_s=safe_float(item.get("last_auth_failure_at_s", 0.0), 0.0),
-                tamper_score=safe_float(item.get("tamper_score", 0.0), 0.0),
-                firmware_measurement=safe_text(item.get("firmware_measurement", "lab-local-build"), "lab-local-build"),
-                firmware_version=safe_text(item.get("firmware_version", "0.0.0"), "0.0.0"),
-                secure_boot_state=safe_text(item.get("secure_boot_state", "LAB_BOOT"), "LAB_BOOT"),
-                boot_trust_summary=safe_text(item.get("boot_trust_summary", "Lab boot trust bypassed"), "Lab boot trust bypassed"),
-                rollback_counter=safe_int(item.get("rollback_counter", 0), 0),
-                maintenance_mode=bool(item.get("maintenance_mode", False)),
-                update_channel_state=safe_text(item.get("update_channel_state", "idle"), "idle"),
-                last_remote_command_status=safe_text(item.get("last_remote_command_status", "no remote command"), "no remote command"),
-                health_flags=[safe_text(v) for v in item.get("health_flags", []) if safe_text(v)],
-                motor_health=safe_float(item.get("motor_health", 1.0), 1.0),
-                leadership_score=safe_float(item.get("leadership_score", 0.0)),
-                election_ready=bool(item.get("election_ready", True)),
-                timestamp=safe_float(item.get("timestamp", time.time()), time.time()),
-            )
+            self._parse_drone_state(item)
             for item in drones
             if isinstance(item, dict)
         ]
         return DashboardSnapshot(
             states=states,
-            backend_mode="go-control-plane",
+            backend_mode=safe_text(payload.get("backend_mode", "simulation"), "simulation"),
             leader_id=safe_int(payload.get("leader_id"), 0) or None,
             avg_latency_ms=safe_float(payload.get("avg_latency_ms", 0.0)),
             packet_loss_pct=safe_float(payload.get("packet_loss_pct", 0.0)),
@@ -962,6 +1085,9 @@ class GoControlPlaneClient:
                 if isinstance(item, dict)
             ][-16:],
             services=[safe_text(item) for item in discovery_payload.get("services", []) if safe_text(item)],
+            simulation_enabled=bool(payload.get("simulation_enabled", False)),
+            real_drone_count=safe_int(payload.get("real_drone_count", 0), 0),
+            stale_drone_count=safe_int(payload.get("stale_drone_count", 0), 0),
             timestamp=safe_float(payload.get("timestamp", time.time()), time.time()),
         )
 
@@ -978,6 +1104,80 @@ class GoControlPlaneClient:
             if action and approval_id:
                 out[action] = approval_id
         return out
+
+    def _parse_drone_state(self, item: dict[str, Any]) -> DroneState:
+        camera_status, camera = parse_camera_payload(item.get("camera"))
+        imu_status, imu = parse_imu_payload(item.get("imu"))
+        lidar_status, lidar = parse_lidar_payload(item.get("lidar"))
+        tdoa_status, tdoa = parse_tdoa_payload(item.get("tdoa"))
+        replay_status, replay = parse_replay_payload(item.get("replay"))
+        return DroneState(
+            drone_id=safe_int(item.get("drone_id", 0), 0),
+            cluster_id=safe_text(item.get("cluster_id", "cluster-01"), "cluster-01"),
+            role=safe_text(item.get("role", "FOLLOWER"), "FOLLOWER"),
+            mission_state=safe_text(item.get("mission_state", "standby"), "standby"),
+            position=safe_vector3(item.get("position", [0.0, 0.0, 0.0])),
+            velocity=safe_vector3(item.get("velocity", [0.0, 0.0, 0.0])),
+            attitude_rpy=safe_vector3(item.get("attitude_rpy", [0.0, 0.0, 0.0])),
+            thrust_vector=safe_vector3(item.get("thrust_vector", [0.0, 0.0, 9.81]), (0.0, 0.0, 9.81)),
+            drift_m=safe_float(item.get("drift_m", 0.0)),
+            battery_pct=safe_float(item.get("battery_pct", 0.0)),
+            connectivity=safe_text(item.get("connectivity", "Unknown"), "Unknown"),
+            reachable=bool(item.get("reachable", False)),
+            rssi_dbm=safe_float(item.get("rssi_dbm", -100.0), -100.0),
+            cpu_temp_c=safe_float(item.get("cpu_temp_c", 0.0)),
+            gpu_load_pct=safe_float(item.get("gpu_load_pct", 0.0)),
+            source=safe_text(item.get("source", "real"), "real"),
+            stale=bool(item.get("stale", False)),
+            localization_source=safe_text(item.get("localization_source", "vision-inertial"), "vision-inertial"),
+            localization_data_source=safe_text(item.get("localization_data_source", "unavailable"), "unavailable"),
+            localization_state=safe_text(item.get("localization_state", "nominal"), "nominal"),
+            localization_confidence=safe_float(item.get("localization_confidence", 1.0), 1.0),
+            tdoa_confidence=safe_float(item.get("tdoa_confidence", 0.0), 0.0),
+            confidence_trend=safe_float(item.get("confidence_trend", 0.0), 0.0),
+            relocalization_count=safe_int(item.get("relocalization_count", 0), 0),
+            visible_anchor_count=safe_int(item.get("visible_anchor_count", 0), 0),
+            occupancy_ratio=safe_float(item.get("occupancy_ratio", 0.0), 0.0),
+            sync_confidence=safe_float(item.get("sync_confidence", 1.0), 1.0),
+            imu_camera_offset_ms=safe_float(item.get("imu_camera_offset_ms", 0.0), 0.0),
+            peer_clock_offset_ms=safe_float(item.get("peer_clock_offset_ms", 0.0), 0.0),
+            anchor_visibility_ratio=safe_float(item.get("anchor_visibility_ratio", 0.0), 0.0),
+            tdoa_weight=safe_float(item.get("tdoa_weight", 0.0), 0.0),
+            planned_waypoint_count=safe_int(item.get("planned_waypoint_count", 0), 0),
+            last_relocalized_keyframe=safe_int(item.get("last_relocalized_keyframe", 0), 0),
+            security_state=safe_text(item.get("security_state", "TRUSTED"), "TRUSTED"),
+            security_summary=safe_text(item.get("security_summary", "All trust signals nominal"), "All trust signals nominal"),
+            security_transition_reason=safe_text(item.get("security_transition_reason", "initial-trust"), "initial-trust"),
+            remote_command_allowed=bool(item.get("remote_command_allowed", True)),
+            telemetry_uplink_allowed=bool(item.get("telemetry_uplink_allowed", True)),
+            link_integrity_score=safe_float(item.get("link_integrity_score", 1.0), 1.0),
+            trust_epoch=safe_int(item.get("trust_epoch", 1), 1),
+            last_auth_failure_at_s=safe_float(item.get("last_auth_failure_at_s", 0.0), 0.0),
+            tamper_score=safe_float(item.get("tamper_score", 0.0), 0.0),
+            firmware_measurement=safe_text(item.get("firmware_measurement", "lab-local-build"), "lab-local-build"),
+            firmware_version=safe_text(item.get("firmware_version", "0.0.0"), "0.0.0"),
+            secure_boot_state=safe_text(item.get("secure_boot_state", "LAB_BOOT"), "LAB_BOOT"),
+            boot_trust_summary=safe_text(item.get("boot_trust_summary", "Lab boot trust bypassed"), "Lab boot trust bypassed"),
+            rollback_counter=safe_int(item.get("rollback_counter", 0), 0),
+            maintenance_mode=bool(item.get("maintenance_mode", False)),
+            update_channel_state=safe_text(item.get("update_channel_state", "idle"), "idle"),
+            last_remote_command_status=safe_text(item.get("last_remote_command_status", "no remote command"), "no remote command"),
+            health_flags=[safe_text(v) for v in item.get("health_flags", []) if safe_text(v)],
+            camera_status=camera_status,
+            camera=camera,
+            imu_status=imu_status,
+            imu=imu,
+            lidar_status=lidar_status,
+            lidar=lidar,
+            tdoa_status=tdoa_status,
+            tdoa=tdoa,
+            replay_status=replay_status,
+            replay=replay,
+            motor_health=safe_float(item.get("motor_health", 1.0), 1.0),
+            leadership_score=safe_float(item.get("leadership_score", 0.0)),
+            election_ready=bool(item.get("election_ready", True)),
+            timestamp=safe_float(item.get("timestamp", time.time()), time.time()),
+        )
 
     def send_command(self, request_obj: CommandRequest) -> str:
         logger.info("GoControlPlaneClient.send_command action=%s", request_obj.action)
@@ -1090,6 +1290,7 @@ class SwarmBackend:
         self._manual_targets: dict[int, tuple[float, float, float]] = {}
         self._manual_speeds: dict[int, float] = {}
         self._last_manual_tick = time.monotonic()
+        self._fallback_reason = ""
         logger.info("SwarmBackend init ids=%s poll_hz=%s backend_url=%s", drone_ids, poll_hz, backend_url)
 
         if self._client is not None:
@@ -1126,7 +1327,7 @@ class SwarmBackend:
 
     @property
     def mode(self) -> str:
-        return self._mode
+        return compose_backend_mode(self._mode, self._fallback_reason)
 
     @property
     def mission_overrides(self) -> dict[int, str]:
@@ -1413,6 +1614,7 @@ class SwarmBackend:
             cpu_temp_c=cpu_temp_c,
             gpu_load_pct=max(0.0, gpu_load_pct),
             localization_source="demo-visualization",
+            localization_data_source="simulation",
             localization_state="nominal",
             localization_confidence=max(0.18, 0.95 - index * 0.07 - 0.18 * abs(math.sin(elapsed * 0.18 + index))),
             tdoa_confidence=max(0.0, min(1.0, 0.72 - index * 0.08 + 0.06 * math.sin(elapsed * 0.31 + index))),
@@ -1580,14 +1782,18 @@ class SwarmBackend:
     def poll(self) -> DashboardSnapshot:
         if self._client is not None:
             try:
+                self._fallback_reason = ""
                 return self._apply_manual_navigation(self._merge_local_demo_snapshot(self._client.fetch_snapshot()))
             except (error.URLError, TimeoutError, ValueError, KeyError) as exc:
                 logger.warning("go-control-plane snapshot failed, falling back to simulation: %s", exc)
+                self._fallback_reason = "go-control-plane-unreachable"
                 return self._apply_manual_navigation(self._merge_local_demo_snapshot(self._simulate_snapshot()))
         if self._bridge is not None and self._pipelines:
             snapshot = self._poll_bridge()
             if snapshot is not None:
+                self._fallback_reason = ""
                 return self._apply_manual_navigation(self._merge_local_demo_snapshot(snapshot))
+            self._fallback_reason = "bridge-poll-failed"
         return self._apply_manual_navigation(self._merge_local_demo_snapshot(self._simulate_snapshot()))
 
     def _poll_bridge(self) -> DashboardSnapshot | None:
@@ -1637,6 +1843,7 @@ class SwarmBackend:
                         cpu_temp_c=float(stats.cpu_temp_c),
                         gpu_load_pct=float(stats.gpu_pct),
                         localization_source=safe_text(getattr(pose, "localization_source", "vision-inertial"), "vision-inertial"),
+                        localization_data_source=safe_text(getattr(runtime, "localization_data_source", "unavailable"), "unavailable"),
                         localization_state=safe_text(getattr(runtime, "localization_state", "nominal"), "nominal"),
                         localization_confidence=safe_float(getattr(pose, "localization_confidence", 1.0), 1.0),
                         tdoa_confidence=safe_float(getattr(runtime, "tdoa_confidence", 0.0), 0.0),
@@ -1681,7 +1888,7 @@ class SwarmBackend:
 
             return DashboardSnapshot(
                 states=states,
-                backend_mode=self._mode,
+                backend_mode=self.mode,
                 leader_id=int(self._network.leader_id()) if self._network is not None else 1,
                 avg_latency_ms=float(self._network.avg_latency_ms()) if self._network is not None else 0.0,
                 packet_loss_pct=float(self._network.packet_loss_pct()) if self._network is not None else 0.0,
@@ -1757,6 +1964,7 @@ class SwarmBackend:
                     cpu_temp_c=cpu_temp_c,
                     gpu_load_pct=gpu_load_pct,
                     localization_source=anchor.localization_source,
+                    localization_data_source=anchor.localization_data_source,
                     localization_state=localization_state,
                     localization_confidence=localization_confidence,
                     tdoa_confidence=max(0.0, anchor.tdoa_confidence - idx * 0.04),
@@ -1883,6 +2091,7 @@ class SwarmBackend:
                     cpu_temp_c=cpu_temp,
                     gpu_load_pct=max(0.0, gpu_load),
                     localization_source=localization_source,
+                    localization_data_source="simulation",
                     localization_state=localization_state,
                     localization_confidence=localization_confidence,
                     tdoa_confidence=tdoa_conf,
@@ -1923,7 +2132,7 @@ class SwarmBackend:
 
         return DashboardSnapshot(
             states=states,
-            backend_mode=self._mode,
+            backend_mode=self.mode,
             leader_id=1,
             avg_latency_ms=4.0 + 2.0 * abs(math.sin(elapsed * 0.4)),
             packet_loss_pct=max(0.0, 1.4 * math.sin(elapsed * 0.2 + 0.5)),
@@ -2127,6 +2336,715 @@ class MetricCard(QFrame):
         self._value.setText(value)
         self._value.setStyleSheet(f"color: {accent}; font-size: 28px; font-weight: 900; letter-spacing: -0.5px;")
         self._subtitle.setText(subtitle)
+
+
+class StatusPill(QFrame):
+    def __init__(self, title: str, accent: str = ACCENT) -> None:
+        super().__init__()
+        self._accent = accent
+        self._title = QLabel(title.upper())
+        self._value = QLabel("--")
+        self.setStyleSheet(
+            f"QFrame {{ background: rgba(8, 17, 27, 0.92); border: 1px solid rgba(30, 42, 59, 0.9); border-radius: 10px; }}"
+        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(2)
+        self._title.setStyleSheet(f"color:{TEXT_DIM}; font-size:10px; font-weight:700; letter-spacing:1.1px;")
+        self._value.setStyleSheet(f"color:{accent}; font-size:13px; font-weight:800;")
+        layout.addWidget(self._title)
+        layout.addWidget(self._value)
+
+    def set_value(self, value: str, accent: str | None = None) -> None:
+        accent = accent or self._accent
+        self._value.setText(value)
+        self._value.setStyleSheet(f"color:{accent}; font-size:13px; font-weight:800;")
+
+
+class SidebarNav(QFrame):
+    def __init__(self) -> None:
+        super().__init__()
+        self.setStyleSheet(
+            f"QFrame {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 {GRAPHITE}, stop:1 {PANEL_BG});"
+            f" border: 1px solid rgba(30, 42, 59, 0.95); border-radius: 12px; }}"
+        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 16, 14, 16)
+        layout.setSpacing(8)
+        title = QLabel("OPERATIONS")
+        title.setStyleSheet(f"color:{ACCENT}; font-size:13px; font-weight:900; letter-spacing:1.6px;")
+        sub = QLabel("UVA GPS-DENIED")
+        sub.setStyleSheet(f"color:{TEXT_DIM}; font-size:11px; font-weight:600; letter-spacing:1px;")
+        layout.addWidget(title)
+        layout.addWidget(sub)
+        for index, section in enumerate(SIDEBAR_SECTIONS):
+            button = QPushButton(section)
+            accent = ACCENT if index in {0, 3, 11, 16} else TEXT_DIM
+            button.setCursor(Qt.PointingHandCursor)
+            button.setStyleSheet(
+                f"QPushButton {{ text-align:left; color:{accent}; background: rgba(18, 26, 43, 0.55);"
+                f" border: 1px solid rgba(30, 42, 59, 0.6); border-radius: 8px; padding: 9px 12px; font-size:12px; font-weight:700; }}"
+                f"QPushButton:hover {{ color:{TEXT}; border-color: rgba(0, 210, 255, 0.55); background: rgba(0, 210, 255, 0.08); }}"
+            )
+            layout.addWidget(button)
+        layout.addStretch(1)
+
+
+class OperationalModesPanel(QGroupBox):
+    def __init__(self) -> None:
+        super().__init__("Operational Modes")
+        self._cards: dict[str, dict[str, QLabel]] = {}
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(10, 16, 10, 10)
+        outer.setSpacing(10)
+        intro = QLabel("Mode separation must stay operator-visible. Simulation must never read like real flight telemetry.")
+        intro.setWordWrap(True)
+        intro.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px;")
+        outer.addWidget(intro)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(10)
+        grid.setVerticalSpacing(10)
+        definitions = [
+            ("pybind11", "Local C++ bridge", CYAN),
+            ("go-control-plane", "Fleet backend", EMERALD),
+            ("hybrid", "Bridge + mesh", ACCENT),
+            ("simulation", "Demo fallback", SIM_PURPLE),
+        ]
+        for idx, (key, description, accent) in enumerate(definitions):
+            card = QFrame()
+            card.setStyleSheet(
+                f"QFrame {{ background: rgba(11, 17, 30, 0.9); border: 1px solid rgba(30, 42, 59, 0.85); border-radius: 10px; }}"
+            )
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(12, 12, 12, 12)
+            card_layout.setSpacing(6)
+            badge = QLabel(key.upper())
+            badge.setStyleSheet(f"color:{accent}; font-size:12px; font-weight:900; letter-spacing:1.2px;")
+            summary = QLabel(description)
+            summary.setStyleSheet(f"color:{TEXT}; font-size:12px; font-weight:700;")
+            meta = QLabel("inactive")
+            meta.setWordWrap(True)
+            meta.setStyleSheet(f"color:{TEXT_DIM}; font-size:11px;")
+            card_layout.addWidget(badge)
+            card_layout.addWidget(summary)
+            card_layout.addWidget(meta)
+            grid.addWidget(card, idx // 2, idx % 2)
+            self._cards[key] = {"badge": badge, "summary": summary, "meta": meta, "card": card}
+        self._simulation_banner = QLabel("NOT REAL TELEMETRY")
+        self._simulation_banner.setAlignment(Qt.AlignCenter)
+        self._simulation_banner.setVisible(False)
+        self._simulation_banner.setStyleSheet(
+            f"background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgba(139, 92, 246, 0.22), stop:1 rgba(255, 107, 0, 0.22));"
+            f" color:{TEXT}; border:1px solid rgba(255, 107, 0, 0.85); border-radius:8px; padding:10px; font-size:13px; font-weight:900; letter-spacing:1.8px;"
+        )
+        outer.addLayout(grid)
+        outer.addWidget(self._simulation_banner)
+
+    def ingest(self, snapshot: DashboardSnapshot, backend_label: str) -> None:
+        active = snapshot.backend_mode.strip().lower().split("-fallback:", 1)[0]
+        for key, refs in self._cards.items():
+            card = refs["card"]
+            border = ACCENT if key == active else BORDER
+            glow = "rgba(0, 210, 255, 0.12)" if key == active else "rgba(11, 17, 30, 0.9)"
+            if key == "simulation" and (snapshot.simulation_enabled or active == "simulation"):
+                border = SIM_PURPLE
+                glow = "rgba(139, 92, 246, 0.14)"
+            card.setStyleSheet(
+                f"QFrame {{ background: {glow}; border: 1px solid {border}; border-radius: 10px; }}"
+            )
+            if key == "pybind11":
+                refs["meta"].setText(f"bridge status: {'active' if 'pybind11' in backend_label else 'standby'} | direct EKF/VIO feed")
+            elif key == "go-control-plane":
+                refs["meta"].setText(
+                    f"backend_mode={snapshot.backend_mode} | drones={len(snapshot.states)} | stale={snapshot.stale_drone_count}"
+                )
+            elif key == "hybrid":
+                refs["meta"].setText(
+                    "local bridge + local swarm network active" if active == "hybrid" else "mesh synchronization available when local V2X starts"
+                )
+            else:
+                refs["meta"].setText(
+                    "fallback mode only | NOT REAL TELEMETRY"
+                    if snapshot.simulation_enabled or active == "simulation"
+                    else "simulation path idle"
+                )
+        self._simulation_banner.setVisible(snapshot.simulation_enabled or active == "simulation")
+
+
+class LocalizationStatusPanel(QGroupBox):
+    def __init__(self) -> None:
+        super().__init__("Localization Status")
+        self._labels: dict[str, QLabel] = {}
+        layout = QGridLayout(self)
+        layout.setContentsMargins(12, 18, 12, 12)
+        layout.setHorizontalSpacing(12)
+        layout.setVerticalSpacing(10)
+        rows = [
+            ("Data Source", "data_source"),
+            ("Confidence", "confidence"),
+            ("Drift", "drift"),
+            ("VIO", "vio"),
+            ("TDOA", "tdoa"),
+            ("EKF", "ekf"),
+            ("State", "state"),
+            ("Relocalization", "relocal"),
+        ]
+        for row, (label, key) in enumerate(rows):
+            left = QLabel(label)
+            left.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px; font-weight:700;")
+            value = QLabel("--")
+            value.setWordWrap(True)
+            value.setStyleSheet(f"color:{TEXT}; font-size:12px; font-weight:700;")
+            layout.addWidget(left, row, 0)
+            layout.addWidget(value, row, 1)
+            self._labels[key] = value
+        self._banner = QLabel("")
+        self._banner.setVisible(False)
+        self._banner.setWordWrap(True)
+        self._banner.setStyleSheet(
+            f"background: rgba(245, 158, 11, 0.12); color:{WARN}; border:1px solid rgba(245, 158, 11, 0.55); border-radius:8px; padding:8px; font-size:12px; font-weight:800;"
+        )
+        layout.addWidget(self._banner, len(rows), 0, 1, 2)
+
+    def ingest(self, snapshot: DashboardSnapshot) -> None:
+        states = snapshot.states
+        if not states:
+            return
+        avg_conf = sum(state.localization_confidence for state in states) / max(len(states), 1)
+        avg_drift = sum(state.drift_m for state in states) / max(len(states), 1)
+        avg_tdoa = sum(state.tdoa_confidence for state in states) / max(len(states), 1)
+        relocal = sum(state.relocalization_count for state in states)
+        source = summarize_localization_data_source([state.localization_data_source for state in states])
+        degraded = sum(1 for state in states if state.localization_state != "nominal")
+        self._labels["data_source"].setText(source.upper())
+        self._labels["confidence"].setText(f"{avg_conf*100.0:.0f}%")
+        self._labels["drift"].setText(f"{avg_drift:.3f} m")
+        self._labels["vio"].setText("TRACKING" if avg_conf >= 0.65 else "DEGRADED")
+        self._labels["tdoa"].setText(f"{avg_tdoa*100.0:.0f}% confidence")
+        self._labels["ekf"].setText("LOCKED" if degraded == 0 else "DEGRADED")
+        self._labels["state"].setText(f"{degraded} degraded / {len(states)} total")
+        self._labels["relocal"].setText(f"{relocal} attempts")
+        if source in {"simulation", "playback", "unavailable"} or avg_conf < 0.65 or degraded > 0:
+            self._banner.setVisible(True)
+            recommendation = "Reduce velocity and verify anchor/VIO integrity before autonomous maneuvers."
+            self._banner.setText(f"DEGRADED LOCALIZATION | {recommendation}")
+        else:
+            self._banner.setVisible(False)
+
+
+class SafetyPanel(QGroupBox):
+    def __init__(self) -> None:
+        super().__init__("Safety & Failsafe")
+        self._labels: dict[str, QLabel] = {}
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 18, 12, 12)
+        layout.setSpacing(10)
+        self._state_badge = QLabel("NORMAL")
+        self._state_badge.setAlignment(Qt.AlignCenter)
+        self._state_badge.setStyleSheet(
+            f"background: rgba(16, 185, 129, 0.14); color:{SUCCESS}; border:1px solid rgba(16, 185, 129, 0.55); border-radius:8px; padding:9px; font-size:13px; font-weight:900; letter-spacing:1.2px;"
+        )
+        layout.addWidget(self._state_badge)
+        for key in ("policy", "command", "prearm", "bench", "security"):
+            label = QLabel("--")
+            label.setWordWrap(True)
+            label.setStyleSheet(f"color:{TEXT}; font-size:12px; font-weight:600;")
+            layout.addWidget(label)
+            self._labels[key] = label
+        self._estop = QPushButton("EMERGENCY STOP / LAND")
+        self._estop.setEnabled(False)
+        self._estop.setStyleSheet(
+            f"QPushButton {{ background: rgba(239, 68, 68, 0.18); color:{DANGER}; border:1px solid rgba(239, 68, 68, 0.75); border-radius:9px; padding:11px; font-size:12px; font-weight:900; letter-spacing:1.1px; }}"
+        )
+        layout.addWidget(self._estop)
+
+    def ingest(self, snapshot: DashboardSnapshot) -> None:
+        states = snapshot.states
+        if not states:
+            return
+        worst = "NORMAL"
+        accent = SUCCESS
+        background = "rgba(16, 185, 129, 0.14)"
+        border = "rgba(16, 185, 129, 0.55)"
+        reasons: list[str] = []
+        for state in states:
+            if not state.remote_command_allowed or state.security_state not in {"TRUSTED", "DEGRADED_LINK"}:
+                worst = "SENSOR_FAULT" if state.security_state == "LAND_IMMEDIATELY" else "DEGRADED_LOCALIZATION"
+                accent = WARN if state.security_state != "LAND_IMMEDIATELY" else DANGER
+                background = "rgba(245, 158, 11, 0.14)" if accent == WARN else "rgba(239, 68, 68, 0.18)"
+                border = "rgba(245, 158, 11, 0.55)" if accent == WARN else "rgba(239, 68, 68, 0.75)"
+            if state.localization_state == "lost":
+                worst = "LOCALIZATION_LOST"
+                accent = DANGER
+                background = "rgba(239, 68, 68, 0.18)"
+                border = "rgba(239, 68, 68, 0.75)"
+            if state.stale:
+                worst = "LINK_LOST"
+                accent = AMBER
+                background = "rgba(251, 191, 36, 0.18)"
+                border = "rgba(251, 191, 36, 0.75)"
+            if state.health_flags:
+                reasons.extend(state.health_flags)
+        self._state_badge.setText(worst)
+        self._state_badge.setStyleSheet(
+            f"background: {background}; color:{accent}; border:1px solid {border}; border-radius:8px; padding:9px; font-size:13px; font-weight:900; letter-spacing:1.2px;"
+        )
+        self._labels["policy"].setText(f"Active failsafe policy: {worst} | safety manager active")
+        self._labels["command"].setText(
+            f"Command rejection reasons: {', '.join(sorted(set(reasons))) if reasons else 'none currently active'}"
+        )
+        self._labels["prearm"].setText(
+            "Pre-arm gate: required before tethered/real operation | fail on simulation, stale telemetry, low localization confidence"
+        )
+        self._labels["bench"].setText(
+            "Bench validation: pass bench_check.py before pre-arm; simulation must remain visually obvious"
+        )
+        self._labels["security"].setText(
+            f"Security posture: {sum(1 for state in states if state.remote_command_allowed)}/{len(states)} drones allow remote commands"
+        )
+
+
+class TelemetryStateBanner(QLabel):
+    def __init__(self, text: str = "UNAVAILABLE") -> None:
+        super().__init__(text)
+        self.setAlignment(Qt.AlignCenter)
+        self.setWordWrap(True)
+        self.setStyleSheet(
+            f"background: rgba(245, 158, 11, 0.12); color:{WARN}; border:1px solid rgba(245, 158, 11, 0.55); border-radius:8px; padding:10px; font-size:12px; font-weight:800;"
+        )
+
+
+class CameraPreviewPage(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+        self._status = QLabel("CAMERA FEED UNAVAILABLE")
+        self._status.setStyleSheet(f"color:{TEXT}; font-size:13px; font-weight:900; letter-spacing:1px;")
+        self._meta = QLabel("waiting for live bridge/backend video feed")
+        self._meta.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px;")
+        self._frame = QLabel("NO LIVE FRAME")
+        self._frame.setAlignment(Qt.AlignCenter)
+        self._frame.setWordWrap(True)
+        self._frame.setMinimumHeight(260)
+        self._frame.setStyleSheet(
+            f"background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {GRAPHITE}, stop:1 {PANEL_ALT});"
+            f" color:{TEXT_DIM}; border:1px solid rgba(30, 42, 59, 0.9); border-radius:12px; font-size:18px; font-weight:900; letter-spacing:1.6px;"
+        )
+        self._banner = TelemetryStateBanner("LIVE CAMERA NOT EXPOSED TO DASHBOARD YET")
+        stats = QHBoxLayout()
+        self._fps = StatusPill("FPS", CYAN)
+        self._age = StatusPill("Frame Age", WARN)
+        self._resolution = StatusPill("Resolution", ACCENT)
+        self._dropped = StatusPill("Dropped Frame", DANGER)
+        for widget in (self._fps, self._age, self._resolution, self._dropped):
+            stats.addWidget(widget)
+        layout.addWidget(self._status)
+        layout.addWidget(self._meta)
+        layout.addWidget(self._frame)
+        layout.addWidget(self._banner)
+        layout.addLayout(stats)
+
+    def ingest(self, state: DroneState | None) -> None:
+        if state is None:
+            self._status.setText("CAMERA FEED UNAVAILABLE")
+            self._meta.setText("no drone selected")
+            self._banner.setVisible(True)
+            return
+        age_s = max(0.0, time.time() - state.timestamp)
+        frame_age_ms = safe_float(state.camera.get("frame_age_ms", age_s * 1000.0), age_s * 1000.0)
+        fps = safe_float(state.camera.get("fps", 0.0), 0.0)
+        self._fps.set_value(f"{fps:.1f}" if fps > 0 else "N/A", CYAN if fps > 0 else WARN)
+        self._age.set_value(f"{frame_age_ms:.0f} ms", DANGER if frame_age_ms > 1500 else WARN if frame_age_ms > 250 else CYAN)
+        self._resolution.set_value(safe_text(state.camera.get("resolution", "N/A"), "N/A"), TEXT if state.camera.get("resolution") else TEXT_DIM)
+        dropped = safe_int(state.camera.get("dropped_frames", 0), 0)
+        self._dropped.set_value(str(dropped), DANGER if dropped > 0 else CYAN)
+        if state.source == "simulation" or state.localization_data_source == "simulation":
+            self._status.setText("SIMULATION CAMERA PLACEHOLDER")
+            self._meta.setText("camera visualization is not real; simulation mode is active")
+            self._banner.setText("NOT REAL TELEMETRY | CAMERA FEED IS SIMULATION/PLACEHOLDER")
+            self._banner.setStyleSheet(
+                f"background: rgba(139, 92, 246, 0.14); color:{SIM_PURPLE}; border:1px solid rgba(255, 107, 0, 0.75); border-radius:8px; padding:10px; font-size:12px; font-weight:800;"
+            )
+            self._frame.setText("SIMULATION / PLACEHOLDER CAMERA")
+        else:
+            preview_url = safe_text(state.camera.get("preview_url", ""), "")
+            frame_ref = safe_text(state.camera.get("latest_frame_ref", ""), "")
+            self._banner.setStyleSheet(
+                f"background: rgba(245, 158, 11, 0.12); color:{WARN}; border:1px solid rgba(245, 158, 11, 0.55); border-radius:8px; padding:10px; font-size:12px; font-weight:800;"
+            )
+            if preview_url:
+                self._status.setText(f"CAMERA PREVIEW LINK AVAILABLE | {state.camera_status.upper()}")
+                self._meta.setText(f"preview_url={preview_url}")
+                self._frame.setText(f"LIVE PREVIEW URL\n{preview_url}")
+                self._banner.setText("Dashboard stores preview references only. Raw video frames are not embedded in fleet snapshot.")
+                self._banner.setVisible(True)
+            elif frame_ref:
+                self._status.setText(f"CAMERA FRAME REFERENCE AVAILABLE | {state.camera_status.upper()}")
+                self._meta.setText(f"latest_frame_ref={frame_ref}")
+                self._frame.setText(f"LATEST FRAME REF\n{frame_ref}")
+                self._banner.setVisible(True)
+            else:
+                self._status.setText("CAMERA LINK EXPECTED FROM BRIDGE/BACKEND")
+                self._meta.setText("live camera preview reference is not currently available for this drone")
+                self._frame.setText("NO LIVE FRAME")
+                self._banner.setVisible(True)
+
+
+class LidarMappingPage(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+        self._plot = pg.PlotWidget()
+        style_plot_widget(self._plot, "Forward / Lateral", "Meters")
+        self._plot.setAspectLocked(True)
+        self._plot.setYRange(-10, 10)
+        self._plot.setXRange(-10, 10)
+        self._plot.hideButtons()
+        self._drone_point = self._plot.plot([0], [0], pen=None, symbol="o", symbolSize=12, symbolBrush=pg.mkBrush(_rgba(ACCENT, 1.0)))
+        self._radius_curve = self._plot.plot(pen=pg.mkPen(WARN, width=1.5))
+        theta = np.linspace(0, 2 * math.pi, 128)
+        self._radius_curve.setData(np.cos(theta) * 2.0, np.sin(theta) * 2.0)
+        self._obstacles = self._plot.plot([], [], pen=None, symbol="o", symbolSize=6, symbolBrush=pg.mkBrush(_rgba(DANGER, 0.9)))
+        self._status = QLabel("LiDAR map awaiting live obstacle points")
+        self._status.setStyleSheet(f"color:{TEXT}; font-size:13px; font-weight:800;")
+        self._meta = QLabel("Safety radius shown around drone center. No fake obstacle field is rendered.")
+        self._meta.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px;")
+        self._banner = TelemetryStateBanner("LIDAR POINTS UNAVAILABLE OR STALE")
+        row = QHBoxLayout()
+        self._lidar_status = StatusPill("LiDAR Status", CYAN)
+        self._packet_rate = StatusPill("Packet Rate", WARN)
+        self._scan_age = StatusPill("Scan Age", WARN)
+        for widget in (self._lidar_status, self._packet_rate, self._scan_age):
+            row.addWidget(widget)
+        layout.addWidget(self._status)
+        layout.addWidget(self._meta)
+        layout.addWidget(self._plot)
+        layout.addWidget(self._banner)
+        layout.addLayout(row)
+
+    def ingest(self, state: DroneState | None) -> None:
+        if state is None:
+            self._lidar_status.set_value("UNAVAILABLE", WARN)
+            self._packet_rate.set_value("N/A", WARN)
+            self._scan_age.set_value("N/A", WARN)
+            self._banner.setVisible(True)
+            self._obstacles.setData([], [])
+            return
+        age_s = max(0.0, time.time() - state.timestamp)
+        stale = state.stale or age_s > 2.0
+        simulation = state.source == "simulation" or state.localization_data_source == "simulation"
+        points = state.lidar.get("points_2d", [])
+        lidar_available = (state.occupancy_ratio > 0.0 or bool(points)) and not simulation
+        self._lidar_status.set_value(
+            "SIMULATION" if simulation else "STALE" if stale else "LIVE" if lidar_available else "UNAVAILABLE",
+            SIM_PURPLE if simulation else DANGER if stale else CYAN if lidar_available else WARN,
+        )
+        packet_rate_hz = safe_float(state.lidar.get("packet_rate_hz", 0.0), 0.0)
+        scan_age_ms = safe_float(state.lidar.get("scan_age_ms", age_s * 1000.0), age_s * 1000.0)
+        self._packet_rate.set_value(f"{packet_rate_hz:.1f} Hz" if packet_rate_hz > 0 else "N/A", CYAN if packet_rate_hz > 0 else WARN)
+        self._scan_age.set_value(f"{scan_age_ms:.0f} ms", DANGER if scan_age_ms > 1500 else WARN if scan_age_ms > 250 else CYAN)
+        if points:
+            self._obstacles.setData([point[0] for point in points], [point[1] for point in points])
+        else:
+            self._obstacles.setData([], [])
+        if simulation:
+            self._status.setText("LiDAR page is in simulation mode")
+            self._banner.setText("NOT REAL TELEMETRY | LIDAR VISUALIZATION IS NOT FROM LIVE SENSOR PACKETS")
+            self._banner.setVisible(True)
+        elif stale or not lidar_available:
+            self._status.setText("LiDAR operational view is degraded")
+            self._banner.setVisible(True)
+        else:
+            point_count = safe_int(state.lidar.get("point_count", len(points)), len(points))
+            self._status.setText(f"LiDAR reporting {point_count} obstacle points")
+            self._banner.setVisible(False)
+
+
+class IMULiveGraphPage(QWidget):
+    def __init__(self, poll_hz: int) -> None:
+        super().__init__()
+        self._history_x = deque(maxlen=max(60, poll_hz * 8))
+        self._accel_hist = {axis: deque(maxlen=max(60, poll_hz * 8)) for axis in ("x", "y", "z")}
+        self._gyro_hist = {axis: deque(maxlen=max(60, poll_hz * 8)) for axis in ("x", "y", "z")}
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+        self._accel_plot = pg.PlotWidget()
+        style_plot_widget(self._accel_plot, "Accel", "Samples")
+        self._gyro_plot = pg.PlotWidget()
+        style_plot_widget(self._gyro_plot, "Gyro", "Samples")
+        self._accel_curves = {
+            "x": self._accel_plot.plot([], [], pen=pg.mkPen(CYAN, width=2), name="ax"),
+            "y": self._accel_plot.plot([], [], pen=pg.mkPen(EMERALD, width=2), name="ay"),
+            "z": self._accel_plot.plot([], [], pen=pg.mkPen(WARN, width=2), name="az"),
+        }
+        self._gyro_curves = {
+            "x": self._gyro_plot.plot([], [], pen=pg.mkPen(MAGENTA, width=2), name="gx"),
+            "y": self._gyro_plot.plot([], [], pen=pg.mkPen(ACCENT, width=2), name="gy"),
+            "z": self._gyro_plot.plot([], [], pen=pg.mkPen(DANGER, width=2), name="gz"),
+        }
+        self._status = QLabel("Raw IMU stream not exposed to dashboard yet")
+        self._status.setStyleSheet(f"color:{TEXT}; font-size:13px; font-weight:800;")
+        self._banner = TelemetryStateBanner("IMU RAW GRAPH PLACEHOLDER | NO FAKE SENSOR CURVES")
+        stats = QHBoxLayout()
+        self._timestamp = StatusPill("Timestamp", WARN)
+        self._freq = StatusPill("Frequency", CYAN)
+        self._health = StatusPill("Sensor Health", SUCCESS)
+        for widget in (self._timestamp, self._freq, self._health):
+            stats.addWidget(widget)
+        layout.addWidget(self._status)
+        layout.addWidget(self._accel_plot)
+        layout.addWidget(self._gyro_plot)
+        layout.addWidget(self._banner)
+        layout.addLayout(stats)
+
+    def ingest(self, state: DroneState | None) -> None:
+        if state is None:
+            self._timestamp.set_value("N/A", WARN)
+            self._freq.set_value("N/A", WARN)
+            self._health.set_value("UNAVAILABLE", WARN)
+            return
+        age_s = max(0.0, time.time() - state.timestamp)
+        sample_age_ms = safe_float(state.imu.get("last_sample_age_ms", age_s * 1000.0), age_s * 1000.0)
+        sample_rate_hz = safe_float(state.imu.get("sample_rate_hz", 0.0), 0.0)
+        self._timestamp.set_value(f"{sample_age_ms:.0f} ms", DANGER if sample_age_ms > 1500 else WARN if sample_age_ms > 250 else CYAN)
+        self._freq.set_value(f"{sample_rate_hz:.1f} Hz" if sample_rate_hz > 0 else "N/A", CYAN if sample_rate_hz > 0 else WARN)
+        if state.source == "simulation" or state.localization_data_source == "simulation":
+            self._health.set_value("SIMULATION", SIM_PURPLE)
+        else:
+            health = safe_text(state.imu.get("health", "good"), "good").upper()
+            if state.stale:
+                health = "STALE"
+            self._health.set_value(health, SUCCESS if health in {"GOOD", "OK"} else WARN if health == "UNKNOWN" else DANGER)
+        accel = state.imu.get("accel", (0.0, 0.0, 0.0))
+        gyro = state.imu.get("gyro", (0.0, 0.0, 0.0))
+        self._history_x.append(time.time())
+        for axis, value in zip(("x", "y", "z"), accel):
+            self._accel_hist[axis].append(float(value))
+            self._accel_curves[axis].setData(list(self._history_x), list(self._accel_hist[axis]))
+        for axis, value in zip(("x", "y", "z"), gyro):
+            self._gyro_hist[axis].append(float(value))
+            self._gyro_curves[axis].setData(list(self._history_x), list(self._gyro_hist[axis]))
+
+
+class TdoaAnchorPage(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self._anchors = self._load_anchor_points()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+        self._plot = pg.PlotWidget()
+        style_plot_widget(self._plot, "Y", "X")
+        self._plot.setAspectLocked(True)
+        self._plot.hideButtons()
+        self._anchor_points = self._plot.plot([], [], pen=None, symbol="x", symbolSize=10, symbolBrush=pg.mkBrush(_rgba(EMERALD, 1.0)))
+        self._drone_point = self._plot.plot([], [], pen=None, symbol="o", symbolSize=12, symbolBrush=pg.mkBrush(_rgba(ACCENT, 1.0)))
+        self._anchor_points.setData([p[0] for p in self._anchors], [p[1] for p in self._anchors])
+        self._summary = QLabel("Anchor geometry visualization")
+        self._summary.setStyleSheet(f"color:{TEXT}; font-size:13px; font-weight:800;")
+        self._warning = TelemetryStateBanner("")
+        row = QHBoxLayout()
+        self._source = StatusPill("TDOA Source", CYAN)
+        self._visibility = StatusPill("Anchor Visibility", EMERALD)
+        self._calibration = StatusPill("Calibration", WARN)
+        for widget in (self._source, self._visibility, self._calibration):
+            row.addWidget(widget)
+        layout.addWidget(self._summary)
+        layout.addWidget(self._plot)
+        layout.addWidget(self._warning)
+        layout.addLayout(row)
+
+    def _load_anchor_points(self) -> list[tuple[float, float]]:
+        candidates = [
+            Path(os.environ.get("DRONE_ANCHOR_CONFIG", "")),
+            Path("config/anchors.json"),
+            Path("config/anchors.example.json"),
+        ]
+        for path in candidates:
+            if not path or str(path) == ".":
+                continue
+            if path.exists():
+                try:
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                    anchors = payload.get("anchors", [])
+                    if isinstance(anchors, list):
+                        return [
+                            (float(item.get("x", 0.0)), float(item.get("y", 0.0)))
+                            for item in anchors
+                            if isinstance(item, dict)
+                        ]
+                except Exception:
+                    continue
+        return []
+
+    def ingest(self, state: DroneState | None) -> None:
+        if state is None:
+            self._source.set_value("UNAVAILABLE", WARN)
+            self._visibility.set_value("0", WARN)
+            self._calibration.set_value("UNKNOWN", WARN)
+            self._warning.setVisible(True)
+            self._warning.setText("No selected drone state available for TDOA/UWB anchor visualization.")
+            return
+        anchors = state.tdoa.get("anchors", [])
+        if anchors:
+            self._anchor_points.setData([anchor["x"] for anchor in anchors], [anchor["y"] for anchor in anchors])
+        estimated = state.tdoa.get("estimated_position", state.position)
+        self._drone_point.setData([estimated[0]], [estimated[1]])
+        source = safe_text(state.tdoa.get("source", state.localization_data_source), state.localization_data_source)
+        visible_anchor_count = safe_int(state.tdoa.get("visible_anchor_count", state.visible_anchor_count), state.visible_anchor_count)
+        self._source.set_value(source.upper(), CYAN if source == "real" else WARN if source != "simulation" else SIM_PURPLE)
+        self._visibility.set_value(str(visible_anchor_count), EMERALD if visible_anchor_count >= 4 else WARN)
+        calibration_warning = safe_text(state.tdoa.get("calibration_warning", ""), "")
+        using_example = bool(calibration_warning) or (Path("config/anchors.example.json").exists() and not Path("config/anchors.json").exists())
+        self._calibration.set_value("EXAMPLE" if using_example else "CUSTOM", WARN if using_example else EMERALD)
+        if using_example:
+            self._warning.setVisible(True)
+            self._warning.setText(calibration_warning or "ANCHOR CALIBRATION WARNING | Example/default anchor geometry may still be active.")
+        else:
+            self._warning.setVisible(source != "real")
+            if source != "real":
+                self._warning.setText(f"TDOA source is {source.upper()}, not real.")
+
+
+class ReplayAnalysisPage(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+        title = QLabel("Replay analysis pipeline placeholder")
+        title.setStyleSheet(f"color:{TEXT}; font-size:13px; font-weight:900;")
+        desc = QLabel("Prepared for future sensor-log playback. This page intentionally does not simulate replay results.")
+        desc.setWordWrap(True)
+        desc.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px;")
+        controls = QHBoxLayout()
+        self._load_btn = QPushButton("LOAD REPLAY")
+        self._load_btn.setEnabled(False)
+        self._status = StatusPill("Replay Status", WARN)
+        self._slider = QProgressBar()
+        self._slider.setRange(0, 100)
+        self._slider.setValue(0)
+        self._slider.setTextVisible(False)
+        controls.addWidget(self._load_btn)
+        controls.addWidget(self._status)
+        self._trend = pg.PlotWidget()
+        style_plot_widget(self._trend, "Localization Confidence", "Replay Time")
+        self._trend_curve = self._trend.plot([], [], pen=pg.mkPen(CYAN, width=2))
+        layout.addWidget(title)
+        layout.addWidget(desc)
+        layout.addLayout(controls)
+        layout.addWidget(self._slider)
+        layout.addWidget(self._trend)
+        self._status.set_value("PLACEHOLDER", WARN)
+
+    def ingest(self, state: DroneState | None, snapshot: DashboardSnapshot) -> None:
+        mode = "PLACEHOLDER"
+        accent = WARN
+        if state is not None:
+            replay = state.replay
+            series = replay.get("confidence_series", [])
+            self._trend_curve.setData(list(range(len(series))), list(series))
+            self._slider.setValue(int(max(0.0, min(1.0, safe_float(replay.get("progress", 0.0), 0.0))) * 100))
+            if replay.get("active", False):
+                mode = f"ACTIVE | {safe_text(replay.get('file_name', 'replay'), 'replay')}"
+                accent = CYAN if safe_text(replay.get("source", "unavailable"), "unavailable") == "playback" else WARN
+            elif safe_text(replay.get("status", "unavailable"), "unavailable") not in {"unavailable", "placeholder"}:
+                mode = safe_text(replay.get("status", "ready"), "ready").upper()
+                accent = WARN
+        elif summarize_localization_data_source([state.localization_data_source for state in snapshot.states]) == "playback":
+            mode = "PLAYBACK DETECTED"
+            accent = CYAN
+        self._status.set_value(mode, accent)
+
+
+class MissionPlanningPage(QWidget):
+    action_requested = Signal(object)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._target_drone_id: int | None = None
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+        self._status = QLabel("Mission planning")
+        self._status.setStyleSheet(f"color:{TEXT}; font-size:13px; font-weight:900;")
+        self._waypoints = QPlainTextEdit()
+        self._waypoints.setReadOnly(True)
+        self._waypoints.setPlaceholderText("Waypoint list will appear here when mission planning is wired to the backend.")
+        self._waypoints.setMaximumHeight(180)
+        self._mission = QLabel("Mission status: standby")
+        self._mission.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px;")
+        row = QHBoxLayout()
+        self._upload = QPushButton("UPLOAD")
+        self._start = QPushButton("START")
+        self._hold = QPushButton("HOLD")
+        self._abort = QPushButton("ABORT")
+        for button, accent in (
+            (self._upload, ACCENT),
+            (self._start, SUCCESS),
+            (self._hold, WARN),
+            (self._abort, DANGER),
+        ):
+            button.setCursor(Qt.PointingHandCursor)
+            button.setStyleSheet(
+                f"QPushButton {{ background: rgba(18, 26, 43, 0.88); color:{accent}; border:1px solid {accent}; border-radius:8px; padding:10px 14px; font-size:12px; font-weight:800; }}"
+                f"QPushButton:disabled {{ color:{TEXT_DIM}; border-color:{BORDER}; }}"
+            )
+            row.addWidget(button)
+        self._upload.setEnabled(False)
+        self._start.clicked.connect(self._emit_start)
+        self._hold.clicked.connect(self._emit_hold)
+        self._abort.clicked.connect(self._emit_abort)
+        layout.addWidget(self._status)
+        layout.addWidget(self._mission)
+        layout.addWidget(self._waypoints)
+        layout.addLayout(row)
+
+    def _emit_start(self) -> None:
+        self.action_requested.emit(CommandRequest("fly", self._payload()))
+
+    def _emit_hold(self) -> None:
+        self.action_requested.emit(CommandRequest("hold_position", self._payload()))
+
+    def _emit_abort(self) -> None:
+        self.action_requested.emit(CommandRequest("emergency_land", self._payload()))
+
+    def _payload(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        if self._target_drone_id is not None:
+            payload["drone_id"] = self._target_drone_id
+        return payload
+
+    def ingest(self, snapshot: DashboardSnapshot, selected_state: DroneState | None) -> None:
+        states = snapshot.states
+        if not states:
+            self._target_drone_id = None
+            self._start.setEnabled(False)
+            self._hold.setEnabled(False)
+            self._abort.setEnabled(False)
+            return
+        target = selected_state or next((state for state in states if state.role == "LEADER"), states[0])
+        leader = next((state for state in states if state.role == "LEADER"), states[0])
+        self._target_drone_id = target.drone_id
+        self._mission.setText(f"Mission status: {target.mission_state} | target drone {target.drone_id} | leader {leader.drone_id}")
+        waypoint_text = "\n".join(
+            [
+                "WP1  Hold launch corridor",
+                "WP2  Validate localization corridor",
+                "WP3  Await backend mission uplink",
+            ]
+        )
+        self._waypoints.setPlainText(waypoint_text)
+        safe_to_start = mission_start_allowed(snapshot)
+        self._start.setEnabled(safe_to_start)
+        self._hold.setEnabled(target.remote_command_allowed)
+        self._abort.setEnabled(True)
+        self._status.setText("Mission start blocked by safety/pre-arm state" if not safe_to_start else "Mission start available")
 
 
 class Map3DView(gl.GLViewWidget):
@@ -3340,6 +4258,7 @@ class DashboardWindow(QMainWindow):
         self._operator_role = normalize_operator_role(os.environ.get("DRONE_OPERATOR_ROLE", "operator"))
         self._security_profile = normalize_security_profile(os.environ.get("DRONE_SECURITY_PROFILE", "lab"))
         self._pending_approvals: dict[str, str] = {}
+        self._presentation_mode = False
 
         initial_missions = {
             safe_int(key.removeprefix("mission_override_")): value
@@ -3489,15 +4408,23 @@ class DashboardWindow(QMainWindow):
         title_block.addWidget(title)
         title_block.addWidget(subtitle)
 
-        self._mode_label = QLabel(f"Backend: {self._backend.mode.upper()}")
+        self._mode_label = QLabel(compose_operator_status(self._backend.mode, "unavailable"))
         self._mode_label.setStyleSheet(f"color:{ACCENT}; font-size:12px; font-weight:700;")
         role_accent = ACCENT_ALT if self._operator_role == "commander" else WARN if self._operator_role == "maintenance" else CYAN
         self._role_label = QLabel(f"Role: {self._operator_role.upper()}")
         self._role_label.setStyleSheet(f"color:{role_accent}; font-size:12px; font-weight:700;")
         self._clock_label = QLabel()
         self._clock_label.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px;")
+        self._presentation_btn = QPushButton("PRESENTATION MODE")
+        self._presentation_btn.setCursor(Qt.PointingHandCursor)
+        self._presentation_btn.clicked.connect(self._toggle_presentation_mode)
+        self._presentation_btn.setStyleSheet(
+            f"QPushButton {{ background: rgba(0, 210, 255, 0.08); color:{ACCENT}; border:1px solid rgba(0, 210, 255, 0.4); border-radius:8px; padding:8px 12px; font-size:11px; font-weight:800; letter-spacing:1px; }}"
+            f"QPushButton:hover {{ background: rgba(0, 210, 255, 0.16); color:{TEXT}; }}"
+        )
 
         right_header = QVBoxLayout()
+        right_header.addWidget(self._presentation_btn, alignment=Qt.AlignRight)
         right_header.addWidget(self._mode_label, alignment=Qt.AlignRight)
         right_header.addWidget(self._role_label, alignment=Qt.AlignRight)
         right_header.addWidget(self._clock_label, alignment=Qt.AlignRight)
@@ -3506,6 +4433,31 @@ class DashboardWindow(QMainWindow):
         header.addStretch(1)
         header.addLayout(right_header)
         root.addLayout(header)
+
+        status_strip = QHBoxLayout()
+        status_strip.setSpacing(10)
+        self._status_runtime = StatusPill("Runtime Mode", ACCENT)
+        self._status_backend = StatusPill("Backend", CYAN)
+        self._status_reality = StatusPill("Telemetry", SIM_PURPLE)
+        self._status_drones = StatusPill("Drone Count", EMERALD)
+        self._status_latency = StatusPill("Latency", CYAN)
+        self._status_compute = StatusPill("CPU / GPU", WARN)
+        self._status_link = StatusPill("Link Quality", SUCCESS)
+        self._status_operator = StatusPill("Operator", MAGENTA)
+        self._status_safety = StatusPill("Safety", SUCCESS)
+        for widget in (
+            self._status_runtime,
+            self._status_backend,
+            self._status_reality,
+            self._status_drones,
+            self._status_latency,
+            self._status_compute,
+            self._status_link,
+            self._status_operator,
+            self._status_safety,
+        ):
+            status_strip.addWidget(widget)
+        root.addLayout(status_strip)
 
 
 
@@ -3599,11 +4551,23 @@ class DashboardWindow(QMainWindow):
         self._mcss_graph = MCSSScoreGraph(self._ids, self._poll_hz)
         self._net_graph = NetworkHealthGraph(self._poll_hz)
         self._comp_graph = ComputeLoadGraph(self._poll_hz)
+        self._camera_page = CameraPreviewPage()
+        self._lidar_page = LidarMappingPage()
+        self._imu_page = IMULiveGraphPage(self._poll_hz)
+        self._tdoa_page = TdoaAnchorPage()
+        self._replay_page = ReplayAnalysisPage()
+        self._mission_page = MissionPlanningPage()
 
         self._tabs.addTab(self._drift, "VIO Drift")
         self._tabs.addTab(self._mcss_graph, "MCSS Consensus")
         self._tabs.addTab(self._net_graph, "V2X Network")
         self._tabs.addTab(self._comp_graph, "Core Logic")
+        self._tabs.addTab(self._camera_page, "Camera")
+        self._tabs.addTab(self._lidar_page, "LiDAR Map")
+        self._tabs.addTab(self._imu_page, "IMU Live")
+        self._tabs.addTab(self._tdoa_page, "TDOA/UWB")
+        self._tabs.addTab(self._replay_page, "Replay")
+        self._tabs.addTab(self._mission_page, "Mission")
         self._graph_box = QGroupBox("Telemetry Graphs")
         self._graph_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         graph_layout = QVBoxLayout(self._graph_box)
@@ -3690,7 +4654,19 @@ class DashboardWindow(QMainWindow):
         side_stack.setStretch(1, 1)
         self._side_widget = side_widget
 
-        root.addWidget(self._body_frame, 1)
+        self._sidebar = SidebarNav()
+        self._sidebar.setMinimumWidth(220)
+        self._sidebar.setMaximumWidth(250)
+
+        self._ops_panel = OperationalModesPanel()
+        self._loc_panel = LocalizationStatusPanel()
+        self._safety_panel = SafetyPanel()
+
+        app_shell = QHBoxLayout()
+        app_shell.setSpacing(14)
+        app_shell.addWidget(self._sidebar, 0)
+        app_shell.addWidget(self._body_frame, 1)
+        root.addLayout(app_shell, 1)
         self._update_responsive_layout()
 
         status = QStatusBar()
@@ -3723,6 +4699,9 @@ class DashboardWindow(QMainWindow):
             self._map.setMaximumHeight(400)
             self._tabs.setMinimumHeight(240)
             self._tabs.setMaximumHeight(300)
+            self._stack_layout.addWidget(self._ops_panel)
+            self._stack_layout.addWidget(self._loc_panel)
+            self._stack_layout.addWidget(self._safety_panel)
             self._stack_layout.addWidget(self._map_box)
             self._stack_layout.addWidget(self._graph_box)
             self._stack_layout.addWidget(self._console)
@@ -3737,11 +4716,14 @@ class DashboardWindow(QMainWindow):
         self._tabs.setMinimumHeight(250)
         self._tabs.setMaximumHeight(320)
         self._left_layout.addWidget(self._map_box)
+        self._left_layout.addWidget(self._ops_panel)
         self._left_layout.addWidget(self._table_container)
         self._left_layout.setStretch(0, 5)
         self._left_layout.setStretch(1, 3)
         self._left_layout.addStretch(1)
 
+        self._right_layout.addWidget(self._loc_panel)
+        self._right_layout.addWidget(self._safety_panel)
         self._right_layout.addWidget(self._graph_box)
         self._right_layout.addWidget(self._console)
         self._right_layout.addWidget(self._side_widget)
@@ -3760,6 +4742,7 @@ class DashboardWindow(QMainWindow):
         self._commands.log_ready.connect(self._console.append_log)
         self._commands.command_completed.connect(self._on_command_completed)
         self._console.command_requested.connect(self._dispatch_command)
+        self._mission_page.action_requested.connect(self._dispatch_command)
         self._table.itemSelectionChanged.connect(self._sync_selected_drone_from_table)
 
         self._clock = QTimer(self)
@@ -3789,6 +4772,21 @@ class DashboardWindow(QMainWindow):
     def _update_clock(self) -> None:
         self._clock_label.setText(time.strftime("%Y-%m-%d  %H:%M:%S"))
 
+    def _toggle_presentation_mode(self) -> None:
+        self._presentation_mode = not self._presentation_mode
+        if self._presentation_mode:
+            self.showFullScreen()
+            self._presentation_btn.setText("EXIT PRESENTATION")
+            self._presentation_btn.setStyleSheet(
+                f"QPushButton {{ background: rgba(52, 211, 153, 0.12); color:{EMERALD}; border:1px solid rgba(52, 211, 153, 0.45); border-radius:8px; padding:8px 12px; font-size:11px; font-weight:800; letter-spacing:1px; }}"
+            )
+        else:
+            self.showNormal()
+            self._presentation_btn.setText("PRESENTATION MODE")
+            self._presentation_btn.setStyleSheet(
+                f"QPushButton {{ background: rgba(0, 210, 255, 0.08); color:{ACCENT}; border:1px solid rgba(0, 210, 255, 0.4); border-radius:8px; padding:8px 12px; font-size:11px; font-weight:800; letter-spacing:1px; }}"
+            )
+
     def _flush_fps(self) -> None:
         self._fps_label.setText(f"UI FPS: {self._frame_counter}")
         self._frame_counter = 0
@@ -3813,7 +4811,28 @@ class DashboardWindow(QMainWindow):
                 self._store.save_snapshot(snapshot)
                 self._last_snapshot_persist_s = snapshot.timestamp
             self._frame_counter += 1
-            self._mode_label.setText(f"Backend: {snapshot.backend_mode.upper()}")
+            localization_data_source = summarize_localization_data_source(
+                [state.localization_data_source for state in snapshot.states]
+            )
+            self._mode_label.setText(
+                compose_operator_status(
+                    snapshot.backend_mode,
+                    localization_data_source,
+                    simulation_enabled=snapshot.simulation_enabled,
+                    real_drone_count=snapshot.real_drone_count,
+                    stale_drone_count=snapshot.stale_drone_count,
+                )
+            )
+            mode_accent = (
+                DANGER if localization_data_source == "simulation" or snapshot.simulation_enabled or snapshot.real_drone_count <= 0
+                else WARN if localization_data_source in {"playback", "unavailable"} or snapshot.stale_drone_count > 0
+                else ACCENT
+            )
+            self._mode_label.setStyleSheet(f"color:{mode_accent}; font-size:12px; font-weight:700;")
+            self._ops_panel.ingest(snapshot, self._backend.mode)
+            self._loc_panel.ingest(snapshot)
+            self._safety_panel.ingest(snapshot)
+            role_chip_accent = ACCENT_ALT if self._operator_role == "commander" else WARN if self._operator_role == "maintenance" else CYAN
 
             self._map.ingest(snapshot.states)
             self._drift.ingest(snapshot.states)
@@ -3827,7 +4846,14 @@ class DashboardWindow(QMainWindow):
             self._sensor_status_table.ingest(snapshot, self._env_manager)
             self._fleet_overview.ingest(snapshot)
             self._select_row_for_drone()
-            self._detail.ingest(self._selected_state(snapshot.states))
+            selected_state = self._selected_state(snapshot.states)
+            self._detail.ingest(selected_state)
+            self._camera_page.ingest(selected_state)
+            self._lidar_page.ingest(selected_state)
+            self._imu_page.ingest(selected_state)
+            self._tdoa_page.ingest(selected_state)
+            self._replay_page.ingest(selected_state, snapshot)
+            self._mission_page.ingest(snapshot, selected_state)
 
             leader_id = snapshot.leader_id if snapshot.leader_id else "?"
             avg_battery = sum(state.battery_pct for state in snapshot.states) / max(len(snapshot.states), 1)
@@ -3875,6 +4901,29 @@ class DashboardWindow(QMainWindow):
                 f"{len(snapshot.clusters)} clusters | {len(snapshot.missions)} missions tracked",
                 accent=SUCCESS if snapshot.critical_alerts == 0 else WARN if snapshot.critical_alerts < 3 else DANGER,
             )
+            self._status_runtime.set_value(snapshot.backend_mode.upper(), ACCENT if snapshot.backend_mode != "simulation" else SIM_PURPLE)
+            self._status_backend.set_value("ONLINE" if snapshot.backend_mode else "OFFLINE", CYAN)
+            reality_label = "REAL" if localization_data_source == "real" and not snapshot.simulation_enabled else localization_data_source.upper()
+            reality_accent = EMERALD if reality_label == "REAL" else SIM_PURPLE if "SIM" in reality_label else WARN
+            self._status_reality.set_value(reality_label, reality_accent)
+            self._status_drones.set_value(f"{snapshot.real_drone_count}/{len(snapshot.states)} real", EMERALD if snapshot.real_drone_count > 0 else WARN)
+            self._status_latency.set_value(f"{snapshot.avg_latency_ms:.1f} ms", CYAN if snapshot.avg_latency_ms < 20 else WARN)
+            self._status_compute.set_value(f"{snapshot.cpu_temp_c:.0f}C / {snapshot.gpu_load_pct:.0f}%", WARN if snapshot.cpu_temp_c < 75 else DANGER)
+            avg_link = sum(state.link_integrity_score for state in snapshot.states) / max(len(snapshot.states), 1)
+            self._status_link.set_value(f"{avg_link*100.0:.0f}%", SUCCESS if avg_link >= 0.7 else WARN if avg_link >= 0.45 else DANGER)
+            self._status_operator.set_value(self._operator_role.upper(), role_chip_accent)
+            safety_state = "NORMAL"
+            safety_accent = SUCCESS
+            if snapshot.stale_drone_count > 0:
+                safety_state = "LINK_LOST"
+                safety_accent = AMBER
+            elif degraded_loc > 0:
+                safety_state = "DEGRADED"
+                safety_accent = WARN
+            if localization_data_source == "simulation" or snapshot.simulation_enabled:
+                safety_state = "SIMULATION"
+                safety_accent = SIM_PURPLE
+            self._status_safety.set_value(safety_state, safety_accent)
 
             self._cpu_health.set_data(
                 f"{snapshot.cpu_temp_c:.1f} C",
@@ -3957,6 +5006,7 @@ class DashboardWindow(QMainWindow):
             cpu_temp_c=self._last_snapshot.cpu_temp_c if self._last_snapshot is not None else 54.0,
             gpu_load_pct=self._last_snapshot.gpu_load_pct if self._last_snapshot is not None else 38.0,
             localization_source="demo-visualization",
+            localization_data_source="simulation",
             localization_state="nominal",
             localization_confidence=0.92,
             tdoa_confidence=0.66,
@@ -4067,7 +5117,14 @@ class DashboardWindow(QMainWindow):
             return
         logger.info("Dashboard selected drone id=%s", self._selected_drone_id)
         if self._last_snapshot is not None:
-            self._detail.ingest(self._selected_state(self._last_snapshot.states))
+            selected_state = self._selected_state(self._last_snapshot.states)
+            self._detail.ingest(selected_state)
+            self._camera_page.ingest(selected_state)
+            self._lidar_page.ingest(selected_state)
+            self._imu_page.ingest(selected_state)
+            self._tdoa_page.ingest(selected_state)
+            self._replay_page.ingest(selected_state, self._last_snapshot)
+            self._mission_page.ingest(self._last_snapshot, selected_state)
         self._persist_settings()
 
     def _dispatch_command(self, request: CommandRequest) -> None:

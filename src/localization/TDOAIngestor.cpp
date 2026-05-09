@@ -199,6 +199,16 @@ double TDOAIngestor::visibility_ratio(size_t total_anchor_count) const {
     return static_cast<double>(visible_anchor_count()) / static_cast<double>(total_anchor_count);
 }
 
+std::vector<uint32_t> TDOAIngestor::visible_anchor_ids() const {
+    std::vector<uint32_t> ids;
+    ids.reserve(anchor_visibility_.size());
+    for (const auto& [anchor_id, _count] : anchor_visibility_) {
+        ids.push_back(anchor_id);
+    }
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
 bool TDOAIngestor::open_udp_socket() {
 #ifdef _WIN32
     WSADATA wsa_data;
@@ -257,6 +267,7 @@ std::optional<std::vector<TDOALocalizer::Measurement>> TDOAIngestor::poll_csv() 
     if (batch.size() < 4) {
         return std::nullopt;
     }
+    last_batch_timestamp_s_ = batch.back().arrival_time_s;
     return batch;
 }
 
@@ -290,6 +301,7 @@ std::optional<std::vector<TDOALocalizer::Measurement>> TDOAIngestor::poll_udp() 
     if (batch.size() < 4) {
         return std::nullopt;
     }
+    last_batch_timestamp_s_ = batch.back().arrival_time_s;
     return batch;
 }
 

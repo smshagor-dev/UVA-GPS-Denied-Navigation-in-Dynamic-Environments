@@ -5,6 +5,12 @@
 #include <gtest/gtest.h>
 
 #include "autonomy/DecisionEngine.hpp"
+#include "safety/SafetyManager.hpp"
+#include "security/CommandPolicy.hpp"
+#include "security/DroneSecurity.hpp"
+#include "sensors/CameraSensor.hpp"
+
+#include <unordered_map>
 
 using namespace drone;
 
@@ -63,6 +69,46 @@ TEST(DecisionEngine, AvoidsLargeCentralHazard) {
     EXPECT_EQ(command.mode, autonomy::BehaviorMode::AVOID_OBSTACLE);
     EXPECT_LT(command.desired_velocity.z(), 0.0);
     EXPECT_TRUE(command.requires_operator_attention);
+}
+
+TEST(DecisionEngine, ReceivesSemanticLabelFromDetectorMapping) {
+    autonomy::DecisionEngine engine;
+    auto ctx = make_context();
+
+    const std::unordered_map<int, std::string> label_map{
+        {0, "person"},
+        {2, "car"},
+        {70, "drone"},
+    };
+
+    sensors::CameraFrame frame;
+    frame.detections.push_back(make_detection(
+        sensors::resolve_detector_label(70, label_map),
+        0.92f,
+        0.40f,
+        0.35f,
+        0.18f,
+        0.18f));
+    ctx.frame = frame;
+
+    const auto command = engine.update(ctx);
+    ASSERT_TRUE(command.focus.has_value());
+    EXPECT_EQ(command.focus->detection.label, "drone");
+    EXPECT_EQ(command.mode, autonomy::BehaviorMode::TRACK_TARGET);
+}
+
+TEST(DecisionEngine, UnknownObjectTriggersSafeObstacleBehavior) {
+    autonomy::DecisionEngine engine;
+    auto ctx = make_context();
+
+    sensors::CameraFrame frame;
+    frame.detections.push_back(make_detection("unknown_class_99", 0.90f, 0.28f, 0.24f, 0.32f, 0.36f));
+    ctx.frame = frame;
+
+    const auto command = engine.update(ctx);
+    EXPECT_EQ(command.mode, autonomy::BehaviorMode::AVOID_OBSTACLE);
+    EXPECT_TRUE(command.requires_operator_attention);
+    EXPECT_NE(command.summary.find("Avoiding"), std::string::npos);
 }
 
 TEST(DecisionEngine, ReturnsHomeOnLowBattery) {
@@ -160,6 +206,106 @@ TEST(DecisionEngine, HoversAndScansWhenLocalizationAndSyncArePoor) {
     const auto command = engine.update(ctx);
     EXPECT_EQ(command.mode, autonomy::BehaviorMode::HOVER_AND_SCAN);
     EXPECT_NE(command.summary.find("hovering and scanning"), std::string::npos);
+}
+
+TEST(CommandPolicy, AcceptsEmergencyLandEvenWhenRemoteCommandsAreBlocked) {
+    security::DroneSecurityAssessment assessment;
+    assessment.state = security::DroneSecurityState::SAFE_RETURN;
+    assessment.remote_command_allowed = false;
+
+    security::RemoteCommandEnvelope command;
+    command.action = security::RemoteCommandAction::EMERGENCY_LAND;
+    command.critical = true;
+
+    const auto policy = security::evaluate_remote_command(assessment, command);
+    EXPECT_TRUE(policy.accepted);
+    EXPECT_TRUE(policy.critical);
+}
+
+TEST(CommandPolicy, RejectsReturnHomeWhenRemoteCommandsAreBlocked) {
+    security::DroneSecurityAssessment assessment;
+    assessment.state = security::DroneSecurityState::CONTROL_PLANE_UNTRUSTED;
+    assessment.remote_command_allowed = false;
+
+    security::RemoteCommandEnvelope command;
+    command.action = security::RemoteCommandAction::RETURN_HOME;
+    command.summary = "test";
+
+    const auto policy = security::evaluate_remote_command(assessment, command);
+    EXPECT_FALSE(policy.accepted);
+    EXPECT_NE(policy.reason.find("rejected"), std::string::npos);
+}
+
+TEST(SafetyManager, LocalizationLostRejectsMissionCommand) {
+    safety::SafetyManager manager;
+    safety::SafetyContext ctx;
+    ctx.runtime_mode = runtime::RuntimeMode::BENCH;
+    ctx.indoor_mode = true;
+    ctx.localization_lost = true;
+    ctx.localization_confidence = 0.12;
+    ctx.localization_source = "vision-inertial";
+
+    const auto decision = manager.evaluate(ctx);
+    EXPECT_EQ(decision.state, safety::SafetyState::LOCALIZATION_LOST);
+    EXPECT_FALSE(decision.mission_command_allowed);
+    EXPECT_FALSE(decision.autonomous_flight_allowed);
+}
+
+TEST(SafetyManager, LowConfidenceLimitsSpeed) {
+    safety::SafetyManager manager;
+    safety::SafetyContext ctx;
+    ctx.runtime_mode = runtime::RuntimeMode::BENCH;
+    ctx.indoor_mode = true;
+    ctx.localization_degraded = true;
+    ctx.localization_confidence = 0.40;
+    ctx.localization_source = "vision-inertial";
+
+    auto safety_status = manager.evaluate(ctx);
+    autonomy::DecisionCommand command;
+    command.mode = autonomy::BehaviorMode::SEARCH;
+    command.desired_velocity = Eigen::Vector3d(1.2, 0.0, 0.0);
+    vio::PoseEstimate pose;
+    pose.orientation = Eigen::Quaterniond::Identity();
+
+    manager.enforce(safety_status, command, pose);
+    EXPECT_EQ(safety_status.state, safety::SafetyState::DEGRADED_LOCALIZATION);
+    EXPECT_LE(command.desired_velocity.norm(), 0.36);
+    EXPECT_LE(command.max_acceleration_mps2, 0.41);
+}
+
+TEST(SafetyManager, EmergencyLandOverridesAllCommands) {
+    safety::SafetyManager manager;
+    safety::SafetyContext ctx;
+    ctx.runtime_mode = runtime::RuntimeMode::BENCH;
+    ctx.indoor_mode = true;
+    ctx.emergency_stop_requested = true;
+
+    auto safety_status = manager.evaluate(ctx);
+    autonomy::DecisionCommand command;
+    command.mode = autonomy::BehaviorMode::TRACK_TARGET;
+    command.desired_velocity = Eigen::Vector3d(1.0, 0.2, 0.4);
+    vio::PoseEstimate pose;
+    pose.orientation = Eigen::Quaterniond::Identity();
+
+    manager.enforce(safety_status, command, pose);
+    EXPECT_EQ(safety_status.state, safety::SafetyState::EMERGENCY_LAND);
+    EXPECT_EQ(command.mode, autonomy::BehaviorMode::EMERGENCY_LAND);
+    EXPECT_TRUE(command.requires_operator_attention);
+}
+
+TEST(SafetyManager, MissingRequiredSensorBlocksArming) {
+    safety::SafetyManager manager;
+    safety::SafetyContext ctx;
+    ctx.runtime_mode = runtime::RuntimeMode::PRODUCTION;
+    ctx.indoor_mode = false;
+    ctx.lidar_required = true;
+    ctx.lidar_available = false;
+    ctx.localization_source = "tdoa";
+
+    const auto decision = manager.evaluate(ctx);
+    EXPECT_EQ(decision.state, safety::SafetyState::SENSOR_FAULT);
+    EXPECT_FALSE(decision.arming_allowed);
+    EXPECT_FALSE(decision.autonomous_flight_allowed);
 }
 
 int main(int argc, char** argv) {

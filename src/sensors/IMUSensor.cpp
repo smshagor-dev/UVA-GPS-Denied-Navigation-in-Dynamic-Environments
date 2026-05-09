@@ -91,6 +91,23 @@ bool IMUSensor::initialize() {
     return true;
 }
 
+IMUSensor::TelemetryStats IMUSensor::telemetry_stats() const {
+    std::lock_guard lock(data_mutex_);
+    TelemetryStats stats;
+    stats.device_active = state() == SensorState::RUNNING;
+    stats.simulated = last_measurement_simulated_;
+    stats.sample_rate_hz = sample_rate_estimate_hz_;
+    stats.last_sample_age_ms = latest_.has_value() ? std::max(0.0, (now_sec() - latest_->timestamp) * 1000.0) : 0.0;
+    if (latest_.has_value()) {
+        stats.accel_mps2 = latest_->accel_mps2;
+        stats.gyro_rads = latest_->gyro_rads;
+        stats.health = stats.simulated ? "simulation" : "good";
+    } else {
+        stats.health = "unavailable";
+    }
+    return stats;
+}
+
  
 void IMUSensor::poll() {
     ImuMeasurement m = read_raw();
@@ -98,6 +115,14 @@ void IMUSensor::poll() {
 
     {
         std::lock_guard lock(data_mutex_);
+        if (last_sample_timestamp_ > 0.0) {
+            const double dt = m.timestamp - last_sample_timestamp_;
+            if (dt > 1.0e-6) {
+                sample_rate_estimate_hz_ = 1.0 / dt;
+            }
+        }
+        last_sample_timestamp_ = m.timestamp;
+        last_measurement_simulated_ = std::abs(m.accel_mps2.z() - 9.81) < 0.25 && fd_ < 0;
         latest_ = m;
         buffer_.push_back(m);
         if (buffer_.size() > kBufferMax)

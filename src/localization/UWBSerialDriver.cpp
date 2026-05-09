@@ -184,6 +184,7 @@ std::optional<std::vector<TDOALocalizer::Measurement>> UWBSerialDriver::poll() {
     if (batch.size() < 4) {
         return std::nullopt;
     }
+    last_batch_timestamp_s_ = batch.back().arrival_time_s;
     return batch;
 }
 

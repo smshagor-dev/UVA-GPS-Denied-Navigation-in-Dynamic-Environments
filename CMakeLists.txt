@@ -193,6 +193,8 @@ set(CORE_SOURCES
     src/localization/TDOALocalizer.cpp
     src/localization/TimeSyncTracker.cpp
     src/localization/UWBSerialDriver.cpp
+    src/runtime/RuntimeMode.cpp
+    src/safety/SafetyManager.cpp
     src/swarm/SwarmSecurity.cpp
     src/sensors/BarometerSensor.cpp
     src/sensors/IMUSensor.cpp

@@ -118,6 +118,12 @@ public:
     //  Depth update (from LiDAR plane fit) â”€
     void update_depth(double z_depth_m, double sigma_m = 0.05);
 
+    //  Visual pose correction from frame-to-frame frontend
+    void update_visual_pose(const Eigen::Vector3d& observed_position,
+                            const Eigen::Vector3d& observed_velocity,
+                            double sigma_position_m = 0.35,
+                            double sigma_velocity_mps = 0.45);
+
     //  Zero velocity update (on ground detection) 
     void update_zupt();
 

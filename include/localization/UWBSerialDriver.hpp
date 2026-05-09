@@ -24,12 +24,14 @@ public:
     void stop();
     [[nodiscard]] bool running() const { return running_; }
     [[nodiscard]] std::optional<std::vector<TDOALocalizer::Measurement>> poll();
+    [[nodiscard]] double last_batch_timestamp_s() const { return last_batch_timestamp_s_; }
 
 private:
     Config cfg_;
     bool running_{false};
     int handle_{-1};
     std::string buffered_text_;
+    double last_batch_timestamp_s_{0.0};
 };
 
 } // namespace drone::localization

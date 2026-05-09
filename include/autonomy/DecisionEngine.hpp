@@ -91,6 +91,8 @@ struct DecisionContext {
     size_t swarm_peer_count{0};
     bool swarm_follower{false};
     bool inference_ready{false};
+    size_t lidar_obstacle_count{0};
+    double nearest_lidar_obstacle_m{-1.0};
     double now_s{0.0};
 };
 
@@ -98,6 +100,7 @@ struct DecisionCommand {
     BehaviorMode mode{BehaviorMode::HOLD_POSITION};
     Eigen::Vector3d desired_velocity{Eigen::Vector3d::Zero()};
     double desired_yaw_rate_rads{0.0};
+    double max_acceleration_mps2{2.5};
     double target_confidence{0.0};
     bool requires_operator_attention{false};
     std::string summary;
@@ -134,9 +137,11 @@ private:
                                               const PerceptionFocus& focus) const;
     [[nodiscard]] DecisionCommand build_avoid(const DecisionContext& ctx,
                                               const PerceptionFocus& focus) const;
+    [[nodiscard]] DecisionCommand build_lidar_avoid(const DecisionContext& ctx) const;
 
     [[nodiscard]] static bool is_hazard_label(std::string_view label);
     [[nodiscard]] static bool is_target_label(std::string_view label);
+    [[nodiscard]] static bool is_unknown_label(std::string_view label);
     DecisionConfig cfg_;
     BehaviorMode   mode_{BehaviorMode::HOLD_POSITION};
     Eigen::Vector3d home_position_{Eigen::Vector3d::Zero()};
