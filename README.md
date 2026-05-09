@@ -6,11 +6,13 @@
 
 High-performance multi-drone software stack for operating a swarm in GPS-denied environments using onboard sensor fusion, local autonomy, swarm networking, and a real-time operator dashboard.
 
+Do not fly unless pre-arm check passes.
+
 This project combines:
 
 - `C++20` for onboard real-time perception, estimation, and safety-oriented control
 - `Python / PySide6` for the live monitoring and operator control dashboard
-- `Go` for the fleet-scale control plane and digital-twin style backend
+- `Go` for the fleet-scale control plane with explicit `simulation` and `production` backend modes
 
 The system is designed for environments where GNSS is weak, jammed, or unavailable, and drones must rely on `IMU + camera + LiDAR + V2X mesh` to localize, coordinate, and execute missions.
 
@@ -40,6 +42,7 @@ At larger scale, the same onboard logic can connect to the `Go control plane` so
 - keyframe-based `SLAM` support
 - `ExperienceMemory` layer for per-drone historical risk summarization
 - `DecisionEngine` for autonomy decisions
+- central `SafetyManager` for runtime safety states, mission gating, and indoor motion limits
 - built-in `V2X` swarm networking with optional native `Fast-DDS` transport when installed
 - secure swarm transport helpers in the swarm security module
 - local safety / degraded-mode behavior when hardware or optional dependencies are unavailable
@@ -60,7 +63,7 @@ At larger scale, the same onboard logic can connect to the `Go control plane` so
 - anti-rollback firmware counters with persisted trust state
 - maintenance-window gating for trusted firmware updates
 - discovery endpoint
-- in-memory digital twin state store
+- in-memory fleet state with simulation-only digital twin seeding
 
 ### Dashboard features
 
@@ -202,7 +205,18 @@ Responsibilities:
 
 Important note:
 
-The current runtime path supports demo-generated TDOA, CSV playback, UDP text ingest, and serial UWB-style ingest. If no external measurements are provided, it still falls back to synthetic demo measurements.
+The current runtime path supports runtime-separated TDOA sources:
+
+- `simulation` mode may use synthetic demo TDOA and built-in demo anchors
+- `bench` mode requires a real anchor configuration and may use playback or live external measurements
+- `production` mode requires a real anchor configuration and rejects startup if no live external TDOA/UWB source is configured
+
+Reference runtime and anchor files are provided in:
+
+- `config/runtime.example.json`
+- `config/anchors.example.json`
+- `config/lidar.example.json`
+- `config/detector_labels.example.json`
 
 ### 6.2 `src/drone_bridge.cpp`
 
@@ -225,6 +239,16 @@ Responsibilities:
 - render trajectories and drift
 - connect either to local `pybind11` or the Go control plane
 - fall back to simulation when needed
+
+### Detector label mapping
+
+The camera detector now supports class-ID-to-semantic-label mapping from JSON so autonomy can reason over labels like `person`, `car`, `tree`, and `drone` instead of raw `class_N` strings.
+
+Reference file:
+
+- `config/detector_labels.example.json`
+
+Any unmapped class is exposed as `unknown_class_ID`, and autonomy treats unknown detections conservatively.
 
 ### 6.4 `cmd/control-plane/main.go`
 
@@ -300,6 +324,13 @@ d_i - d_ref = c * (t_i - t_ref)
 ```
 
 The current implementation uses iterative least-squares / Gauss-Newton style multilateration across multiple anchors.
+
+Anchor geometry is now loaded from JSON configuration rather than being silently hardcoded outside simulation mode. The loader validates:
+
+- minimum of 4 anchors
+- unique anchor IDs
+- finite coordinates
+- geometry quality warnings for anchors that are too close together or nearly collinear/coplanar
 
 ### 7.5 Formation control
 
@@ -395,6 +426,8 @@ Current implementation status:
 - telemetry, fleet, mission, command, health, event, and discovery endpoints are present
 - approvals endpoint is present
 - in-memory digital twin state store is present
+- explicit `simulation` / `production` backend modes are present
+- simulation-only digital twin seeding is present
 - dashboard can connect to the backend using `--backend-url`
 
 Current API routes:
@@ -472,8 +505,20 @@ python main.py --skip-gui
 #### 1. Go control plane
 
 ```powershell
+$env:DRONE_BACKEND_MODE="production"
+$env:DRONE_BACKEND_SIMULATION_ENABLED="false"
+$env:DRONE_BACKEND_STALE_SEC="5"
 go run ./cmd/control-plane
 ```
+
+Backend runtime notes:
+
+- `DRONE_BACKEND_MODE=production` disables seeded fake drones and disables the simulation flight loop
+- `DRONE_BACKEND_MODE=simulation` allows the demo fleet and continuous motion loop
+- `DRONE_BACKEND_SIMULATION_ENABLED=false` is enforced automatically in `production`
+- `/api/v1/fleet` and `/api/v1/health` now expose `backend_mode`, `simulation_enabled`, `real_drone_count`, and `stale_drone_count`
+- each drone record now exposes `source` as `real`, `simulation`, or `playback`
+- in `production`, the fleet is intentionally empty until real onboard telemetry is received
 
 #### 2. C++ drone node
 
@@ -531,7 +576,9 @@ Phase 4 boot/update trust is configured with `DRONE_FIRMWARE_*`, `DRONE_SECURE_B
 
 The onboard C++ runtime now also evaluates a drone security state from link integrity, timing trust, localization loss, and hardened-profile trust posture. In bridge mode this is exposed as `security_state`, `security_summary`, `link_integrity_score`, and health flags to the dashboard.
 It also keeps a drone-side remote command inbox and policy gate: secure swarm commands such as formation hold, mission sync, and emergency stop are accepted or rejected on the drone itself based on the current onboard security state.
+The onboard runtime now also routes autonomy output through a central `SafetyManager` that enforces `NORMAL`, `DEGRADED_LOCALIZATION`, `LOCALIZATION_LOST`, `LINK_LOST`, `SENSOR_FAULT`, `EMERGENCY_LAND`, and `MOTOR_LOCKED` states. In indoor-oriented bench mode it clamps commanded speed and acceleration, blocks waypoint missions when localization is lost, blocks arming when required sensors are unavailable, and preserves emergency-land priority over all other behavior.
 The node can now also post native telemetry directly to the Go backend when `DRONE_ENABLE_BACKEND_TELEMETRY=true`, which lets the backend/dashboard receive the drone's onboard security posture without depending on the Python bridge. In hardened mode this telemetry path uses HTTPS plus a drone client certificate from `DRONE_TLS_CLIENT_PFX_FILE`.
+The telemetry uplink now supports both Windows and Linux HTTP posting for plain `http://` backends, and includes `Authorization` / `X-Drone-Token` headers derived from `DRONE_SWARM_SECRET` when that secret is set.
 
 Phase 2 status in `SECURITY_IMPLEMENTATION.md` is now complete end-to-end in the repository:
 
@@ -630,12 +677,17 @@ Implemented in the repository:
 - unified process launcher
 - loop-relocalization hook and map-planner waypoint generation
 - OpenCV DNN fallback inference path for non-TensorRT machines
+- detector label mapping from class IDs to semantic autonomy labels
+- cross-platform backend telemetry uplink for Windows and Linux `http://` control-plane posting
 
 Known limitations:
 
 - native `TensorRT` still requires an NVIDIA GPU/runtime and is not available on AMD-only machines
 - local C++ builds still depend on native packages being installed and discoverable by CMake
-- if external TDOA/UWB data is not supplied, `main.cpp` still falls back to synthetic demo measurements
+- synthetic TDOA and built-in demo anchors are still available in explicit `simulation` mode and must not be used as proof of real-flight readiness
+- deployment anchor geometry still requires surveyed/calibrated field configuration and real validation logs
+- detector label semantics now map into autonomy, but the deployed label map must still match the actual trained detector model
+- Linux backend telemetry uplink is implemented for plain HTTP, but HTTPS/TLS hardening and backend-side telemetry authentication still need production validation
 - several checked-in build folders may be stale across path or machine changes
 - `scripts/drone_setup.py` is mainly Linux/Jetson oriented
 
