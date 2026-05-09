@@ -1,0 +1,4337 @@
+{
+  "experiment_name": "UVA_GPS_DENIED_INDOOR_TESTBED",
+  "version": "2.0",
+  "coordinate_frame": "local_enu",
+  "units": "meters",
+  "environment": {
+    "type": "indoor_lab",
+    "room_length_m": 20.0,
+    "room_width_m": 20.0,
+    "ceiling_height_m": 4.0,
+    "gps_signal": "unavailable"
+  },
+  "anchors": [
+    {
+      "id": "A0",
+      "x": 0.26,
+      "y": 0.01,
+      "z": 2.76,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A1",
+      "x": 5.09,
+      "y": 0.29,
+      "z": 2.84,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A2",
+      "x": 10.36,
+      "y": 0.03,
+      "z": 2.78,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A3",
+      "x": 15.01,
+      "y": 0.09,
+      "z": 2.8,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A4",
+      "x": 0.01,
+      "y": 6.08,
+      "z": 2.83,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A5",
+      "x": 5.22,
+      "y": 6.09,
+      "z": 2.82,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A6",
+      "x": 10.32,
+      "y": 6.0,
+      "z": 2.86,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A7",
+      "x": 15.28,
+      "y": 6.14,
+      "z": 2.73,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A8",
+      "x": 0.38,
+      "y": 12.13,
+      "z": 2.72,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A9",
+      "x": 5.04,
+      "y": 12.34,
+      "z": 2.82,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A10",
+      "x": 10.32,
+      "y": 12.29,
+      "z": 2.81,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A11",
+      "x": 15.39,
+      "y": 12.15,
+      "z": 2.81,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    }
+  ],
+  "telemetry_samples": [
+    {
+      "sample_id": 1,
+      "timestamp": "2026-05-09T10:00:00Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.318,
+        "y": 5.474,
+        "z": 1.645
+      },
+      "velocity_mps": 0.562,
+      "localization_confidence": 0.889,
+      "vio_drift_m": 0.018,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.163,
+          "y": -0.126,
+          "z": 9.624
+        },
+        "gyro": {
+          "x": -0.027,
+          "y": -0.04,
+          "z": -0.022
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 40
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 226,
+        "scan_age_ms": 48
+      },
+      "tdoa": {
+        "visible_anchor_count": 7,
+        "estimated_error_m": 0.154
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 2,
+      "timestamp": "2026-05-09T10:00:00.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.838,
+        "y": 4.068,
+        "z": 1.675
+      },
+      "velocity_mps": 0.618,
+      "localization_confidence": 0.866,
+      "vio_drift_m": 0.039,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.137,
+          "y": -0.202,
+          "z": 9.714
+        },
+        "gyro": {
+          "x": 0.049,
+          "y": 0.014,
+          "z": 0.006
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 41
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 161,
+        "scan_age_ms": 28
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.244
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 3,
+      "timestamp": "2026-05-09T10:00:00.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.22,
+        "y": 4.605,
+        "z": 1.326
+      },
+      "velocity_mps": 0.831,
+      "localization_confidence": 0.856,
+      "vio_drift_m": 0.132,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.172,
+          "y": -0.0,
+          "z": 9.865
+        },
+        "gyro": {
+          "x": 0.014,
+          "y": -0.036,
+          "z": -0.036
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 43
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 191,
+        "scan_age_ms": 59
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.229
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 4,
+      "timestamp": "2026-05-09T10:00:00.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.714,
+        "y": 5.334,
+        "z": 1.445
+      },
+      "velocity_mps": 0.898,
+      "localization_confidence": 0.753,
+      "vio_drift_m": 0.094,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.153,
+          "y": 0.217,
+          "z": 9.646
+        },
+        "gyro": {
+          "x": -0.034,
+          "y": 0.018,
+          "z": 0.01
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 32
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 168,
+        "scan_age_ms": 54
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.274
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 5,
+      "timestamp": "2026-05-09T10:00:00.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.443,
+        "y": 3.046,
+        "z": 1.588
+      },
+      "velocity_mps": 0.645,
+      "localization_confidence": 0.849,
+      "vio_drift_m": 0.055,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.085,
+          "y": -0.233,
+          "z": 9.73
+        },
+        "gyro": {
+          "x": -0.005,
+          "y": 0.045,
+          "z": 0.038
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 28
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 184,
+        "scan_age_ms": 36
+      },
+      "tdoa": {
+        "visible_anchor_count": 6,
+        "estimated_error_m": 0.254
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 6,
+      "timestamp": "2026-05-09T10:00:01Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.194,
+        "y": 5.556,
+        "z": 1.544
+      },
+      "velocity_mps": 0.222,
+      "localization_confidence": 0.903,
+      "vio_drift_m": 0.102,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.167,
+          "y": 0.018,
+          "z": 9.6
+        },
+        "gyro": {
+          "x": -0.018,
+          "y": -0.048,
+          "z": 0.043
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 45
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 159,
+        "scan_age_ms": 40
+      },
+      "tdoa": {
+        "visible_anchor_count": 5,
+        "estimated_error_m": 0.128
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 7,
+      "timestamp": "2026-05-09T10:00:01.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.269,
+        "y": 3.315,
+        "z": 1.593
+      },
+      "velocity_mps": 0.753,
+      "localization_confidence": 0.955,
+      "vio_drift_m": 0.101,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.225,
+          "y": 0.096,
+          "z": 9.884
+        },
+        "gyro": {
+          "x": -0.033,
+          "y": 0.003,
+          "z": 0.011
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 26
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 238,
+        "scan_age_ms": 59
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.223
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 8,
+      "timestamp": "2026-05-09T10:00:01.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.596,
+        "y": 5.687,
+        "z": 1.449
+      },
+      "velocity_mps": 0.82,
+      "localization_confidence": 0.828,
+      "vio_drift_m": 0.052,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.262,
+          "y": -0.287,
+          "z": 9.766
+        },
+        "gyro": {
+          "x": 0.009,
+          "y": -0.049,
+          "z": 0.021
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 21
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 149,
+        "scan_age_ms": 29
+      },
+      "tdoa": {
+        "visible_anchor_count": 5,
+        "estimated_error_m": 0.252
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 9,
+      "timestamp": "2026-05-09T10:00:01.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.283,
+        "y": 3.952,
+        "z": 1.568
+      },
+      "velocity_mps": 0.271,
+      "localization_confidence": 0.752,
+      "vio_drift_m": 0.169,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.043,
+          "y": -0.016,
+          "z": 9.835
+        },
+        "gyro": {
+          "x": 0.031,
+          "y": -0.031,
+          "z": -0.04
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 33
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 165,
+        "scan_age_ms": 52
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.173
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 10,
+      "timestamp": "2026-05-09T10:00:01.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.916,
+        "y": 5.693,
+        "z": 1.694
+      },
+      "velocity_mps": 0.179,
+      "localization_confidence": 0.817,
+      "vio_drift_m": 0.068,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.217,
+          "y": -0.151,
+          "z": 9.657
+        },
+        "gyro": {
+          "x": -0.005,
+          "y": -0.008,
+          "z": -0.022
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 27
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 231,
+        "scan_age_ms": 29
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.242
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 11,
+      "timestamp": "2026-05-09T10:00:02Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.424,
+        "y": 3.392,
+        "z": 1.561
+      },
+      "velocity_mps": 0.532,
+      "localization_confidence": 0.724,
+      "vio_drift_m": 0.026,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.152,
+          "y": -0.158,
+          "z": 9.722
+        },
+        "gyro": {
+          "x": -0.002,
+          "y": 0.036,
+          "z": 0.04
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 25
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 168,
+        "scan_age_ms": 25
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.133
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 12,
+      "timestamp": "2026-05-09T10:00:02.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.136,
+        "y": 4.82,
+        "z": 1.469
+      },
+      "velocity_mps": 0.866,
+      "localization_confidence": 0.959,
+      "vio_drift_m": 0.104,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.131,
+          "y": -0.207,
+          "z": 9.689
+        },
+        "gyro": {
+          "x": 0.047,
+          "y": 0.008,
+          "z": 0.004
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 43
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 160,
+        "scan_age_ms": 28
+      },
+      "tdoa": {
+        "visible_anchor_count": 5,
+        "estimated_error_m": 0.197
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 13,
+      "timestamp": "2026-05-09T10:00:02.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.011,
+        "y": 6.411,
+        "z": 1.363
+      },
+      "velocity_mps": 0.869,
+      "localization_confidence": 0.739,
+      "vio_drift_m": 0.042,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.057,
+          "y": 0.105,
+          "z": 9.671
+        },
+        "gyro": {
+          "x": -0.038,
+          "y": 0.039,
+          "z": -0.025
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 39
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 125,
+        "scan_age_ms": 30
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.211
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 14,
+      "timestamp": "2026-05-09T10:00:02.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.261,
+        "y": 4.265,
+        "z": 1.404
+      },
+      "velocity_mps": 0.636,
+      "localization_confidence": 0.795,
+      "vio_drift_m": 0.055,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.221,
+          "y": 0.087,
+          "z": 9.737
+        },
+        "gyro": {
+          "x": 0.043,
+          "y": 0.044,
+          "z": -0.049
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 39
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 192,
+        "scan_age_ms": 31
+      },
+      "tdoa": {
+        "visible_anchor_count": 6,
+        "estimated_error_m": 0.188
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 15,
+      "timestamp": "2026-05-09T10:00:02.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.024,
+        "y": 3.53,
+        "z": 1.44
+      },
+      "velocity_mps": 0.155,
+      "localization_confidence": 0.779,
+      "vio_drift_m": 0.058,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.037,
+          "y": 0.026,
+          "z": 9.691
+        },
+        "gyro": {
+          "x": 0.048,
+          "y": 0.031,
+          "z": 0.003
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 41
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 224,
+        "scan_age_ms": 60
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.266
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 16,
+      "timestamp": "2026-05-09T10:00:03Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.414,
+        "y": 6.513,
+        "z": 1.406
+      },
+      "velocity_mps": 0.812,
+      "localization_confidence": 0.898,
+      "vio_drift_m": 0.036,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.131,
+          "y": -0.174,
+          "z": 9.703
+        },
+        "gyro": {
+          "x": 0.019,
+          "y": 0.035,
+          "z": 0.001
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 28
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 235,
+        "scan_age_ms": 28
+      },
+      "tdoa": {
+        "visible_anchor_count": 6,
+        "estimated_error_m": 0.207
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 17,
+      "timestamp": "2026-05-09T10:00:03.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.317,
+        "y": 3.176,
+        "z": 1.433
+      },
+      "velocity_mps": 0.205,
+      "localization_confidence": 0.955,
+      "vio_drift_m": 0.037,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.035,
+          "y": 0.123,
+          "z": 9.768
+        },
+        "gyro": {
+          "x": -0.039,
+          "y": 0.045,
+          "z": 0.019
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 24
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 189,
+        "scan_age_ms": 27
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.197
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 18,
+      "timestamp": "2026-05-09T10:00:03.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.592,
+        "y": 3.51,
+        "z": 1.423
+      },
+      "velocity_mps": 0.819,
+      "localization_confidence": 0.911,
+      "vio_drift_m": 0.156,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.239,
+          "y": -0.174,
+          "z": 9.675
+        },
+        "gyro": {
+          "x": -0.04,
+          "y": 0.028,
+          "z": 0.038
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 33
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 199,
+        "scan_age_ms": 34
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.253
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 19,
+      "timestamp": "2026-05-09T10:00:03.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.905,
+        "y": 6.243,
+        "z": 1.653
+      },
+      "velocity_mps": 0.12,
+      "localization_confidence": 0.897,
+      "vio_drift_m": 0.066,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.258,
+          "y": 0.181,
+          "z": 9.859
+        },
+        "gyro": {
+          "x": 0.031,
+          "y": -0.023,
+          "z": 0.029
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 23
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 168,
+        "scan_age_ms": 27
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.124
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 20,
+      "timestamp": "2026-05-09T10:00:03.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.266,
+        "y": 4.841,
+        "z": 1.422
+      },
+      "velocity_mps": 0.736,
+      "localization_confidence": 0.775,
+      "vio_drift_m": 0.014,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.184,
+          "y": -0.103,
+          "z": 9.859
+        },
+        "gyro": {
+          "x": 0.047,
+          "y": -0.022,
+          "z": 0.014
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 32
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 206,
+        "scan_age_ms": 59
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.268
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 21,
+      "timestamp": "2026-05-09T10:00:04Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.461,
+        "y": 6.882,
+        "z": 1.371
+      },
+      "velocity_mps": 0.87,
+      "localization_confidence": 0.784,
+      "vio_drift_m": 0.028,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.039,
+          "y": 0.137,
+          "z": 9.694
+        },
+        "gyro": {
+          "x": 0.011,
+          "y": 0.001,
+          "z": -0.011
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 38
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 144,
+        "scan_age_ms": 41
+      },
+      "tdoa": {
+        "visible_anchor_count": 5,
+        "estimated_error_m": 0.222
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 22,
+      "timestamp": "2026-05-09T10:00:04.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.007,
+        "y": 6.702,
+        "z": 1.515
+      },
+      "velocity_mps": 0.676,
+      "localization_confidence": 0.898,
+      "vio_drift_m": 0.124,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.081,
+          "y": -0.258,
+          "z": 9.799
+        },
+        "gyro": {
+          "x": -0.017,
+          "y": -0.019,
+          "z": 0.035
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 43
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 235,
+        "scan_age_ms": 44
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.213
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 23,
+      "timestamp": "2026-05-09T10:00:04.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.305,
+        "y": 5.789,
+        "z": 1.522
+      },
+      "velocity_mps": 0.253,
+      "localization_confidence": 0.88,
+      "vio_drift_m": 0.074,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.149,
+          "y": -0.196,
+          "z": 9.771
+        },
+        "gyro": {
+          "x": -0.009,
+          "y": 0.033,
+          "z": -0.02
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 26
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 175,
+        "scan_age_ms": 45
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.168
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 24,
+      "timestamp": "2026-05-09T10:00:04.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.703,
+        "y": 5.045,
+        "z": 1.617
+      },
+      "velocity_mps": 0.868,
+      "localization_confidence": 0.897,
+      "vio_drift_m": 0.122,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.13,
+          "y": 0.098,
+          "z": 9.786
+        },
+        "gyro": {
+          "x": -0.041,
+          "y": 0.045,
+          "z": -0.027
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 29
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 148,
+        "scan_age_ms": 37
+      },
+      "tdoa": {
+        "visible_anchor_count": 7,
+        "estimated_error_m": 0.085
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 25,
+      "timestamp": "2026-05-09T10:00:04.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.979,
+        "y": 4.901,
+        "z": 1.64
+      },
+      "velocity_mps": 0.158,
+      "localization_confidence": 0.819,
+      "vio_drift_m": 0.117,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.183,
+          "y": 0.118,
+          "z": 9.748
+        },
+        "gyro": {
+          "x": -0.026,
+          "y": 0.016,
+          "z": -0.049
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 44
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 230,
+        "scan_age_ms": 31
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.124
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 26,
+      "timestamp": "2026-05-09T10:00:05Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.216,
+        "y": 5.784,
+        "z": 1.486
+      },
+      "velocity_mps": 0.546,
+      "localization_confidence": 0.94,
+      "vio_drift_m": 0.031,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.22,
+          "y": -0.021,
+          "z": 9.759
+        },
+        "gyro": {
+          "x": 0.006,
+          "y": -0.018,
+          "z": 0.026
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 34
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 198,
+        "scan_age_ms": 57
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.246
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 27,
+      "timestamp": "2026-05-09T10:00:05.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.191,
+        "y": 6.589,
+        "z": 1.597
+      },
+      "velocity_mps": 0.48,
+      "localization_confidence": 0.782,
+      "vio_drift_m": 0.052,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.083,
+          "y": 0.159,
+          "z": 9.756
+        },
+        "gyro": {
+          "x": 0.013,
+          "y": -0.023,
+          "z": -0.042
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 29
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 150,
+        "scan_age_ms": 42
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.144
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 28,
+      "timestamp": "2026-05-09T10:00:05.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.161,
+        "y": 3.553,
+        "z": 1.393
+      },
+      "velocity_mps": 0.655,
+      "localization_confidence": 0.89,
+      "vio_drift_m": 0.021,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.055,
+          "y": 0.026,
+          "z": 9.725
+        },
+        "gyro": {
+          "x": -0.029,
+          "y": -0.008,
+          "z": 0.04
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 38
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 209,
+        "scan_age_ms": 26
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.175
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 29,
+      "timestamp": "2026-05-09T10:00:05.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.771,
+        "y": 4.194,
+        "z": 1.456
+      },
+      "velocity_mps": 0.813,
+      "localization_confidence": 0.921,
+      "vio_drift_m": 0.101,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.141,
+          "y": 0.18,
+          "z": 9.869
+        },
+        "gyro": {
+          "x": -0.001,
+          "y": -0.023,
+          "z": -0.001
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 32
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 163,
+        "scan_age_ms": 50
+      },
+      "tdoa": {
+        "visible_anchor_count": 7,
+        "estimated_error_m": 0.248
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 30,
+      "timestamp": "2026-05-09T10:00:05.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.678,
+        "y": 6.923,
+        "z": 1.514
+      },
+      "velocity_mps": 0.826,
+      "localization_confidence": 0.862,
+      "vio_drift_m": 0.123,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.25,
+          "y": -0.043,
+          "z": 9.86
+        },
+        "gyro": {
+          "x": -0.032,
+          "y": -0.024,
+          "z": -0.017
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 34
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 161,
+        "scan_age_ms": 46
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.136
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 31,
+      "timestamp": "2026-05-09T10:00:06Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.805,
+        "y": 4.686,
+        "z": 1.634
+      },
+      "velocity_mps": 0.476,
+      "localization_confidence": 0.9,
+      "vio_drift_m": 0.019,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.271,
+          "y": -0.165,
+          "z": 9.621
+        },
+        "gyro": {
+          "x": 0.046,
+          "y": -0.046,
+          "z": -0.047
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 27
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 145,
+        "scan_age_ms": 26
+      },
+      "tdoa": {
+        "visible_anchor_count": 7,
+        "estimated_error_m": 0.128
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 32,
+      "timestamp": "2026-05-09T10:00:06.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.894,
+        "y": 3.458,
+        "z": 1.679
+      },
+      "velocity_mps": 0.472,
+      "localization_confidence": 0.781,
+      "vio_drift_m": 0.073,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.064,
+          "y": 0.278,
+          "z": 9.816
+        },
+        "gyro": {
+          "x": 0.028,
+          "y": -0.034,
+          "z": -0.019
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 38
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 123,
+        "scan_age_ms": 44
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.159
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 33,
+      "timestamp": "2026-05-09T10:00:06.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.86,
+        "y": 3.304,
+        "z": 1.576
+      },
+      "velocity_mps": 0.602,
+      "localization_confidence": 0.744,
+      "vio_drift_m": 0.141,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.21,
+          "y": 0.06,
+          "z": 9.636
+        },
+        "gyro": {
+          "x": 0.048,
+          "y": 0.028,
+          "z": -0.015
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 33
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 204,
+        "scan_age_ms": 48
+      },
+      "tdoa": {
+        "visible_anchor_count": 6,
+        "estimated_error_m": 0.181
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 34,
+      "timestamp": "2026-05-09T10:00:06.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.365,
+        "y": 6.398,
+        "z": 1.629
+      },
+      "velocity_mps": 0.184,
+      "localization_confidence": 0.951,
+      "vio_drift_m": 0.118,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.197,
+          "y": 0.124,
+          "z": 9.731
+        },
+        "gyro": {
+          "x": 0.023,
+          "y": 0.047,
+          "z": -0.023
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 45
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 237,
+        "scan_age_ms": 59
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.173
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 35,
+      "timestamp": "2026-05-09T10:00:06.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.303,
+        "y": 5.37,
+        "z": 1.429
+      },
+      "velocity_mps": 0.296,
+      "localization_confidence": 0.944,
+      "vio_drift_m": 0.057,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.03,
+          "y": 0.15,
+          "z": 9.771
+        },
+        "gyro": {
+          "x": 0.017,
+          "y": -0.016,
+          "z": -0.001
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 30
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 143,
+        "scan_age_ms": 56
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.151
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 36,
+      "timestamp": "2026-05-09T10:00:07Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.033,
+        "y": 4.119,
+        "z": 1.538
+      },
+      "velocity_mps": 0.804,
+      "localization_confidence": 0.853,
+      "vio_drift_m": 0.098,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.185,
+          "y": -0.155,
+          "z": 9.722
+        },
+        "gyro": {
+          "x": 0.006,
+          "y": -0.026,
+          "z": -0.002
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 42
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 182,
+        "scan_age_ms": 53
+      },
+      "tdoa": {
+        "visible_anchor_count": 5,
+        "estimated_error_m": 0.099
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 37,
+      "timestamp": "2026-05-09T10:00:07.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.886,
+        "y": 5.767,
+        "z": 1.422
+      },
+      "velocity_mps": 0.565,
+      "localization_confidence": 0.834,
+      "vio_drift_m": 0.1,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.045,
+          "y": 0.148,
+          "z": 9.699
+        },
+        "gyro": {
+          "x": 0.02,
+          "y": -0.023,
+          "z": -0.025
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 23
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 212,
+        "scan_age_ms": 37
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.104
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 38,
+      "timestamp": "2026-05-09T10:00:07.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.143,
+        "y": 6.049,
+        "z": 1.374
+      },
+      "velocity_mps": 0.273,
+      "localization_confidence": 0.836,
+      "vio_drift_m": 0.133,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.286,
+          "y": 0.015,
+          "z": 9.685
+        },
+        "gyro": {
+          "x": -0.04,
+          "y": -0.031,
+          "z": -0.027
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 25
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 158,
+        "scan_age_ms": 25
+      },
+      "tdoa": {
+        "visible_anchor_count": 7,
+        "estimated_error_m": 0.135
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 39,
+      "timestamp": "2026-05-09T10:00:07.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.897,
+        "y": 5.213,
+        "z": 1.579
+      },
+      "velocity_mps": 0.201,
+      "localization_confidence": 0.928,
+      "vio_drift_m": 0.093,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.224,
+          "y": 0.044,
+          "z": 9.741
+        },
+        "gyro": {
+          "x": -0.006,
+          "y": -0.032,
+          "z": -0.045
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 35
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 134,
+        "scan_age_ms": 29
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.178
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 40,
+      "timestamp": "2026-05-09T10:00:07.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.308,
+        "y": 5.746,
+        "z": 1.361
+      },
+      "velocity_mps": 0.749,
+      "localization_confidence": 0.948,
+      "vio_drift_m": 0.024,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.151,
+          "y": 0.035,
+          "z": 9.725
+        },
+        "gyro": {
+          "x": 0.01,
+          "y": 0.012,
+          "z": 0.028
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 32
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 177,
+        "scan_age_ms": 53
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.252
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 41,
+      "timestamp": "2026-05-09T10:00:08Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.96,
+        "y": 4.222,
+        "z": 1.548
+      },
+      "velocity_mps": 0.588,
+      "localization_confidence": 0.898,
+      "vio_drift_m": 0.171,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.175,
+          "y": -0.173,
+          "z": 9.798
+        },
+        "gyro": {
+          "x": -0.034,
+          "y": -0.033,
+          "z": -0.042
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 20
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 172,
+        "scan_age_ms": 53
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.138
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 42,
+      "timestamp": "2026-05-09T10:00:08.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.926,
+        "y": 5.828,
+        "z": 1.581
+      },
+      "velocity_mps": 0.463,
+      "localization_confidence": 0.885,
+      "vio_drift_m": 0.167,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.173,
+          "y": 0.075,
+          "z": 9.798
+        },
+        "gyro": {
+          "x": 0.043,
+          "y": -0.007,
+          "z": 0.004
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 40
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 139,
+        "scan_age_ms": 42
+      },
+      "tdoa": {
+        "visible_anchor_count": 7,
+        "estimated_error_m": 0.094
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 43,
+      "timestamp": "2026-05-09T10:00:08.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.664,
+        "y": 4.23,
+        "z": 1.6
+      },
+      "velocity_mps": 0.555,
+      "localization_confidence": 0.789,
+      "vio_drift_m": 0.031,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.113,
+          "y": 0.12,
+          "z": 9.883
+        },
+        "gyro": {
+          "x": 0.0,
+          "y": -0.001,
+          "z": -0.042
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 21
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 233,
+        "scan_age_ms": 52
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.201
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 44,
+      "timestamp": "2026-05-09T10:00:08.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.103,
+        "y": 3.916,
+        "z": 1.57
+      },
+      "velocity_mps": 0.788,
+      "localization_confidence": 0.861,
+      "vio_drift_m": 0.014,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.159,
+          "y": 0.193,
+          "z": 9.773
+        },
+        "gyro": {
+          "x": 0.026,
+          "y": -0.032,
+          "z": 0.002
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 34
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 237,
+        "scan_age_ms": 42
+      },
+      "tdoa": {
+        "visible_anchor_count": 7,
+        "estimated_error_m": 0.279
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 45,
+      "timestamp": "2026-05-09T10:00:08.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.744,
+        "y": 6.257,
+        "z": 1.688
+      },
+      "velocity_mps": 0.476,
+      "localization_confidence": 0.818,
+      "vio_drift_m": 0.065,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.237,
+          "y": -0.204,
+          "z": 9.723
+        },
+        "gyro": {
+          "x": -0.0,
+          "y": 0.016,
+          "z": -0.01
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 44
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 190,
+        "scan_age_ms": 27
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.098
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 46,
+      "timestamp": "2026-05-09T10:00:09Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.01,
+        "y": 3.464,
+        "z": 1.609
+      },
+      "velocity_mps": 0.792,
+      "localization_confidence": 0.918,
+      "vio_drift_m": 0.01,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.222,
+          "y": -0.023,
+          "z": 9.616
+        },
+        "gyro": {
+          "x": 0.002,
+          "y": 0.012,
+          "z": -0.0
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 34
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 217,
+        "scan_age_ms": 28
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.133
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 47,
+      "timestamp": "2026-05-09T10:00:09.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.524,
+        "y": 4.152,
+        "z": 1.652
+      },
+      "velocity_mps": 0.488,
+      "localization_confidence": 0.727,
+      "vio_drift_m": 0.117,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.18,
+          "y": 0.126,
+          "z": 9.693
+        },
+        "gyro": {
+          "x": -0.049,
+          "y": -0.009,
+          "z": -0.028
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 23
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 179,
+        "scan_age_ms": 32
+      },
+      "tdoa": {
+        "visible_anchor_count": 7,
+        "estimated_error_m": 0.18
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 48,
+      "timestamp": "2026-05-09T10:00:09.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.866,
+        "y": 5.035,
+        "z": 1.409
+      },
+      "velocity_mps": 0.768,
+      "localization_confidence": 0.955,
+      "vio_drift_m": 0.051,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.031,
+          "y": -0.07,
+          "z": 9.877
+        },
+        "gyro": {
+          "x": 0.001,
+          "y": 0.038,
+          "z": 0.036
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 28
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 218,
+        "scan_age_ms": 51
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.267
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 49,
+      "timestamp": "2026-05-09T10:00:09.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.031,
+        "y": 6.282,
+        "z": 1.413
+      },
+      "velocity_mps": 0.339,
+      "localization_confidence": 0.861,
+      "vio_drift_m": 0.18,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.006,
+          "y": -0.211,
+          "z": 9.762
+        },
+        "gyro": {
+          "x": -0.015,
+          "y": 0.005,
+          "z": 0.004
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 34
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 239,
+        "scan_age_ms": 45
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.276
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 50,
+      "timestamp": "2026-05-09T10:00:09.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.955,
+        "y": 4.532,
+        "z": 1.642
+      },
+      "velocity_mps": 0.429,
+      "localization_confidence": 0.796,
+      "vio_drift_m": 0.09,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.248,
+          "y": -0.071,
+          "z": 9.897
+        },
+        "gyro": {
+          "x": 0.029,
+          "y": 0.015,
+          "z": -0.035
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 21
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 136,
+        "scan_age_ms": 57
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.254
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 51,
+      "timestamp": "2026-05-09T10:00:10Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.497,
+        "y": 4.761,
+        "z": 1.51
+      },
+      "velocity_mps": 0.466,
+      "localization_confidence": 0.893,
+      "vio_drift_m": 0.08,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.093,
+          "y": -0.207,
+          "z": 9.741
+        },
+        "gyro": {
+          "x": 0.047,
+          "y": -0.016,
+          "z": 0.019
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 40
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 130,
+        "scan_age_ms": 46
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.271
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 52,
+      "timestamp": "2026-05-09T10:00:10.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.507,
+        "y": 6.55,
+        "z": 1.495
+      },
+      "velocity_mps": 0.533,
+      "localization_confidence": 0.868,
+      "vio_drift_m": 0.05,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.111,
+          "y": -0.128,
+          "z": 9.668
+        },
+        "gyro": {
+          "x": -0.041,
+          "y": 0.048,
+          "z": 0.026
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 42
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 231,
+        "scan_age_ms": 31
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.113
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 53,
+      "timestamp": "2026-05-09T10:00:10.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.198,
+        "y": 3.116,
+        "z": 1.43
+      },
+      "velocity_mps": 0.145,
+      "localization_confidence": 0.806,
+      "vio_drift_m": 0.083,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.153,
+          "y": -0.053,
+          "z": 9.805
+        },
+        "gyro": {
+          "x": -0.032,
+          "y": -0.032,
+          "z": 0.011
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 32
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 199,
+        "scan_age_ms": 40
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.263
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 54,
+      "timestamp": "2026-05-09T10:00:10.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.572,
+        "y": 4.845,
+        "z": 1.402
+      },
+      "velocity_mps": 0.304,
+      "localization_confidence": 0.722,
+      "vio_drift_m": 0.147,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.241,
+          "y": 0.107,
+          "z": 9.647
+        },
+        "gyro": {
+          "x": -0.006,
+          "y": -0.015,
+          "z": 0.009
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 40
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 174,
+        "scan_age_ms": 41
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.249
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 55,
+      "timestamp": "2026-05-09T10:00:10.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.797,
+        "y": 4.539,
+        "z": 1.493
+      },
+      "velocity_mps": 0.29,
+      "localization_confidence": 0.857,
+      "vio_drift_m": 0.108,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.296,
+          "y": -0.123,
+          "z": 9.893
+        },
+        "gyro": {
+          "x": 0.016,
+          "y": -0.023,
+          "z": 0.007
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 41
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 219,
+        "scan_age_ms": 28
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.247
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 56,
+      "timestamp": "2026-05-09T10:00:11Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.612,
+        "y": 6.103,
+        "z": 1.392
+      },
+      "velocity_mps": 0.742,
+      "localization_confidence": 0.773,
+      "vio_drift_m": 0.042,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.15,
+          "y": 0.153,
+          "z": 9.83
+        },
+        "gyro": {
+          "x": 0.018,
+          "y": -0.036,
+          "z": -0.04
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 40
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 202,
+        "scan_age_ms": 27
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.238
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 57,
+      "timestamp": "2026-05-09T10:00:11.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.133,
+        "y": 4.459,
+        "z": 1.353
+      },
+      "velocity_mps": 0.828,
+      "localization_confidence": 0.798,
+      "vio_drift_m": 0.081,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.18,
+          "y": 0.172,
+          "z": 9.863
+        },
+        "gyro": {
+          "x": -0.013,
+          "y": 0.0,
+          "z": -0.023
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 25
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 152,
+        "scan_age_ms": 55
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.229
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 58,
+      "timestamp": "2026-05-09T10:00:11.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.355,
+        "y": 3.461,
+        "z": 1.685
+      },
+      "velocity_mps": 0.213,
+      "localization_confidence": 0.952,
+      "vio_drift_m": 0.156,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.135,
+          "y": 0.288,
+          "z": 9.89
+        },
+        "gyro": {
+          "x": 0.03,
+          "y": -0.013,
+          "z": 0.029
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 20
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 153,
+        "scan_age_ms": 59
+      },
+      "tdoa": {
+        "visible_anchor_count": 6,
+        "estimated_error_m": 0.171
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 59,
+      "timestamp": "2026-05-09T10:00:11.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.691,
+        "y": 5.689,
+        "z": 1.534
+      },
+      "velocity_mps": 0.758,
+      "localization_confidence": 0.946,
+      "vio_drift_m": 0.028,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.16,
+          "y": -0.285,
+          "z": 9.865
+        },
+        "gyro": {
+          "x": 0.006,
+          "y": 0.042,
+          "z": -0.028
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 22
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 201,
+        "scan_age_ms": 54
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.21
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 60,
+      "timestamp": "2026-05-09T10:00:11.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.467,
+        "y": 3.181,
+        "z": 1.315
+      },
+      "velocity_mps": 0.897,
+      "localization_confidence": 0.748,
+      "vio_drift_m": 0.05,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.023,
+          "y": -0.067,
+          "z": 9.711
+        },
+        "gyro": {
+          "x": 0.045,
+          "y": 0.02,
+          "z": 0.004
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 38
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 215,
+        "scan_age_ms": 34
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.211
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 61,
+      "timestamp": "2026-05-09T10:00:12Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.335,
+        "y": 5.463,
+        "z": 1.676
+      },
+      "velocity_mps": 0.324,
+      "localization_confidence": 0.886,
+      "vio_drift_m": 0.047,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.033,
+          "y": -0.158,
+          "z": 9.709
+        },
+        "gyro": {
+          "x": 0.048,
+          "y": -0.013,
+          "z": 0.04
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 40
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 165,
+        "scan_age_ms": 28
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.135
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 62,
+      "timestamp": "2026-05-09T10:00:12.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.873,
+        "y": 6.796,
+        "z": 1.63
+      },
+      "velocity_mps": 0.173,
+      "localization_confidence": 0.771,
+      "vio_drift_m": 0.119,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.283,
+          "y": -0.27,
+          "z": 9.7
+        },
+        "gyro": {
+          "x": 0.049,
+          "y": 0.029,
+          "z": -0.029
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 44
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 190,
+        "scan_age_ms": 38
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.243
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 63,
+      "timestamp": "2026-05-09T10:00:12.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.932,
+        "y": 6.097,
+        "z": 1.615
+      },
+      "velocity_mps": 0.577,
+      "localization_confidence": 0.787,
+      "vio_drift_m": 0.177,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.293,
+          "y": 0.024,
+          "z": 9.84
+        },
+        "gyro": {
+          "x": -0.039,
+          "y": 0.037,
+          "z": -0.037
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 31
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 221,
+        "scan_age_ms": 40
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.083
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 64,
+      "timestamp": "2026-05-09T10:00:12.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.061,
+        "y": 3.507,
+        "z": 1.468
+      },
+      "velocity_mps": 0.191,
+      "localization_confidence": 0.735,
+      "vio_drift_m": 0.086,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.083,
+          "y": 0.056,
+          "z": 9.736
+        },
+        "gyro": {
+          "x": -0.028,
+          "y": 0.012,
+          "z": 0.023
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 41
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 186,
+        "scan_age_ms": 44
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.209
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 65,
+      "timestamp": "2026-05-09T10:00:12.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.125,
+        "y": 6.994,
+        "z": 1.639
+      },
+      "velocity_mps": 0.441,
+      "localization_confidence": 0.746,
+      "vio_drift_m": 0.131,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.034,
+          "y": 0.24,
+          "z": 9.697
+        },
+        "gyro": {
+          "x": -0.035,
+          "y": -0.037,
+          "z": 0.012
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 38
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 190,
+        "scan_age_ms": 45
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.279
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 66,
+      "timestamp": "2026-05-09T10:00:13Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.122,
+        "y": 4.815,
+        "z": 1.542
+      },
+      "velocity_mps": 0.179,
+      "localization_confidence": 0.888,
+      "vio_drift_m": 0.155,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.091,
+          "y": 0.161,
+          "z": 9.816
+        },
+        "gyro": {
+          "x": -0.028,
+          "y": -0.005,
+          "z": -0.027
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 30
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 225,
+        "scan_age_ms": 54
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.163
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 67,
+      "timestamp": "2026-05-09T10:00:13.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.38,
+        "y": 4.707,
+        "z": 1.566
+      },
+      "velocity_mps": 0.399,
+      "localization_confidence": 0.757,
+      "vio_drift_m": 0.167,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.26,
+          "y": 0.199,
+          "z": 9.628
+        },
+        "gyro": {
+          "x": -0.04,
+          "y": 0.024,
+          "z": 0.031
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 37
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 127,
+        "scan_age_ms": 60
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.214
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 68,
+      "timestamp": "2026-05-09T10:00:13.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.643,
+        "y": 6.494,
+        "z": 1.676
+      },
+      "velocity_mps": 0.438,
+      "localization_confidence": 0.94,
+      "vio_drift_m": 0.019,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.127,
+          "y": -0.113,
+          "z": 9.631
+        },
+        "gyro": {
+          "x": 0.001,
+          "y": -0.035,
+          "z": -0.002
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 23
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 164,
+        "scan_age_ms": 60
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.103
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 69,
+      "timestamp": "2026-05-09T10:00:13.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.114,
+        "y": 3.905,
+        "z": 1.472
+      },
+      "velocity_mps": 0.549,
+      "localization_confidence": 0.904,
+      "vio_drift_m": 0.116,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.105,
+          "y": 0.034,
+          "z": 9.783
+        },
+        "gyro": {
+          "x": 0.016,
+          "y": 0.019,
+          "z": -0.047
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 28
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 209,
+        "scan_age_ms": 44
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.15
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 70,
+      "timestamp": "2026-05-09T10:00:13.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.726,
+        "y": 3.573,
+        "z": 1.563
+      },
+      "velocity_mps": 0.156,
+      "localization_confidence": 0.898,
+      "vio_drift_m": 0.175,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.245,
+          "y": 0.018,
+          "z": 9.713
+        },
+        "gyro": {
+          "x": -0.005,
+          "y": -0.034,
+          "z": -0.019
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 30
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 219,
+        "scan_age_ms": 30
+      },
+      "tdoa": {
+        "visible_anchor_count": 5,
+        "estimated_error_m": 0.111
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 71,
+      "timestamp": "2026-05-09T10:00:14Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.018,
+        "y": 3.199,
+        "z": 1.333
+      },
+      "velocity_mps": 0.454,
+      "localization_confidence": 0.822,
+      "vio_drift_m": 0.113,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.051,
+          "y": -0.171,
+          "z": 9.754
+        },
+        "gyro": {
+          "x": -0.015,
+          "y": -0.039,
+          "z": 0.018
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 38
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 182,
+        "scan_age_ms": 58
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.089
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 72,
+      "timestamp": "2026-05-09T10:00:14.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.581,
+        "y": 5.397,
+        "z": 1.303
+      },
+      "velocity_mps": 0.341,
+      "localization_confidence": 0.771,
+      "vio_drift_m": 0.033,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.147,
+          "y": -0.103,
+          "z": 9.602
+        },
+        "gyro": {
+          "x": 0.025,
+          "y": -0.032,
+          "z": -0.012
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 42
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 149,
+        "scan_age_ms": 57
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.094
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 73,
+      "timestamp": "2026-05-09T10:00:14.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.447,
+        "y": 3.169,
+        "z": 1.307
+      },
+      "velocity_mps": 0.837,
+      "localization_confidence": 0.927,
+      "vio_drift_m": 0.108,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.044,
+          "y": 0.126,
+          "z": 9.725
+        },
+        "gyro": {
+          "x": -0.038,
+          "y": -0.048,
+          "z": -0.018
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 45
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 199,
+        "scan_age_ms": 54
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.098
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 74,
+      "timestamp": "2026-05-09T10:00:14.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.378,
+        "y": 3.973,
+        "z": 1.536
+      },
+      "velocity_mps": 0.519,
+      "localization_confidence": 0.815,
+      "vio_drift_m": 0.063,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.096,
+          "y": -0.1,
+          "z": 9.65
+        },
+        "gyro": {
+          "x": 0.001,
+          "y": -0.039,
+          "z": 0.001
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 44
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 164,
+        "scan_age_ms": 47
+      },
+      "tdoa": {
+        "visible_anchor_count": 7,
+        "estimated_error_m": 0.127
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 75,
+      "timestamp": "2026-05-09T10:00:14.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.586,
+        "y": 3.789,
+        "z": 1.541
+      },
+      "velocity_mps": 0.708,
+      "localization_confidence": 0.877,
+      "vio_drift_m": 0.04,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.164,
+          "y": -0.004,
+          "z": 9.826
+        },
+        "gyro": {
+          "x": 0.026,
+          "y": -0.005,
+          "z": 0.042
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 38
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 202,
+        "scan_age_ms": 45
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.11
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 76,
+      "timestamp": "2026-05-09T10:00:15Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.273,
+        "y": 4.769,
+        "z": 1.421
+      },
+      "velocity_mps": 0.32,
+      "localization_confidence": 0.733,
+      "vio_drift_m": 0.096,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.114,
+          "y": -0.029,
+          "z": 9.617
+        },
+        "gyro": {
+          "x": 0.033,
+          "y": -0.042,
+          "z": 0.036
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 22
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 198,
+        "scan_age_ms": 57
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.173
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 77,
+      "timestamp": "2026-05-09T10:00:15.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.217,
+        "y": 6.167,
+        "z": 1.658
+      },
+      "velocity_mps": 0.46,
+      "localization_confidence": 0.914,
+      "vio_drift_m": 0.121,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.107,
+          "y": -0.015,
+          "z": 9.645
+        },
+        "gyro": {
+          "x": -0.044,
+          "y": -0.04,
+          "z": 0.04
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 30
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 211,
+        "scan_age_ms": 30
+      },
+      "tdoa": {
+        "visible_anchor_count": 7,
+        "estimated_error_m": 0.088
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 78,
+      "timestamp": "2026-05-09T10:00:15.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.83,
+        "y": 6.964,
+        "z": 1.51
+      },
+      "velocity_mps": 0.588,
+      "localization_confidence": 0.807,
+      "vio_drift_m": 0.166,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.068,
+          "y": 0.165,
+          "z": 9.804
+        },
+        "gyro": {
+          "x": -0.045,
+          "y": 0.013,
+          "z": -0.017
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 30
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 132,
+        "scan_age_ms": 60
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.137
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 79,
+      "timestamp": "2026-05-09T10:00:15.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.895,
+        "y": 5.626,
+        "z": 1.663
+      },
+      "velocity_mps": 0.799,
+      "localization_confidence": 0.8,
+      "vio_drift_m": 0.109,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.215,
+          "y": -0.09,
+          "z": 9.89
+        },
+        "gyro": {
+          "x": 0.02,
+          "y": -0.011,
+          "z": 0.01
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 22
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 159,
+        "scan_age_ms": 60
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.209
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 80,
+      "timestamp": "2026-05-09T10:00:15.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.314,
+        "y": 3.511,
+        "z": 1.581
+      },
+      "velocity_mps": 0.858,
+      "localization_confidence": 0.959,
+      "vio_drift_m": 0.165,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.244,
+          "y": 0.102,
+          "z": 9.753
+        },
+        "gyro": {
+          "x": -0.048,
+          "y": -0.019,
+          "z": 0.045
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 30
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 218,
+        "scan_age_ms": 56
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.125
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 81,
+      "timestamp": "2026-05-09T10:00:16Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.55,
+        "y": 3.309,
+        "z": 1.638
+      },
+      "velocity_mps": 0.181,
+      "localization_confidence": 0.905,
+      "vio_drift_m": 0.152,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.23,
+          "y": -0.277,
+          "z": 9.701
+        },
+        "gyro": {
+          "x": 0.027,
+          "y": -0.037,
+          "z": -0.012
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 25
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 143,
+        "scan_age_ms": 35
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.089
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 82,
+      "timestamp": "2026-05-09T10:00:16.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.457,
+        "y": 5.878,
+        "z": 1.688
+      },
+      "velocity_mps": 0.588,
+      "localization_confidence": 0.901,
+      "vio_drift_m": 0.143,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.16,
+          "y": -0.156,
+          "z": 9.89
+        },
+        "gyro": {
+          "x": 0.028,
+          "y": 0.04,
+          "z": -0.031
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 41
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 193,
+        "scan_age_ms": 53
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.234
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 83,
+      "timestamp": "2026-05-09T10:00:16.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.112,
+        "y": 5.012,
+        "z": 1.467
+      },
+      "velocity_mps": 0.23,
+      "localization_confidence": 0.768,
+      "vio_drift_m": 0.113,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.224,
+          "y": -0.269,
+          "z": 9.744
+        },
+        "gyro": {
+          "x": -0.013,
+          "y": 0.043,
+          "z": 0.021
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 36
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 228,
+        "scan_age_ms": 32
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.097
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 84,
+      "timestamp": "2026-05-09T10:00:16.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.641,
+        "y": 4.797,
+        "z": 1.505
+      },
+      "velocity_mps": 0.765,
+      "localization_confidence": 0.742,
+      "vio_drift_m": 0.165,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.19,
+          "y": 0.231,
+          "z": 9.879
+        },
+        "gyro": {
+          "x": -0.009,
+          "y": -0.01,
+          "z": -0.013
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 32
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 130,
+        "scan_age_ms": 48
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.086
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 85,
+      "timestamp": "2026-05-09T10:00:16.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.723,
+        "y": 6.357,
+        "z": 1.56
+      },
+      "velocity_mps": 0.733,
+      "localization_confidence": 0.753,
+      "vio_drift_m": 0.059,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.198,
+          "y": 0.118,
+          "z": 9.642
+        },
+        "gyro": {
+          "x": 0.021,
+          "y": -0.005,
+          "z": -0.049
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 22
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 122,
+        "scan_age_ms": 41
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.247
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 86,
+      "timestamp": "2026-05-09T10:00:17Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.195,
+        "y": 5.909,
+        "z": 1.511
+      },
+      "velocity_mps": 0.189,
+      "localization_confidence": 0.789,
+      "vio_drift_m": 0.061,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.271,
+          "y": -0.048,
+          "z": 9.838
+        },
+        "gyro": {
+          "x": -0.004,
+          "y": -0.039,
+          "z": 0.041
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 39
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 188,
+        "scan_age_ms": 26
+      },
+      "tdoa": {
+        "visible_anchor_count": 8,
+        "estimated_error_m": 0.224
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 87,
+      "timestamp": "2026-05-09T10:00:17.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.165,
+        "y": 3.006,
+        "z": 1.441
+      },
+      "velocity_mps": 0.557,
+      "localization_confidence": 0.765,
+      "vio_drift_m": 0.124,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.014,
+          "y": -0.084,
+          "z": 9.886
+        },
+        "gyro": {
+          "x": 0.004,
+          "y": 0.029,
+          "z": 0.001
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 20
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 169,
+        "scan_age_ms": 55
+      },
+      "tdoa": {
+        "visible_anchor_count": 5,
+        "estimated_error_m": 0.207
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 88,
+      "timestamp": "2026-05-09T10:00:17.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.924,
+        "y": 4.015,
+        "z": 1.306
+      },
+      "velocity_mps": 0.731,
+      "localization_confidence": 0.803,
+      "vio_drift_m": 0.135,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.077,
+          "y": 0.163,
+          "z": 9.821
+        },
+        "gyro": {
+          "x": -0.017,
+          "y": -0.046,
+          "z": 0.005
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 40
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 142,
+        "scan_age_ms": 54
+      },
+      "tdoa": {
+        "visible_anchor_count": 12,
+        "estimated_error_m": 0.206
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 89,
+      "timestamp": "2026-05-09T10:00:17.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.246,
+        "y": 3.252,
+        "z": 1.61
+      },
+      "velocity_mps": 0.466,
+      "localization_confidence": 0.79,
+      "vio_drift_m": 0.017,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.18,
+          "y": -0.275,
+          "z": 9.88
+        },
+        "gyro": {
+          "x": 0.002,
+          "y": 0.049,
+          "z": 0.004
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 28
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 124,
+        "scan_age_ms": 37
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.151
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 90,
+      "timestamp": "2026-05-09T10:00:17.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.123,
+        "y": 6.463,
+        "z": 1.433
+      },
+      "velocity_mps": 0.2,
+      "localization_confidence": 0.808,
+      "vio_drift_m": 0.161,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.146,
+          "y": 0.237,
+          "z": 9.716
+        },
+        "gyro": {
+          "x": 0.047,
+          "y": -0.0,
+          "z": -0.0
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 45
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 186,
+        "scan_age_ms": 42
+      },
+      "tdoa": {
+        "visible_anchor_count": 6,
+        "estimated_error_m": 0.225
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 91,
+      "timestamp": "2026-05-09T10:00:18Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.316,
+        "y": 5.41,
+        "z": 1.629
+      },
+      "velocity_mps": 0.536,
+      "localization_confidence": 0.797,
+      "vio_drift_m": 0.024,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.097,
+          "y": -0.116,
+          "z": 9.781
+        },
+        "gyro": {
+          "x": -0.007,
+          "y": 0.019,
+          "z": -0.015
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 21
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 213,
+        "scan_age_ms": 47
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.135
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 92,
+      "timestamp": "2026-05-09T10:00:18.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.92,
+        "y": 6.792,
+        "z": 1.33
+      },
+      "velocity_mps": 0.61,
+      "localization_confidence": 0.807,
+      "vio_drift_m": 0.146,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.108,
+          "y": 0.272,
+          "z": 9.643
+        },
+        "gyro": {
+          "x": 0.011,
+          "y": 0.028,
+          "z": -0.047
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 22
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 150,
+        "scan_age_ms": 48
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.157
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 93,
+      "timestamp": "2026-05-09T10:00:18.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.269,
+        "y": 5.42,
+        "z": 1.572
+      },
+      "velocity_mps": 0.859,
+      "localization_confidence": 0.809,
+      "vio_drift_m": 0.14,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.044,
+          "y": 0.018,
+          "z": 9.719
+        },
+        "gyro": {
+          "x": 0.015,
+          "y": -0.025,
+          "z": -0.039
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 43
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 143,
+        "scan_age_ms": 56
+      },
+      "tdoa": {
+        "visible_anchor_count": 11,
+        "estimated_error_m": 0.263
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 94,
+      "timestamp": "2026-05-09T10:00:18.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 3.471,
+        "y": 6.1,
+        "z": 1.582
+      },
+      "velocity_mps": 0.272,
+      "localization_confidence": 0.867,
+      "vio_drift_m": 0.128,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.299,
+          "y": -0.18,
+          "z": 9.641
+        },
+        "gyro": {
+          "x": -0.043,
+          "y": -0.033,
+          "z": 0.021
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 22
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 223,
+        "scan_age_ms": 45
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.222
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 95,
+      "timestamp": "2026-05-09T10:00:18.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.2,
+        "y": 4.161,
+        "z": 1.42
+      },
+      "velocity_mps": 0.226,
+      "localization_confidence": 0.89,
+      "vio_drift_m": 0.129,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.196,
+          "y": -0.083,
+          "z": 9.667
+        },
+        "gyro": {
+          "x": 0.049,
+          "y": 0.029,
+          "z": -0.026
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 35
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 123,
+        "scan_age_ms": 48
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.173
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 96,
+      "timestamp": "2026-05-09T10:00:19Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.932,
+        "y": 3.519,
+        "z": 1.654
+      },
+      "velocity_mps": 0.153,
+      "localization_confidence": 0.816,
+      "vio_drift_m": 0.132,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.013,
+          "y": -0.054,
+          "z": 9.723
+        },
+        "gyro": {
+          "x": 0.007,
+          "y": -0.037,
+          "z": -0.018
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 22
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 177,
+        "scan_age_ms": 54
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.106
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 97,
+      "timestamp": "2026-05-09T10:00:19.200000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.316,
+        "y": 5.205,
+        "z": 1.535
+      },
+      "velocity_mps": 0.714,
+      "localization_confidence": 0.751,
+      "vio_drift_m": 0.095,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.221,
+          "y": 0.199,
+          "z": 9.755
+        },
+        "gyro": {
+          "x": -0.02,
+          "y": -0.034,
+          "z": 0.043
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 27
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 164,
+        "scan_age_ms": 58
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.249
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 98,
+      "timestamp": "2026-05-09T10:00:19.400000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 4.002,
+        "y": 5.54,
+        "z": 1.52
+      },
+      "velocity_mps": 0.2,
+      "localization_confidence": 0.793,
+      "vio_drift_m": 0.101,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.002,
+          "y": -0.199,
+          "z": 9.882
+        },
+        "gyro": {
+          "x": -0.035,
+          "y": 0.016,
+          "z": 0.022
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 39
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 163,
+        "scan_age_ms": 27
+      },
+      "tdoa": {
+        "visible_anchor_count": 5,
+        "estimated_error_m": 0.096
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 99,
+      "timestamp": "2026-05-09T10:00:19.600000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 6.794,
+        "y": 6.084,
+        "z": 1.406
+      },
+      "velocity_mps": 0.269,
+      "localization_confidence": 0.857,
+      "vio_drift_m": 0.115,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": -0.282,
+          "y": 0.233,
+          "z": 9.764
+        },
+        "gyro": {
+          "x": 0.014,
+          "y": -0.02,
+          "z": -0.026
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 45
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 207,
+        "scan_age_ms": 50
+      },
+      "tdoa": {
+        "visible_anchor_count": 9,
+        "estimated_error_m": 0.171
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    },
+    {
+      "sample_id": 100,
+      "timestamp": "2026-05-09T10:00:19.800000Z",
+      "drone_id": "UAV_01",
+      "pose": {
+        "x": 5.754,
+        "y": 3.632,
+        "z": 1.466
+      },
+      "velocity_mps": 0.472,
+      "localization_confidence": 0.802,
+      "vio_drift_m": 0.034,
+      "imu": {
+        "sample_rate_hz": 100,
+        "accel": {
+          "x": 0.217,
+          "y": -0.108,
+          "z": 9.896
+        },
+        "gyro": {
+          "x": -0.015,
+          "y": -0.01,
+          "z": 0.026
+        }
+      },
+      "camera": {
+        "fps": 30,
+        "resolution": "1280x720",
+        "frame_age_ms": 36
+      },
+      "lidar": {
+        "packet_rate_hz": 10,
+        "point_count": 191,
+        "scan_age_ms": 31
+      },
+      "tdoa": {
+        "visible_anchor_count": 10,
+        "estimated_error_m": 0.128
+      },
+      "safety_state": "NORMAL",
+      "source": "real"
+    }
+  ]
+}

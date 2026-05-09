@@ -1,6 +1,0 @@
-{
-  "runtime_mode": "simulation",
-  "anchor_config_path": "config/anchors.example.json",
-  "lidar_config_path": "config/lidar.example.json",
-  "detector_labels_path": "config/detector_labels.example.json"
-}
