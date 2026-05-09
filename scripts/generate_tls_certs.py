@@ -10,6 +10,7 @@ from pathlib import Path
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 
@@ -53,6 +54,29 @@ def write_private_key(path: Path, key: rsa.RSAPrivateKey, force: bool) -> None:
 def write_certificate(path: Path, cert: x509.Certificate, force: bool) -> None:
     ensure_writable(path, force)
     path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+
+
+def write_pkcs12_bundle(
+    path: Path,
+    cert: x509.Certificate,
+    key: rsa.RSAPrivateKey,
+    ca_cert: x509.Certificate,
+    force: bool,
+    password: str = "",
+) -> None:
+    ensure_writable(path, force)
+    encryption = serialization.NoEncryption()
+    if password:
+        encryption = serialization.BestAvailableEncryption(password.encode("utf-8"))
+    path.write_bytes(
+        pkcs12.serialize_key_and_certificates(
+            name=b"drone-client",
+            key=key,
+            cert=cert,
+            cas=[ca_cert],
+            encryption_algorithm=encryption,
+        )
+    )
 
 
 def build_name(common_name: str, organization: str) -> x509.Name:
@@ -208,6 +232,7 @@ def main() -> int:
     write_certificate(out_dir / "operator-client.crt", operator_cert, args.force)
     write_private_key(out_dir / "drone-client.key", drone_key, args.force)
     write_certificate(out_dir / "drone-client.crt", drone_cert, args.force)
+    write_pkcs12_bundle(out_dir / "drone-client.pfx", drone_cert, drone_key, ca_cert, args.force)
 
     print(f"certificate bundle written to {out_dir}")
     print("generated files:")
@@ -220,10 +245,13 @@ def main() -> int:
         "operator-client.key",
         "drone-client.crt",
         "drone-client.key",
+        "drone-client.pfx",
     ]:
         print(f"  - {out_dir / name}")
     print("next step:")
-    print("  set DRONE_TLS_* env vars to these files and use https://127.0.0.1:8080")
+    print("  dashboard: set DRONE_TLS_CLIENT_CERT_FILE / DRONE_TLS_CLIENT_KEY_FILE")
+    print("  drone node telemetry: set DRONE_TLS_CLIENT_PFX_FILE to drone-client.pfx")
+    print("  then use https://127.0.0.1:8080")
     return 0
 
 

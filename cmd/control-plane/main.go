@@ -7,6 +7,8 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"os"
@@ -66,9 +68,13 @@ func main() {
 		OperatorRole:          os.Getenv("DRONE_OPERATOR_ROLE"),
 		OperatorSecret:        os.Getenv("DRONE_OPERATOR_SECRET"),
 		Operators:             parseOperatorCredentialsEnv(os.Getenv("DRONE_OPERATOR_CREDENTIALS")),
+		Devices:               parseDeviceRegistry(os.Getenv("DRONE_DEVICE_REGISTRY"), os.Getenv("DRONE_DEVICE_REGISTRY_FILE")),
+		RevokedFingerprints:   parseStringSet(os.Getenv("DRONE_REVOKED_CERT_FINGERPRINTS")),
+		RevokedIdentities:     parseStringSet(os.Getenv("DRONE_REVOKED_IDENTITIES")),
 		MaxCommandSkew:        time.Duration(parseIntEnv("DRONE_MAX_COMMAND_SKEW_SEC", 30)) * time.Second,
 		MaxCommandTTL:         time.Duration(parseIntEnv("DRONE_COMMAND_TTL_SEC", 90)) * time.Second,
 		NonceRetention:        time.Duration(parseIntEnv("DRONE_COMMAND_NONCE_RETENTION_SEC", 300)) * time.Second,
+		MinCertValidity:       time.Duration(parseIntEnv("DRONE_CERT_MIN_VALIDITY_HOURS", 24)) * time.Hour,
 	}
 	if err := securityCfg.Validate(); err != nil {
 		log.Printf("invalid security configuration: %v", err)
@@ -83,6 +89,10 @@ func main() {
 	}
 	if err := tlsCfg.Validate(); err != nil {
 		log.Printf("invalid tls configuration: %v", err)
+		os.Exit(1)
+	}
+	if err := validateHardenedTransport(securityCfg, tlsCfg); err != nil {
+		log.Printf("invalid hardened transport configuration: %v", err)
 		os.Exit(1)
 	}
 	log.Printf("control-plane security profile=%s signed_commands_required=%t operator_id=%s operator_role=%s",
@@ -150,6 +160,69 @@ func parseOperatorCredentialsEnv(value string) map[string]controlplane.OperatorC
 	return operators
 }
 
+func parseDeviceRegistry(value, filePath string) map[string]controlplane.DeviceRecord {
+	devices := map[string]controlplane.DeviceRecord{}
+	if strings.TrimSpace(filePath) != "" {
+		loaded, err := os.ReadFile(filePath)
+		if err == nil {
+			var records []controlplane.DeviceRecord
+			if jsonErr := json.Unmarshal(loaded, &records); jsonErr == nil {
+				for _, record := range records {
+					identity := strings.TrimSpace(record.Identity)
+					if identity == "" {
+						continue
+					}
+					devices[identity] = record
+				}
+			}
+		}
+	}
+	for _, item := range strings.Split(value, ";") {
+		entry := strings.TrimSpace(item)
+		if entry == "" {
+			continue
+		}
+		parts := strings.SplitN(entry, ":", 4)
+		if len(parts) < 2 {
+			continue
+		}
+		identity := strings.TrimSpace(parts[0])
+		deviceType := strings.TrimSpace(parts[1])
+		scope := []string{}
+		status := "active"
+		if len(parts) >= 3 && strings.TrimSpace(parts[2]) != "" {
+			scope = strings.Split(parts[2], ",")
+		}
+		if len(parts) >= 4 && strings.TrimSpace(parts[3]) != "" {
+			status = strings.TrimSpace(parts[3])
+		}
+		if identity == "" || deviceType == "" {
+			continue
+		}
+		devices[identity] = controlplane.DeviceRecord{
+			Identity:     identity,
+			DeviceType:   deviceType,
+			ClusterScope: scope,
+			Status:       status,
+		}
+	}
+	return devices
+}
+
+func parseStringSet(value string) map[string]struct{} {
+	out := map[string]struct{}{}
+	for _, item := range strings.FieldsFunc(value, func(r rune) bool {
+		return r == ';' || r == ',' || r == '\n'
+	}) {
+		item = strings.ToLower(strings.TrimSpace(item))
+		if item == "" {
+			continue
+		}
+		out[item] = struct{}{}
+	}
+	return out
+}
+
 func parseBoolEnv(key string, fallback bool) bool {
 	value := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
 	switch value {
@@ -172,4 +245,18 @@ func parseIntEnv(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func validateHardenedTransport(securityCfg controlplane.SecurityConfig, tlsCfg controlplane.TLSConfig) error {
+	profile := controlplane.NormalizeSecurityProfile(securityCfg.Profile)
+	if profile == "lab" {
+		return nil
+	}
+	if !tlsCfg.Enabled {
+		return errors.New("tls must be enabled outside lab mode")
+	}
+	if !tlsCfg.RequireClientCert {
+		return errors.New("mutual tls with client certificates is required outside lab mode")
+	}
+	return nil
 }

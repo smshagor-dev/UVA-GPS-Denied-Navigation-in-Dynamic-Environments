@@ -15,6 +15,7 @@
 #include "vio/VIOPipeline.hpp"
 #include "vio/EKFEstimator.hpp"
 #include "hal/JetsonHAL.hpp"
+#include "swarm/SwarmSecurity.hpp"
 #include "swarm/V2XMeshNetwork.hpp"
 
 namespace py = pybind11;
@@ -72,9 +73,20 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def_readwrite("localization_source", &vio::RuntimeTelemetry::localization_source)
         .def_readwrite("security_state", &vio::RuntimeTelemetry::security_state)
         .def_readwrite("security_summary", &vio::RuntimeTelemetry::security_summary)
+        .def_readwrite("security_transition_reason", &vio::RuntimeTelemetry::security_transition_reason)
         .def_readwrite("remote_command_allowed", &vio::RuntimeTelemetry::remote_command_allowed)
         .def_readwrite("telemetry_uplink_allowed", &vio::RuntimeTelemetry::telemetry_uplink_allowed)
         .def_readwrite("link_integrity_score", &vio::RuntimeTelemetry::link_integrity_score)
+        .def_readwrite("trust_epoch", &vio::RuntimeTelemetry::trust_epoch)
+        .def_readwrite("last_auth_failure_at_s", &vio::RuntimeTelemetry::last_auth_failure_at_s)
+        .def_readwrite("tamper_score", &vio::RuntimeTelemetry::tamper_score)
+        .def_readwrite("firmware_measurement", &vio::RuntimeTelemetry::firmware_measurement)
+        .def_readwrite("firmware_version", &vio::RuntimeTelemetry::firmware_version)
+        .def_readwrite("secure_boot_state", &vio::RuntimeTelemetry::secure_boot_state)
+        .def_readwrite("boot_trust_summary", &vio::RuntimeTelemetry::boot_trust_summary)
+        .def_readwrite("rollback_counter", &vio::RuntimeTelemetry::rollback_counter)
+        .def_readwrite("maintenance_mode", &vio::RuntimeTelemetry::maintenance_mode)
+        .def_readwrite("update_channel_state", &vio::RuntimeTelemetry::update_channel_state)
         .def_readwrite("last_remote_command_status", &vio::RuntimeTelemetry::last_remote_command_status)
         .def_readwrite("health_flags", &vio::RuntimeTelemetry::health_flags);
 
@@ -127,6 +139,12 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def_readwrite("leader_target", &swarm::FormationCommand::leader_target)
         .def_readwrite("velocity_mps",  &swarm::FormationCommand::velocity_mps);
 
+    py::class_<swarm::SwarmSecurityConfig>(m, "SwarmSecurityConfig")
+        .def(py::init<>())
+        .def_readwrite("enabled", &swarm::SwarmSecurityConfig::enabled)
+        .def_readwrite("swarm_secret", &swarm::SwarmSecurityConfig::swarm_secret)
+        .def_readwrite("pbkdf2_iterations", &swarm::SwarmSecurityConfig::pbkdf2_iterations);
+
     //  PeerInfo 
     py::class_<swarm::PeerInfo>(m, "PeerInfo")
         .def(py::init<>())
@@ -155,6 +173,9 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def("avg_latency_ms",  &swarm::V2XMeshNetwork::avg_latency_ms)
         .def("packet_loss_pct", &swarm::V2XMeshNetwork::packet_loss_pct)
         .def("trigger_election",&swarm::V2XMeshNetwork::trigger_election)
+        .def("configure_security", &swarm::V2XMeshNetwork::configure_security)
+        .def("security_enabled", &swarm::V2XMeshNetwork::security_enabled)
+        .def("security_last_error", &swarm::V2XMeshNetwork::security_last_error)
         .def("send_formation",  &swarm::V2XMeshNetwork::send_formation)
         .def("broadcast",
              &swarm::V2XMeshNetwork::broadcast,

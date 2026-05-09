@@ -19,14 +19,18 @@ type SecurityConfig struct {
 	OperatorRole          string
 	OperatorSecret        string
 	Operators             map[string]OperatorCredential
+	Devices               map[string]DeviceRecord
+	RevokedFingerprints   map[string]struct{}
+	RevokedIdentities     map[string]struct{}
 	MaxCommandSkew        time.Duration
 	MaxCommandTTL         time.Duration
 	NonceRetention        time.Duration
+	MinCertValidity       time.Duration
 }
 
 type OperatorCredential struct {
-	OperatorID   string
-	OperatorRole string
+	OperatorID     string
+	OperatorRole   string
 	OperatorSecret string
 }
 
@@ -92,6 +96,15 @@ func (cfg SecurityConfig) normalized() SecurityConfig {
 	if cfg.Operators == nil {
 		cfg.Operators = map[string]OperatorCredential{}
 	}
+	if cfg.Devices == nil {
+		cfg.Devices = map[string]DeviceRecord{}
+	}
+	if cfg.RevokedFingerprints == nil {
+		cfg.RevokedFingerprints = map[string]struct{}{}
+	}
+	if cfg.RevokedIdentities == nil {
+		cfg.RevokedIdentities = map[string]struct{}{}
+	}
 	if id := strings.TrimSpace(cfg.OperatorID); id != "" {
 		cfg.Operators[id] = OperatorCredential{
 			OperatorID:     id,
@@ -114,6 +127,39 @@ func (cfg SecurityConfig) normalized() SecurityConfig {
 		normalizedOperators[normalizedID] = operator
 	}
 	cfg.Operators = normalizedOperators
+	normalizedDevices := make(map[string]DeviceRecord, len(cfg.Devices)+len(cfg.Operators))
+	for identity, device := range cfg.Devices {
+		normalizedIdentity := strings.TrimSpace(identity)
+		if normalizedIdentity == "" {
+			continue
+		}
+		if strings.TrimSpace(device.Identity) == "" {
+			device.Identity = normalizedIdentity
+		}
+		device.Identity = strings.TrimSpace(device.Identity)
+		switch strings.ToLower(strings.TrimSpace(device.DeviceType)) {
+		case "drone", "control-plane", "provisioner":
+			device.DeviceType = strings.ToLower(strings.TrimSpace(device.DeviceType))
+		default:
+			device.DeviceType = NormalizeOperatorRole(device.DeviceType)
+		}
+		device.Status = normalizeDeviceStatus(device.Status)
+		device.ClusterScope = normalizeClusterScope(device.ClusterScope)
+		normalizedDevices[normalizedIdentity] = device
+	}
+	for id, operator := range cfg.Operators {
+		if _, exists := normalizedDevices[id]; exists {
+			continue
+		}
+		normalizedDevices[id] = DeviceRecord{
+			Identity:   id,
+			DeviceType: operator.OperatorRole,
+			Status:     "active",
+		}
+	}
+	cfg.Devices = normalizedDevices
+	cfg.RevokedFingerprints = normalizeRevokedSet(cfg.RevokedFingerprints)
+	cfg.RevokedIdentities = normalizeRevokedSet(cfg.RevokedIdentities)
 	if cfg.MaxCommandSkew <= 0 {
 		cfg.MaxCommandSkew = 30 * time.Second
 	}
@@ -122,6 +168,9 @@ func (cfg SecurityConfig) normalized() SecurityConfig {
 	}
 	if cfg.NonceRetention <= 0 {
 		cfg.NonceRetention = 5 * time.Minute
+	}
+	if cfg.MinCertValidity < 0 {
+		cfg.MinCertValidity = 0
 	}
 	return cfg
 }
@@ -156,6 +205,14 @@ func (cfg SecurityConfig) Validate() error {
 			if strings.TrimSpace(operator.OperatorSecret) == "" {
 				return fmt.Errorf("operator secret is required for operator %q", id)
 			}
+		}
+	}
+	for identity, device := range cfg.Devices {
+		if strings.TrimSpace(identity) == "" {
+			return errors.New("device registry identity cannot be empty")
+		}
+		if strings.TrimSpace(device.DeviceType) == "" {
+			return fmt.Errorf("device %q is missing a device type", identity)
 		}
 	}
 	return nil
@@ -336,4 +393,115 @@ func (v *CommandSecurityValidator) claimNonce(operatorID, nonce string, expiresA
 	}
 	v.usedNonces[key] = retainUntil
 	return nil
+}
+
+func normalizeDeviceStatus(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "rotating", "rotation-pending":
+		return "rotating"
+	case "revoked", "disabled":
+		return "revoked"
+	default:
+		return "active"
+	}
+}
+
+func normalizeClusterScope(scope []string) []string {
+	out := make([]string, 0, len(scope))
+	seen := map[string]struct{}{}
+	for _, item := range scope {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+	}
+	return out
+}
+
+func normalizeRevokedSet(in map[string]struct{}) map[string]struct{} {
+	out := make(map[string]struct{}, len(in))
+	for value := range in {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if value == "" {
+			continue
+		}
+		out[value] = struct{}{}
+	}
+	return out
+}
+
+func (cfg SecurityConfig) AuthorizePeer(peer PeerIdentity, allowedTypes []string, clusterID string) (DeviceRecord, error) {
+	cfg = cfg.normalized()
+	if cfg.Profile == "lab" {
+		return DeviceRecord{}, nil
+	}
+	if !peer.Verified {
+		return DeviceRecord{}, errors.New("verified client certificate is required")
+	}
+	fingerprint := strings.ToLower(strings.TrimSpace(peer.FingerprintSHA256))
+	if fingerprint != "" {
+		if _, revoked := cfg.RevokedFingerprints[fingerprint]; revoked {
+			return DeviceRecord{}, errors.New("client certificate fingerprint is revoked")
+		}
+	}
+	identities := make([]string, 0, len(peer.Identities)+1)
+	seen := map[string]struct{}{}
+	for _, identity := range peer.Identities {
+		identity = strings.TrimSpace(identity)
+		if identity == "" {
+			continue
+		}
+		if _, ok := seen[identity]; ok {
+			continue
+		}
+		seen[identity] = struct{}{}
+		identities = append(identities, identity)
+	}
+	if cfg.MinCertValidity > 0 && !peer.NotAfter.IsZero() && time.Until(peer.NotAfter) < cfg.MinCertValidity {
+		return DeviceRecord{}, fmt.Errorf("client certificate rotation is required within %s", cfg.MinCertValidity)
+	}
+	allowed := map[string]struct{}{}
+	for _, item := range allowedTypes {
+		item = strings.TrimSpace(strings.ToLower(item))
+		if item == "" {
+			continue
+		}
+		allowed[item] = struct{}{}
+	}
+	for _, identity := range identities {
+		if _, revoked := cfg.RevokedIdentities[strings.ToLower(identity)]; revoked {
+			return DeviceRecord{}, fmt.Errorf("client identity %q is revoked", identity)
+		}
+		device, ok := cfg.Devices[identity]
+		if !ok {
+			continue
+		}
+		if device.Status == "revoked" {
+			return DeviceRecord{}, fmt.Errorf("device %q is revoked", identity)
+		}
+		if len(allowed) > 0 {
+			if _, ok := allowed[strings.ToLower(device.DeviceType)]; !ok {
+				return DeviceRecord{}, fmt.Errorf("device %q with type %q is not authorized for this route", identity, device.DeviceType)
+			}
+		}
+		if clusterID != "" && len(device.ClusterScope) > 0 {
+			matched := false
+			for _, scope := range device.ClusterScope {
+				if scope == clusterID {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return DeviceRecord{}, fmt.Errorf("device %q is not authorized for cluster %q", identity, clusterID)
+			}
+		}
+		return device, nil
+	}
+	return DeviceRecord{}, errors.New("peer identity is not present in the device registry")
 }

@@ -5,6 +5,9 @@
 package controlplane
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sort"
@@ -30,6 +33,13 @@ func asFloat64(value any) (float64, bool) {
 	}
 }
 
+func movementStep(payload map[string]any) float64 {
+	if value, ok := asFloat64(payload["step_m"]); ok && value > 0 {
+		return value
+	}
+	return 1.5
+}
+
 type FleetState struct {
 	mu            sync.RWMutex
 	drones        map[int]DroneTelemetry
@@ -39,6 +49,7 @@ type FleetState struct {
 	events        []EventRecord
 	clusterForm   map[string]string
 	clusterLeader map[string]int
+	lastAuditHash string
 }
 
 func NewFleetState() *FleetState {
@@ -207,6 +218,10 @@ func (s *FleetState) RecordCommand(cmd CommandEnvelope) {
 	log.Printf("FleetState.RecordCommand id=%s action=%s", cmd.CommandID, cmd.Action)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	prevHash := s.lastAuditHash
+	cmd.AuditPrevHash = prevHash
+	cmd.AuditHash = auditHash("command", cmd.CommandID, cmd.Action, cmd.IssuedBy, cmd.Payload, prevHash, cmd.IssuedAt)
+	s.lastAuditHash = cmd.AuditHash
 	s.commands = append(s.commands, cmd)
 }
 
@@ -223,6 +238,10 @@ func (s *FleetState) AddEvent(event EventRecord) {
 	log.Printf("FleetState.AddEvent type=%s message=%s", event.Type, event.Message)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	prevHash := s.lastAuditHash
+	event.AuditPrevHash = prevHash
+	event.AuditHash = auditHash("event", event.Type, event.Message, "", event.Data, prevHash, event.Timestamp)
+	s.lastAuditHash = event.AuditHash
 	s.events = append(s.events, event)
 	if len(s.events) > 512 {
 		s.events = append([]EventRecord(nil), s.events[len(s.events)-512:]...)
@@ -289,6 +308,26 @@ func (s *FleetState) Events() []EventRecord {
 	return out
 }
 
+func auditHash(kind, subjectID, message, actor string, payload map[string]any, prevHash string, ts time.Time) string {
+	if ts.IsZero() {
+		ts = time.Now().UTC()
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		encoded = []byte("{}")
+	}
+	sum := sha256.Sum256([]byte(strings.Join([]string{
+		kind,
+		strings.TrimSpace(subjectID),
+		strings.TrimSpace(message),
+		strings.TrimSpace(actor),
+		string(encoded),
+		strings.TrimSpace(prevHash),
+		ts.UTC().Format(time.RFC3339Nano),
+	}, "\n")))
+	return hex.EncodeToString(sum[:])
+}
+
 func (s *FleetState) AddDrone(droneID int, clusterID string) DroneTelemetry {
 	log.Printf("FleetState.AddDrone requested drone=%d cluster=%s", droneID, clusterID)
 	s.mu.RLock()
@@ -322,6 +361,8 @@ func (s *FleetState) AddDrone(droneID int, clusterID string) DroneTelemetry {
 		ThrustVector:            [3]float64{0.0, 0.0, 9.81},
 		CommandedAltitudeM:      8.0,
 		CommandedSpeedMPS:       3.0,
+		ManualTargetPosition:    [3]float64{float64(droneID % 20), float64((droneID / 20) % 10), 8.0 + float64(droneID%3)},
+		ManualControlActive:     false,
 		DriftM:                  0.05,
 		BatteryPct:              96.0,
 		RSSIDBm:                 -50.0,
@@ -343,6 +384,13 @@ func (s *FleetState) AddDrone(droneID int, clusterID string) DroneTelemetry {
 		RemoteCommandAllowed:    true,
 		TelemetryUplinkAllowed:  true,
 		LinkIntegrityScore:      0.90,
+		FirmwareMeasurement:     "lab-local-build",
+		FirmwareVersion:         "2.0.0",
+		SecureBootState:         "LAB_BOOT",
+		BootTrustSummary:        "Lab digital twin boot trust state",
+		RollbackCounter:         1,
+		MaintenanceMode:         false,
+		UpdateChannelState:      "idle",
 		LastRemoteCommandStatus: "no remote command",
 		Timestamp:               time.Now().UTC(),
 	}
@@ -388,6 +436,7 @@ func (s *FleetState) ApplyCommand(action string, clusterID string, targetIDs []i
 
 		switch action {
 		case "formation":
+			drone.ManualControlActive = false
 			if shape, ok := payload["shape"].(string); ok {
 				drone.MissionState = "formation-" + strings.ToLower(shape)
 				s.clusterForm[drone.ClusterID] = shape
@@ -395,17 +444,95 @@ func (s *FleetState) ApplyCommand(action string, clusterID string, targetIDs []i
 				drone.MissionState = "formation-hold"
 			}
 		case "hold_position":
+			drone.ManualControlActive = true
+			drone.ManualTargetPosition = drone.Position
 			drone.MissionState = "hold-position"
+		case "move_left":
+			step := movementStep(payload)
+			base := drone.Position
+			if drone.ManualControlActive {
+				base = drone.ManualTargetPosition
+			}
+			base[0] -= step
+			drone.ManualTargetPosition = base
+			drone.ManualControlActive = true
+			drone.MissionState = "remote-nav"
+		case "move_right":
+			step := movementStep(payload)
+			base := drone.Position
+			if drone.ManualControlActive {
+				base = drone.ManualTargetPosition
+			}
+			base[0] += step
+			drone.ManualTargetPosition = base
+			drone.ManualControlActive = true
+			drone.MissionState = "remote-nav"
+		case "move_up":
+			step := movementStep(payload)
+			base := drone.Position
+			if drone.ManualControlActive {
+				base = drone.ManualTargetPosition
+			}
+			base[1] += step
+			drone.ManualTargetPosition = base
+			drone.ManualControlActive = true
+			drone.MissionState = "remote-nav"
+		case "move_down":
+			step := movementStep(payload)
+			base := drone.Position
+			if drone.ManualControlActive {
+				base = drone.ManualTargetPosition
+			}
+			base[1] -= step
+			drone.ManualTargetPosition = base
+			drone.ManualControlActive = true
+			drone.MissionState = "remote-nav"
 		case "return_home":
+			drone.ManualControlActive = false
 			drone.MissionState = "return-home"
 		case "emergency_land":
+			drone.ManualControlActive = false
 			drone.MissionState = "emergency-land"
 		case "fly":
+			drone.ManualControlActive = false
 			drone.MissionState = "fly"
 		case "land":
+			drone.ManualControlActive = false
 			drone.MissionState = "land"
 		case "election":
+			drone.ManualControlActive = false
 			drone.MissionState = "leader-election"
+		case "maintenance_mode":
+			drone.ManualControlActive = false
+			drone.MaintenanceMode = true
+			drone.UpdateChannelState = "maintenance-window-open"
+			drone.MissionState = "maintenance-window"
+		case "firmware_update":
+			drone.ManualControlActive = false
+			drone.MaintenanceMode = true
+			drone.MissionState = "firmware-update"
+			if value, ok := payload["firmware_version"].(string); ok && strings.TrimSpace(value) != "" {
+				drone.FirmwareVersion = strings.TrimSpace(value)
+			}
+			if value, ok := payload["firmware_measurement"].(string); ok && strings.TrimSpace(value) != "" {
+				drone.FirmwareMeasurement = strings.TrimSpace(value)
+			}
+			if value, ok := payload["secure_boot_state"].(string); ok && strings.TrimSpace(value) != "" {
+				drone.SecureBootState = strings.TrimSpace(value)
+			} else {
+				drone.SecureBootState = "SECURE_BOOT_TRUSTED"
+			}
+			if value, ok := payload["boot_trust_summary"].(string); ok && strings.TrimSpace(value) != "" {
+				drone.BootTrustSummary = strings.TrimSpace(value)
+			} else {
+				drone.BootTrustSummary = "Firmware update applied through trusted maintenance workflow"
+			}
+			if value, ok := asFloat64(payload["rollback_counter"]); ok && value >= 0 {
+				drone.RollbackCounter = uint64(value)
+			} else {
+				drone.RollbackCounter++
+			}
+			drone.UpdateChannelState = "firmware-updated"
 		case "remove_drone":
 			delete(s.drones, id)
 			affected++

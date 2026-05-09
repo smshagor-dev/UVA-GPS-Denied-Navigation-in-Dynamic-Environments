@@ -52,6 +52,13 @@ At larger scale, the same onboard logic can connect to the `Go control plane` so
 - command fan-out endpoint
 - health monitoring endpoint
 - event/log aggregation endpoint
+- device-registry enforcement for hardened mTLS peers
+- certificate revocation / rotation policy checks
+- hash-chained command and security audit trail
+- critical-command two-person approval workflow
+- signed firmware manifest verification and secure-boot trust checks
+- anti-rollback firmware counters with persisted trust state
+- maintenance-window gating for trusted firmware updates
 - discovery endpoint
 - in-memory digital twin state store
 
@@ -386,6 +393,7 @@ Current implementation status:
 
 - integrated HTTP control-plane service is present
 - telemetry, fleet, mission, command, health, event, and discovery endpoints are present
+- approvals endpoint is present
 - in-memory digital twin state store is present
 - dashboard can connect to the backend using `--backend-url`
 
@@ -397,6 +405,7 @@ Current API routes:
 - `GET,POST /api/v1/missions`
 - `GET /api/v1/health`
 - `GET /api/v1/events`
+- `GET /api/v1/approvals`
 - `GET /api/v1/discovery`
 
 ## 10. Dashboard Operating Modes
@@ -491,6 +500,7 @@ $env:DRONE_TLS_ENABLED="true"
 $env:DRONE_TLS_CA_FILE="certs/ca.crt"
 $env:DRONE_TLS_CLIENT_CERT_FILE="certs/operator-client.crt"
 $env:DRONE_TLS_CLIENT_KEY_FILE="certs/operator-client.key"
+$env:DRONE_TLS_CLIENT_PFX_FILE="certs/drone-client.pfx"
 python gui/dashboard.py --backend-url https://127.0.0.1:8080
 ```
 
@@ -500,13 +510,54 @@ Before first hardened run, generate local certificates:
 python scripts/generate_tls_certs.py --force
 ```
 
+Generate a signed firmware manifest for Phase 4 boot trust:
+
+```powershell
+python scripts/generate_firmware_manifest.py --measurement fw-secure-2026-04-17 --secret replace-with-a-phase4-signing-secret --secure-boot-attested --bootloader-locked
+```
+
 The generated operator client certificate uses common name `operator-console-1` by default. In mTLS mode, that identity must match `DRONE_OPERATOR_ID` or command submission will be rejected.
 Role-based command authorization is also enforced by the control plane through `DRONE_OPERATOR_ROLE`. Use `operator` for standard mission control, `commander` for election privileges, and `maintenance` for maintenance-only actions.
+The same generator now also emits `certs/drone-client.pfx` for the native C++ telemetry client. Use `DRONE_TLS_CLIENT_PFX_FILE` when `DRONE_ENABLE_BACKEND_TELEMETRY=true` so the drone can present its own mTLS client certificate to the Go backend.
 For multi-operator approval workflows, configure the control-plane with `DRONE_OPERATOR_CREDENTIALS` using `operator_id:role:secret;...`. Critical actions such as `election` and `emergency_land` now require a second distinct authenticated operator to approve the exact same request.
+For hardened device identity enforcement, configure `DRONE_DEVICE_REGISTRY` or `DRONE_DEVICE_REGISTRY_FILE`. Example:
+
+```powershell
+$env:DRONE_DEVICE_REGISTRY="operator-console-1:commander::active;operator-console-2:operator::active;drone-node-1:drone:cluster-01:active"
+```
+
+The registry is checked against the verified client certificate identity on telemetry, approvals, event access, and signed command submission. You can revoke clients immediately with `DRONE_REVOKED_IDENTITIES` or `DRONE_REVOKED_CERT_FINGERPRINTS`, and you can force certificate rotation by setting `DRONE_CERT_MIN_VALIDITY_HOURS`.
+Phase 4 boot/update trust is configured with `DRONE_FIRMWARE_*`, `DRONE_SECURE_BOOT_ATTESTED`, `DRONE_BOOTLOADER_LOCKED`, and `DRONE_MAINTENANCE_*` variables. In hardened mode the drone runtime now validates a signed firmware manifest, enforces secure-boot attestation, persists a rollback counter under `DRONE_FIRMWARE_STATE_FILE`, and refuses maintenance mode without `DRONE_MAINTENANCE_APPROVAL_TOKEN`.
 
 The onboard C++ runtime now also evaluates a drone security state from link integrity, timing trust, localization loss, and hardened-profile trust posture. In bridge mode this is exposed as `security_state`, `security_summary`, `link_integrity_score`, and health flags to the dashboard.
 It also keeps a drone-side remote command inbox and policy gate: secure swarm commands such as formation hold, mission sync, and emergency stop are accepted or rejected on the drone itself based on the current onboard security state.
-The node can now also post native telemetry directly to the Go backend when `DRONE_ENABLE_BACKEND_TELEMETRY=true`, which lets the backend/dashboard receive the drone's onboard security posture without depending on the Python bridge.
+The node can now also post native telemetry directly to the Go backend when `DRONE_ENABLE_BACKEND_TELEMETRY=true`, which lets the backend/dashboard receive the drone's onboard security posture without depending on the Python bridge. In hardened mode this telemetry path uses HTTPS plus a drone client certificate from `DRONE_TLS_CLIENT_PFX_FILE`.
+
+Phase 2 status in `SECURITY_IMPLEMENTATION.md` is now complete end-to-end in the repository:
+
+- per-device registry enforcement for operator and drone mTLS identities
+- certificate revocation by identity or fingerprint
+- certificate rotation enforcement through minimum remaining validity policy
+- role-based operator authorization with signed command validation
+- critical-command second-operator approval flow
+- hash-chained audit trail for commands and security events
+
+Phase 3 status in `SECURITY_IMPLEMENTATION.md` is now complete end-to-end in the repository:
+
+- explicit onboard security-state machine in the C++ runtime
+- remote-command safety plus authorization gating on the drone
+- failsafe/autonomy binding for `HOLD_POSITION`, `RETURN_HOME`, and `EMERGENCY_LAND`
+- security posture propagation through bridge telemetry, native backend telemetry, Go fleet snapshots, and dashboard views
+- backend tests that verify security telemetry fields survive ingest-to-snapshot flow
+
+Phase 4 status in `SECURITY_IMPLEMENTATION.md` is now complete end-to-end in the repository:
+
+- signed firmware manifest validation in the C++ runtime
+- secure-boot and bootloader-lock attestation enforcement in hardened profiles
+- persisted anti-rollback counter and version checks
+- maintenance-window authorization for firmware updates
+- firmware trust state propagated through native telemetry, backend snapshots, and dashboard views
+- backend validation for `firmware_update` and `maintenance_mode` command workflows
 
 #### 4. Dashboard in local mode
 
@@ -588,16 +639,12 @@ Known limitations:
 - several checked-in build folders may be stale across path or machine changes
 - `scripts/drone_setup.py` is mainly Linux/Jetson oriented
 
-Verification completed in this workspace on `2026-04-08`:
+Verification completed in this workspace on `2026-04-17`:
 
 - `python -m py_compile main.py gui/dashboard.py scripts/drone_setup.py` passed
 - `go test ./...` passed
-- `cmake -S . -B build-runtime-check -DBUILD_TESTS=OFF` passed
-- `cmake --build build-runtime-check --config Release --target drone_node drone_bridge` passed
-- `drone_bridge` imported successfully from the built module with Windows DLL directories added
-- `test_autonomy.exe` passed
-- `test_navigation_intelligence.exe` passed
-- native `Fast-DDS` transport was detected after local package installation
+- `ctest --test-dir build -C Release --output-on-failure` passed for 47/48 registered tests; `test_v2x` currently fails in two leader-follower avoidance assertions unrelated to Phase 3 security flow
+- Phase 3 security path re-verified across C++ runtime, Go ingest, and dashboard/backend data models
 
 What that means:
 

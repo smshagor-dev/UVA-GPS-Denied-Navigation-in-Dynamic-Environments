@@ -105,6 +105,8 @@ func (s *Server) seedDigitalTwin(n int) {
 			ThrustVector:            [3]float64{0.0, 0.0, 9.81},
 			CommandedAltitudeM:      8.0 + float64(i%3)*0.5,
 			CommandedSpeedMPS:       3.0,
+			ManualTargetPosition:    [3]float64{float64(i % 20), float64((i / 20) % 10), 8.0 + float64(i%3)},
+			ManualControlActive:     false,
 			DriftM:                  0.08 + math.Mod(float64(i), 7)*0.01,
 			BatteryPct:              92.0 - math.Mod(float64(i), 20),
 			RSSIDBm:                 -48.0 - math.Mod(float64(i), 8),
@@ -126,6 +128,13 @@ func (s *Server) seedDigitalTwin(n int) {
 			RemoteCommandAllowed:    true,
 			TelemetryUplinkAllowed:  true,
 			LinkIntegrityScore:      0.92 - math.Mod(float64(i), 5)*0.06,
+			FirmwareMeasurement:     "seeded-demo-build",
+			FirmwareVersion:         "2.0.0",
+			SecureBootState:         "LAB_BOOT",
+			BootTrustSummary:        "Seeded digital twin boot trust state",
+			RollbackCounter:         1,
+			MaintenanceMode:         false,
+			UpdateChannelState:      "idle",
 			LastRemoteCommandStatus: "no remote command",
 			Timestamp:               time.Now().UTC(),
 		})
@@ -150,6 +159,9 @@ func (s *Server) handleTelemetry(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 		return
 	}
+	if !s.requireVerifiedPeer(w, r, "telemetry uplink") {
+		return
+	}
 	var telemetry DroneTelemetry
 	if err := decodeJSONBody(r, &telemetry); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -157,6 +169,9 @@ func (s *Server) handleTelemetry(w http.ResponseWriter, r *http.Request) {
 	}
 	if telemetry.DroneID <= 0 {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid drone_id"})
+		return
+	}
+	if _, ok := s.requireAuthorizedPeer(w, r, "telemetry uplink", telemetry.ClusterID, "drone", "control-plane"); !ok {
 		return
 	}
 	s.state.UpsertTelemetry(telemetry)
@@ -246,7 +261,14 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if !RoleAllowsAction(validated.IssuerRole, validated.Action) {
+	clusterID := ""
+	if rawClusterID, ok := validated.Payload["cluster_id"].(string); ok {
+		clusterID = strings.TrimSpace(rawClusterID)
+	}
+	if _, ok := s.requireAuthorizedPeer(w, r, "command submission", clusterID, validated.IssuerRole); !ok {
+		return
+	}
+	if s.security.Profile != "lab" && !RoleAllowsAction(validated.IssuerRole, validated.Action) {
 		s.state.AddEvent(EventRecord{
 			Type:      "security",
 			Message:   "command rejected: role is not authorized for action",
@@ -261,6 +283,24 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 		})
 		writeJSON(w, http.StatusForbidden, map[string]any{"error": fmt.Sprintf("role %q is not authorized for action %q", validated.IssuerRole, validated.Action)})
 		return
+	}
+	if s.security.Profile != "lab" {
+		if err := validateMaintenanceWorkflow(validated); err != nil {
+			s.state.AddEvent(EventRecord{
+				Type:      "security",
+				Message:   fmt.Sprintf("command rejected: %v", err),
+				Timestamp: time.Now().UTC(),
+				Data: map[string]any{
+					"remote_addr":      r.RemoteAddr,
+					"action":           validated.Action,
+					"issued_by":        validated.IssuedBy,
+					"issuer_role":      validated.IssuerRole,
+					"peer_common_name": peerIdentity.CommonName,
+				},
+			})
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
 	}
 	validatedPayloadJSON, err := canonicalPayloadExcludingApproval(validated.Payload)
 	if err != nil {
@@ -346,8 +386,8 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 		Authenticated:   validated.Authenticated,
 		SecurityProfile: s.security.Profile,
 	}
-	if clusterID, ok := validated.Payload["cluster_id"].(string); ok {
-		cmd.ClusterID = strings.TrimSpace(clusterID)
+	if clusterID != "" {
+		cmd.ClusterID = clusterID
 	}
 	if rawTargets, ok := validated.Payload["target_ids"].([]any); ok {
 		for _, raw := range rawTargets {
@@ -409,11 +449,47 @@ func (s *Server) handleCommands(w http.ResponseWriter, r *http.Request) {
 
 func CommandRequiresApproval(action string) bool {
 	switch strings.TrimSpace(strings.ToLower(action)) {
-	case "election", "emergency_land":
+	case "election", "emergency_land", "firmware_update":
 		return true
 	default:
 		return false
 	}
+}
+
+func validateMaintenanceWorkflow(cmd ValidatedCommand) error {
+	switch cmd.Action {
+	case "maintenance_mode":
+		tokenID, _ := cmd.Payload["maintenance_token_id"].(string)
+		if strings.TrimSpace(tokenID) == "" {
+			return errors.New("maintenance_mode requires maintenance_token_id")
+		}
+		return nil
+	case "firmware_update":
+		tokenID, _ := cmd.Payload["maintenance_token_id"].(string)
+		version, _ := cmd.Payload["firmware_version"].(string)
+		measurement, _ := cmd.Payload["firmware_measurement"].(string)
+		signature, _ := cmd.Payload["firmware_signature"].(string)
+		signer, _ := cmd.Payload["firmware_signer"].(string)
+		maintenanceWindow, _ := cmd.Payload["maintenance_window"].(bool)
+		if strings.TrimSpace(tokenID) == "" {
+			return errors.New("firmware_update requires maintenance_token_id")
+		}
+		if !maintenanceWindow {
+			return errors.New("firmware_update requires maintenance_window=true")
+		}
+		if strings.TrimSpace(version) == "" || strings.TrimSpace(measurement) == "" ||
+			strings.TrimSpace(signature) == "" || strings.TrimSpace(signer) == "" {
+			return errors.New("firmware_update requires firmware_version, firmware_measurement, firmware_signer, and firmware_signature")
+		}
+		if counter, ok := cmd.Payload["rollback_counter"]; ok {
+			if value, ok := asFloat64(counter); !ok || value < 0 {
+				return errors.New("firmware_update rollback_counter must be a non-negative number")
+			}
+		} else {
+			return errors.New("firmware_update requires rollback_counter")
+		}
+	}
+	return nil
 }
 
 func payloadWithoutApproval(payload map[string]any) map[string]any {
@@ -457,6 +533,13 @@ func (s *Server) handleMissions(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"missions": s.state.Missions()})
 	case http.MethodPost:
+		if s.security.Profile != "lab" {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "mission creation must be submitted through signed /api/v1/commands in hardened profiles"})
+			return
+		}
+		if !s.requireVerifiedPeer(w, r, "mission scheduling") {
+			return
+		}
 		var plan MissionPlan
 		if err := decodeJSONBody(r, &plan); err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
@@ -484,6 +567,9 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	log.Printf("handleEvents method=%s remote=%s", r.Method, r.RemoteAddr)
+	if _, ok := s.requireAuthorizedPeer(w, r, "security event access", "", "operator", "commander", "maintenance", "control-plane"); !ok {
+		return
+	}
 	limit := 50
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -501,6 +587,9 @@ func (s *Server) handleApprovals(w http.ResponseWriter, r *http.Request) {
 	log.Printf("handleApprovals method=%s remote=%s", r.Method, r.RemoteAddr)
 	if r.Method != http.MethodGet {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	if _, ok := s.requireAuthorizedPeer(w, r, "approval status access", "", "operator", "commander", "maintenance", "control-plane"); !ok {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"approvals": s.state.PendingApprovals()})
@@ -563,6 +652,69 @@ func (s *Server) withRecovery(next http.HandlerFunc) http.HandlerFunc {
 		}()
 		next(w, r)
 	}
+}
+
+func (s *Server) requireVerifiedPeer(w http.ResponseWriter, r *http.Request, purpose string) bool {
+	if s.security.Profile == "lab" {
+		return true
+	}
+	if !s.tls.Enabled || !s.tls.RequireClientCert {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "verified client certificates are required in hardened profiles"})
+		return false
+	}
+	peerIdentity := RequestPeerIdentity(r)
+	if !peerIdentity.Verified {
+		s.state.AddEvent(EventRecord{
+			Type:      "security",
+			Message:   fmt.Sprintf("%s rejected: verified client certificate required", purpose),
+			Timestamp: time.Now().UTC(),
+			Data: map[string]any{
+				"remote_addr":      r.RemoteAddr,
+				"peer_common_name": peerIdentity.CommonName,
+				"peer_fingerprint": peerIdentity.FingerprintSHA256,
+			},
+		})
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "verified client certificate is required"})
+		return false
+	}
+	return true
+}
+
+func (s *Server) requireAuthorizedPeer(w http.ResponseWriter, r *http.Request, purpose, clusterID string, allowedTypes ...string) (DeviceRecord, bool) {
+	if !s.requireVerifiedPeer(w, r, purpose) {
+		return DeviceRecord{}, false
+	}
+	peerIdentity := RequestPeerIdentity(r)
+	device, err := s.security.AuthorizePeer(peerIdentity, allowedTypes, clusterID)
+	if err != nil {
+		s.state.AddEvent(EventRecord{
+			Type:      "security",
+			Message:   fmt.Sprintf("%s rejected: %v", purpose, err),
+			Timestamp: time.Now().UTC(),
+			Data: map[string]any{
+				"remote_addr":      r.RemoteAddr,
+				"peer_common_name": peerIdentity.CommonName,
+				"peer_fingerprint": peerIdentity.FingerprintSHA256,
+				"cluster_id":       clusterID,
+			},
+		})
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": err.Error()})
+		return DeviceRecord{}, false
+	}
+	if device.Status == "rotating" {
+		s.state.AddEvent(EventRecord{
+			Type:      "security",
+			Message:   fmt.Sprintf("%s accepted during certificate rotation", purpose),
+			Timestamp: time.Now().UTC(),
+			Data: map[string]any{
+				"remote_addr":      r.RemoteAddr,
+				"peer_common_name": peerIdentity.CommonName,
+				"peer_fingerprint": peerIdentity.FingerprintSHA256,
+				"cluster_id":       clusterID,
+			},
+		})
+	}
+	return device, true
 }
 
 func (s *Server) simulateFlightLoop() {
@@ -701,6 +853,14 @@ func flightTargetForDrone(drone DroneTelemetry, leaderID int, slot int, leaderPo
 		return [3]float64{0, 0, targetAltitude}, [3]float64{}, maxSpeed, maxAccel
 	case "hold-position", "leader-election":
 		return drone.Position, [3]float64{}, math.Min(maxSpeed, 1.0), maxAccel
+	}
+
+	if drone.ManualControlActive {
+		target := drone.ManualTargetPosition
+		if target[2] < 0 {
+			target[2] = 0
+		}
+		return target, [3]float64{}, math.Max(1.2, maxSpeed), math.Max(1.5, maxAccel)
 	}
 
 	if drone.DroneID == leaderID {

@@ -7,41 +7,54 @@ package controlplane
 import "time"
 
 type DroneTelemetry struct {
-	DroneID                 int        `json:"drone_id"`
-	ClusterID               string     `json:"cluster_id"`
-	Role                    string     `json:"role"`
-	Connectivity            string     `json:"connectivity"`
-	Reachable               bool       `json:"reachable"`
-	Position                [3]float64 `json:"position"`
-	Velocity                [3]float64 `json:"velocity"`
-	AttitudeRPY             [3]float64 `json:"attitude_rpy"`
-	ThrustVector            [3]float64 `json:"thrust_vector"`
-	CommandedAltitudeM      float64    `json:"commanded_altitude_m,omitempty"`
-	CommandedSpeedMPS       float64    `json:"commanded_speed_mps,omitempty"`
-	DriftM                  float64    `json:"drift_m"`
-	BatteryPct              float64    `json:"battery_pct"`
-	RSSIDBm                 float64    `json:"rssi_dbm"`
-	CPUTempC                float64    `json:"cpu_temp_c"`
-	GPULoadPct              float64    `json:"gpu_load_pct"`
-	MissionState            string     `json:"mission_state"`
-	LocalizationSource      string     `json:"localization_source,omitempty"`
-	LocalizationState       string     `json:"localization_state,omitempty"`
-	LocalizationConfidence  float64    `json:"localization_confidence,omitempty"`
-	TDOAConfidence          float64    `json:"tdoa_confidence,omitempty"`
-	ConfidenceTrend         float64    `json:"confidence_trend,omitempty"`
-	RelocalizationCount     int        `json:"relocalization_count,omitempty"`
-	VisibleAnchorCount      int        `json:"visible_anchor_count,omitempty"`
-	OccupancyRatio          float64    `json:"occupancy_ratio,omitempty"`
-	SyncConfidence          float64    `json:"sync_confidence,omitempty"`
-	IMUCameraOffsetMS       float64    `json:"imu_camera_offset_ms,omitempty"`
-	SecurityState           string     `json:"security_state,omitempty"`
-	SecuritySummary         string     `json:"security_summary,omitempty"`
-	RemoteCommandAllowed    bool       `json:"remote_command_allowed,omitempty"`
-	TelemetryUplinkAllowed  bool       `json:"telemetry_uplink_allowed,omitempty"`
-	LinkIntegrityScore      float64    `json:"link_integrity_score,omitempty"`
-	LastRemoteCommandStatus string     `json:"last_remote_command_status,omitempty"`
-	HealthFlags             []string   `json:"health_flags,omitempty"`
-	Timestamp               time.Time  `json:"timestamp"`
+	DroneID                  int        `json:"drone_id"`
+	ClusterID                string     `json:"cluster_id"`
+	Role                     string     `json:"role"`
+	Connectivity             string     `json:"connectivity"`
+	Reachable                bool       `json:"reachable"`
+	Position                 [3]float64 `json:"position"`
+	Velocity                 [3]float64 `json:"velocity"`
+	AttitudeRPY              [3]float64 `json:"attitude_rpy"`
+	ThrustVector             [3]float64 `json:"thrust_vector"`
+	CommandedAltitudeM       float64    `json:"commanded_altitude_m,omitempty"`
+	CommandedSpeedMPS        float64    `json:"commanded_speed_mps,omitempty"`
+	ManualTargetPosition     [3]float64 `json:"manual_target_position,omitempty"`
+	ManualControlActive      bool       `json:"manual_control_active,omitempty"`
+	DriftM                   float64    `json:"drift_m"`
+	BatteryPct               float64    `json:"battery_pct"`
+	RSSIDBm                  float64    `json:"rssi_dbm"`
+	CPUTempC                 float64    `json:"cpu_temp_c"`
+	GPULoadPct               float64    `json:"gpu_load_pct"`
+	MissionState             string     `json:"mission_state"`
+	LocalizationSource       string     `json:"localization_source,omitempty"`
+	LocalizationState        string     `json:"localization_state,omitempty"`
+	LocalizationConfidence   float64    `json:"localization_confidence,omitempty"`
+	TDOAConfidence           float64    `json:"tdoa_confidence,omitempty"`
+	ConfidenceTrend          float64    `json:"confidence_trend,omitempty"`
+	RelocalizationCount      int        `json:"relocalization_count,omitempty"`
+	VisibleAnchorCount       int        `json:"visible_anchor_count,omitempty"`
+	OccupancyRatio           float64    `json:"occupancy_ratio,omitempty"`
+	SyncConfidence           float64    `json:"sync_confidence,omitempty"`
+	IMUCameraOffsetMS        float64    `json:"imu_camera_offset_ms,omitempty"`
+	SecurityState            string     `json:"security_state,omitempty"`
+	SecuritySummary          string     `json:"security_summary,omitempty"`
+	SecurityTransitionReason string     `json:"security_transition_reason,omitempty"`
+	RemoteCommandAllowed     bool       `json:"remote_command_allowed,omitempty"`
+	TelemetryUplinkAllowed   bool       `json:"telemetry_uplink_allowed,omitempty"`
+	LinkIntegrityScore       float64    `json:"link_integrity_score,omitempty"`
+	TrustEpoch               int        `json:"trust_epoch,omitempty"`
+	LastAuthFailureAtS       float64    `json:"last_auth_failure_at_s,omitempty"`
+	TamperScore              float64    `json:"tamper_score,omitempty"`
+	FirmwareMeasurement      string     `json:"firmware_measurement,omitempty"`
+	FirmwareVersion          string     `json:"firmware_version,omitempty"`
+	SecureBootState          string     `json:"secure_boot_state,omitempty"`
+	BootTrustSummary         string     `json:"boot_trust_summary,omitempty"`
+	RollbackCounter          uint64     `json:"rollback_counter,omitempty"`
+	MaintenanceMode          bool       `json:"maintenance_mode,omitempty"`
+	UpdateChannelState       string     `json:"update_channel_state,omitempty"`
+	LastRemoteCommandStatus  string     `json:"last_remote_command_status,omitempty"`
+	HealthFlags              []string   `json:"health_flags,omitempty"`
+	Timestamp                time.Time  `json:"timestamp"`
 }
 
 type FleetSnapshot struct {
@@ -88,6 +101,8 @@ type CommandEnvelope struct {
 	Nonce           string         `json:"nonce,omitempty"`
 	Authenticated   bool           `json:"authenticated"`
 	SecurityProfile string         `json:"security_profile,omitempty"`
+	AuditPrevHash   string         `json:"audit_prev_hash,omitempty"`
+	AuditHash       string         `json:"audit_hash,omitempty"`
 }
 
 type PendingApproval struct {
@@ -104,10 +119,20 @@ type PendingApproval struct {
 }
 
 type EventRecord struct {
-	Type      string         `json:"type"`
-	Message   string         `json:"message"`
-	Timestamp time.Time      `json:"timestamp"`
-	Data      map[string]any `json:"data,omitempty"`
+	Type          string         `json:"type"`
+	Message       string         `json:"message"`
+	Timestamp     time.Time      `json:"timestamp"`
+	Data          map[string]any `json:"data,omitempty"`
+	AuditPrevHash string         `json:"audit_prev_hash,omitempty"`
+	AuditHash     string         `json:"audit_hash,omitempty"`
+}
+
+type DeviceRecord struct {
+	Identity     string    `json:"identity"`
+	DeviceType   string    `json:"device_type"`
+	ClusterScope []string  `json:"cluster_scope,omitempty"`
+	Status       string    `json:"status,omitempty"`
+	NotAfter     time.Time `json:"not_after,omitempty"`
 }
 
 type HealthReport struct {

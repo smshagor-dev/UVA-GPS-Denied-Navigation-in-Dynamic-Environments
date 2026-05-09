@@ -24,9 +24,9 @@ func testSecurityConfig() SecurityConfig {
 				OperatorSecret: "super-secret-commander-key",
 			},
 		},
-		MaxCommandSkew:        30 * time.Second,
-		MaxCommandTTL:         90 * time.Second,
-		NonceRetention:        5 * time.Minute,
+		MaxCommandSkew: 30 * time.Second,
+		MaxCommandTTL:  90 * time.Second,
+		NonceRetention: 5 * time.Minute,
 	}
 }
 
@@ -43,12 +43,12 @@ func TestCommandSecurityValidatorAcceptsSignedCommand(t *testing.T) {
 		Action:      "formation",
 		PayloadJSON: payloadJSON,
 		Auth: &CommandAuth{
-			OperatorID: cfg.OperatorID,
+			OperatorID:   cfg.OperatorID,
 			OperatorRole: cfg.OperatorRole,
-			IssuedAt:   issuedAt,
-			ExpiresAt:  expiresAt,
-			Nonce:      nonce,
-			Signature:  SignCommand(cfg.OperatorSecret, "formation", payloadJSON, cfg.OperatorID, cfg.OperatorRole, issuedAt, expiresAt, nonce),
+			IssuedAt:     issuedAt,
+			ExpiresAt:    expiresAt,
+			Nonce:        nonce,
+			Signature:    SignCommand(cfg.OperatorSecret, "formation", payloadJSON, cfg.OperatorID, cfg.OperatorRole, issuedAt, expiresAt, nonce),
 		},
 	}
 
@@ -81,12 +81,12 @@ func TestCommandSecurityValidatorRejectsReplayNonce(t *testing.T) {
 		Action:      "hold",
 		PayloadJSON: payloadJSON,
 		Auth: &CommandAuth{
-			OperatorID: cfg.OperatorID,
+			OperatorID:   cfg.OperatorID,
 			OperatorRole: cfg.OperatorRole,
-			IssuedAt:   issuedAt,
-			ExpiresAt:  expiresAt,
-			Nonce:      nonce,
-			Signature:  signature,
+			IssuedAt:     issuedAt,
+			ExpiresAt:    expiresAt,
+			Nonce:        nonce,
+			Signature:    signature,
 		},
 	}
 
@@ -178,5 +178,8 @@ func TestRoleAllowsActionEnforcesCommanderOnlyElection(t *testing.T) {
 	}
 	if !RoleAllowsAction("maintenance", "add_drone") {
 		t.Fatal("expected maintenance role to retain standard add_drone access")
+	}
+	if !RoleAllowsAction("maintenance", "firmware_update") {
+		t.Fatal("expected maintenance role to be allowed firmware updates")
 	}
 }

@@ -153,6 +153,7 @@ public:
     bool unicast  (uint32_t dst, SwarmMessage::Type type, std::vector<uint8_t> payload);
     void configure_security(SwarmSecurityConfig cfg);
     [[nodiscard]] bool security_enabled() const;
+    [[nodiscard]] std::string security_last_error() const;
     void set_local_health(SwarmHealthMetrics health);
     [[nodiscard]] SwarmHealthMetrics local_health() const;
     [[nodiscard]] static float compute_leadership_score(const SwarmHealthMetrics& health);

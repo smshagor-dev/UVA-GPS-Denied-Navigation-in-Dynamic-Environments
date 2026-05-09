@@ -49,6 +49,25 @@ struct CommandPolicyDecision {
     std::string reason;
 };
 
+struct RemoteCommandSafetyInputs {
+    double now_s{0.0};
+    double max_command_age_s{3.0};
+    double localization_confidence{1.0};
+    double minimum_localization_confidence{0.35};
+    double battery_pct{100.0};
+    double minimum_battery_pct{18.0};
+    bool health_state_ok{true};
+    bool geofence_clear{true};
+    bool no_fly_lock{false};
+    bool swarm_consistency_ok{true};
+    double issuer_trust_score{1.0};
+    double minimum_issuer_trust_score{0.60};
+};
+
+inline CommandPolicyDecision evaluate_remote_command(const DroneSecurityAssessment& security,
+                                                     const RemoteCommandSafetyInputs& safety,
+                                                     const RemoteCommandEnvelope& command);
+
 inline std::optional<RemoteCommandEnvelope> command_from_swarm_message(const swarm::SwarmMessage& msg) {
     RemoteCommandEnvelope out;
     out.src_id = msg.src_id;
@@ -84,12 +103,66 @@ inline std::optional<RemoteCommandEnvelope> command_from_swarm_message(const swa
 
 inline CommandPolicyDecision evaluate_remote_command(const DroneSecurityAssessment& security,
                                                      const RemoteCommandEnvelope& command) {
+    return evaluate_remote_command(security, RemoteCommandSafetyInputs{}, command);
+}
+
+inline CommandPolicyDecision evaluate_remote_command(const DroneSecurityAssessment& security,
+                                                     const RemoteCommandSafetyInputs& safety,
+                                                     const RemoteCommandEnvelope& command) {
     CommandPolicyDecision out;
     out.critical = command.critical;
 
     if (command.action == RemoteCommandAction::EMERGENCY_LAND) {
         out.accepted = true;
         out.reason = "Critical remote emergency command accepted";
+        return out;
+    }
+
+    if (safety.now_s > 0.0 && command.issued_at_s > 0.0 &&
+        (safety.now_s - command.issued_at_s) > safety.max_command_age_s) {
+        out.accepted = false;
+        out.reason = "Remote command rejected: freshness window exceeded";
+        return out;
+    }
+
+    if (safety.issuer_trust_score < safety.minimum_issuer_trust_score) {
+        out.accepted = false;
+        out.reason = "Remote command rejected: issuer trust score below onboard minimum";
+        return out;
+    }
+
+    if (safety.no_fly_lock) {
+        const bool safe_action = command.action == RemoteCommandAction::RETURN_HOME ||
+            command.action == RemoteCommandAction::HOLD_POSITION;
+        if (!safe_action) {
+            out.accepted = false;
+            out.reason = "Remote command rejected: mission no-fly lock is active";
+            return out;
+        }
+    }
+
+    if (!safety.geofence_clear) {
+        const bool safe_action = command.action == RemoteCommandAction::RETURN_HOME ||
+            command.action == RemoteCommandAction::HOLD_POSITION;
+        if (!safe_action) {
+            out.accepted = false;
+            out.reason = "Remote command rejected: geofence policy blocks external maneuver";
+            return out;
+        }
+    }
+
+    if (!safety.swarm_consistency_ok && command.action == RemoteCommandAction::FORMATION_HOLD) {
+        out.accepted = false;
+        out.reason = "Remote command rejected: swarm consistency state is degraded";
+        return out;
+    }
+
+    if ((!safety.health_state_ok ||
+         safety.localization_confidence < safety.minimum_localization_confidence ||
+         safety.battery_pct < safety.minimum_battery_pct) &&
+        command.action == RemoteCommandAction::FORMATION_HOLD) {
+        out.accepted = false;
+        out.reason = "Remote command rejected: onboard safety margin is below formation-control threshold";
         return out;
     }
 

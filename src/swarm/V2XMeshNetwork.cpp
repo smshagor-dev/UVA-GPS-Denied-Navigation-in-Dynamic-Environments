@@ -664,6 +664,9 @@ void V2XMeshNetwork::configure_security(SwarmSecurityConfig cfg) {
 bool V2XMeshNetwork::security_enabled() const {
     return security_ && security_->enabled();
 }
+std::string V2XMeshNetwork::security_last_error() const {
+    return security_ ? security_->last_error() : std::string{};
+}
 void V2XMeshNetwork::set_local_health(SwarmHealthMetrics health) {
     health.battery_pct = std::clamp(health.battery_pct, 0.0f, 100.0f);
     health.motor_health = std::clamp(health.motor_health, 0.0f, 1.0f);

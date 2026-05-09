@@ -12,6 +12,7 @@ import logging
 import os
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -104,6 +105,12 @@ def find_go_launcher() -> list[str] | None:
     return None
 
 
+def is_tcp_port_in_use(port: int, host: str = "127.0.0.1") -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.25)
+        return sock.connect_ex((host, port)) == 0
+
+
 def open_log(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     return path.open("w", encoding="utf-8")
@@ -176,6 +183,40 @@ def print_plan(processes: list[ManagedProcess]) -> None:
         print(f"    log: {spec.log_path}")
 
 
+def normalize_security_profile(value: str) -> str:
+    lowered = value.strip().lower()
+    if lowered == "field":
+        return "field"
+    if lowered in {"prod", "production"}:
+        return "production"
+    return "lab"
+
+
+def validate_runtime_security(env: dict[str, str], backend_url: str) -> None:
+    profile = normalize_security_profile(env.get("DRONE_SECURITY_PROFILE", "lab"))
+    if profile == "lab":
+        return
+    if env.get("DRONE_TLS_ENABLED", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        raise RuntimeError("field/production mode requires DRONE_TLS_ENABLED=true")
+    if not backend_url.lower().startswith("https://"):
+        raise RuntimeError("field/production mode requires an https DRONE_BACKEND_URL")
+    required = [
+        "DRONE_TLS_CERT_FILE",
+        "DRONE_TLS_KEY_FILE",
+        "DRONE_TLS_CA_FILE",
+        "DRONE_TLS_CLIENT_CERT_FILE",
+        "DRONE_TLS_CLIENT_KEY_FILE",
+    ]
+    missing = [key for key in required if not env.get(key, "").strip()]
+    if missing:
+        raise RuntimeError(f"field/production mode missing TLS settings: {', '.join(missing)}")
+    if env.get("DRONE_TLS_REQUIRE_CLIENT_CERT", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        raise RuntimeError("field/production mode requires DRONE_TLS_REQUIRE_CLIENT_CERT=true")
+    if env.get("DRONE_ENABLE_BACKEND_TELEMETRY", "").strip().lower() in {"1", "true", "yes", "on"}:
+        if not env.get("DRONE_TLS_CLIENT_PFX_FILE", "").strip():
+            raise RuntimeError("field/production mode with backend telemetry requires DRONE_TLS_CLIENT_PFX_FILE")
+
+
 def main() -> int:
     try:
         bootstrap_env()
@@ -208,20 +249,29 @@ def main() -> int:
         tls_enabled = env.get("DRONE_TLS_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
         default_scheme = "https" if tls_enabled else "http"
         go_url = env.get("DRONE_BACKEND_URL", f"{default_scheme}://127.0.0.1:{args.go_port}")
+        validate_runtime_security(env, go_url)
 
         if not args.skip_go:
-            go_cmd = find_go_launcher()
-            if go_cmd is None:
-                print("Go control-plane not found. Install Go or provide a built control-plane.exe.", file=sys.stderr)
-            else:
-                processes.append(
-                    ManagedProcess(
-                        name="go-control-plane",
-                        command=go_cmd,
-                        log_path=LOG_DIR / "go-control-plane.log",
-                        required=False,
-                    )
+            if is_tcp_port_in_use(args.go_port):
+                logger.warning("go-control-plane launch skipped because port %s is already in use", args.go_port)
+                print(
+                    f"Go control-plane launch skipped because port {args.go_port} is already in use. "
+                    f"Reusing existing backend at {go_url}.",
+                    file=sys.stderr,
                 )
+            else:
+                go_cmd = find_go_launcher()
+                if go_cmd is None:
+                    print("Go control-plane not found. Install Go or provide a built control-plane.exe.", file=sys.stderr)
+                else:
+                    processes.append(
+                        ManagedProcess(
+                            name="go-control-plane",
+                            command=go_cmd,
+                            log_path=LOG_DIR / "go-control-plane.log",
+                            required=False,
+                        )
+                    )
 
         if not args.skip_cpp:
             drone_node = find_drone_node()

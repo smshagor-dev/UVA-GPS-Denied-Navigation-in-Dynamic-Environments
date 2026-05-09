@@ -43,14 +43,32 @@ struct TelemetrySnapshot {
     double imu_camera_offset_ms{0.0};
     std::string security_state{"TRUSTED"};
     std::string security_summary{"All trust signals nominal"};
+    std::string security_transition_reason{"initial-trust"};
     bool remote_command_allowed{true};
     bool telemetry_uplink_allowed{true};
     double link_integrity_score{1.0};
+    uint64_t trust_epoch{1};
+    double last_auth_failure_at_s{0.0};
+    double tamper_score{0.0};
+    std::string firmware_measurement{"lab-local-build"};
+    std::string firmware_version{"0.0.0"};
+    std::string secure_boot_state{"LAB_BOOT"};
+    std::string boot_trust_summary{"Lab boot trust bypassed"};
+    uint64_t rollback_counter{0};
+    bool maintenance_mode{false};
+    std::string update_channel_state{"idle"};
     std::vector<std::string> health_flags{};
 };
 
 class ControlPlaneTelemetryClient {
 public:
+    struct TLSRuntimeConfig {
+        bool skip_verify{false};
+        std::string ca_file{};
+        std::string client_pfx_file{};
+        std::string client_pfx_password{};
+    };
+
     explicit ControlPlaneTelemetryClient(std::string backend_url, int interval_ms = 1000);
 
     [[nodiscard]] bool enabled() const;
@@ -66,11 +84,13 @@ private:
         std::string path{"/api/v1/telemetry"};
     };
 
+    [[nodiscard]] static TLSRuntimeConfig load_tls_runtime_config();
     [[nodiscard]] static ParsedEndpoint parse_backend_url(const std::string& backend_url);
     [[nodiscard]] static std::string build_payload(const TelemetrySnapshot& snapshot);
     void mark_result(bool ok, std::string status, std::chrono::steady_clock::time_point now);
 
     ParsedEndpoint endpoint_{};
+    TLSRuntimeConfig tls_{};
     std::chrono::milliseconds interval_{1000};
     std::chrono::steady_clock::time_point last_attempt_{};
     std::string last_status_{"disabled"};

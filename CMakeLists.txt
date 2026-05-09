@@ -225,6 +225,8 @@ target_link_libraries(sensor_fusion_core PUBLIC
     $<$<BOOL:${fastrtps_FOUND}>:fastrtps>
     $<$<BOOL:${HAS_TENSORRT}>:${TENSORRT_LIB}>
     $<$<BOOL:${MSVC}>:bcrypt>
+    $<$<BOOL:${WIN32}>:crypt32>
+    $<$<BOOL:${WIN32}>:ncrypt>
     $<$<BOOL:${WIN32}>:Ws2_32>
 )
 

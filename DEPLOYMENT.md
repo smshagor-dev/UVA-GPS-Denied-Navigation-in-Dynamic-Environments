@@ -136,6 +136,8 @@ Use these variables to harden dashboard-to-control-plane transport:
 - `DRONE_TLS_REQUIRE_CLIENT_CERT`
 - `DRONE_TLS_CLIENT_CERT_FILE`
 - `DRONE_TLS_CLIENT_KEY_FILE`
+- `DRONE_TLS_CLIENT_PFX_FILE`
+- `DRONE_TLS_CLIENT_PFX_PASSWORD`
 - `DRONE_TLS_SKIP_VERIFY`
 
 Example hardened transport:
@@ -151,10 +153,12 @@ $env:DRONE_TLS_CA_FILE="certs/ca.crt"
 $env:DRONE_TLS_REQUIRE_CLIENT_CERT="true"
 $env:DRONE_TLS_CLIENT_CERT_FILE="certs/operator-client.crt"
 $env:DRONE_TLS_CLIENT_KEY_FILE="certs/operator-client.key"
+$env:DRONE_TLS_CLIENT_PFX_FILE="certs/drone-client.pfx"
 $env:DRONE_BACKEND_URL="https://127.0.0.1:8080"
 ```
 
 When `DRONE_TLS_ENABLED=true`, the control plane serves HTTPS with TLS 1.3 minimum. If `DRONE_TLS_REQUIRE_CLIENT_CERT=true`, the client must present a certificate signed by `DRONE_TLS_CA_FILE`.
+The dashboard uses `DRONE_TLS_CLIENT_CERT_FILE` / `DRONE_TLS_CLIENT_KEY_FILE`, while the native C++ telemetry client uses `DRONE_TLS_CLIENT_PFX_FILE`.
 The generated operator client certificate common name must match `DRONE_OPERATOR_ID` when command signing and mTLS are both enabled.
 
 ### Onboard Drone Security State
@@ -181,13 +185,14 @@ The drone node can now publish telemetry directly to the Go control plane:
 Example:
 
 ```powershell
-$env:DRONE_BACKEND_URL="http://127.0.0.1:8080"
+$env:DRONE_BACKEND_URL="https://127.0.0.1:8080"
 $env:DRONE_ENABLE_BACKEND_TELEMETRY="true"
+$env:DRONE_TLS_CLIENT_PFX_FILE="certs/drone-client.pfx"
 $env:DRONE_BACKEND_TELEMETRY_INTERVAL_MS="1000"
 build\Release\drone_node.exe --id=1 --esp32=192.168.4.1 --lidar=192.168.1.201:2368
 ```
 
-This uplink includes onboard security posture fields such as `security_state`, `security_summary`, `link_integrity_score`, and `health_flags`. The current C++ client is intended for direct local/backend telemetry posting and does not yet present a client certificate for mTLS-enforced drone identity.
+This uplink includes onboard security posture fields such as `security_state`, `security_summary`, `link_integrity_score`, and `health_flags`. In hardened profiles the node now requires HTTPS, validates backend certificates against `DRONE_TLS_CA_FILE`, and presents the drone client certificate bundle from `DRONE_TLS_CLIENT_PFX_FILE`.
 
 ### Drone / Sensor Connection Variables
 

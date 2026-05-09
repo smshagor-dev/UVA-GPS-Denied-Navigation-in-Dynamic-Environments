@@ -115,6 +115,19 @@ target_link_libraries(test_swarm_security PRIVATE
 )
 gtest_discover_tests(test_swarm_security DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
 
+add_executable(test_boot_trust
+    test_boot_trust.cpp
+    ../third_party/crypto/sha3.c
+)
+target_include_directories(test_boot_trust PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/crypto
+)
+target_link_libraries(test_boot_trust PRIVATE
+    GTest::gtest_main
+)
+gtest_discover_tests(test_boot_trust DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+
 if(HAS_FASTDDS_TRANSPORT)
     add_executable(test_v2x test_v2x.cpp)
     target_link_libraries(test_v2x PRIVATE

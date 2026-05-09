@@ -33,7 +33,8 @@ import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from PySide6.QtCore import QThread, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QImage, QImageReader, QPainter, QPalette
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -44,6 +45,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QGroupBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -83,11 +85,59 @@ logger = logging.getLogger(__name__)
 LOG_DIR = Path(__file__).resolve().parent.parent / "logs" / "dashboard"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "dashboard"
 STORE_PATH = DATA_DIR / "dashboard.sqlite3"
+ASSET_DIR = Path(__file__).resolve().parent.parent / "assets"
 
 
 def _rgba(hex_color: str, alpha: float) -> tuple[int, int, int, int]:
     color = QColor(hex_color)
     return (color.red(), color.green(), color.blue(), max(0, min(255, int(alpha * 255))))
+
+
+def _qimage_to_gl_image(image: QImage) -> np.ndarray:
+    converted = image.convertToFormat(QImage.Format.Format_RGBA8888)
+    width = converted.width()
+    height = converted.height()
+    buffer = converted.bits().tobytes()
+    array = np.frombuffer(buffer, dtype=np.uint8).reshape((height, width, 4))
+    return np.ascontiguousarray(np.flipud(array))
+
+
+def _load_raster_gl_image(path: Path, size: tuple[int, int]) -> np.ndarray:
+    reader = QImageReader(str(path))
+    image = reader.read()
+    if image.isNull():
+        raise ValueError(f"failed to load image: {path}")
+    scaled = image.scaled(
+        size[0],
+        size[1],
+        Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+        Qt.TransformationMode.SmoothTransformation,
+    )
+    return _qimage_to_gl_image(scaled)
+
+
+def _load_svg_gl_image(path: Path, size: tuple[int, int]) -> np.ndarray:
+    renderer = QSvgRenderer(str(path))
+    if not renderer.isValid():
+        raise ValueError(f"failed to load svg: {path}")
+    image = QImage(size[0], size[1], QImage.Format.Format_RGBA8888)
+    image.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(image)
+    try:
+        renderer.render(painter)
+    finally:
+        painter.end()
+    return _qimage_to_gl_image(image)
+
+
+def _colorize_gl_image(image: np.ndarray, rgba: tuple[int, int, int, int]) -> np.ndarray:
+    colored = image.copy()
+    alpha_mask = colored[:, :, 3] > 0
+    colored[:, :, 0][alpha_mask] = rgba[0]
+    colored[:, :, 1][alpha_mask] = rgba[1]
+    colored[:, :, 2][alpha_mask] = rgba[2]
+    colored[:, :, 3][alpha_mask] = np.clip((colored[:, :, 3][alpha_mask].astype(np.float32) * (rgba[3] / 255.0)), 0, 255).astype(np.uint8)
+    return colored
 
 
 def style_plot_widget(widget: pg.PlotWidget, left_label: str, bottom_label: str = "Time (s)") -> pg.LegendItem:
@@ -727,6 +777,10 @@ class DroneState:
     rssi_dbm: float
     cpu_temp_c: float
     gpu_load_pct: float
+    commanded_altitude_m: float = 0.0
+    commanded_speed_mps: float = 0.0
+    manual_target_position: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    manual_control_active: bool = False
     attitude_rpy: tuple[float, float, float] = (0.0, 0.0, 0.0)
     thrust_vector: tuple[float, float, float] = (0.0, 0.0, 9.81)
     localization_source: str = "vision-inertial"
@@ -739,11 +793,27 @@ class DroneState:
     occupancy_ratio: float = 0.0
     sync_confidence: float = 1.0
     imu_camera_offset_ms: float = 0.0
+    peer_clock_offset_ms: float = 0.0
+    anchor_visibility_ratio: float = 0.0
+    tdoa_weight: float = 0.0
+    planned_waypoint_count: int = 0
+    last_relocalized_keyframe: int = 0
     security_state: str = "TRUSTED"
     security_summary: str = "All trust signals nominal"
+    security_transition_reason: str = "initial-trust"
     remote_command_allowed: bool = True
     telemetry_uplink_allowed: bool = True
     link_integrity_score: float = 1.0
+    trust_epoch: int = 1
+    last_auth_failure_at_s: float = 0.0
+    tamper_score: float = 0.0
+    firmware_measurement: str = "lab-local-build"
+    firmware_version: str = "0.0.0"
+    secure_boot_state: str = "LAB_BOOT"
+    boot_trust_summary: str = "Lab boot trust bypassed"
+    rollback_counter: int = 0
+    maintenance_mode: bool = False
+    update_channel_state: str = "idle"
     last_remote_command_status: str = "no remote command"
     health_flags: list[str] = field(default_factory=list)
     motor_health: float = 1.0
@@ -762,6 +832,12 @@ class DashboardSnapshot:
     cpu_temp_c: float
     gpu_load_pct: float
     election_state: str = "stable"
+    clusters: list[dict[str, Any]] = field(default_factory=list)
+    critical_alerts: int = 0
+    health: dict[str, Any] = field(default_factory=dict)
+    missions: list[dict[str, Any]] = field(default_factory=list)
+    events: list[dict[str, Any]] = field(default_factory=list)
+    services: list[str] = field(default_factory=list)
     timestamp: float = field(default_factory=time.time)
 
 
@@ -775,15 +851,22 @@ class GoControlPlaneClient:
     def __init__(self, base_url: str) -> None:
         self._base_url = base_url.rstrip("/")
         self._security_profile = normalize_security_profile(os.environ.get("DRONE_SECURITY_PROFILE", "lab"))
+        self._require_signed_commands = parse_env_bool("DRONE_REQUIRE_SIGNED_COMMANDS", False)
         self._operator_id = os.environ.get("DRONE_OPERATOR_ID", "").strip()
         self._operator_role = normalize_operator_role(os.environ.get("DRONE_OPERATOR_ROLE", "operator"))
         self._operator_secret = os.environ.get("DRONE_OPERATOR_SECRET", "").strip()
         self._command_ttl_sec = max(safe_int(os.environ.get("DRONE_COMMAND_TTL_SEC", "90"), 90), 5)
+        self._cache: dict[str, tuple[float, dict[str, Any]]] = {}
+        validate_backend_security_profile(self._base_url, self._security_profile)
         self._ssl_context = build_backend_ssl_context(self._base_url)
 
     def fetch_snapshot(self) -> DashboardSnapshot:
         logger.debug("GoControlPlaneClient.fetch_snapshot url=%s", self._base_url)
         payload = self._get_json("/api/v1/fleet")
+        health_payload = self._get_json_cached("/api/v1/health", ttl_sec=2.0)
+        missions_payload = self._get_json_cached("/api/v1/missions", ttl_sec=3.0)
+        events_payload = self._get_json_cached("/api/v1/events", ttl_sec=2.0)
+        discovery_payload = self._get_json_cached("/api/v1/discovery", ttl_sec=5.0)
         drones = payload.get("drones", [])
         states = [
             DroneState(
@@ -793,6 +876,10 @@ class GoControlPlaneClient:
                 mission_state=safe_text(item.get("mission_state", "standby"), "standby"),
                 position=safe_vector3(item.get("position", [0.0, 0.0, 0.0])),
                 velocity=safe_vector3(item.get("velocity", [0.0, 0.0, 0.0])),
+                commanded_altitude_m=safe_float(item.get("commanded_altitude_m", 0.0)),
+                commanded_speed_mps=safe_float(item.get("commanded_speed_mps", 0.0)),
+                manual_target_position=safe_vector3(item.get("manual_target_position", [0.0, 0.0, 0.0])),
+                manual_control_active=bool(item.get("manual_control_active", False)),
                 attitude_rpy=safe_vector3(item.get("attitude_rpy", [0.0, 0.0, 0.0])),
                 thrust_vector=safe_vector3(item.get("thrust_vector", [0.0, 0.0, 9.81]), (0.0, 0.0, 9.81)),
                 drift_m=safe_float(item.get("drift_m", 0.0)),
@@ -812,11 +899,27 @@ class GoControlPlaneClient:
                 occupancy_ratio=safe_float(item.get("occupancy_ratio", 0.0), 0.0),
                 sync_confidence=safe_float(item.get("sync_confidence", 1.0), 1.0),
                 imu_camera_offset_ms=safe_float(item.get("imu_camera_offset_ms", 0.0), 0.0),
+                peer_clock_offset_ms=safe_float(item.get("peer_clock_offset_ms", 0.0), 0.0),
+                anchor_visibility_ratio=safe_float(item.get("anchor_visibility_ratio", 0.0), 0.0),
+                tdoa_weight=safe_float(item.get("tdoa_weight", 0.0), 0.0),
+                planned_waypoint_count=safe_int(item.get("planned_waypoint_count", 0), 0),
+                last_relocalized_keyframe=safe_int(item.get("last_relocalized_keyframe", 0), 0),
                 security_state=safe_text(item.get("security_state", "TRUSTED"), "TRUSTED"),
                 security_summary=safe_text(item.get("security_summary", "All trust signals nominal"), "All trust signals nominal"),
+                security_transition_reason=safe_text(item.get("security_transition_reason", "initial-trust"), "initial-trust"),
                 remote_command_allowed=bool(item.get("remote_command_allowed", True)),
                 telemetry_uplink_allowed=bool(item.get("telemetry_uplink_allowed", True)),
                 link_integrity_score=safe_float(item.get("link_integrity_score", 1.0), 1.0),
+                trust_epoch=safe_int(item.get("trust_epoch", 1), 1),
+                last_auth_failure_at_s=safe_float(item.get("last_auth_failure_at_s", 0.0), 0.0),
+                tamper_score=safe_float(item.get("tamper_score", 0.0), 0.0),
+                firmware_measurement=safe_text(item.get("firmware_measurement", "lab-local-build"), "lab-local-build"),
+                firmware_version=safe_text(item.get("firmware_version", "0.0.0"), "0.0.0"),
+                secure_boot_state=safe_text(item.get("secure_boot_state", "LAB_BOOT"), "LAB_BOOT"),
+                boot_trust_summary=safe_text(item.get("boot_trust_summary", "Lab boot trust bypassed"), "Lab boot trust bypassed"),
+                rollback_counter=safe_int(item.get("rollback_counter", 0), 0),
+                maintenance_mode=bool(item.get("maintenance_mode", False)),
+                update_channel_state=safe_text(item.get("update_channel_state", "idle"), "idle"),
                 last_remote_command_status=safe_text(item.get("last_remote_command_status", "no remote command"), "no remote command"),
                 health_flags=[safe_text(v) for v in item.get("health_flags", []) if safe_text(v)],
                 motor_health=safe_float(item.get("motor_health", 1.0), 1.0),
@@ -836,6 +939,29 @@ class GoControlPlaneClient:
             cpu_temp_c=safe_float(payload.get("cpu_temp_c", 0.0)),
             gpu_load_pct=safe_float(payload.get("gpu_load_pct", 0.0)),
             election_state=safe_text(payload.get("election_state", "stable"), "stable"),
+            clusters=[
+                {
+                    "cluster_id": safe_text(item.get("cluster_id"), "cluster-01"),
+                    "leader_id": safe_int(item.get("leader_id"), 0),
+                    "drone_count": safe_int(item.get("drone_count"), 0),
+                    "formation": safe_text(item.get("formation"), "unknown"),
+                    "mission_state": safe_text(item.get("mission_state"), "unknown"),
+                    "avg_battery": safe_float(item.get("avg_battery", 0.0)),
+                }
+                for item in payload.get("clusters", [])
+                if isinstance(item, dict)
+            ],
+            critical_alerts=safe_int(payload.get("critical_alerts", health_payload.get("critical_alerts", 0)), 0),
+            health=health_payload if isinstance(health_payload, dict) else {},
+            missions=[
+                item for item in missions_payload.get("missions", [])
+                if isinstance(item, dict)
+            ][:12],
+            events=[
+                item for item in events_payload.get("events", [])
+                if isinstance(item, dict)
+            ][-16:],
+            services=[safe_text(item) for item in discovery_payload.get("services", []) if safe_text(item)],
             timestamp=safe_float(payload.get("timestamp", time.time()), time.time()),
         )
 
@@ -874,6 +1000,11 @@ class GoControlPlaneClient:
         return str(payload.get("message", "command accepted"))
 
     def _build_command_body(self, request_obj: CommandRequest) -> dict[str, Any]:
+        if not self._require_signed_commands and not security_profile_requires_signed(self._security_profile):
+            return {
+                "action": request_obj.action,
+                "payload": request_obj.payload,
+            }
         payload_json = json.dumps(request_obj.payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         if not self._operator_id or not self._operator_secret:
             if security_profile_requires_signed(self._security_profile):
@@ -918,6 +1049,19 @@ class GoControlPlaneClient:
             raise ValueError(f"unexpected payload type for {path}")
         return payload
 
+    def _get_json_cached(self, path: str, ttl_sec: float) -> dict[str, Any]:
+        now = time.monotonic()
+        cached = self._cache.get(path)
+        if cached is not None and (now - cached[0]) < ttl_sec:
+            return cached[1]
+        try:
+            payload = self._get_json(path)
+        except Exception as exc:
+            logger.debug("GoControlPlaneClient optional fetch failed path=%s error=%s", path, exc)
+            return cached[1] if cached is not None else {}
+        self._cache[path] = (now, payload)
+        return payload
+
 
 class SwarmBackend:
     """Small facade over pybind11 bridge with simulation fallback."""
@@ -933,19 +1077,24 @@ class SwarmBackend:
         self._poll_hz = max(poll_hz, 1)
         self._bridge = BRIDGE
         self._mode = BRIDGE_MODE
+        self._security_profile = normalize_security_profile(os.environ.get("DRONE_SECURITY_PROFILE", "lab"))
         self._pipelines: dict[int, Any] = {}
         self._network = None
         self._control_ready = False
         self._started_at = time.time()
         self._client = GoControlPlaneClient(backend_url) if backend_url else None
         self._mission_overrides: dict[int, str] = dict(initial_mission_overrides or {})
+        self._firmware_overrides: dict[int, dict[str, Any]] = {}
         self._local_demo_ids: set[int] = set()
+        self._live_positions: dict[int, tuple[float, float, float]] = {}
+        self._manual_targets: dict[int, tuple[float, float, float]] = {}
+        self._manual_speeds: dict[int, float] = {}
+        self._last_manual_tick = time.monotonic()
         logger.info("SwarmBackend init ids=%s poll_hz=%s backend_url=%s", drone_ids, poll_hz, backend_url)
 
         if self._client is not None:
             self._mode = "go-control-plane"
             self._control_ready = True
-            return
 
         if self._bridge is not None:
             for drone_id in self._ids:
@@ -963,12 +1112,17 @@ class SwarmBackend:
         ):
             try:
                 self._network = self._bridge.V2XMeshNetwork(9000, "239.255.0.1", 7400)
-                self._control_ready = bool(self._network.start())
-                if self._control_ready:
+                self._configure_network_security()
+                network_ready = bool(self._network.start())
+                self._control_ready = self._control_ready or network_ready
+                if network_ready and self._client is None:
                     self._mode = "hybrid"
+                elif network_ready:
+                    logger.info("SwarmBackend local mesh sidecar ready while using go-control-plane mode")
             except Exception:
                 self._network = None
-                self._control_ready = False
+                if self._client is None:
+                    self._control_ready = False
 
     @property
     def mode(self) -> str:
@@ -978,6 +1132,39 @@ class SwarmBackend:
     def mission_overrides(self) -> dict[int, str]:
         return dict(self._mission_overrides)
 
+    def _configure_network_security(self) -> None:
+        if self._network is None or self._bridge is None:
+            return
+        if not hasattr(self._bridge, "SwarmSecurityConfig") or not hasattr(self._network, "configure_security"):
+            logger.info("SwarmBackend bridge lacks swarm security bindings; mesh commands stay unsecured")
+            return
+        secret = os.environ.get("DRONE_SWARM_SECRET", "").strip() or "drone-swarm-dev-secret-change-me"
+        if secret == "drone-swarm-dev-secret-change-me":
+            logger.warning("SwarmBackend mesh sidecar using development swarm secret fallback")
+        try:
+            security_cfg = self._bridge.SwarmSecurityConfig()
+            security_cfg.enabled = True
+            security_cfg.swarm_secret = secret
+            self._network.configure_security(security_cfg)
+            enabled = bool(self._network.security_enabled()) if hasattr(self._network, "security_enabled") else True
+            last_error = self._network.security_last_error() if hasattr(self._network, "security_last_error") else ""
+            logger.info("SwarmBackend secure mesh sidecar configured enabled=%s error=%s", enabled, last_error)
+        except Exception:
+            logger.exception("SwarmBackend failed to configure mesh sidecar security")
+
+    def _apply_firmware_overrides(self, state: DroneState) -> DroneState:
+        override = self._firmware_overrides.get(state.drone_id)
+        if not override:
+            return state
+        state.firmware_measurement = safe_text(override.get("firmware_measurement", state.firmware_measurement), state.firmware_measurement)
+        state.firmware_version = safe_text(override.get("firmware_version", state.firmware_version), state.firmware_version)
+        state.secure_boot_state = safe_text(override.get("secure_boot_state", state.secure_boot_state), state.secure_boot_state)
+        state.boot_trust_summary = safe_text(override.get("boot_trust_summary", state.boot_trust_summary), state.boot_trust_summary)
+        state.rollback_counter = safe_int(override.get("rollback_counter", state.rollback_counter), state.rollback_counter)
+        state.maintenance_mode = bool(override.get("maintenance_mode", state.maintenance_mode))
+        state.update_channel_state = safe_text(override.get("update_channel_state", state.update_channel_state), state.update_channel_state)
+        return state
+
     def pending_approvals(self) -> dict[str, str]:
         if self._client is None:
             return {}
@@ -986,6 +1173,33 @@ class SwarmBackend:
         except (error.URLError, TimeoutError, ValueError, KeyError) as exc:
             logger.warning("go-control-plane approvals fetch failed: %s", exc)
             return {}
+
+    def _mirror_backend_command(self, request: CommandRequest) -> None:
+        if self._network is None or self._bridge is None:
+            return
+        try:
+            if request.action == "emergency_land":
+                msg_type = self._bridge.SwarmMessageType.EMERGENCY_STOP
+                ok = bool(self._network.broadcast(msg_type, []))
+                logger.info("SwarmBackend mirrored emergency_land to local mesh ok=%s", ok)
+                return
+            if request.action == "election":
+                self._network.trigger_election()
+                logger.info("SwarmBackend mirrored election to local mesh")
+                return
+            if request.action == "formation":
+                self._ensure_leader()
+                cmd = self._bridge.FormationCommand()
+                shape_name = request.payload.get("shape", "DIAMOND")
+                cmd.shape = getattr(self._bridge.FormationShape, shape_name)
+                cmd.spacing_m = float(request.payload.get("spacing_m", 2.5))
+                cmd.altitude_m = float(request.payload.get("altitude_m", 8.0))
+                cmd.velocity_mps = float(request.payload.get("velocity_mps", 3.0))
+                cmd.leader_target = np.array(request.payload.get("leader_target", [0.0, 0.0, cmd.altitude_m]))
+                ok = bool(self._network.send_formation(cmd))
+                logger.info("SwarmBackend mirrored formation to local mesh ok=%s shape=%s", ok, shape_name)
+        except Exception:
+            logger.exception("SwarmBackend failed to mirror backend command action=%s", request.action)
 
     def close(self) -> None:
         logger.info("SwarmBackend close mode=%s", self._mode)
@@ -1021,8 +1235,138 @@ class SwarmBackend:
         self._ids.remove(drone_id)
         self._pipelines.pop(drone_id, None)
         self._mission_overrides.pop(drone_id, None)
+        self._live_positions.pop(drone_id, None)
+        self._manual_targets.pop(drone_id, None)
+        self._manual_speeds.pop(drone_id, None)
         logger.info("SwarmBackend removed local drone id=%s total=%s", drone_id, len(self._ids))
         return True
+
+    def _clear_manual_targets(self, drone_ids: list[int]) -> None:
+        for drone_id in drone_ids:
+            self._manual_targets.pop(drone_id, None)
+            self._manual_speeds.pop(drone_id, None)
+
+    @staticmethod
+    def _critical_alert_count(states: list[DroneState]) -> int:
+        return sum(
+            1
+            for state in states
+            if (not state.reachable)
+            or state.battery_pct < 15.0
+            or state.cpu_temp_c > 82.0
+            or state.localization_state == "lost"
+            or state.sync_confidence < 0.35
+            or state.security_state not in {"", "TRUSTED", "DEGRADED_LINK"}
+        )
+
+    @staticmethod
+    def _cluster_snapshot(states: list[DroneState]) -> list[dict[str, Any]]:
+        clusters: dict[str, dict[str, Any]] = {}
+        for state in states:
+            cluster = clusters.setdefault(
+                state.cluster_id,
+                {
+                    "cluster_id": state.cluster_id,
+                    "leader_id": 0,
+                    "drone_count": 0,
+                    "formation": "dynamic",
+                    "mission_state": state.mission_state,
+                    "avg_battery": 0.0,
+                },
+            )
+            cluster["drone_count"] += 1
+            cluster["avg_battery"] += state.battery_pct
+            if state.role == "LEADER" and not cluster["leader_id"]:
+                cluster["leader_id"] = state.drone_id
+        out = list(clusters.values())
+        for cluster in out:
+            count = max(1, safe_int(cluster["drone_count"], 1))
+            cluster["avg_battery"] = safe_float(cluster["avg_battery"], 0.0) / count
+        out.sort(key=lambda item: safe_text(item.get("cluster_id"), ""))
+        return out
+
+    @classmethod
+    def _health_snapshot(cls, states: list[DroneState], cpu_temp_c: float) -> dict[str, Any]:
+        avg_battery = sum(state.battery_pct for state in states) / max(len(states), 1)
+        return {
+            "online_drones": sum(1 for state in states if state.reachable),
+            "total_drones": len(states),
+            "critical_alerts": cls._critical_alert_count(states),
+            "avg_battery_pct": avg_battery,
+            "max_cpu_temp_c": max([cpu_temp_c] + [state.cpu_temp_c for state in states]) if states else cpu_temp_c,
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+
+    def _set_manual_target(self, drone_id: int, target: tuple[float, float, float], speed: float) -> None:
+        self._manual_targets[drone_id] = target
+        self._manual_speeds[drone_id] = max(0.5, speed)
+        self._mission_overrides[drone_id] = "remote-nav"
+
+    def _apply_manual_step(self, request: CommandRequest, target_ids: list[int]) -> str:
+        step = max(0.2, safe_float(request.payload.get("step_m"), 1.5))
+        speed = max(0.5, safe_float(request.payload.get("velocity_mps"), 3.0))
+        deltas = {
+            "move_left": (-step, 0.0, 0.0),
+            "move_right": (step, 0.0, 0.0),
+            "move_up": (0.0, step, 0.0),
+            "move_down": (0.0, -step, 0.0),
+        }
+        dx, dy, dz = deltas[request.action]
+        for drone_id in target_ids:
+            base = self._manual_targets.get(drone_id, self._live_positions.get(drone_id, (0.0, 0.0, max(4.0, safe_float(request.payload.get("altitude_m"), 8.0)))))
+            target = (
+                base[0] + dx,
+                base[1] + dy,
+                max(0.4, base[2] + dz),
+            )
+            self._set_manual_target(drone_id, target, speed)
+        direction = request.action.removeprefix("move_")
+        return f"{direction} move applied to {len(target_ids)} drone(s)"
+
+    def _apply_manual_navigation(self, snapshot: DashboardSnapshot) -> DashboardSnapshot:
+        now = time.monotonic()
+        dt = max(1.0 / self._poll_hz, min(0.25, now - self._last_manual_tick))
+        self._last_manual_tick = now
+        active_ids = {state.drone_id for state in snapshot.states}
+        for drone_id in list(self._manual_targets):
+            if drone_id not in active_ids:
+                self._manual_targets.pop(drone_id, None)
+                self._manual_speeds.pop(drone_id, None)
+        if not self._manual_targets:
+            for state in snapshot.states:
+                self._live_positions[state.drone_id] = state.position
+            return snapshot
+
+        for state in snapshot.states:
+            target = self._manual_targets.get(state.drone_id)
+            if target is None:
+                self._live_positions[state.drone_id] = state.position
+                continue
+            current = np.array(self._live_positions.get(state.drone_id, state.position), dtype=float)
+            desired = np.array(target, dtype=float)
+            delta = desired - current
+            distance = float(np.linalg.norm(delta))
+            if distance <= 0.04:
+                next_pos = desired
+                velocity = np.zeros(3, dtype=float)
+                self._mission_overrides[state.drone_id] = "hold-position"
+            else:
+                speed = self._manual_speeds.get(state.drone_id, 3.0)
+                step = min(distance, speed * dt)
+                direction = delta / max(distance, 1e-6)
+                next_pos = current + direction * step
+                velocity = direction * (step / max(dt, 1e-6))
+                self._mission_overrides[state.drone_id] = "remote-nav"
+            state.position = (float(next_pos[0]), float(next_pos[1]), float(next_pos[2]))
+            state.velocity = (float(velocity[0]), float(velocity[1]), float(velocity[2]))
+            state.commanded_altitude_m = float(desired[2])
+            state.commanded_speed_mps = float(self._manual_speeds.get(state.drone_id, 3.0))
+            state.manual_target_position = (float(desired[0]), float(desired[1]), float(desired[2]))
+            state.manual_control_active = True
+            state.attitude_rpy, state.thrust_vector = derive_attitude_thrust(state.position, state.velocity, state.role, time.time() - self._started_at)
+            state.mission_state = self._mission_overrides.get(state.drone_id, state.mission_state)
+            self._live_positions[state.drone_id] = state.position
+        return snapshot
 
     def _local_demo_state(self, drone_id: int, index: int, snapshot: DashboardSnapshot | None) -> DroneState:
         now = time.time()
@@ -1048,13 +1392,17 @@ class SwarmBackend:
         )
         cpu_temp_c = snapshot.cpu_temp_c if snapshot is not None else 54.0
         gpu_load_pct = snapshot.gpu_load_pct if snapshot is not None else 38.0
-        return DroneState(
+        return self._apply_firmware_overrides(DroneState(
             drone_id=drone_id,
             cluster_id=cluster_id,
             role=role,
             mission_state=mission_state,
             position=(x, y, z),
             velocity=(vx, vy, 0.0),
+            commanded_altitude_m=z,
+            commanded_speed_mps=2.8,
+            manual_target_position=(x + 0.5, y + 0.5, z),
+            manual_control_active=False,
             attitude_rpy=attitude_rpy,
             thrust_vector=thrust_vector,
             drift_m=0.04 + 0.03 * index + abs(math.sin(elapsed * 0.2 + index)) * 0.12,
@@ -1074,18 +1422,34 @@ class SwarmBackend:
             occupancy_ratio=min(1.0, 0.12 + index * 0.04 + 0.03 * abs(math.sin(elapsed * 0.22 + index))),
             sync_confidence=max(0.25, 0.94 - index * 0.06 - 0.08 * abs(math.sin(elapsed * 0.27 + index))),
             imu_camera_offset_ms=(1.5 + index * 0.9) * math.sin(elapsed * 0.14 + index),
+            peer_clock_offset_ms=1.2 * math.sin(elapsed * 0.16 + index),
+            anchor_visibility_ratio=max(0.0, min(1.0, (5 - index) / 6.0)),
+            tdoa_weight=0.58,
+            planned_waypoint_count=max(1, 6 - index),
+            last_relocalized_keyframe=64 - index,
             security_state="TRUSTED",
             security_summary="Demo drone rendered from local dashboard state",
+            security_transition_reason="dashboard-demo-state",
             remote_command_allowed=True,
             telemetry_uplink_allowed=True,
             link_integrity_score=0.90,
+            trust_epoch=2 + index,
+            last_auth_failure_at_s=0.0,
+            tamper_score=0.02 * index,
+            firmware_measurement=f"fw-demo-{drone_id}",
+            firmware_version="2.0.0",
+            secure_boot_state="SECURE_BOOT_TRUSTED",
+            boot_trust_summary="Demo drone trust profile active",
+            rollback_counter=1,
+            maintenance_mode=False,
+            update_channel_state="idle",
             last_remote_command_status="dashboard demo add",
             health_flags=[],
             motor_health=max(0.35, 0.94 - index * 0.04 - 0.03 * abs(math.sin(elapsed * 0.23 + index))),
             leadership_score=max(0.1, min(0.98, 0.58 - index * 0.03 + (0.16 if role == "LEADER" else 0.0))),
             election_ready=True,
             timestamp=now,
-        )
+        ))
 
     def _merge_local_demo_snapshot(self, snapshot: DashboardSnapshot) -> DashboardSnapshot:
         missing_ids = [drone_id for drone_id in sorted(self._local_demo_ids) if all(state.drone_id != drone_id for state in snapshot.states)]
@@ -1109,6 +1473,12 @@ class SwarmBackend:
             cpu_temp_c=snapshot.cpu_temp_c,
             gpu_load_pct=snapshot.gpu_load_pct,
             election_state=snapshot.election_state,
+            clusters=self._cluster_snapshot(states),
+            critical_alerts=self._critical_alert_count(states),
+            health=self._health_snapshot(states, snapshot.cpu_temp_c),
+            missions=snapshot.missions,
+            events=snapshot.events,
+            services=snapshot.services,
             timestamp=snapshot.timestamp,
         )
 
@@ -1131,6 +1501,7 @@ class SwarmBackend:
             return "no target drones resolved"
 
         if request.action == "formation":
+            self._clear_manual_targets(target_ids)
             shape = str(request.payload.get("shape", "DIAMOND")).lower()
             for drone_id in target_ids:
                 self._mission_overrides[drone_id] = f"formation-{shape}"
@@ -1138,25 +1509,33 @@ class SwarmBackend:
 
         if request.action == "hold_position":
             for drone_id in target_ids:
+                self._set_manual_target(drone_id, self._live_positions.get(drone_id, (0.0, 0.0, safe_float(request.payload.get("altitude_m"), 8.0))), safe_float(request.payload.get("velocity_mps"), 1.5))
                 self._mission_overrides[drone_id] = "hold-position"
             return f"hold position applied to {len(target_ids)} drone(s)"
 
+        if request.action in {"move_left", "move_right", "move_up", "move_down"}:
+            return self._apply_manual_step(request, target_ids)
+
         if request.action == "return_home":
+            self._clear_manual_targets(target_ids)
             for drone_id in target_ids:
                 self._mission_overrides[drone_id] = "return-home"
             return f"return home applied to {len(target_ids)} drone(s)"
 
         if request.action == "emergency_land":
+            self._clear_manual_targets(target_ids)
             for drone_id in target_ids:
                 self._mission_overrides[drone_id] = "emergency-land"
             return f"emergency land applied to {len(target_ids)} drone(s)"
 
         if request.action == "fly":
+            self._clear_manual_targets(target_ids)
             for drone_id in target_ids:
                 self._mission_overrides[drone_id] = "fly"
             return f"takeoff applied to {len(target_ids)} drone(s)"
 
         if request.action == "land":
+            self._clear_manual_targets(target_ids)
             for drone_id in target_ids:
                 self._mission_overrides[drone_id] = "land"
             return f"target landing applied to {len(target_ids)} drone(s)"
@@ -1166,20 +1545,50 @@ class SwarmBackend:
                 self._mission_overrides.setdefault(drone_id, "formation-hold")
             return "leader election broadcast sent"
 
+        if request.action == "maintenance_mode":
+            token_id = safe_text(request.payload.get("maintenance_token_id"), "maintenance-window-1")
+            for drone_id in target_ids:
+                self._mission_overrides[drone_id] = "maintenance-window"
+                self._firmware_overrides[drone_id] = {
+                    **self._firmware_overrides.get(drone_id, {}),
+                    "maintenance_mode": True,
+                    "update_channel_state": f"maintenance-window-open:{token_id}",
+                    "boot_trust_summary": "Maintenance window opened from dashboard console",
+                }
+            return f"maintenance window opened for {len(target_ids)} drone(s)"
+
+        if request.action == "firmware_update":
+            version = safe_text(request.payload.get("firmware_version"), "2.0.0")
+            measurement = safe_text(request.payload.get("firmware_measurement"), "fw-secure-local")
+            rollback_counter = safe_int(request.payload.get("rollback_counter"), 1)
+            for drone_id in target_ids:
+                self._mission_overrides[drone_id] = "firmware-update"
+                self._firmware_overrides[drone_id] = {
+                    **self._firmware_overrides.get(drone_id, {}),
+                    "firmware_version": version,
+                    "firmware_measurement": measurement,
+                    "secure_boot_state": safe_text(request.payload.get("secure_boot_state"), "SECURE_BOOT_TRUSTED"),
+                    "boot_trust_summary": safe_text(request.payload.get("boot_trust_summary"), "Firmware update applied from dashboard console"),
+                    "rollback_counter": rollback_counter,
+                    "maintenance_mode": True,
+                    "update_channel_state": "firmware-updated",
+                }
+            return f"firmware update staged for {len(target_ids)} drone(s)"
+
         return f"{request.action} accepted for {len(target_ids)} drone(s)"
 
     def poll(self) -> DashboardSnapshot:
         if self._client is not None:
             try:
-                return self._merge_local_demo_snapshot(self._client.fetch_snapshot())
+                return self._apply_manual_navigation(self._merge_local_demo_snapshot(self._client.fetch_snapshot()))
             except (error.URLError, TimeoutError, ValueError, KeyError) as exc:
                 logger.warning("go-control-plane snapshot failed, falling back to simulation: %s", exc)
-                return self._merge_local_demo_snapshot(self._simulate_snapshot())
+                return self._apply_manual_navigation(self._merge_local_demo_snapshot(self._simulate_snapshot()))
         if self._bridge is not None and self._pipelines:
             snapshot = self._poll_bridge()
             if snapshot is not None:
-                return self._merge_local_demo_snapshot(snapshot)
-        return self._merge_local_demo_snapshot(self._simulate_snapshot())
+                return self._apply_manual_navigation(self._merge_local_demo_snapshot(snapshot))
+        return self._apply_manual_navigation(self._merge_local_demo_snapshot(self._simulate_snapshot()))
 
     def _poll_bridge(self) -> DashboardSnapshot | None:
         try:
@@ -1204,7 +1613,7 @@ class SwarmBackend:
                     attitude_rpy, thrust_vector = derive_attitude_thrust(position, velocity, role, now - self._started_at)
 
                 states.append(
-                    DroneState(
+                    self._apply_firmware_overrides(DroneState(
                         drone_id=drone_id,
                         cluster_id=str(peer.cluster_id) if peer is not None and hasattr(peer, "cluster_id") else f"cluster-{((drone_id - 1) // 20) + 1:02d}",
                         role=role,
@@ -1214,6 +1623,10 @@ class SwarmBackend:
                         ),
                         position=position,
                         velocity=velocity,
+                        commanded_altitude_m=safe_float(getattr(runtime, "commanded_altitude_m", position[2]), position[2]),
+                        commanded_speed_mps=safe_float(getattr(runtime, "commanded_speed_mps", vector_norm3(velocity)), vector_norm3(velocity)),
+                        manual_target_position=safe_vector3(getattr(runtime, "manual_target_position", position), position),
+                        manual_control_active=bool(getattr(runtime, "manual_control_active", False)),
                         attitude_rpy=attitude_rpy,
                         thrust_vector=thrust_vector,
                         drift_m=float(self._pipelines[drone_id].drift_m()),
@@ -1233,18 +1646,34 @@ class SwarmBackend:
                         occupancy_ratio=safe_float(getattr(runtime, "occupancy_ratio", 0.0), 0.0),
                         sync_confidence=safe_float(getattr(runtime, "sync_confidence", 1.0), 1.0),
                         imu_camera_offset_ms=safe_float(getattr(runtime, "imu_camera_offset_ms", 0.0), 0.0),
+                        peer_clock_offset_ms=safe_float(getattr(runtime, "peer_clock_offset_ms", 0.0), 0.0),
+                        anchor_visibility_ratio=safe_float(getattr(runtime, "anchor_visibility_ratio", 0.0), 0.0),
+                        tdoa_weight=safe_float(getattr(runtime, "tdoa_weight", 0.0), 0.0),
+                        planned_waypoint_count=safe_int(getattr(runtime, "planned_waypoint_count", 0), 0),
+                        last_relocalized_keyframe=safe_int(getattr(runtime, "last_relocalized_keyframe", 0), 0),
                         security_state=safe_text(getattr(runtime, "security_state", "TRUSTED"), "TRUSTED"),
                         security_summary=safe_text(getattr(runtime, "security_summary", "All trust signals nominal"), "All trust signals nominal"),
+                        security_transition_reason=safe_text(getattr(runtime, "security_transition_reason", "initial-trust"), "initial-trust"),
                         remote_command_allowed=bool(getattr(runtime, "remote_command_allowed", True)),
                         telemetry_uplink_allowed=bool(getattr(runtime, "telemetry_uplink_allowed", True)),
                         link_integrity_score=safe_float(getattr(runtime, "link_integrity_score", 1.0), 1.0),
+                        trust_epoch=safe_int(getattr(runtime, "trust_epoch", 1), 1),
+                        last_auth_failure_at_s=safe_float(getattr(runtime, "last_auth_failure_at_s", 0.0), 0.0),
+                        tamper_score=safe_float(getattr(runtime, "tamper_score", 0.0), 0.0),
+                        firmware_measurement=safe_text(getattr(runtime, "firmware_measurement", "lab-local-build"), "lab-local-build"),
+                        firmware_version=safe_text(getattr(runtime, "firmware_version", "0.0.0"), "0.0.0"),
+                        secure_boot_state=safe_text(getattr(runtime, "secure_boot_state", "LAB_BOOT"), "LAB_BOOT"),
+                        boot_trust_summary=safe_text(getattr(runtime, "boot_trust_summary", "Lab boot trust bypassed"), "Lab boot trust bypassed"),
+                        rollback_counter=safe_int(getattr(runtime, "rollback_counter", 0), 0),
+                        maintenance_mode=bool(getattr(runtime, "maintenance_mode", False)),
+                        update_channel_state=safe_text(getattr(runtime, "update_channel_state", "idle"), "idle"),
                         last_remote_command_status=safe_text(getattr(runtime, "last_remote_command_status", "no remote command"), "no remote command"),
                         health_flags=[safe_text(v) for v in getattr(runtime, "health_flags", []) if safe_text(v)],
                         motor_health=max(0.45, min(1.0, 1.0 - (drone_id - 1) * 0.03)),
                         leadership_score=max(0.1, min(0.98, (battery / 100.0) * 0.35 + 0.55)),
                         election_ready=reachable and battery > 18.0,
                         timestamp=now,
-                    )
+                    ))
                 )
 
             if self._should_synthesize_fleet(states, peer_map):
@@ -1259,6 +1688,12 @@ class SwarmBackend:
                 cpu_temp_c=float(stats.cpu_temp_c),
                 gpu_load_pct=float(stats.gpu_pct),
                 election_state="election-ready" if any(state.election_ready for state in states) else "degraded",
+                clusters=self._cluster_snapshot(states),
+                critical_alerts=self._critical_alert_count(states),
+                health=self._health_snapshot(states, float(stats.cpu_temp_c)),
+                events=[],
+                missions=[],
+                services=["telemetry-bridge", "mesh-sidecar"] if self._network is not None else ["telemetry-bridge"],
                 timestamp=now,
             )
         except Exception:
@@ -1301,13 +1736,17 @@ class SwarmBackend:
             localization_confidence = max(0.22, anchor.localization_confidence - idx * 0.05)
             localization_state = "lost" if localization_confidence < 0.28 else "degraded" if localization_confidence < 0.58 else "nominal"
             synthesized.append(
-                DroneState(
+                self._apply_firmware_overrides(DroneState(
                     drone_id=drone_id,
                     cluster_id=f"cluster-{((drone_id - 1) // 20) + 1:02d}",
                     role="LEADER" if idx == 0 else "FOLLOWER",
                     mission_state=self._mission_overrides.get(drone_id, "formation-hold"),
                     position=synth_position,
                     velocity=synth_velocity,
+                    commanded_altitude_m=anchor.commanded_altitude_m,
+                    commanded_speed_mps=anchor.commanded_speed_mps,
+                    manual_target_position=anchor.manual_target_position,
+                    manual_control_active=anchor.manual_control_active,
                     attitude_rpy=attitude_rpy,
                     thrust_vector=thrust_vector,
                     drift_m=anchor.drift_m + 0.015 * idx,
@@ -1327,18 +1766,34 @@ class SwarmBackend:
                     occupancy_ratio=min(1.0, anchor.occupancy_ratio + idx * 0.01),
                     sync_confidence=max(0.2, anchor.sync_confidence - idx * 0.04),
                     imu_camera_offset_ms=anchor.imu_camera_offset_ms + idx * 0.7,
+                    peer_clock_offset_ms=anchor.peer_clock_offset_ms + idx * 0.4,
+                    anchor_visibility_ratio=max(0.0, anchor.anchor_visibility_ratio - idx * 0.08),
+                    tdoa_weight=max(0.0, anchor.tdoa_weight - idx * 0.05),
+                    planned_waypoint_count=max(0, anchor.planned_waypoint_count - idx),
+                    last_relocalized_keyframe=anchor.last_relocalized_keyframe,
                     security_state=anchor.security_state,
                     security_summary=anchor.security_summary,
+                    security_transition_reason=anchor.security_transition_reason,
                     remote_command_allowed=anchor.remote_command_allowed,
                     telemetry_uplink_allowed=anchor.telemetry_uplink_allowed,
                     link_integrity_score=max(0.1, anchor.link_integrity_score - idx * 0.05),
+                    trust_epoch=anchor.trust_epoch,
+                    last_auth_failure_at_s=anchor.last_auth_failure_at_s,
+                    tamper_score=anchor.tamper_score,
+                    firmware_measurement=anchor.firmware_measurement,
+                    firmware_version=anchor.firmware_version,
+                    secure_boot_state=anchor.secure_boot_state,
+                    boot_trust_summary=anchor.boot_trust_summary,
+                    rollback_counter=anchor.rollback_counter,
+                    maintenance_mode=anchor.maintenance_mode,
+                    update_channel_state=anchor.update_channel_state,
                     last_remote_command_status=anchor.last_remote_command_status,
                     health_flags=list(anchor.health_flags),
                     motor_health=max(0.55, anchor.motor_health - idx * 0.04),
                     leadership_score=max(0.12, anchor.leadership_score - idx * 0.06),
                     election_ready=(anchor.battery_pct - idx * 2.5) > 18.0,
                     timestamp=now,
-                )
+                ))
             )
         return synthesized
 
@@ -1404,7 +1859,7 @@ class SwarmBackend:
             attitude_rpy, thrust_vector = derive_attitude_thrust((x, y, z), (vx, vy, 0.0), "LEADER" if idx == 0 else "FOLLOWER", elapsed)
 
             states.append(
-                DroneState(
+                self._apply_firmware_overrides(DroneState(
                     drone_id=drone_id,
                     cluster_id=f"cluster-{((drone_id - 1) // 20) + 1:02d}",
                     role="LEADER" if idx == 0 else "FOLLOWER",
@@ -1414,6 +1869,10 @@ class SwarmBackend:
                     ),
                     position=(x, y, z),
                     velocity=(vx, vy, 0.0),
+                    commanded_altitude_m=8.0 + idx * 0.4,
+                    commanded_speed_mps=3.0,
+                    manual_target_position=(x + 1.2, y + 0.8, z),
+                    manual_control_active=False,
                     attitude_rpy=attitude_rpy,
                     thrust_vector=thrust_vector,
                     drift_m=drift,
@@ -1433,17 +1892,33 @@ class SwarmBackend:
                     occupancy_ratio=occupancy_ratio,
                     sync_confidence=sync_confidence,
                     imu_camera_offset_ms=(1.5 + idx * 0.9) * math.sin(elapsed * 0.14 + idx),
+                    peer_clock_offset_ms=2.5 * math.sin(elapsed * 0.19 + idx),
+                    anchor_visibility_ratio=max(0.0, min(1.0, anchor_visibility / 6.0)),
+                    tdoa_weight=max(0.0, min(1.0, tdoa_conf * 0.9)),
+                    planned_waypoint_count=max(1, 5 - idx),
+                    last_relocalized_keyframe=max(0, 42 - idx * 3),
                     security_state=security_state,
                     security_summary=security_summary,
+                    security_transition_reason="safety-consistency-failed" if security_state == "SAFE_RETURN" else "link-integrity-low" if security_state == "DEGRADED_LINK" else "nominal-trust",
                     remote_command_allowed=security_state == "TRUSTED",
                     telemetry_uplink_allowed=True,
                     link_integrity_score=link_integrity_score,
+                    trust_epoch=3 + idx,
+                    last_auth_failure_at_s=18.5 if security_state != "TRUSTED" else 0.0,
+                    tamper_score=max(0.0, 0.42 - link_integrity_score * 0.3),
+                    firmware_measurement=f"fw-sim-2026-04-{18 + idx:02d}",
+                    firmware_version=f"2.0.{idx}",
+                    secure_boot_state="SECURE_BOOT_TRUSTED" if security_state == "TRUSTED" else "SECURE_BOOT_DEGRADED",
+                    boot_trust_summary="Trusted boot chain validated" if security_state == "TRUSTED" else "Boot chain held under degraded trust policy",
+                    rollback_counter=1 + idx,
+                    maintenance_mode=idx == 0 and int(elapsed) % 50 > 42,
+                    update_channel_state="idle" if idx else "tracking",
                     last_remote_command_status="simulation: no remote command",
                     health_flags=[] if security_state == "TRUSTED" else [security_state.lower()],
                     motor_health=motor_health,
                     leadership_score=leadership_score,
                     election_ready=reachable and battery > 18.0 and motor_health > 0.45,
-                )
+                ))
             )
 
         return DashboardSnapshot(
@@ -1455,6 +1930,28 @@ class SwarmBackend:
             cpu_temp_c=states[0].cpu_temp_c,
             gpu_load_pct=states[0].gpu_load_pct,
             election_state="stable" if states[0].election_ready else "re-election",
+            clusters=self._cluster_snapshot(states),
+            critical_alerts=self._critical_alert_count(states),
+            health=self._health_snapshot(states, states[0].cpu_temp_c),
+            missions=[
+                {
+                    "mission_id": "sim-patrol-1",
+                    "name": "Sim Patrol",
+                    "formation": "DIAMOND",
+                    "cluster_id": states[0].cluster_id if states else "cluster-01",
+                    "target": [6.0, 4.0, 8.0],
+                    "status": "running",
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                }
+            ],
+            events=[
+                {
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "type": "simulation",
+                    "message": "Local simulation snapshot refreshed",
+                }
+            ],
+            services=["sim-telemetry", "local-map", "command-console"],
         )
 
     def execute(self, request: CommandRequest) -> str:
@@ -1471,7 +1968,18 @@ class SwarmBackend:
                 return f"demo drone {drone_id} removed from local dashboard swarm" if self._remove_local_drone(drone_id) else f"drone {drone_id} not found"
         if self._client is not None:
             try:
-                return self._client.send_command(request)
+                message = self._client.send_command(request)
+                self._mirror_backend_command(request)
+                return message
+            except error.HTTPError as exc:
+                if (
+                    self._security_profile == "lab"
+                    and exc.code in {403, 409}
+                    and request.action in {"election", "maintenance_mode", "firmware_update", "emergency_land"}
+                ):
+                    logger.warning("Go backend rejected %s in lab mode with %s, applying local fallback", request.action, exc.code)
+                    return self._apply_local_command_effect(request)
+                return f"{request.action} failed via go backend: HTTP Error {exc.code}: {exc.reason}"
             except (error.URLError, TimeoutError, ValueError) as exc:
                 return f"{request.action} failed via go backend: {exc}"
         if request.action == "add_drone":
@@ -1487,7 +1995,7 @@ class SwarmBackend:
             if request.action == "remove_drone":
                 drone_id = int(request.payload.get("drone_id", 0) or 0)
                 return f"drone {drone_id} removed in simulation mode" if self._remove_local_drone(drone_id) else f"drone {drone_id} not found"
-            if request.action in {"election", "formation", "hold_position", "return_home", "emergency_land", "fly", "land"}:
+            if request.action in {"election", "formation", "hold_position", "return_home", "emergency_land", "fly", "land", "move_left", "move_right", "move_up", "move_down", "maintenance_mode", "firmware_update"}:
                 return self._apply_local_command_effect(request)
             return f"{request.action} queued in simulation mode"
 
@@ -1517,7 +2025,7 @@ class SwarmBackend:
                     return self._apply_local_command_effect(request)
                 return "emergency land broadcast failed"
 
-            if request.action in {"hold_position", "return_home", "fly", "land"}:
+            if request.action in {"hold_position", "return_home", "fly", "land", "move_left", "move_right", "move_up", "move_down", "maintenance_mode", "firmware_update"}:
                 return self._apply_local_command_effect(request)
 
             return f"unknown command: {request.action}"
@@ -1639,43 +2147,70 @@ class Map3DView(gl.GLViewWidget):
         axis.setSize(4.0, 4.0, 4.0)
         self.addItem(axis)
 
-        self._scatter = gl.GLScatterPlotItem(pos=np.zeros((1, 3)), size=12, pxMode=True)
-        self.addItem(self._scatter)
+        self._drone_icon_base = _load_svg_gl_image(ASSET_DIR / "drone.svg", (56, 56))
+        self._leader_icon = _colorize_gl_image(self._drone_icon_base, (255, 196, 64, 220))
+        self._follower_icon = _colorize_gl_image(self._drone_icon_base, (84, 235, 255, 205))
+        self._offline_icon = _colorize_gl_image(self._drone_icon_base, (255, 96, 96, 210))
         self._histories: dict[int, deque[tuple[float, float, float]]] = {}
         self._trails: dict[int, gl.GLLinePlotItem] = {}
-        self._max_points = 240
+        self._icons: dict[int, gl.GLImageItem] = {}
+        self._max_points = 120
         self._camera_center = np.array([0.0, 0.0, 6.0], dtype=float)
         self._camera_distance = 26.0
+        self._auto_camera_resume_at = 0.0
 
     def ingest(self, states: list[DroneState]) -> None:
         if not states:
             return
 
         positions = np.array([state.position for state in states], dtype=float)
-        colors = []
-        for state in states:
-            if not state.reachable:
-                colors.append((0.94, 0.27, 0.27, 1.0))
-            elif state.role == "LEADER":
-                colors.append((0.98, 0.55, 0.12, 1.0))
-            else:
-                colors.append((0.15, 0.78, 0.85, 1.0))
-        self._scatter.setData(pos=positions, color=np.array(colors), size=11)
         self._update_camera_frame(positions)
 
         for state in states:
             if state.drone_id not in self._histories:
                 self._histories[state.drone_id] = deque(maxlen=self._max_points)
-                line = gl.GLLinePlotItem(width=2.0, antialias=True)
+                line = gl.GLLinePlotItem(width=1.5, antialias=False)
                 self._trails[state.drone_id] = line
                 self.addItem(line)
+            if state.drone_id not in self._icons:
+                icon = gl.GLImageItem(self._follower_icon)
+                icon.setGLOptions("translucent")
+                self._icons[state.drone_id] = icon
+                self.addItem(icon)
             self._histories[state.drone_id].append(state.position)
+            icon = self._icons[state.drone_id]
+            icon.resetTransform()
+            if not state.reachable:
+                icon.setData(self._offline_icon)
+                trail_rgba = np.array([[1.0, 0.36, 0.36, 0.55]])
+            elif state.role == "LEADER":
+                icon.setData(self._leader_icon)
+                trail_rgba = np.array([[1.0, 0.80, 0.28, 0.62]])
+            else:
+                icon.setData(self._follower_icon)
+                trail_rgba = np.array([[0.34, 0.92, 1.0, 0.5]])
+            icon.scale(0.028, 0.028, 0.028)
+            icon.translate(state.position[0] - 0.78, state.position[1] - 0.78, max(0.22, state.position[2]) + 0.22)
             if len(self._histories[state.drone_id]) >= 2:
                 trail = np.array(self._histories[state.drone_id], dtype=float)
-                color = np.tile(np.array([[0.22, 0.74, 0.97, 0.45]]), (trail.shape[0], 1))
+                color = np.tile(trail_rgba, (trail.shape[0], 1))
                 self._trails[state.drone_id].setData(pos=trail, color=color)
 
+        active_ids = {state.drone_id for state in states}
+        for drone_id in list(self._trails):
+            if drone_id in active_ids:
+                continue
+            icon = self._icons.pop(drone_id, None)
+            if icon is not None:
+                self.removeItem(icon)
+            self._histories.pop(drone_id, None)
+            trail = self._trails.pop(drone_id, None)
+            if trail is not None:
+                self.removeItem(trail)
+
     def _update_camera_frame(self, positions: np.ndarray) -> None:
+        if time.monotonic() < self._auto_camera_resume_at:
+            return
         mins = positions.min(axis=0)
         maxs = positions.max(axis=0)
         center = (mins + maxs) / 2.0
@@ -1691,6 +2226,30 @@ class Map3DView(gl.GLViewWidget):
             elevation=22,
             azimuth=38,
         )
+
+    def _pause_auto_camera(self, seconds: float = 3.0) -> None:
+        self._auto_camera_resume_at = max(self._auto_camera_resume_at, time.monotonic() + seconds)
+        self._camera_distance = float(self.opts.get("distance", self._camera_distance))
+        center = self.opts.get("center")
+        if center is not None:
+            self._camera_center = np.array([center.x(), center.y(), center.z()], dtype=float)
+
+    def wheelEvent(self, event) -> None:  # noqa: N802
+        self._pause_auto_camera(4.0)
+        super().wheelEvent(event)
+        self._pause_auto_camera(4.0)
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802
+        self._pause_auto_camera()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802
+        self._pause_auto_camera()
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802
+        self._pause_auto_camera()
+        super().mouseReleaseEvent(event)
 
 
 class DriftGraph(pg.PlotWidget):
@@ -1848,16 +2407,23 @@ class AdvancedMetricsTable(QTableWidget):
     def __init__(self) -> None:
         super().__init__(0, len(self.HEADERS))
         self.setHorizontalHeaderLabels(self.HEADERS)
-        self.horizontalHeader().setStretchLastSection(True)
+        header = self.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setMinimumSectionSize(84)
+        header.setDefaultAlignment(Qt.AlignCenter)
         self.verticalHeader().setVisible(False)
         self.setAlternatingRowColors(True)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionBehavior(QTableWidget.SelectRows)
         self.setShowGrid(False)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setWordWrap(False)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def ingest(self, snapshot: DashboardSnapshot) -> None:
         if not snapshot.states:
+            self.setRowCount(0)
             return
         self.setRowCount(len(snapshot.states))
         for row, state in enumerate(snapshot.states):
@@ -1886,6 +2452,420 @@ class AdvancedMetricsTable(QTableWidget):
                     item.setForeground(QColor(WARN))
                     
                 self.setItem(row, col, item)
+        self.resizeRowsToContents()
+
+
+class AutonomySecurityTable(QTableWidget):
+    HEADERS = [
+        "ID",
+        "Keyframe-based SLAM",
+        "Zero-Trust Security",
+        "Health Flags",
+    ]
+
+    def __init__(self) -> None:
+        super().__init__(0, len(self.HEADERS))
+        self.setHorizontalHeaderLabels(self.HEADERS)
+        header = self.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setMinimumSectionSize(120)
+        header.setDefaultAlignment(Qt.AlignCenter)
+        for col in range(len(self.HEADERS)):
+            header.setSectionResizeMode(col, QHeaderView.Stretch)
+        self.verticalHeader().setVisible(False)
+        self.setAlternatingRowColors(True)
+        self.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.setSelectionBehavior(QTableWidget.SelectRows)
+        self.setShowGrid(False)
+        self.setWordWrap(True)
+        self.setTextElideMode(Qt.ElideNone)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def ingest(self, snapshot: DashboardSnapshot) -> None:
+        self.setRowCount(len(snapshot.states))
+        for row, state in enumerate(snapshot.states):
+            health_flags = ", ".join(state.health_flags) if state.health_flags else "Nominal"
+            values = [
+                str(state.drone_id),
+                (
+                    f"anchors {state.visible_anchor_count} | occupancy {state.occupancy_ratio*100.0:.1f}% | "
+                    f"relocal {state.relocalization_count} | trend {state.confidence_trend:+.2f}"
+                ),
+                (
+                    f"{state.security_state} | integrity {state.link_integrity_score:.2f} | "
+                    f"epoch {state.trust_epoch} | tamper {state.tamper_score:.2f}"
+                ),
+                health_flags,
+            ]
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                item.setTextAlignment(Qt.AlignCenter)
+                if col == 2:
+                    if state.security_state == "TRUSTED":
+                        item.setForeground(QColor(SUCCESS))
+                    elif state.security_state == "DEGRADED_LINK":
+                        item.setForeground(QColor(WARN))
+                    else:
+                        item.setForeground(QColor(DANGER))
+                elif col == 3 and state.health_flags:
+                    item.setForeground(QColor(WARN))
+                self.setItem(row, col, item)
+        self.resizeRowsToContents()
+
+
+class AutonomyHighlightsTable(QTableWidget):
+    HEADERS = [
+        "ID",
+        "Visual-Inertial Odometry (VIO)",
+        "Remote Command Trust",
+        "Health Flags",
+    ]
+
+    def __init__(self) -> None:
+        super().__init__(0, len(self.HEADERS))
+        self.setHorizontalHeaderLabels(self.HEADERS)
+        header = self.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setMinimumSectionSize(130)
+        header.setDefaultAlignment(Qt.AlignCenter)
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for col in range(1, len(self.HEADERS)):
+            header.setSectionResizeMode(col, QHeaderView.Stretch)
+        self.verticalHeader().setVisible(False)
+        self.setAlternatingRowColors(True)
+        self.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.setSelectionBehavior(QTableWidget.SelectRows)
+        self.setShowGrid(False)
+        self.setWordWrap(True)
+        self.setTextElideMode(Qt.ElideNone)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def ingest(self, snapshot: DashboardSnapshot) -> None:
+        self.setRowCount(len(snapshot.states))
+        for row, state in enumerate(snapshot.states):
+            health_flags = ", ".join(state.health_flags) if state.health_flags else "Nominal"
+            values = [
+                str(state.drone_id),
+                (
+                    f"{state.localization_source} | {state.localization_state.upper()} | "
+                    f"drift {state.drift_m:.3f} m | conf {state.localization_confidence:.2f}"
+                ),
+                (
+                    f"remote {'ALLOW' if state.remote_command_allowed else 'BLOCK'} | "
+                    f"uplink {'ON' if state.telemetry_uplink_allowed else 'OFF'} | "
+                    f"{state.last_remote_command_status} | fw {state.firmware_version} | {state.secure_boot_state}"
+                ),
+                health_flags,
+            ]
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                item.setTextAlignment(Qt.AlignCenter)
+                if col == 2 and not state.remote_command_allowed:
+                    item.setForeground(QColor(DANGER))
+                elif col == 3 and state.health_flags:
+                    item.setForeground(QColor(WARN))
+                self.setItem(row, col, item)
+        self.resizeRowsToContents()
+
+
+class SensorConnectionStatusTable(QWidget):
+    HEADERS = [
+        "Sensor",
+        "Connection",
+        "Connection Time",
+        "Working Ability",
+        "Error",
+    ]
+
+    SENSOR_DEFINITIONS = [
+        ("IMU", "enable_imu", lambda cfg: f"{cfg.get('imu_device', '/dev/i2c-1')} @ addr {cfg.get('imu_addr', '104')}"),
+        ("Camera", "enable_camera", lambda cfg: cfg.get("camera_stream_url", "").strip() or cfg.get("esp32_ip", "").strip() or "Not configured"),
+        ("LiDAR", "enable_lidar", lambda cfg: cfg.get("lidar_endpoint", "").strip() or "Not configured"),
+        ("Barometer", "enable_barometer", lambda _cfg: "Onboard telemetry bus"),
+        ("Motor Health", "enable_motor", lambda _cfg: "ESC telemetry / controller bus"),
+        ("Optical Flow", "enable_optical_flow", lambda _cfg: "Downward optical-flow module"),
+        ("Rangefinder", "enable_rangefinder", lambda _cfg: "Altitude / proximity rangefinder"),
+        ("TDOA Ingestor", "enable_tdoa_ingestor", lambda cfg: f"UDP {cfg.get('tdoa_udp_port', '0')} | {cfg.get('tdoa_csv', '').strip() or 'live feed'}"),
+        ("UWB Serial", "enable_uwb_serial", lambda cfg: cfg.get("tdoa_serial", "").strip() or "Not configured"),
+    ]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._tables_by_drone_id: dict[int, QTableWidget] = {}
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        self._tabs = QTabWidget()
+        self._tabs.setDocumentMode(True)
+        self._tabs.setStyleSheet(
+            f"QTabWidget::pane {{ border: 1px solid {BORDER}; border-radius: 6px; background: {PANEL_ALT}; top: -1px; }}"
+            f" QTabBar::tab {{ background: {PANEL_BG}; color: {TEXT_DIM}; padding: 8px 14px; border: 1px solid {BORDER};"
+            f" border-bottom: none; min-width: 90px; }}"
+            f" QTabBar::tab:selected {{ background: {PANEL_ALT}; color: {TEXT}; border-top: 1px solid {ACCENT}; font-weight: 700; }}"
+            f" QTabBar::tab:!selected:hover {{ color: {TEXT}; }}"
+        )
+        layout.addWidget(self._tabs)
+
+    def _create_table(self) -> QTableWidget:
+        table = QTableWidget(0, len(self.HEADERS))
+        table.setHorizontalHeaderLabels(self.HEADERS)
+        header = table.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setMinimumSectionSize(120)
+        header.setDefaultAlignment(Qt.AlignCenter)
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        for col in range(1, len(self.HEADERS)):
+            header.setSectionResizeMode(col, QHeaderView.Stretch)
+        table.verticalHeader().setVisible(False)
+        table.setAlternatingRowColors(True)
+        table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectRows)
+        table.setShowGrid(False)
+        table.setWordWrap(True)
+        table.setTextElideMode(Qt.ElideNone)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        return table
+
+    @staticmethod
+    def _set_table_item(table: QTableWidget, row: int, col: int, value: str, color: str | None = None) -> None:
+        item = table.item(row, col)
+        if item is None:
+            item = QTableWidgetItem(value)
+            item.setTextAlignment(Qt.AlignCenter)
+            table.setItem(row, col, item)
+        elif item.text() != value:
+            item.setText(value)
+        if color is not None:
+            item.setForeground(QColor(color))
+
+    @staticmethod
+    def _enabled(config: dict[str, str], key: str) -> bool:
+        return safe_text(config.get(key, "false"), "false").lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _connection_time_text(timestamp: float) -> str:
+        if timestamp <= 0:
+            return "Unknown"
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+
+    @staticmethod
+    def _sensor_error_text(sensor_name: str, enabled: bool, state: DroneState) -> str:
+        if not enabled:
+            return "Disabled in sensor profile"
+        if not state.reachable:
+            return "Drone unreachable"
+
+        sensor_key = sensor_name.lower().replace(" ", "_")
+        matching_flags = [flag for flag in state.health_flags if sensor_key in flag.lower()]
+        if matching_flags:
+            return ", ".join(matching_flags)
+
+        if sensor_name == "Camera" and state.localization_source.lower() == "vision-inertial" and state.localization_state != "nominal":
+            return f"Localization {state.localization_state}"
+        if sensor_name == "IMU" and abs(state.imu_camera_offset_ms) > 8.0:
+            return f"Sync offset {state.imu_camera_offset_ms:.1f} ms"
+        if sensor_name == "LiDAR" and state.occupancy_ratio <= 0.02:
+            return "Low obstacle returns"
+        if sensor_name == "Motor Health" and state.motor_health < 0.65:
+            return f"Motor health {state.motor_health:.2f}"
+        if sensor_name == "TDOA Ingestor" and state.visible_anchor_count == 0:
+            return "No anchors visible"
+        if sensor_name == "UWB Serial" and state.sync_confidence < 0.5:
+            return f"Sync confidence {state.sync_confidence:.2f}"
+        if sensor_name == "Rangefinder" and state.position[2] < 0.2:
+            return "Altitude estimate near floor"
+        if sensor_name == "Barometer" and state.cpu_temp_c >= 78.0:
+            return "High compute temperature may skew readings"
+        if sensor_name == "Optical Flow" and state.drift_m > 1.5:
+            return f"High drift {state.drift_m:.2f} m"
+        return "None"
+
+    @staticmethod
+    def _working_ability_text(sensor_name: str, enabled: bool, state: DroneState) -> tuple[str, str]:
+        if not enabled:
+            return "Disabled", TEXT_DIM
+        if not state.reachable:
+            return "Offline", DANGER
+        if sensor_name == "Motor Health" and state.motor_health < 0.65:
+            return "Degraded", WARN
+        if sensor_name == "Camera" and state.localization_state != "nominal":
+            return "Degraded", WARN
+        if sensor_name == "IMU" and abs(state.imu_camera_offset_ms) > 8.0:
+            return "Degraded", WARN
+        if sensor_name == "UWB Serial" and state.sync_confidence < 0.5:
+            return "Degraded", WARN
+        if sensor_name == "TDOA Ingestor" and state.visible_anchor_count == 0:
+            return "Degraded", WARN
+        return "Working", SUCCESS
+
+    def ingest(self, snapshot: DashboardSnapshot, env_manager: DroneEnvManager) -> None:
+        current_drone_id = self._tabs.currentWidget().property("drone_id") if self._tabs.currentWidget() is not None else None
+        incoming_ids = [state.drone_id for state in snapshot.states]
+
+        for drone_id in [drone_id for drone_id in list(self._tables_by_drone_id) if drone_id not in incoming_ids]:
+            table = self._tables_by_drone_id.pop(drone_id)
+            index = self._tabs.indexOf(table)
+            if index >= 0:
+                self._tabs.removeTab(index)
+            table.deleteLater()
+
+        for state in snapshot.states:
+            table = self._tables_by_drone_id.get(state.drone_id)
+            is_new_table = table is None
+            if table is None:
+                table = self._create_table()
+                table.setProperty("drone_id", state.drone_id)
+                table.setRowCount(len(self.SENSOR_DEFINITIONS))
+                self._tables_by_drone_id[state.drone_id] = table
+                self._tabs.addTab(table, f"Drone {state.drone_id}")
+
+            config = env_manager.drone_config(state.drone_id)
+            connection_time = self._connection_time_text(state.timestamp)
+
+            for row, (sensor_name, enabled_key, describe_connection) in enumerate(self.SENSOR_DEFINITIONS):
+                enabled = self._enabled(config, enabled_key)
+                ability_text, ability_color = self._working_ability_text(sensor_name, enabled, state)
+                error_text = self._sensor_error_text(sensor_name, enabled, state)
+                error_color = None
+                if error_text != "None":
+                    error_color = WARN if error_text != "Drone unreachable" else DANGER
+                self._set_table_item(table, row, 0, sensor_name)
+                self._set_table_item(table, row, 1, describe_connection(config))
+                self._set_table_item(table, row, 2, connection_time)
+                self._set_table_item(table, row, 3, ability_text, ability_color)
+                self._set_table_item(table, row, 4, error_text, error_color or TEXT)
+
+            if is_new_table:
+                table.resizeRowsToContents()
+
+        if current_drone_id is not None and current_drone_id in self._tables_by_drone_id:
+            self._tabs.setCurrentWidget(self._tables_by_drone_id[current_drone_id])
+        elif self._tabs.count() and self._tabs.currentIndex() < 0:
+            self._tabs.setCurrentIndex(0)
+
+
+class FleetOverviewPanel(QGroupBox):
+    def __init__(self) -> None:
+        super().__init__("Fleet Operations Overview")
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 16, 10, 10)
+        layout.setSpacing(10)
+
+        self._summary = QLabel("--")
+        self._summary.setWordWrap(True)
+        self._summary.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._summary.setStyleSheet(f"color:{TEXT}; font-size:12px; font-weight:600;")
+        layout.addWidget(self._summary)
+
+        self._tabs = QTabWidget()
+        self._tabs.setDocumentMode(True)
+        self._tabs.setStyleSheet(
+            f"QTabWidget::pane {{ border: 1px solid {BORDER}; border-radius: 6px; background: {PANEL_ALT}; top: -1px; }}"
+            f" QTabBar::tab {{ background: {PANEL_BG}; color: {TEXT_DIM}; padding: 8px 14px; border: 1px solid {BORDER};"
+            f" border-bottom: none; min-width: 90px; }}"
+            f" QTabBar::tab:selected {{ background: {PANEL_ALT}; color: {TEXT}; border-top: 1px solid {ACCENT}; font-weight: 700; }}"
+        )
+        layout.addWidget(self._tabs)
+
+        self._clusters = self._make_table(["Cluster", "Leader", "Drones", "Formation", "Mission", "Avg Battery"])
+        self._missions = self._make_table(["Mission", "Formation", "Cluster", "Target", "Status", "Created"])
+        self._events = self._make_table(["Time", "Type", "Message"])
+        self._tabs.addTab(self._clusters, "Clusters")
+        self._tabs.addTab(self._missions, "Missions")
+        self._tabs.addTab(self._events, "Events")
+
+    def _make_table(self, headers: list[str]) -> QTableWidget:
+        table = QTableWidget(0, len(headers))
+        table.setHorizontalHeaderLabels(headers)
+        header = table.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setDefaultAlignment(Qt.AlignCenter)
+        for col in range(len(headers)):
+            header.setSectionResizeMode(col, QHeaderView.Stretch)
+        table.verticalHeader().setVisible(False)
+        table.setAlternatingRowColors(True)
+        table.setEditTriggers(QTableWidget.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectRows)
+        table.setShowGrid(False)
+        table.setWordWrap(True)
+        table.setTextElideMode(Qt.ElideNone)
+        table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        return table
+
+    @staticmethod
+    def _set_item(table: QTableWidget, row: int, col: int, value: str, color: str | None = None) -> None:
+        item = table.item(row, col)
+        if item is None:
+            item = QTableWidgetItem(value)
+            item.setTextAlignment(Qt.AlignCenter)
+            table.setItem(row, col, item)
+        else:
+            item.setText(value)
+        item.setForeground(QColor(color or TEXT))
+
+    def ingest(self, snapshot: DashboardSnapshot) -> None:
+        health = snapshot.health
+        online = safe_int(health.get("online_drones"), sum(1 for state in snapshot.states if state.reachable))
+        total = safe_int(health.get("total_drones"), len(snapshot.states))
+        avg_battery = safe_float(health.get("avg_battery_pct"), 0.0)
+        max_cpu = safe_float(health.get("max_cpu_temp_c"), snapshot.cpu_temp_c)
+        services = ", ".join(snapshot.services[:6]) if snapshot.services else "fleet snapshot only"
+        self._summary.setText(
+            f"Critical alerts: {snapshot.critical_alerts}  |  Online: {online}/{total}  |  "
+            f"Avg battery: {avg_battery:.1f}%  |  Max CPU: {max_cpu:.1f} C  |  Services: {services}"
+        )
+
+        self._clusters.setRowCount(len(snapshot.clusters))
+        for row, cluster in enumerate(snapshot.clusters):
+            values = [
+                safe_text(cluster.get("cluster_id"), "cluster-01"),
+                str(safe_int(cluster.get("leader_id"), 0) or "-"),
+                str(safe_int(cluster.get("drone_count"), 0)),
+                safe_text(cluster.get("formation"), "unknown"),
+                safe_text(cluster.get("mission_state"), "unknown"),
+                f"{safe_float(cluster.get('avg_battery', 0.0)):.1f}%",
+            ]
+            for col, value in enumerate(values):
+                color = WARN if col == 5 and safe_float(cluster.get("avg_battery", 0.0)) < 25.0 else None
+                self._set_item(self._clusters, row, col, value, color)
+
+        missions = snapshot.missions
+        self._missions.setRowCount(len(missions))
+        for row, mission in enumerate(missions):
+            target = safe_vector3(mission.get("target", [0.0, 0.0, 0.0]))
+            values = [
+                safe_text(mission.get("name"), safe_text(mission.get("mission_id"), "mission")),
+                safe_text(mission.get("formation"), "unknown"),
+                safe_text(mission.get("cluster_id"), "all"),
+                f"({target[0]:.1f}, {target[1]:.1f}, {target[2]:.1f})",
+                safe_text(mission.get("status"), "unknown"),
+                safe_text(mission.get("created_at"), "")[:19].replace("T", " "),
+            ]
+            for col, value in enumerate(values):
+                color = SUCCESS if col == 4 and value.lower() in {"running", "scheduled"} else None
+                self._set_item(self._missions, row, col, value, color)
+
+        events = snapshot.events[-12:]
+        self._events.setRowCount(len(events))
+        for row, event in enumerate(events):
+            values = [
+                safe_text(event.get("timestamp"), "")[:19].replace("T", " "),
+                safe_text(event.get("type"), "event"),
+                safe_text(event.get("message"), ""),
+            ]
+            for col, value in enumerate(values):
+                color = WARN if col == 1 and "approval" in value.lower() else DANGER if col == 2 and "rejected" in value.lower() else None
+                self._set_item(self._events, row, col, value, color)
+
+        self._clusters.resizeRowsToContents()
+        self._missions.resizeRowsToContents()
+        self._events.resizeRowsToContents()
+
 
 class DroneDetailPanel(QGroupBox):
     def __init__(self) -> None:
@@ -1971,6 +2951,15 @@ class DroneDetailPanel(QGroupBox):
         layout.addLayout(make_row("Net Thrust", "thrust_mag", True))
         layout.addLayout(make_row("Relocal / Trend", "reloc_trend"))
         layout.addLayout(make_row("Anchors / Sync", "anchors_sync"))
+        layout.addLayout(make_row("Bridge Diagnostics", "bridge_diag"))
+        layout.addLayout(make_row("Planner / Relocal KF", "planner_diag"))
+        layout.addLayout(make_row("Manual Control", "manual_control"))
+        layout.addLayout(make_row("Manual Target", "manual_target"))
+        layout.addLayout(make_row("Trust / Tamper", "trust_tamper"))
+        layout.addLayout(make_row("Security Summary", "security_summary"))
+        layout.addLayout(make_row("Security Reason", "security_reason"))
+        layout.addLayout(make_row("Auth / Firmware", "auth_firmware"))
+        layout.addLayout(make_row("Boot / Maintenance", "boot_maint"))
         layout.addLayout(make_row("Occupancy", "occupancy", True))
         
         layout.addStretch(1)
@@ -2034,6 +3023,30 @@ class DroneDetailPanel(QGroupBox):
         self._labels["reloc_trend"].setText(f"Count: {state.relocalization_count}  |  Trend: {state.confidence_trend:+.2f}")
         
         self._labels["anchors_sync"].setText(f"Vis: {state.visible_anchor_count}  |  Sync: {state.sync_confidence*100.0:.0f}%  ({state.imu_camera_offset_ms:.1f}ms)")
+        self._labels["bridge_diag"].setText(
+            f"Peer clk {state.peer_clock_offset_ms:+.1f} ms  |  Anchor vis {state.anchor_visibility_ratio*100.0:.0f}%  |  TDOA weight {state.tdoa_weight:.2f}"
+        )
+        self._labels["planner_diag"].setText(
+            f"Waypoints: {state.planned_waypoint_count}  |  last KF: {state.last_relocalized_keyframe}  |  source {state.localization_source}"
+        )
+        self._labels["manual_control"].setText(
+            f"{'ACTIVE' if state.manual_control_active else 'IDLE'}  |  cmd alt {state.commanded_altitude_m:.1f} m  |  cmd speed {state.commanded_speed_mps:.1f} m/s"
+        )
+        self._labels["manual_target"].setText(
+            f"Target ({state.manual_target_position[0]:.1f}, {state.manual_target_position[1]:.1f}, {state.manual_target_position[2]:.1f})"
+        )
+        self._labels["trust_tamper"].setText(
+            f"Epoch: {state.trust_epoch}  |  Tamper: {state.tamper_score:.2f}  |  "
+            f"{state.secure_boot_state}  |  rc {state.rollback_counter}  |  {state.update_channel_state}"
+        )
+        self._labels["security_summary"].setText(state.security_summary)
+        self._labels["security_reason"].setText(state.security_transition_reason.replace("-", " "))
+        self._labels["auth_firmware"].setText(
+            f"Last auth fail: {state.last_auth_failure_at_s:.1f}s  |  fw {state.firmware_version}  |  {state.firmware_measurement}"
+        )
+        self._labels["boot_maint"].setText(
+            f"{'maintenance ON' if state.maintenance_mode else 'maintenance OFF'}  |  {state.boot_trust_summary}"
+        )
         self._set_bar("occupancy", state.occupancy_ratio * 100.0, "{:.1f}%", 60.0, 85.0, invert=True)
 
 
@@ -2044,6 +3057,7 @@ class CommandConsole(QGroupBox):
     def __init__(self) -> None:
         super().__init__("Command Console")
         self._operator_role = normalize_operator_role(os.environ.get("DRONE_OPERATOR_ROLE", "operator"))
+        self._security_profile = normalize_security_profile(os.environ.get("DRONE_SECURITY_PROFILE", "lab"))
         self.setMinimumHeight(250)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         layout = QVBoxLayout(self)
@@ -2068,6 +3082,32 @@ class CommandConsole(QGroupBox):
         content_layout.setContentsMargins(4, 4, 4, 4)
         content_layout.setSpacing(12)
 
+        def make_action_button(
+            label: str,
+            color: str,
+            action: str,
+            *,
+            min_height: int = 38,
+            radius: int = 10,
+            font_size: int = 12,
+            auto_repeat: bool = False,
+        ) -> QPushButton:
+            button = QPushButton(label)
+            button.setCursor(Qt.PointingHandCursor)
+            button.setMinimumHeight(min_height)
+            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            button.setAutoRepeat(auto_repeat)
+            if auto_repeat:
+                button.setAutoRepeatDelay(180)
+                button.setAutoRepeatInterval(120)
+            button.setStyleSheet(
+                f"QPushButton {{ background:{color}; color:#041019; border:none; border-radius:{radius}px; "
+                f"font-weight:700; font-size:{font_size}px; padding:10px 14px; }}"
+                "QPushButton:pressed { padding-top: 12px; padding-bottom: 8px; }"
+            )
+            button.clicked.connect(lambda _checked=False, action_name=action: self.command_requested.emit(self._build_request(action_name)))
+            return button
+
         button_layout = QGridLayout()
         button_layout.setHorizontalSpacing(10)
         button_layout.setVerticalSpacing(10)
@@ -2080,6 +3120,11 @@ class CommandConsole(QGroupBox):
         self._spacing.setValue(2.5)
         self._spacing.setSuffix(" m")
         self._spacing.setStyleSheet(f"background:{PANEL_ALT}; color:{TEXT}; border:1px solid {BORDER}; padding:6px;")
+        self._drone_id = QSpinBox()
+        self._drone_id.setRange(0, 999)
+        self._drone_id.setSpecialValueText("Selected")
+        self._drone_id.setValue(0)
+        self._drone_id.setStyleSheet(f"background:{PANEL_ALT}; color:{TEXT}; border:1px solid {BORDER}; padding:6px;")
         self._altitude = QDoubleSpinBox()
         self._altitude.setRange(1.0, 120.0)
         self._altitude.setValue(8.0)
@@ -2090,45 +3135,76 @@ class CommandConsole(QGroupBox):
         self._speed.setValue(3.0)
         self._speed.setSuffix(" m/s")
         self._speed.setStyleSheet(f"background:{PANEL_ALT}; color:{TEXT}; border:1px solid {BORDER}; padding:6px;")
+        self._step = QDoubleSpinBox()
+        self._step.setRange(0.2, 25.0)
+        self._step.setValue(1.5)
+        self._step.setSuffix(" m")
+        self._step.setStyleSheet(f"background:{PANEL_ALT}; color:{TEXT}; border:1px solid {BORDER}; padding:6px;")
 
         tuning_layout = QGridLayout()
         tuning_layout.setColumnStretch(0, 0)
         tuning_layout.setColumnStretch(1, 1)
         tuning_layout.addWidget(QLabel("Scope"), 0, 0)
         tuning_layout.addWidget(self._scope, 0, 1)
-        tuning_layout.addWidget(QLabel("Spacing"), 1, 0)
-        tuning_layout.addWidget(self._spacing, 1, 1)
-        tuning_layout.addWidget(QLabel("Altitude"), 2, 0)
-        tuning_layout.addWidget(self._altitude, 2, 1)
-        tuning_layout.addWidget(QLabel("Speed"), 3, 0)
-        tuning_layout.addWidget(self._speed, 3, 1)
+        tuning_layout.addWidget(QLabel("Drone ID"), 1, 0)
+        tuning_layout.addWidget(self._drone_id, 1, 1)
+        tuning_layout.addWidget(QLabel("Spacing"), 2, 0)
+        tuning_layout.addWidget(self._spacing, 2, 1)
+        tuning_layout.addWidget(QLabel("Altitude"), 3, 0)
+        tuning_layout.addWidget(self._altitude, 3, 1)
+        tuning_layout.addWidget(QLabel("Speed"), 4, 0)
+        tuning_layout.addWidget(self._speed, 4, 1)
+        tuning_layout.addWidget(QLabel("Move Step"), 5, 0)
+        tuning_layout.addWidget(self._step, 5, 1)
+
+        movement_box = QFrame()
+        movement_box.setStyleSheet(f"background:{PANEL_ALT}; border:1px solid {BORDER}; border-radius:16px;")
+        movement_layout = QGridLayout(movement_box)
+        movement_layout.setContentsMargins(16, 16, 16, 16)
+        movement_layout.setHorizontalSpacing(10)
+        movement_layout.setVerticalSpacing(10)
 
         controls = [
             ("Add Drone", "#A3E635", "add_drone"),
             ("Remove Drone", DANGER, "remove_drone"),
             ("Election", SUCCESS, "election"),
+            ("Maint Window", WARN, "maintenance_mode"),
+            ("Firmware Update", "#F97316", "firmware_update"),
             ("VEE", ACCENT, "VEE"),
             ("LINE", CYAN, "LINE"),
             ("DIAMOND", MAGENTA, "DIAMOND"),
             ("Takeoff (Fly)", SUCCESS, "fly"),
             ("Target Land", WARN, "land"),
-            ("Hold", "#94A3B8", "hold_position"),
             ("Return Home", "#60A5FA", "return_home"),
             ("Emergency Land", DANGER, "emergency_land"),
         ]
         self._buttons: dict[str, QPushButton] = {}
 
-        for idx, (label, color, action) in enumerate(controls):
-            button = QPushButton(label)
-            button.setCursor(Qt.PointingHandCursor)
-            button.setMinimumHeight(38)
-            button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            button.setStyleSheet(
-                f"QPushButton {{ background:{color}; color:#041019; border:none; border-radius:10px; "
-                f"font-weight:700; padding:10px 14px; }}"
-                "QPushButton:pressed { padding-top: 12px; padding-bottom: 8px; }"
+        for action, label, color, row, col in [
+            ("move_up", "↑", "#FDE68A", 0, 1),
+            ("move_left", "←", "#7DD3FC", 1, 0),
+            ("hold_position", "◎", "#94A3B8", 1, 1),
+            ("move_right", "→", "#38BDF8", 1, 2),
+            ("move_down", "↓", "#FDBA74", 2, 1),
+        ]:
+            button = make_action_button(
+                label,
+                color,
+                action,
+                min_height=54,
+                radius=18,
+                font_size=24,
+                auto_repeat=action != "hold_position",
             )
-            button.clicked.connect(lambda _checked=False, action_name=action: self.command_requested.emit(self._build_request(action_name)))
+            button.setToolTip(action.replace("_", " ").title())
+            movement_layout.addWidget(button, row, col)
+            self._buttons[action] = button
+        movement_layout.setColumnStretch(0, 1)
+        movement_layout.setColumnStretch(1, 1)
+        movement_layout.setColumnStretch(2, 1)
+
+        for idx, (label, color, action) in enumerate(controls):
+            button = make_action_button(label, color, action)
             button_layout.addWidget(button, idx // 2, idx % 2)
             self._buttons[action] = button
         button_layout.setColumnStretch(0, 1)
@@ -2145,6 +3221,7 @@ class CommandConsole(QGroupBox):
         )
 
         content_layout.addLayout(tuning_layout)
+        content_layout.addWidget(movement_box)
         content_layout.addLayout(button_layout)
         content_layout.addWidget(self._log, 1)
         scroll.setWidget(content)
@@ -2161,10 +3238,19 @@ class CommandConsole(QGroupBox):
         self._operator_role = normalize_operator_role(role)
         election_button = self._buttons.get("election")
         if election_button is not None:
-            allowed = self._operator_role == "commander"
-            election_button.setEnabled(allowed)
+            allowed = self._operator_role == "commander" or self._security_profile == "lab"
+            election_button.setEnabled(True)
             election_button.setToolTip(
-                "Commander role required for leader election" if not allowed else "Trigger leader election"
+                "Commander role required outside lab mode" if not allowed else "Trigger leader election"
+            )
+        for action in ("maintenance_mode", "firmware_update"):
+            button = self._buttons.get(action)
+            if button is None:
+                continue
+            allowed = self._operator_role == "maintenance" or self._security_profile == "lab"
+            button.setEnabled(True)
+            button.setToolTip(
+                "Maintenance role required outside lab mode" if not allowed else action.replace("_", " ").title()
             )
 
     def set_pending_approvals(self, approvals: dict[str, str]) -> None:
@@ -2188,14 +3274,35 @@ class CommandConsole(QGroupBox):
     def _build_request(self, action: str) -> CommandRequest:
         payload = {
             "scope": self._scope.currentText(),
+            "drone_id": int(self._drone_id.value()),
             "spacing_m": float(self._spacing.value()),
             "altitude_m": float(self._altitude.value()),
             "velocity_mps": float(self._speed.value()),
+            "step_m": float(self._step.value()),
         }
         if action == "add_drone":
             return CommandRequest("add_drone", payload)
         if action in {"VEE", "LINE", "DIAMOND"}:
             return CommandRequest("formation", {**payload, "shape": action})
+        if action == "maintenance_mode":
+            return CommandRequest("maintenance_mode", {
+                **payload,
+                "maintenance_token_id": safe_text(os.environ.get("DRONE_MAINTENANCE_APPROVAL_TOKEN", "maintenance-window-1"), "maintenance-window-1"),
+            })
+        if action == "firmware_update":
+            rollback_counter = safe_int(os.environ.get("DRONE_FIRMWARE_ROLLBACK_COUNTER", "1"), 1) + 1
+            return CommandRequest("firmware_update", {
+                **payload,
+                "maintenance_token_id": safe_text(os.environ.get("DRONE_MAINTENANCE_APPROVAL_TOKEN", "maintenance-window-1"), "maintenance-window-1"),
+                "maintenance_window": True,
+                "firmware_version": safe_text(os.environ.get("DRONE_FIRMWARE_VERSION", "2.0.0"), "2.0.0"),
+                "firmware_measurement": safe_text(os.environ.get("DRONE_FIRMWARE_MEASUREMENT", "fw-secure-local"), "fw-secure-local"),
+                "firmware_signer": safe_text(os.environ.get("DRONE_FIRMWARE_SIGNER", "release-ca"), "release-ca"),
+                "firmware_signature": safe_text(os.environ.get("DRONE_FIRMWARE_SIGNATURE", "pending-signature"), "pending-signature"),
+                "rollback_counter": rollback_counter,
+                "secure_boot_state": "SECURE_BOOT_TRUSTED",
+                "boot_trust_summary": "Firmware update requested from maintenance console",
+            })
         return CommandRequest(action, payload)
 
 
@@ -2231,6 +3338,7 @@ class DashboardWindow(QMainWindow):
         self._selected_drone_id = safe_int(saved_settings.get("selected_drone_id"), drone_ids[0] if drone_ids else 0) or (drone_ids[0] if drone_ids else None)
         self._last_backend_url = backend_url or ""
         self._operator_role = normalize_operator_role(os.environ.get("DRONE_OPERATOR_ROLE", "operator"))
+        self._security_profile = normalize_security_profile(os.environ.get("DRONE_SECURITY_PROFILE", "lab"))
         self._pending_approvals: dict[str, str] = {}
 
         initial_missions = {
@@ -2410,6 +3518,7 @@ class DashboardWindow(QMainWindow):
         self._battery_card = MetricCard("SWARM BATTERY", SUCCESS)
         self._link_card = MetricCard("MESH HEALTH", CYAN)
         self._drift_card = MetricCard("AVG EKF DRIFT", MAGENTA)
+        self._alerts_card = MetricCard("CRITICAL ALERTS", DANGER)
         for idx, card in enumerate(
             [
                 self._leader_card,
@@ -2418,6 +3527,7 @@ class DashboardWindow(QMainWindow):
                 self._battery_card,
                 self._link_card,
                 self._drift_card,
+                self._alerts_card,
             ]
         ):
             cards.addWidget(card, 0, idx)
@@ -2469,8 +3579,8 @@ class DashboardWindow(QMainWindow):
         map_layout = QVBoxLayout(self._map_box)
         map_layout.setContentsMargins(10, 16, 10, 10)
         self._map = Map3DView()
-        self._map.setMinimumHeight(250)
-        self._map.setMaximumHeight(320)
+        self._map.setMinimumHeight(430)
+        self._map.setMaximumHeight(540)
         map_layout.addWidget(self._map)
 
         self._tabs = QTabWidget()
@@ -2512,17 +3622,45 @@ class DashboardWindow(QMainWindow):
         table_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         table_layout = QVBoxLayout(table_box)
         self._table = SwarmTable()
-        self._table.setMinimumHeight(130)
+        self._table.setMinimumHeight(150)
         table_layout.addWidget(self._table)
         table_container_layout.addWidget(table_box)
 
-        metrics_box = QGroupBox("Advanced Metrics (VIO, MCSS, V2X, Core Logic)")
+        metrics_box = QGroupBox("Advanced Metrics (VIO, MCSS, V2X)")
         metrics_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         metrics_layout = QVBoxLayout(metrics_box)
         self._metrics_table = AdvancedMetricsTable()
         self._metrics_table.setMinimumHeight(130)
         metrics_layout.addWidget(self._metrics_table)
         table_container_layout.addWidget(metrics_box)
+
+        autonomy_box = QGroupBox("Autonomy & Zero-Trust Matrix")
+        autonomy_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        autonomy_layout = QVBoxLayout(autonomy_box)
+        self._autonomy_security_table = AutonomySecurityTable()
+        self._autonomy_security_table.setMinimumHeight(170)
+        autonomy_layout.addWidget(self._autonomy_security_table)
+        table_container_layout.addWidget(autonomy_box)
+
+        autonomy_highlights_box = QGroupBox("Autonomy Highlights Table")
+        autonomy_highlights_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        autonomy_highlights_layout = QVBoxLayout(autonomy_highlights_box)
+        self._autonomy_highlights_table = AutonomyHighlightsTable()
+        self._autonomy_highlights_table.setMinimumHeight(130)
+        autonomy_highlights_layout.addWidget(self._autonomy_highlights_table)
+        table_container_layout.addWidget(autonomy_highlights_box)
+
+        sensor_status_box = QGroupBox("Sensor Connection Status Table")
+        sensor_status_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        sensor_status_layout = QVBoxLayout(sensor_status_box)
+        self._sensor_status_table = SensorConnectionStatusTable()
+        self._sensor_status_table.setMinimumHeight(220)
+        sensor_status_layout.addWidget(self._sensor_status_table)
+        table_container_layout.addWidget(sensor_status_box)
+
+        self._fleet_overview = FleetOverviewPanel()
+        self._fleet_overview.setMinimumHeight(280)
+        table_container_layout.addWidget(self._fleet_overview)
 
         resource_box = QGroupBox("Jetson Health Cards")
         resource_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -2581,8 +3719,8 @@ class DashboardWindow(QMainWindow):
                     widget.setParent(None)
 
         if compact:
-            self._map.setMinimumHeight(220)
-            self._map.setMaximumHeight(280)
+            self._map.setMinimumHeight(320)
+            self._map.setMaximumHeight(400)
             self._tabs.setMinimumHeight(240)
             self._tabs.setMaximumHeight(300)
             self._stack_layout.addWidget(self._map_box)
@@ -2594,12 +3732,14 @@ class DashboardWindow(QMainWindow):
             self._body_shell.addWidget(self._stack_scroll, 1)
             return
 
-        self._map.setMinimumHeight(250)
-        self._map.setMaximumHeight(320)
+        self._map.setMinimumHeight(430)
+        self._map.setMaximumHeight(540)
         self._tabs.setMinimumHeight(250)
         self._tabs.setMaximumHeight(320)
         self._left_layout.addWidget(self._map_box)
         self._left_layout.addWidget(self._table_container)
+        self._left_layout.setStretch(0, 5)
+        self._left_layout.setStretch(1, 3)
         self._left_layout.addStretch(1)
 
         self._right_layout.addWidget(self._graph_box)
@@ -2682,6 +3822,10 @@ class DashboardWindow(QMainWindow):
             self._comp_graph.ingest(snapshot.cpu_temp_c, snapshot.gpu_load_pct)
             self._table.ingest(snapshot.states)
             self._metrics_table.ingest(snapshot)
+            self._autonomy_security_table.ingest(snapshot)
+            self._autonomy_highlights_table.ingest(snapshot)
+            self._sensor_status_table.ingest(snapshot, self._env_manager)
+            self._fleet_overview.ingest(snapshot)
             self._select_row_for_drone()
             self._detail.ingest(self._selected_state(snapshot.states))
 
@@ -2726,6 +3870,11 @@ class DashboardWindow(QMainWindow):
                 f"localization confidence | drift {avg_drift:.3f} m",
                 accent=MAGENTA if avg_localization >= 0.70 else WARN,
             )
+            self._alerts_card.set_data(
+                str(snapshot.critical_alerts),
+                f"{len(snapshot.clusters)} clusters | {len(snapshot.missions)} missions tracked",
+                accent=SUCCESS if snapshot.critical_alerts == 0 else WARN if snapshot.critical_alerts < 3 else DANGER,
+            )
 
             self._cpu_health.set_data(
                 f"{snapshot.cpu_temp_c:.1f} C",
@@ -2761,7 +3910,8 @@ class DashboardWindow(QMainWindow):
             self.statusBar().showMessage(
                 f"Leader: {leader_id} | Nodes online: {online}/{len(snapshot.states)} | "
                 f"Avg drift: {avg_drift:.3f} m | Loc degraded: {degraded_loc}/{len(snapshot.states)} | "
-                f"Motor: {avg_motor * 100.0:.0f}% | Election-ready: {ready_count}/{len(snapshot.states)}"
+                f"Motor: {avg_motor * 100.0:.0f}% | Election-ready: {ready_count}/{len(snapshot.states)} | "
+                f"Critical alerts: {snapshot.critical_alerts}"
             )
         except Exception as exc:
             logger.exception("snapshot render failed")
@@ -2793,6 +3943,10 @@ class DashboardWindow(QMainWindow):
             mission_state="standby",
             position=(x, y, z),
             velocity=(vx, vy, 0.0),
+            commanded_altitude_m=z,
+            commanded_speed_mps=2.5,
+            manual_target_position=(x, y, z),
+            manual_control_active=False,
             attitude_rpy=attitude_rpy,
             thrust_vector=thrust_vector,
             drift_m=0.05,
@@ -2812,11 +3966,23 @@ class DashboardWindow(QMainWindow):
             occupancy_ratio=0.14,
             sync_confidence=0.93,
             imu_camera_offset_ms=2.1,
+            peer_clock_offset_ms=0.8,
+            anchor_visibility_ratio=0.82,
+            tdoa_weight=0.64,
+            planned_waypoint_count=4,
+            last_relocalized_keyframe=51,
             security_state="TRUSTED",
             security_summary="Demo drone injected into local dashboard state",
+            security_transition_reason="manual-add",
             remote_command_allowed=True,
             telemetry_uplink_allowed=True,
             link_integrity_score=0.90,
+            trust_epoch=2,
+            firmware_measurement="fw-demo-local",
+            firmware_version="2.0.0",
+            secure_boot_state="SECURE_BOOT_TRUSTED",
+            boot_trust_summary="Dashboard demo trust profile",
+            rollback_counter=1,
             last_remote_command_status="dashboard add_drone",
             health_flags=[],
             motor_health=0.94,
@@ -2842,6 +4008,12 @@ class DashboardWindow(QMainWindow):
             cpu_temp_c=self._last_snapshot.cpu_temp_c if self._last_snapshot is not None else 54.0,
             gpu_load_pct=self._last_snapshot.gpu_load_pct if self._last_snapshot is not None else 38.0,
             election_state=self._last_snapshot.election_state if self._last_snapshot is not None else "stable",
+            clusters=self._last_snapshot.clusters if self._last_snapshot is not None else self._backend._cluster_snapshot(states),
+            critical_alerts=self._last_snapshot.critical_alerts if self._last_snapshot is not None else self._backend._critical_alert_count(states),
+            health=self._last_snapshot.health if self._last_snapshot is not None else self._backend._health_snapshot(states, 54.0),
+            missions=self._last_snapshot.missions if self._last_snapshot is not None else [],
+            events=self._last_snapshot.events if self._last_snapshot is not None else [],
+            services=self._last_snapshot.services if self._last_snapshot is not None else ["dashboard-console"],
             timestamp=time.time(),
         )
         self._on_snapshot(snapshot)
@@ -2864,6 +4036,12 @@ class DashboardWindow(QMainWindow):
             cpu_temp_c=self._last_snapshot.cpu_temp_c,
             gpu_load_pct=self._last_snapshot.gpu_load_pct,
             election_state=self._last_snapshot.election_state,
+            clusters=self._backend._cluster_snapshot(states),
+            critical_alerts=self._backend._critical_alert_count(states),
+            health=self._backend._health_snapshot(states, self._last_snapshot.cpu_temp_c),
+            missions=self._last_snapshot.missions,
+            events=self._last_snapshot.events,
+            services=self._last_snapshot.services,
             timestamp=time.time(),
         )
         self._on_snapshot(snapshot)
@@ -2896,6 +4074,10 @@ class DashboardWindow(QMainWindow):
         try:
             logger.info("Dashboard dispatch requested action=%s payload=%s", request.action, request.payload)
             request = CommandRequest(request.action, dict(request.payload))
+            requested_drone_id = safe_int(request.payload.get("drone_id"), 0)
+            states = self._last_snapshot.states if self._last_snapshot else []
+            selected = self._selected_state(states)
+            target_state = next((state for state in states if state.drone_id == requested_drone_id), None) if requested_drone_id > 0 else selected
             if request.action == "add_drone":
                 suggested_id = (max(self._ids) + 1) if self._ids else 1
                 dialog = AddDroneDialog(self._env_manager, suggested_id, self)
@@ -2913,29 +4095,31 @@ class DashboardWindow(QMainWindow):
                 else:
                     self._console.append_log("demo drone selected; .env left unchanged")
             if request.action == "remove_drone":
-                selected = self._selected_state(self._last_snapshot.states if self._last_snapshot else [])
-                if selected is None:
+                if target_state is None:
                     self._console.append_log("remove rejected: no drone selected")
                     return
                 answer = QMessageBox.question(
                     self,
                     "Remove Drone",
-                    f"Remove drone {selected.drone_id} and delete its drone-wise sensor connection from .env?",
+                    f"Remove drone {target_state.drone_id} and delete its drone-wise sensor connection from .env?",
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.No,
                 )
                 if answer != QMessageBox.Yes:
                     self._console.append_log("remove drone cancelled")
                     return
-                request.payload["drone_id"] = selected.drone_id
-                request.payload["target_ids"] = [selected.drone_id]
-                request.payload["cluster_id"] = selected.cluster_id
-                self._env_manager.remove_drone(selected.drone_id)
-                self._console.append_log(f"drone {selected.drone_id} removed from .env")
+                request.payload["drone_id"] = target_state.drone_id
+                request.payload["target_ids"] = [target_state.drone_id]
+                request.payload["cluster_id"] = target_state.cluster_id
+                self._env_manager.remove_drone(target_state.drone_id)
+                self._console.append_log(f"drone {target_state.drone_id} removed from .env")
                 self._commands.submit(request)
                 return
-            if request.action == "election" and self._operator_role != "commander":
+            if request.action == "election" and self._operator_role != "commander" and self._security_profile != "lab":
                 self._console.append_log(f"command rejected locally: election requires commander role, current role is {self._operator_role}")
+                return
+            if request.action in {"maintenance_mode", "firmware_update"} and self._operator_role != "maintenance" and self._security_profile != "lab":
+                self._console.append_log(f"command rejected locally: {request.action} requires maintenance role, current role is {self._operator_role}")
                 return
             approval_id = self._pending_approvals.get(request.action)
             if approval_id:
@@ -2946,7 +4130,11 @@ class DashboardWindow(QMainWindow):
                 self._commands.submit(request)
                 return
             scope = request.payload.get("scope", "Fleet")
-            selected = self._selected_state(self._last_snapshot.states if self._last_snapshot else [])
+            if target_state is not None and requested_drone_id > 0:
+                request.payload["target_ids"] = [target_state.drone_id]
+                request.payload["cluster_id"] = target_state.cluster_id
+                self._commands.submit(request)
+                return
             if scope == "Selected Drone":
                 if selected is None:
                     self._console.append_log("command rejected: no drone selected")
@@ -3051,6 +4239,23 @@ def normalize_operator_role(value: str) -> str:
 
 def security_profile_requires_signed(profile: str) -> bool:
     return normalize_security_profile(profile) in {"field", "production"}
+
+
+def validate_backend_security_profile(base_url: str, profile: str) -> None:
+    normalized_profile = normalize_security_profile(profile)
+    if normalized_profile == "lab":
+        return
+    if not base_url.lower().startswith("https://"):
+        raise ValueError("field/production mode requires an https control-plane backend URL")
+    client_cert = os.environ.get("DRONE_TLS_CLIENT_CERT_FILE", "").strip()
+    client_key = os.environ.get("DRONE_TLS_CLIENT_KEY_FILE", "").strip()
+    ca_file = os.environ.get("DRONE_TLS_CA_FILE", "").strip()
+    if not ca_file:
+        raise ValueError("field/production mode requires DRONE_TLS_CA_FILE for backend trust")
+    if not client_cert:
+        raise ValueError("field/production mode requires DRONE_TLS_CLIENT_CERT_FILE for mTLS")
+    if not client_key:
+        raise ValueError("field/production mode requires DRONE_TLS_CLIENT_KEY_FILE for mTLS")
 
 
 def build_backend_ssl_context(base_url: str) -> ssl.SSLContext | None:

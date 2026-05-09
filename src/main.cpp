@@ -22,6 +22,7 @@
 #include "localization/TimeSyncTracker.hpp"
 #include "localization/UWBSerialDriver.hpp"
 #include "security/CommandPolicy.hpp"
+#include "security/FirmwareTrust.hpp"
 #include "telemetry/ControlPlaneTelemetryClient.hpp"
 #include "vio/VIOPipeline.hpp"
 #include "slam/KeyframeManager.hpp"
@@ -43,6 +44,7 @@
 #include <mutex>
 #include <sstream>
 #include <tuple>
+#include <string_view>
 #include <vector>
 #include <iostream>
 #include <thread>
@@ -160,6 +162,22 @@ bool parse_bool_or_default(const std::string& value, bool fallback) {
     return fallback;
 }
 
+double parse_double_or_default(const std::string& value, double fallback) {
+    try {
+        return std::stod(value);
+    } catch (const std::exception&) {
+        return fallback;
+    }
+}
+
+uint64_t parse_u64_or_default(const std::string& value, uint64_t fallback) {
+    try {
+        return static_cast<uint64_t>(std::stoull(value));
+    } catch (const std::exception&) {
+        return fallback;
+    }
+}
+
 void apply_env_overrides(NodeConfig& cfg) {
     if (const auto value = env_var("DRONE_NODE_ID")) {
         try {
@@ -256,6 +274,91 @@ bool is_placeholder_secret(const std::string& secret) {
            secret == "replace-with-a-strong-shared-secret" ||
            secret == "replace-with-strong-shared-secret" ||
            secret == "drone-swarm-dev-secret-change-me";
+}
+
+bool starts_with_case_insensitive(std::string_view value, std::string_view prefix) {
+    if (value.size() < prefix.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < prefix.size(); ++i) {
+        if (std::tolower(static_cast<unsigned char>(value[i])) !=
+            std::tolower(static_cast<unsigned char>(prefix[i]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool env_enabled(std::string_view key) {
+    const auto value = env_var(key);
+    if (!value.has_value()) {
+        return false;
+    }
+    std::string lowered = *value;
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+    });
+    return lowered == "1" || lowered == "true" || lowered == "yes" || lowered == "on";
+}
+
+bool has_nonempty_env(std::string_view key) {
+    const auto value = env_var(key);
+    return value.has_value() && !value->empty();
+}
+
+std::vector<std::string> split_csv_list(std::string_view value) {
+    std::vector<std::string> out;
+    std::stringstream ss(std::string(value));
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+        item.erase(item.begin(), std::find_if(item.begin(), item.end(), [](unsigned char c) {
+            return !std::isspace(c);
+        }));
+        item.erase(std::find_if(item.rbegin(), item.rend(), [](unsigned char c) {
+            return !std::isspace(c);
+        }).base(), item.end());
+        if (!item.empty()) {
+            out.push_back(item);
+        }
+    }
+    return out;
+}
+
+bool validate_backend_transport(const NodeConfig& cfg,
+                                const std::string& backend_url,
+                                std::string& error) {
+    const bool hardened_profile = cfg.security_profile == "field" || cfg.security_profile == "production";
+    if (!hardened_profile) {
+        return true;
+    }
+    if (backend_url.empty()) {
+        if (!cfg.enable_backend_telemetry) {
+            return true;
+        }
+        error = "DRONE_BACKEND_URL is required when backend telemetry is enabled in hardened mode";
+        return false;
+    }
+    if (!starts_with_case_insensitive(backend_url, "https://")) {
+        error = "DRONE_BACKEND_URL must use https in field/production mode";
+        return false;
+    }
+    if (!env_enabled("DRONE_TLS_ENABLED")) {
+        error = "DRONE_TLS_ENABLED must be true in field/production mode";
+        return false;
+    }
+    for (const auto* key : {
+             "DRONE_TLS_CA_FILE",
+         }) {
+        if (!has_nonempty_env(key)) {
+            error = std::string(key) + " is required for hardened backend trust";
+            return false;
+        }
+    }
+    if (cfg.enable_backend_telemetry && !has_nonempty_env("DRONE_TLS_CLIENT_PFX_FILE")) {
+        error = "DRONE_TLS_CLIENT_PFX_FILE is required for hardened backend telemetry mTLS";
+        return false;
+    }
+    return true;
 }
 
 void apply_security_failsafe(const drone::security::DroneSecurityAssessment& security,
@@ -421,9 +524,72 @@ int main(int argc, char** argv) {
 
     const auto cfg = parse_args(argc, argv);
     const auto backend_url = env_var("DRONE_BACKEND_URL").value_or("");
+    const bool hardened_profile = cfg.security_profile == "field" || cfg.security_profile == "production";
+    std::string backend_transport_error;
+    if (!validate_backend_transport(cfg, backend_url, backend_transport_error)) {
+        spdlog::error("{}", backend_transport_error);
+        return 1;
+    }
     drone::telemetry::ControlPlaneTelemetryClient telemetry_client(
         cfg.enable_backend_telemetry ? backend_url : std::string{},
         cfg.backend_telemetry_interval_ms);
+    const auto geofence_radius_env = env_var("DRONE_GEOFENCE_RADIUS_M");
+    const auto no_fly_lock_env = env_var("DRONE_NO_FLY_LOCK");
+    const double geofence_radius_m = geofence_radius_env.has_value()
+        ? parse_double_or_default(*geofence_radius_env, 60.0)
+        : 60.0;
+    const bool no_fly_lock_configured = no_fly_lock_env.has_value()
+        ? parse_bool_or_default(*no_fly_lock_env, false)
+        : false;
+    drone::security::FirmwareManifest firmware_manifest =
+        drone::security::load_firmware_manifest_file(
+            env_var("DRONE_FIRMWARE_MANIFEST_FILE").value_or(std::string{})).value_or(
+                drone::security::FirmwareManifest{});
+    if (const auto value = env_var("DRONE_FIRMWARE_VERSION")) {
+        firmware_manifest.version = *value;
+    }
+    if (const auto value = env_var("DRONE_FIRMWARE_MEASUREMENT")) {
+        firmware_manifest.measurement = *value;
+    } else {
+        firmware_manifest.measurement = hardened_profile ? "unsigned-local-build" : "lab-local-build";
+    }
+    if (const auto value = env_var("DRONE_FIRMWARE_SIGNER")) {
+        firmware_manifest.signer = *value;
+    }
+    if (const auto value = env_var("DRONE_FIRMWARE_SIGNATURE")) {
+        firmware_manifest.signature = *value;
+    }
+    if (const auto value = env_var("DRONE_FIRMWARE_ROLLBACK_COUNTER")) {
+        firmware_manifest.rollback_counter = parse_u64_or_default(*value, firmware_manifest.rollback_counter);
+    }
+    if (const auto value = env_var("DRONE_SECURE_BOOT_ATTESTED")) {
+        firmware_manifest.secure_boot_attested = parse_bool_or_default(*value, firmware_manifest.secure_boot_attested);
+    }
+    if (const auto value = env_var("DRONE_BOOTLOADER_LOCKED")) {
+        firmware_manifest.bootloader_locked = parse_bool_or_default(*value, firmware_manifest.bootloader_locked);
+    }
+    drone::security::FirmwareTrustPolicy firmware_policy;
+    firmware_policy.profile = cfg.security_profile;
+    firmware_policy.state_file = env_var("DRONE_FIRMWARE_STATE_FILE").value_or("state/firmware_trust.state");
+    firmware_policy.allowed_signers = split_csv_list(env_var("DRONE_FIRMWARE_ALLOWED_SIGNERS").value_or("release-ca,maint-ca"));
+    firmware_policy.signing_secret = env_var("DRONE_FIRMWARE_SIGNING_SECRET").value_or(std::string{});
+    firmware_policy.maintenance_mode = env_enabled("DRONE_MAINTENANCE_MODE");
+    firmware_policy.maintenance_token = env_var("DRONE_MAINTENANCE_APPROVAL_TOKEN").value_or(std::string{});
+    const auto firmware_trust = drone::security::validate_firmware_trust(firmware_manifest, firmware_policy);
+    if (!firmware_trust.accepted && hardened_profile) {
+        spdlog::error("firmware boot trust failed: {} ({})", firmware_trust.summary, firmware_trust.boot_state);
+        return 1;
+    }
+    if (!firmware_trust.accepted) {
+        spdlog::warn("firmware boot trust degraded: {} ({})", firmware_trust.summary, firmware_trust.boot_state);
+    } else {
+        spdlog::info("firmware boot trust accepted: {} version={} rollback_counter={} state={}",
+                     firmware_trust.summary,
+                     firmware_trust.version,
+                     firmware_trust.rollback_counter,
+                     firmware_trust.boot_state);
+    }
+    drone::security::SecurityRuntimeMonitor security_monitor(firmware_trust.measurement);
 
     spdlog::info("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
     spdlog::info("â•‘  GPS-Denied Drone Swarm Node v2.0        â•‘");
@@ -531,7 +697,6 @@ int main(int argc, char** argv) {
         cfg.drone_id, cfg.swarm_group, cfg.swarm_port);
     drone::swarm::SwarmSecurityConfig security_cfg;
     security_cfg.enabled = true;
-    const bool hardened_profile = cfg.security_profile == "field" || cfg.security_profile == "production";
     bool placeholder_swarm_secret = false;
     if (const auto secret = env_var("DRONE_SWARM_SECRET")) {
         security_cfg.swarm_secret = *secret;
@@ -555,6 +720,7 @@ int main(int argc, char** argv) {
     std::mutex remote_command_mutex;
     std::optional<drone::security::RemoteCommandEnvelope> pending_remote_command;
     std::string last_remote_command_status = "no remote command";
+    std::string last_mesh_security_error;
 
     net->on_message([&](const drone::swarm::SwarmMessage& msg) {
         if (msg.type == drone::swarm::SwarmMessage::Type::KEYFRAME_SHARE)
@@ -673,19 +839,50 @@ int main(int argc, char** argv) {
             sync_status,
             pose.localization_confidence,
         });
-        const drone::security::DroneSecurityAssessment security = drone::security::assess_security({
+        const std::string mesh_security_error = net->security_last_error();
+        if (!mesh_security_error.empty() && mesh_security_error != last_mesh_security_error) {
+            security_monitor.note_mesh_security_error(mesh_security_error, now_s);
+            last_mesh_security_error = mesh_security_error;
+        }
+
+        const bool home_initialized = ai.home_position().norm() > 1e-6;
+        const double home_distance_m = home_initialized ? (pose.position - ai.home_position()).norm() : 0.0;
+        const bool geofence_clear = !home_initialized || home_distance_m <= geofence_radius_m;
+        const bool no_fly_lock = no_fly_lock_configured ||
+            (occupancy_status.occupied_ratio > 0.92 && stats.battery_pct < 20.0);
+        const bool swarm_consistency_ok =
+            (swarm_peer_count == 0) ||
+            (sync_status.confidence >= 0.35 && swarm_health.link_quality >= 0.18f);
+        const bool backend_trust_ok = telemetry_client.last_status().rfind("error:", 0) != 0;
+        const double issuer_trust_score =
+            net->security_enabled() ? (placeholder_swarm_secret ? 0.45 : 0.85) : (hardened_profile ? 0.30 : 0.65);
+        const double tamper_score =
+            (placeholder_swarm_secret ? 0.25 : 0.0) +
+            (!geofence_clear ? 0.25 : 0.0) +
+            (no_fly_lock ? 0.15 : 0.0) +
+            (!backend_trust_ok ? 0.15 : 0.0);
+
+        const drone::security::DroneSecurityAssessment security = security_monitor.evaluate({
             cfg.security_profile,
             net->security_enabled(),
             hardened_profile,
             placeholder_swarm_secret,
             fusion.lost,
             swarm_health.emergency_fault,
+            geofence_clear,
+            no_fly_lock,
+            swarm_consistency_ok,
+            backend_trust_ok,
+            swarm_health.link_quality >= 0.20f,
             stats.battery_pct,
             swarm_health.link_quality,
             sync_status.confidence,
             sync_status.peer_clock_offset_ms,
+            fusion.confidence,
+            issuer_trust_score,
+            tamper_score,
             swarm_peer_count,
-        });
+        }, now_s);
 
         memory.observe(
             cfg.drone_id,
@@ -764,9 +961,20 @@ int main(int argc, char** argv) {
             fusion.source,
             std::string(drone::security::to_string(security.state)),
             security.summary,
+            security.transition_reason,
             security.remote_command_allowed,
             security.telemetry_uplink_allowed,
             security.link_integrity_score,
+            security.trust_epoch,
+            security.last_auth_failure_at_s,
+            security.tamper_score,
+            security.firmware_measurement,
+            firmware_trust.version,
+            firmware_trust.boot_state,
+            firmware_trust.summary,
+            firmware_trust.rollback_counter,
+            firmware_trust.maintenance_mode,
+            firmware_trust.update_state,
             last_remote_command_status,
             security.health_flags,
         });
@@ -839,12 +1047,31 @@ int main(int argc, char** argv) {
         {
             std::lock_guard lock(remote_command_mutex);
             if (pending_remote_command.has_value()) {
-                const auto policy = drone::security::evaluate_remote_command(security, *pending_remote_command);
+                const auto policy = drone::security::evaluate_remote_command(
+                    security,
+                    {
+                        now_s,
+                        3.0,
+                        fusion.confidence,
+                        0.35,
+                        stats.battery_pct,
+                        18.0,
+                        !swarm_health.emergency_fault && stats.cpu_temp_c < 82.0f,
+                        geofence_clear,
+                        no_fly_lock,
+                        swarm_consistency_ok,
+                        issuer_trust_score,
+                        hardened_profile ? 0.70 : 0.55,
+                    },
+                    *pending_remote_command);
                 last_remote_command_status =
                     std::string(drone::security::to_string(pending_remote_command->action)) +
                     " from node " + std::to_string(pending_remote_command->src_id) +
                     (policy.accepted ? " accepted" : " rejected") +
                     " (" + policy.reason + ")";
+                if (!policy.accepted) {
+                    security_monitor.note_remote_command_rejection(policy.reason, policy.critical, now_s);
+                }
                 if (policy.accepted) {
                     drone::security::apply_remote_command(*pending_remote_command, decision, fused_pose);
                 }
@@ -886,13 +1113,25 @@ int main(int argc, char** argv) {
             snapshot.imu_camera_offset_ms = sync_status.imu_camera_offset_ms;
             snapshot.security_state = std::string(drone::security::to_string(security.state));
             snapshot.security_summary = security.summary;
+            snapshot.security_transition_reason = security.transition_reason;
             snapshot.remote_command_allowed = security.remote_command_allowed;
             snapshot.telemetry_uplink_allowed = security.telemetry_uplink_allowed;
             snapshot.link_integrity_score = security.link_integrity_score;
+            snapshot.trust_epoch = security.trust_epoch;
+            snapshot.last_auth_failure_at_s = security.last_auth_failure_at_s;
+            snapshot.tamper_score = security.tamper_score;
+            snapshot.firmware_measurement = security.firmware_measurement;
+            snapshot.firmware_version = firmware_trust.version;
+            snapshot.secure_boot_state = firmware_trust.boot_state;
+            snapshot.boot_trust_summary = firmware_trust.summary;
+            snapshot.rollback_counter = firmware_trust.rollback_counter;
+            snapshot.maintenance_mode = firmware_trust.maintenance_mode;
+            snapshot.update_channel_state = firmware_trust.update_state;
             snapshot.health_flags = security.health_flags;
             telemetry_client.publish(snapshot, telemetry_now);
         }
         if (telemetry_client.enabled()) {
+            security_monitor.note_control_plane_status(telemetry_client.last_status(), now_s);
             spdlog::info("[ BACKEND] {}", telemetry_client.last_status());
         }
         spdlog::info("[ AI     ] Mode:{}  Vcmd:[{:.2f},{:.2f},{:.2f}]  Yaw:{:.2f}  {}",

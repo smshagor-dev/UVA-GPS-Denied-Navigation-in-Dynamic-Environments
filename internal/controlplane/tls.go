@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 type TLSConfig struct {
@@ -24,6 +25,8 @@ type PeerIdentity struct {
 	Identities        []string
 	FingerprintSHA256 string
 	Verified          bool
+	NotBefore         time.Time
+	NotAfter          time.Time
 }
 
 func (cfg TLSConfig) Validate() error {
@@ -108,6 +111,8 @@ func RequestPeerIdentity(r *http.Request) PeerIdentity {
 		Identities:        names,
 		FingerprintSHA256: hex.EncodeToString(fingerprint[:]),
 		Verified:          len(r.TLS.VerifiedChains) > 0,
+		NotBefore:         cert.NotBefore,
+		NotAfter:          cert.NotAfter,
 	}
 }
 

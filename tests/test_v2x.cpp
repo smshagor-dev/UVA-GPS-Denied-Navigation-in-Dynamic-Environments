@@ -6,6 +6,7 @@
 // test_v2x.cpp    GoogleTest suite for V2X Mesh / Leader-Follower
  
 #include <gtest/gtest.h>
+#include "security/DroneSecurity.hpp"
 #include "security/CommandPolicy.hpp"
 #include "sensors/LidarSensor.hpp"
 #include "swarm/V2XMeshNetwork.hpp"
@@ -232,6 +233,149 @@ TEST(CommandPolicy, NonCriticalCommandRejectedWhenRemoteControlBlocked) {
 
     const auto decision = drone::security::evaluate_remote_command(security, cmd);
     EXPECT_FALSE(decision.accepted);
+}
+
+TEST(CommandPolicy, FormationCommandRejectedWhenFreshnessWindowExceeded) {
+    drone::security::DroneSecurityAssessment security;
+    security.state = drone::security::DroneSecurityState::TRUSTED;
+    security.remote_command_allowed = true;
+
+    drone::security::RemoteCommandEnvelope cmd;
+    cmd.action = drone::security::RemoteCommandAction::FORMATION_HOLD;
+    cmd.issued_at_s = 10.0;
+
+    const auto decision = drone::security::evaluate_remote_command(
+        security,
+        {
+            20.0,
+            3.0,
+            0.9,
+            0.35,
+            80.0,
+            18.0,
+            true,
+            true,
+            false,
+            true,
+            0.9,
+            0.6,
+        },
+        cmd);
+    EXPECT_FALSE(decision.accepted);
+    EXPECT_NE(decision.reason.find("freshness"), std::string::npos);
+}
+
+TEST(CommandPolicy, ReturnHomeAllowedDuringGeofenceBlock) {
+    drone::security::DroneSecurityAssessment security;
+    security.state = drone::security::DroneSecurityState::TRUSTED;
+    security.remote_command_allowed = true;
+
+    drone::security::RemoteCommandEnvelope cmd;
+    cmd.action = drone::security::RemoteCommandAction::RETURN_HOME;
+    cmd.issued_at_s = 18.0;
+
+    const auto decision = drone::security::evaluate_remote_command(
+        security,
+        {
+            20.0,
+            3.0,
+            0.4,
+            0.35,
+            15.0,
+            18.0,
+            true,
+            false,
+            false,
+            true,
+            0.9,
+            0.6,
+        },
+        cmd);
+    EXPECT_TRUE(decision.accepted);
+}
+
+TEST(DroneSecurity, TrustEpochAdvancesOnSecurityTransition) {
+    drone::security::SecurityRuntimeMonitor monitor("fw-test");
+
+    const auto trusted = monitor.evaluate({
+        "field",
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        90.0,
+        0.9,
+        0.9,
+        0.0,
+        0.9,
+        0.85,
+        0.0,
+        4,
+    }, 10.0);
+    EXPECT_EQ(trusted.state, drone::security::DroneSecurityState::TRUSTED);
+
+    monitor.note_mesh_security_error("replay rejected", 12.0);
+    monitor.note_mesh_security_error("replay rejected again", 13.0);
+    const auto suspicious = monitor.evaluate({
+        "field",
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        false,
+        88.0,
+        0.8,
+        0.8,
+        0.0,
+        0.8,
+        0.85,
+        0.0,
+        4,
+    }, 14.0);
+    EXPECT_EQ(suspicious.state, drone::security::DroneSecurityState::COMMAND_REPLAY_SUSPECT);
+    EXPECT_GT(suspicious.trust_epoch, trusted.trust_epoch);
+}
+
+TEST(DroneSecurity, AuthorizationFailuresRaiseAuthSuspect) {
+    drone::security::SecurityRuntimeMonitor monitor("fw-test");
+    monitor.note_remote_command_rejection("remote command blocked under hardened security posture", false, 21.0);
+    monitor.note_remote_command_rejection("remote command blocked under hardened security posture", false, 22.0);
+    monitor.note_remote_command_rejection("remote command blocked under hardened security posture", false, 23.0);
+
+    const auto assessment = monitor.evaluate({
+        "field",
+        true,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        78.0,
+        0.85,
+        0.9,
+        0.0,
+        0.82,
+        0.85,
+        0.0,
+        3,
+    }, 24.0);
+    EXPECT_EQ(assessment.state, drone::security::DroneSecurityState::AUTH_SUSPECT);
+    EXPECT_GT(assessment.last_auth_failure_at_s, 0.0);
 }
 
  
