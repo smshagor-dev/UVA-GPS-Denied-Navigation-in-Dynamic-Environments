@@ -1,4 +1,4 @@
-# GPS-Denied Autonomous UAV Swarm Platform
+﻿# GPS-Denied Autonomous UAV Swarm Platform
 
 ### Edge-computing swarm intelligence, VIO/TDOA localization, secure telemetry, and confidence-aware distributed autonomy
 
@@ -11,14 +11,18 @@
 ![UAV Swarm](https://img.shields.io/badge/UAV-Swarm%20Intelligence-blue?style=flat-square)
 ![Edge AI](https://img.shields.io/badge/Edge-AI%20Inference-purple?style=flat-square)
 ![VIO](https://img.shields.io/badge/VIO-Visual--Inertial%20Odometry-green?style=flat-square)
+![EKF](https://img.shields.io/badge/EKF-Sensor%20Fusion-0F766E?style=flat-square)
 ![UWB](https://img.shields.io/badge/UWB%2FTDOA-Localization-orange?style=flat-square)
+![TDOA](https://img.shields.io/badge/TDOA-Time%20Difference%20of%20Arrival-orange?style=flat-square)
 ![LiDAR](https://img.shields.io/badge/LiDAR-Obstacle%20Awareness-red?style=flat-square)
+![Edge Computing](https://img.shields.io/badge/Edge-Computing-7C3AED?style=flat-square)
 ![Distributed Systems](https://img.shields.io/badge/Distributed-Peer%20Mesh-4B5563?style=flat-square)
 ![Secure Telemetry](https://img.shields.io/badge/Secure-Telemetry%20Pipeline-0F766E?style=flat-square)
 
 ![Bench Demo Ready](https://img.shields.io/badge/Bench%20Demo-Ready-brightgreen?style=flat-square)
 ![Local Validation](https://img.shields.io/badge/Local%20Validation-Passing-brightgreen?style=flat-square)
 ![HIL](https://img.shields.io/badge/HIL-Planned-yellow?style=flat-square)
+![RF Validation](https://img.shields.io/badge/RF%20Validation-Pending-yellow?style=flat-square)
 ![Flight Validation](https://img.shields.io/badge/Flight%20Validation-Not%20Validated-red?style=flat-square)
 ![Flight Readiness](https://img.shields.io/badge/Status-NOT%20FLIGHT%20READY-red?style=flat-square)
 
@@ -31,24 +35,27 @@
 
 1. [Executive Summary](#executive-summary)
 2. [System Overview](#system-overview)
-3. [Visual Architecture](#visual-architecture)
-4. [Mathematical Modeling](#mathematical-modeling)
-5. [Performance Benchmarking and Estimated Edge Gains](#performance-benchmarking-and-estimated-edge-gains)
-6. [Complexity Analysis](#complexity-analysis)
-7. [Edge AI Workflow](#edge-ai-workflow)
-8. [Security Model](#security-model)
-9. [Edge Failsafe System](#edge-failsafe-system)
-10. [Dashboard](#dashboard)
-11. [Runtime Modes](#runtime-modes)
-12. [Validation Status](#validation-status)
-13. [Hardware Roadmap](#hardware-roadmap)
-14. [HIL and Bench Test Plan](#hil-and-bench-test-plan)
-15. [Research Contribution](#research-contribution)
-16. [Limitations](#limitations)
-17. [Future Work](#future-work)
-18. [Installation and Build](#installation-and-build)
-19. [Repository Map](#repository-map)
-20. [Related Documentation](#related-documentation)
+3. [Full Platform A-Z Overview](#full-platform-a-z-overview)
+4. [Visual Asset Roadmap](#visual-asset-roadmap)
+5. [Visual Architecture](#visual-architecture)
+6. [Mathematical Modeling](#mathematical-modeling)
+7. [Performance Benchmarking and Estimated Edge Gains](#performance-benchmarking-and-estimated-edge-gains)
+8. [Complexity Analysis](#complexity-analysis)
+9. [Edge AI Workflow](#edge-ai-workflow)
+10. [Security Model](#security-model)
+11. [Edge Failsafe System](#edge-failsafe-system)
+12. [Dashboard](#dashboard)
+13. [Runtime Modes](#runtime-modes)
+14. [Validation Status](#validation-status)
+15. [Hardware Roadmap](#hardware-roadmap)
+16. [HIL and Bench Test Plan](#hil-and-bench-test-plan)
+17. [Research Contribution](#research-contribution)
+18. [Limitations](#limitations)
+19. [Future Work](#future-work)
+20. [Installation and Build](#installation-and-build)
+21. [Repository Map](#repository-map)
+22. [Expanded Repository Structure](#expanded-repository-structure)
+23. [Related Documentation](#related-documentation)
 
 ---
 
@@ -147,6 +154,82 @@ local immediate safety
 ```
 
 Consensus is useful for coordination, but local collision avoidance and emergency descent do not wait for consensus.
+
+---
+
+## Full Platform A-Z Overview
+
+This section keeps the project framed as a complete GPS-denied UAV platform, not only an `edge_swarm` protocol implementation.
+
+| Platform area | Role in the system | Current evidence level |
+|---|---|---|
+| Onboard UAV stack | C++ runtime that orchestrates sensors, localization, autonomy, safety, swarm networking, and telemetry | implemented software stack |
+| VIO/EKF localization | visual-inertial and inertial state estimation with confidence telemetry | implemented software path |
+| UWB/TDOA localization | anchor/ranging support for GPS-denied correction and recovery | implemented parser/localizer support |
+| LiDAR perception | scan parsing, obstacle extraction, occupancy/map integration | implemented software path |
+| Edge AI inference | onboard detector/inference status and confidence telemetry with OpenCV DNN fallback | implemented software path |
+| Local autonomy | decision engine, mission behavior, degraded localization handling, and return/hold logic | implemented software path |
+| Safety/failsafe system | local safety manager, emergency behavior, missing-sensor gating, and command rejection | implemented and unit-tested |
+| Distributed peer networking | V2X-style mesh packets, peer state, and swarm health exchange | implemented with UDP fallback |
+| Edge swarm intelligence | peer packet model, state cache, stale-peer filtering, advisory consensus | implemented and unit-tested |
+| Edge serialization | JSON debug path plus CBOR binary peer packet prototype | implemented and tested |
+| Backend control plane | Go telemetry/control plane for fleet state and operator-facing APIs | implemented and tested |
+| Telemetry system | C++ telemetry client, backend snapshot schema, dashboard parsing | implemented and tested |
+| Dashboard/operator console | PySide6 UI for runtime mode, topology, replay, mission, sensor, and safety visibility | implemented and tested |
+| Replay analysis | playback-aware data paths and dashboard source visibility | implemented software path |
+| Mission planning | local planner plus operator-supervised command workflow | implemented software path |
+| Runtime separation | explicit `simulation`, `bench`, `production`, and `edge_swarm` modes | implemented policy model |
+| Security model | trust epoch, stale packet rejection, command policy, swarm security context | partial implementation |
+| Post-quantum roadmap | ML-KEM/Kyber, Dilithium/ML-DSA, hybrid migration design | proposed future work |
+
+The platform is intentionally layered:
+
+```text
+local safety and actuation
+  -> localization and perception
+  -> local autonomy
+  -> peer mesh and edge consensus
+  -> backend supervision
+  -> dashboard/operator workflows
+```
+
+This hierarchy matters because the backend and dashboard should improve visibility and supervision without becoming mandatory for immediate collision avoidance or emergency descent.
+
+---
+
+## Visual Asset Roadmap
+
+The README references image placeholders for future generated or designed visual assets. The placeholder directory is `docs/assets/`; the image files themselves are documentation targets and are not validation evidence.
+
+![Full UAV Swarm Architecture](docs/assets/full_uav_swarm_architecture.png)  
+Caption: Full end-to-end GPS-denied UAV swarm architecture with onboard autonomy, backend supervision, dashboard visibility, and peer mesh coordination. Suggested filename: `docs/assets/full_uav_swarm_architecture.png`.
+
+![Edge Swarm Topology](docs/assets/edge_swarm_topology.png)  
+Caption: Distributed `edge_swarm` coordination topology with peer cache, stale-peer filtering, and advisory consensus. Suggested filename: `docs/assets/edge_swarm_topology.png`.
+
+![Dashboard Screenshot](docs/assets/dashboard_operator_console.png)  
+Caption: Operator console concept showing runtime mode, localization source, peer health, topology, and safety state. Suggested filename: `docs/assets/dashboard_operator_console.png`.
+
+![GPS-Denied Localization Concept](docs/assets/gps_denied_localization_concept.png)  
+Caption: VIO/EKF, UWB/TDOA, LiDAR, and confidence-aware localization under GNSS-denied operation. Suggested filename: `docs/assets/gps_denied_localization_concept.png`.
+
+![Edge AI Workflow](docs/assets/edge_ai_workflow.png)  
+Caption: Local edge AI inference and confidence propagation into peer-shared semantic digests. Suggested filename: `docs/assets/edge_ai_workflow.png`.
+
+![Secure Telemetry Pipeline](docs/assets/secure_telemetry_pipeline.png)  
+Caption: Secure telemetry pipeline from C++ UAV node to Go backend and PySide6 dashboard. Suggested filename: `docs/assets/secure_telemetry_pipeline.png`.
+
+![Split-Swarm Recovery Concept](docs/assets/split_swarm_recovery.png)  
+Caption: Partition rejoin and deterministic conflict-resolution concept for split-swarm recovery. Suggested filename: `docs/assets/split_swarm_recovery.png`.
+
+![Backend and Dashboard Infrastructure](docs/assets/backend_dashboard_infrastructure.png)  
+Caption: Control-plane backend and dashboard infrastructure for operator supervision and telemetry archiving. Suggested filename: `docs/assets/backend_dashboard_infrastructure.png`.
+
+![CBOR Packet Flow](docs/assets/cbor_packet_flow.png)  
+Caption: JSON debug and CBOR binary peer-packet flow through deterministic validation and cache update. Suggested filename: `docs/assets/cbor_packet_flow.png`.
+
+![HIL Validation Workflow](docs/assets/hil_validation_workflow.png)  
+Caption: Proposed HIL validation workflow from single-node timing to multi-node degraded mesh testing. Suggested filename: `docs/assets/hil_validation_workflow.png`.
 
 ---
 
@@ -598,6 +681,25 @@ Future roadmap:
 - Dilithium / ML-DSA-style signatures for packet authentication
 - selective full signing for emergency, consensus, and trust-transition packets
 
+### Edge packet validation and serialization
+
+The peer packet layer supports:
+
+- `json` for readable debug and development transport
+- `cbor` as the first production-oriented binary serialization prototype
+- `protobuf_placeholder` as a reserved future schema-driven transport
+
+Current packet validation rejects malformed packets, expired packets, unknown packet types, stale sequence numbers, oversized packets, invalid emergency corridors, and non-finite pose vectors. CBOR packets are decoded through a deterministic fixed-shape array model and then pass through the same validation/cache path as JSON.
+
+Serialization visibility is exposed through telemetry fields:
+
+- `edge_serialization_mode`
+- `edge_average_packet_size_bytes`
+- `edge_bandwidth_savings_estimate_pct`
+- `edge_packet_encode_latency_us`
+
+These metrics are local software/runtime telemetry. They are not RF throughput proof.
+
 ### Trust epoch model
 
 `trust_epoch` represents security freshness. A peer packet should be considered stale or degraded when:
@@ -687,6 +789,8 @@ Capabilities include:
 - mission and command workflows
 - replay and backend status visibility
 - sensor telemetry panels for camera, IMU, LiDAR, TDOA, and replay state
+- edge serialization visibility for JSON/CBOR mode, packet size, estimated savings, and encode latency
+- safety-state and security-state visibility for operator review
 
 The dashboard is an operations and research visualization tool. It is not a flight certification interface.
 
@@ -942,6 +1046,28 @@ build-local-validate\Release\drone_node.exe --id=1 --esp32=192.168.4.1 --lidar=1
 
 Do not use this for flight without a validated hardware safety plan.
 
+### Edge serialization mode
+
+The edge peer protocol can run in JSON debug mode or CBOR binary mode:
+
+```powershell
+$env:DRONE_EDGE_SERIALIZATION_MODE="cbor"
+build-local-validate\Release\drone_node.exe --id=1 --edge-serialization=cbor
+```
+
+The protocol configuration files are:
+
+- `config/swarm_edge_protocol.json`
+- `config/swarm_edge_protocol.example.json`
+
+Supported values:
+
+- `json`
+- `cbor`
+- `protobuf_placeholder`
+
+`protobuf_placeholder` is reserved for future schema work and currently falls back to JSON compatibility.
+
 ---
 
 ## Repository Map
@@ -968,6 +1094,54 @@ config/                         Runtime, anchors, labels, edge protocol configur
 
 ---
 
+## Expanded Repository Structure
+
+```text
+drone_swarm/
+├── src/                         C++ implementation for onboard node, sensors, fusion, swarm, telemetry
+│   ├── autonomy/                Mission decision logic and experience memory
+│   ├── localization/            TDOA, UWB, time synchronization, localization fusion
+│   ├── safety/                  Safety manager and failsafe policy implementation
+│   ├── sensors/                 Camera, IMU, LiDAR, rangefinder, motor, thermal sensor drivers
+│   ├── slam/                    Keyframe, map, occupancy, and planning components
+│   ├── swarm/                   V2X mesh, edge peer protocol, consensus, state cache, swarm security
+│   ├── telemetry/               Control-plane telemetry client
+│   └── vio/                     EKF and VIO pipeline implementation
+├── include/                     Public C++ headers matching the major runtime modules
+│   ├── autonomy/                Decision engine and memory interfaces
+│   ├── localization/            Localization and time-sync interfaces
+│   ├── safety/                  Safety context/result interfaces
+│   ├── security/                Command policy, drone security, firmware trust
+│   ├── sensors/                 Sensor base classes and sensor telemetry contracts
+│   ├── swarm/                   Edge peer protocol, V2X mesh, consensus, cache
+│   ├── telemetry/               Telemetry snapshot/client interface
+│   └── vio/                     EKF and VIO pipeline interfaces
+├── gui/                         Python/PySide6 dashboard and backend-status helpers
+├── internal/controlplane/       Go control-plane backend types, handlers, telemetry state
+├── tests/                       C++, Go, and Python validation entry points
+├── config/                      Runtime, detector, LiDAR, anchor, and swarm protocol examples
+├── docs/                        Architecture, HIL, safety, edge swarm, benchmark, and research notes
+├── docs/assets/                 README image placeholders and future generated documentation visuals
+├── docs/benchmarks/             Mock/model benchmark data and future HIL benchmark artifacts
+├── scripts/                     Local validation, smoke tests, and development utilities
+├── telemetry/                   Telemetry-related schemas/assets when separated from source
+└── third_party/                 Vendored crypto/support code used by the build
+```
+
+| Area | Primary paths | Purpose |
+|---|---|---|
+| Onboard autonomy | `src/main.cpp`, `src/autonomy/`, `include/autonomy/` | Node orchestration and local mission behavior |
+| Sensors | `src/sensors/`, `include/sensors/` | Camera, IMU, LiDAR, range, motor, thermal acquisition |
+| Localization | `src/localization/`, `src/vio/`, `include/vio/` | VIO/EKF, TDOA, time sync, confidence estimation |
+| Swarm | `src/swarm/`, `include/swarm/` | V2X mesh, edge packets, CBOR/JSON serialization, consensus |
+| Safety | `src/safety/`, `include/safety/` | Local safety authority and failsafe behavior |
+| Security | `src/swarm/SwarmSecurity.cpp`, `include/security/` | Command policy, trust state, replay/stale rejection hooks |
+| Backend | `internal/controlplane/` | Go telemetry/control plane |
+| Dashboard | `gui/` | PySide6 operator visualization, replay, topology, mission pages |
+| Tests | `tests/` | CTest, Go tests, Python dashboard/backend tests |
+
+---
+
 ## Related Documentation
 
 - [Edge Swarm Architecture](docs/EDGE_SWARM_ARCHITECTURE.md)
@@ -981,6 +1155,9 @@ config/                         Runtime, anchors, labels, edge protocol configur
 - [Dashboard Sensor Telemetry Schema](docs/DASHBOARD_SENSOR_TELEMETRY_SCHEMA.md)
 - [Local Build and Bench Demo Guide](docs/LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md)
 - [Security Implementation](SECURITY_IMPLEMENTATION.md)
+- [Edge Swarm Research Notes](docs/EDGE_SWARM_RESEARCH_NOTES.md)
+- [Benchmark Mock Data](docs/benchmarks/edge_swarm_benchmark_mock_data.json)
+- [Documentation Visual Assets](docs/assets/README.md)
 
 ---
 
