@@ -409,6 +409,57 @@ Fix:
 - Windows: install `pcl` through `vcpkg`
 - Linux: install `libpcl-dev` or distro equivalent
 
+### Fixing stale vcpkg root / PCL link mismatch
+
+Symptom:
+
+- CMake is invoked with `D:\tools\vcpkg-full`, but the build tries to link libraries from `C:\tools\vcpkg-full`, for example `C:\tools\vcpkg-full\installed\x64-windows\lib\pcl_io.lib`
+
+Cause:
+
+- an existing `CMakeCache.txt` was created with a different vcpkg root and still contains stale package paths
+
+Fix from the repository root:
+
+```powershell
+Remove-Item -Recurse -Force .\build-local-validate -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force .\build-edge -ErrorAction SilentlyContinue
+$env:VCPKG_ROOT="D:\tools\vcpkg-full"
+```
+
+Optional persistent user environment:
+
+```powershell
+setx VCPKG_ROOT "D:\tools\vcpkg-full"
+```
+
+Verify the expected files exist:
+
+```powershell
+Test-Path "D:\tools\vcpkg-full\installed\x64-windows\lib\pcl_io.lib"
+Test-Path "D:\tools\vcpkg-full\installed\x64-windows\include\eigen3\Eigen\Core"
+```
+
+If dependencies are missing:
+
+```powershell
+D:\tools\vcpkg-full\vcpkg.exe install pcl:x64-windows opencv:x64-windows eigen3:x64-windows spdlog:x64-windows fmt:x64-windows
+```
+
+Rerun with an explicit toolchain:
+
+```powershell
+cmake -S . -B build-local-validate -DBUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake
+cmake --build build-local-validate --config Release
+ctest --test-dir build-local-validate --output-on-failure -C Release
+```
+
+The validator also checks for this mismatch:
+
+```powershell
+python scripts/local_validate.py --toolchain "D:\tools\vcpkg-full\scripts\buildsystems\vcpkg.cmake"
+```
+
 ### `Could not find spdlog`
 
 Cause:

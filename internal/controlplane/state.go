@@ -334,10 +334,15 @@ func (s *FleetState) Snapshot() FleetSnapshot {
 	var critical int
 	var realDroneCount int
 	var staleDroneCount int
+	var peerLatencySum float64
+	var meshBandwidthSum float64
+	var topologyMode string
 	for _, drone := range drones {
 		total++
 		cpuSum += drone.CPUTempC
 		gpuSum += drone.GPULoadPct
+		peerLatencySum += drone.PeerLatencyMS
+		meshBandwidthSum += drone.MeshBandwidthKBPS
 		if drone.Source == "real" {
 			realDroneCount++
 		}
@@ -346,6 +351,9 @@ func (s *FleetState) Snapshot() FleetSnapshot {
 		}
 		if drone.Role == "LEADER" && leaderID == 0 {
 			leaderID = drone.DroneID
+		}
+		if topologyMode == "" && strings.TrimSpace(drone.MeshTopologyMode) != "" {
+			topologyMode = strings.TrimSpace(drone.MeshTopologyMode)
 		}
 		if drone.BatteryPct < 15 || drone.CPUTempC > 82 || !drone.Reachable || drone.Stale || drone.LocalizationState == "lost" || drone.SyncConfidence < 0.35 || (drone.SecurityState != "" && drone.SecurityState != "TRUSTED" && drone.SecurityState != "DEGRADED_LINK") {
 			critical++
@@ -374,15 +382,23 @@ func (s *FleetState) Snapshot() FleetSnapshot {
 	sort.Slice(clusters, func(i, j int) bool { return clusters[i].ClusterID < clusters[j].ClusterID })
 
 	var cpuAvg, gpuAvg float64
+	var peerLatencyAvg, meshBandwidthAvg float64
 	if total > 0 {
 		cpuAvg = cpuSum / float64(total)
 		gpuAvg = gpuSum / float64(total)
+		peerLatencyAvg = peerLatencySum / float64(total)
+		meshBandwidthAvg = meshBandwidthSum / float64(total)
+	}
+	if topologyMode == "" {
+		topologyMode = "adaptive_mesh"
 	}
 
 	return FleetSnapshot{
 		Drones:            drones,
 		LeaderID:          leaderID,
 		AvgLatencyMS:      4.0,
+		AvgPeerLatencyMS:  peerLatencyAvg,
+		AvgMeshBandwidth:  meshBandwidthAvg,
 		PacketLossPct:     0.5,
 		CPUTempC:          cpuAvg,
 		GPULoadPct:        gpuAvg,
@@ -390,6 +406,7 @@ func (s *FleetState) Snapshot() FleetSnapshot {
 		Clusters:          clusters,
 		CriticalAlerts:    critical,
 		BackendMode:       s.backendMode,
+		MeshTopologyMode:  topologyMode,
 		SimulationEnabled: s.simulated,
 		RealDroneCount:    realDroneCount,
 		StaleDroneCount:   staleDroneCount,
@@ -422,6 +439,7 @@ func (s *FleetState) Health() HealthReport {
 		MaxCPUTempC:       maxTemp,
 		UpdatedAt:         time.Now().UTC(),
 		BackendMode:       snapshot.BackendMode,
+		MeshTopologyMode:  snapshot.MeshTopologyMode,
 		SimulationEnabled: snapshot.SimulationEnabled,
 		RealDroneCount:    snapshot.RealDroneCount,
 		StaleDroneCount:   snapshot.StaleDroneCount,
@@ -623,6 +641,21 @@ func (s *FleetState) AddDrone(droneID int, clusterID string) DroneTelemetry {
 		OccupancyRatio:          0.14,
 		SyncConfidence:          0.93,
 		IMUCameraOffsetMS:       2.1,
+		PeerCount:               0,
+		StalePeerCount:          0,
+		MeshTopologyMode:        "adaptive_mesh",
+		LocalConsensusState:     "single_node",
+		LocalConsensusEpoch:     1,
+		PeerLatencyMS:           0.0,
+		MeshBandwidthKBPS:       0.0,
+		DisconnectedOperation:   true,
+		EdgeHealthStatus:        "simulation",
+		EdgeAutonomyState:       "local_only",
+		EdgeInferenceStatus:     "simulation",
+		EdgeInferenceFPS:        12.0,
+		EdgeInferenceConfidence: 0.68,
+		LocalObstacleCount:      0,
+		SharedObstacleCount:     0,
 		SecurityState:           "TRUSTED",
 		SecuritySummary:         "All trust signals nominal",
 		RemoteCommandAllowed:    true,

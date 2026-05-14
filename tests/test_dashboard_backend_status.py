@@ -74,6 +74,12 @@ class BackendStatusTests(unittest.TestCase):
             compose_operator_status("production", "real", simulation_enabled=False, real_drone_count=1, stale_drone_count=2),
         )
 
+    def test_operator_status_marks_edge_swarm_mode(self) -> None:
+        self.assertIn(
+            "EDGE SWARM ACTIVE",
+            compose_operator_status("edge_swarm", "real", simulation_enabled=False, real_drone_count=2),
+        )
+
     def test_source_summary_prioritizes_simulation(self) -> None:
         self.assertEqual(summarize_localization_data_source(["real", "simulation"]), "simulation")
 

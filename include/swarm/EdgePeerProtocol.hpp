@@ -1,0 +1,138 @@
+#pragma once
+
+#include <Eigen/Core>
+
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <string_view>
+
+namespace drone::swarm {
+
+enum class EdgePacketType : uint8_t {
+    HEARTBEAT = 0,
+    POSE_STATE,
+    EDGE_HEALTH,
+    OBSTACLE_DIGEST,
+    THREAT_DIGEST,
+    CONSENSUS_STATE,
+    EMERGENCY_CORRIDOR,
+    PEER_GOODBYE,
+};
+
+enum class ConsensusProposalType : uint8_t {
+    NONE = 0,
+    COLLECTIVE_HALT,
+    EMERGENCY_REROUTE,
+    LEADER_CONTINUITY_HINT,
+    SPLIT_SWARM_RECOVERY_HINT,
+};
+
+struct HeartbeatPayload {
+    int peer_count{0};
+    int stale_peer_count{0};
+    double battery_pct{0.0};
+    double motor_health{0.0};
+    double link_quality{0.0};
+    bool emergency_fault{false};
+    std::string edge_health_status{"nominal"};
+    std::string autonomy_state{"distributed_autonomy"};
+};
+
+struct PoseStatePayload {
+    Eigen::Vector3d position{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d velocity{Eigen::Vector3d::Zero()};
+    double localization_confidence{0.0};
+};
+
+struct EdgeHealthPayload {
+    std::string edge_health_status{"nominal"};
+    std::string autonomy_state{"distributed_autonomy"};
+    std::string consensus_state{"single_node"};
+    double mesh_bandwidth_kbps{0.0};
+    bool disconnected_operation{false};
+};
+
+struct ObstacleDigestPayload {
+    int local_obstacle_count{0};
+    int shared_obstacle_count{0};
+    uint32_t freshness_ms{0};
+    std::string digest_id{};
+};
+
+struct ThreatDigestPayload {
+    std::string threat_level{"none"};
+    std::string summary{};
+    double confidence{0.0};
+};
+
+struct ConsensusStatePayload {
+    ConsensusProposalType proposal_type{ConsensusProposalType::NONE};
+    std::string consensus_state{"single_node"};
+    uint64_t consensus_epoch{0};
+    int quorum_count{0};
+    bool local_safety_override{false};
+};
+
+struct EmergencyCorridorPayload {
+    Eigen::Vector3d center{Eigen::Vector3d::Zero()};
+    double radius_m{0.0};
+    uint32_t hold_ttl_ms{0};
+    std::string summary{};
+};
+
+struct PeerGoodbyePayload {
+    std::string reason{"shutdown"};
+};
+
+struct EdgePeerPacket {
+    EdgePacketType packet_type{EdgePacketType::HEARTBEAT};
+    uint32_t sender_id{0};
+    uint64_t timestamp_ms{0};
+    uint32_t sequence_number{0};
+    uint64_t trust_epoch{0};
+    std::string source{"unavailable"};
+    uint32_t ttl_ms{0};
+    std::string auth_hook{"unsigned"};
+
+    std::optional<HeartbeatPayload> heartbeat{};
+    std::optional<PoseStatePayload> pose_state{};
+    std::optional<EdgeHealthPayload> edge_health{};
+    std::optional<ObstacleDigestPayload> obstacle_digest{};
+    std::optional<ThreatDigestPayload> threat_digest{};
+    std::optional<ConsensusStatePayload> consensus_state{};
+    std::optional<EmergencyCorridorPayload> emergency_corridor{};
+    std::optional<PeerGoodbyePayload> peer_goodbye{};
+};
+
+struct EdgePacketValidationOptions {
+    uint64_t now_ms{0};
+    uint32_t last_sequence_number{0};
+    bool has_last_sequence{false};
+    size_t max_packet_size_bytes{1400};
+};
+
+struct EdgePacketValidationResult {
+    bool ok{false};
+    std::string error{};
+};
+
+struct EdgePacketParseResult {
+    bool ok{false};
+    EdgePeerPacket packet{};
+    std::string error{};
+};
+
+[[nodiscard]] std::string_view to_string(EdgePacketType type);
+[[nodiscard]] std::optional<EdgePacketType> parse_edge_packet_type(std::string_view value);
+[[nodiscard]] std::string_view to_string(ConsensusProposalType type);
+[[nodiscard]] std::optional<ConsensusProposalType> parse_consensus_proposal_type(std::string_view value);
+[[nodiscard]] std::string normalize_edge_source_tag(std::string_view value);
+[[nodiscard]] bool packet_is_expired(const EdgePeerPacket& packet, uint64_t now_ms);
+[[nodiscard]] std::string serialize_edge_packet_json(const EdgePeerPacket& packet);
+[[nodiscard]] EdgePacketParseResult parse_edge_packet_json(std::string_view wire);
+[[nodiscard]] EdgePacketValidationResult validate_edge_packet(
+    const EdgePeerPacket& packet,
+    const EdgePacketValidationOptions& options);
+
+} // namespace drone::swarm

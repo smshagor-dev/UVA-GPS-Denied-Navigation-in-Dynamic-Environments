@@ -23,6 +23,8 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+#include "swarm/EdgeConsensusManager.hpp"
+#include "swarm/SwarmStateCache.hpp"
 #include "sensors/LidarSensor.hpp"
 
 namespace drone::swarm {
@@ -72,6 +74,7 @@ struct SwarmMessage {
         FORMATION_CMD   = 4,
         EMERGENCY_STOP  = 5,
         MISSION_SYNC    = 6,
+        EDGE_PACKET     = 7,
     };
 
     uint32_t    src_id{0};
@@ -133,6 +136,26 @@ struct FormationCommand {
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
+struct LocalEdgeState {
+    Eigen::Vector3d position{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d velocity{Eigen::Vector3d::Zero()};
+    double localization_confidence{0.0};
+    std::string source{"unavailable"};
+    std::string edge_health_status{"nominal"};
+    std::string autonomy_state{"distributed_autonomy"};
+    std::string consensus_state{"single_node"};
+    uint64_t consensus_epoch{0};
+    int local_obstacle_count{0};
+    int shared_obstacle_count{0};
+    double mesh_bandwidth_kbps{0.0};
+    bool disconnected_operation{false};
+    uint64_t trust_epoch{0};
+    std::string threat_level{"none"};
+    std::string threat_summary{};
+
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
+
  
 class V2XMeshNetwork {
 public:
@@ -155,6 +178,7 @@ public:
     [[nodiscard]] bool security_enabled() const;
     [[nodiscard]] std::string security_last_error() const;
     void set_local_health(SwarmHealthMetrics health);
+    void set_local_edge_state(const LocalEdgeState& state);
     [[nodiscard]] SwarmHealthMetrics local_health() const;
     [[nodiscard]] static float compute_leadership_score(const SwarmHealthMetrics& health);
 
@@ -169,6 +193,15 @@ public:
     //  Peer registry 
     [[nodiscard]] std::vector<PeerInfo> active_peers() const;
     [[nodiscard]] size_t                peer_count()   const;
+    [[nodiscard]] size_t                stale_peer_count() const;
+    [[nodiscard]] size_t                safety_eligible_peer_count() const;
+    [[nodiscard]] std::string           consensus_state() const;
+    [[nodiscard]] uint64_t              consensus_epoch() const;
+    [[nodiscard]] std::string           edge_health_status() const;
+    [[nodiscard]] std::string           autonomy_state() const;
+    [[nodiscard]] float                 mesh_bandwidth_kbps() const;
+    [[nodiscard]] bool                  disconnected_operation() const;
+    [[nodiscard]] bool                  split_swarm_isolated() const;
 
     //  Callbacks 
     void on_message(MessageCallback cb) { msg_cb_  = std::move(cb); }
@@ -190,9 +223,19 @@ private:
     void handle_heartbeat(const SwarmMessage& msg);
     void handle_election(const SwarmMessage& msg);
     void handle_pose_update(const SwarmMessage& msg);
+    void handle_edge_packet(const SwarmMessage& msg);
     [[nodiscard]] bool should_force_re_election(const PeerInfo& peer) const;
 
     std::vector<uint8_t> build_heartbeat_payload() const;
+    bool broadcast_edge_packet(const EdgePeerPacket& packet);
+    EdgePeerPacket build_edge_heartbeat_packet() const;
+    EdgePeerPacket build_edge_pose_packet() const;
+    EdgePeerPacket build_edge_health_packet() const;
+    EdgePeerPacket build_edge_obstacle_packet() const;
+    EdgePeerPacket build_edge_threat_packet() const;
+    EdgePeerPacket build_edge_consensus_packet() const;
+    EdgePeerPacket build_edge_emergency_packet() const;
+    EdgePeerPacket build_edge_goodbye_packet() const;
 
     uint32_t    local_id_;
     std::string multicast_group_;
@@ -206,9 +249,13 @@ private:
     std::atomic<bool>      election_ongoing_{false};
     mutable std::mutex      health_mutex_;
     SwarmHealthMetrics      local_health_{};
+    mutable std::mutex      local_edge_state_mutex_;
+    LocalEdgeState          local_edge_state_{};
 
     mutable std::mutex                          peers_mutex_;
     std::unordered_map<uint32_t, PeerInfo>      peers_;
+    SwarmStateCache edge_state_cache_{};
+    EdgeConsensusManager edge_consensus_{local_id_};
 
     std::thread recv_thread_;
     std::thread heartbeat_thread_;
@@ -224,6 +271,9 @@ private:
     uint32_t rx_count_{0};
     uint32_t rx_expected_{0};
     float    packet_loss_pct_{0.0f};
+    std::atomic<uint64_t> edge_tx_bytes_{0};
+    std::atomic<uint64_t> edge_rx_bytes_{0};
+    mutable std::atomic<uint64_t> last_edge_sequence_{0};
 
     std::shared_ptr<spdlog::logger> logger_{spdlog::get("V2X")};
 

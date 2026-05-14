@@ -15,6 +15,7 @@ enum class RuntimeMode : uint8_t {
     SIMULATION = 0,
     BENCH,
     PRODUCTION,
+    EDGE_SWARM,
 };
 
 struct RuntimeFileConfig {

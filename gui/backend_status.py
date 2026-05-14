@@ -35,7 +35,10 @@ def compose_operator_status(
     stale_drone_count: int = 0,
 ) -> str:
     source = str(localization_data_source or "unavailable").strip().lower() or "unavailable"
+    mode = str(backend_mode or "simulation").strip().lower() or "simulation"
     warnings: list[str] = []
+    if mode == "edge_swarm":
+        warnings.append("EDGE SWARM ACTIVE")
     if simulation_enabled:
         warnings.append("SIMULATION ENABLED")
     if real_drone_count <= 0:

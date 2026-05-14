@@ -7,6 +7,7 @@
 // Drone Swarm Sensor Fusion  |  Phase 3
  
 #include "swarm/V2XMeshNetwork.hpp"
+#include "swarm/EdgePeerProtocol.hpp"
 #include "swarm/SwarmSecurity.hpp"
 #include <cstring>
 #include <stdexcept>
@@ -162,7 +163,9 @@ V2XMeshNetwork::V2XMeshNetwork(uint32_t local_id,
                                  uint16_t port)
     : local_id_(local_id)
     , multicast_group_(std::move(multicast_group))
-    , port_(port) {
+    , port_(port)
+    , edge_state_cache_({})
+    , edge_consensus_(local_id) {
     logger_ = spdlog::get("V2X");
     if (!logger_) logger_ = spdlog::stdout_color_mt("V2X");
 }
@@ -244,6 +247,10 @@ bool V2XMeshNetwork::start() {
 void V2XMeshNetwork::stop() {
     if (!running_.exchange(false)) return;
 
+    if (sock_ >= 0) {
+        broadcast_edge_packet(build_edge_goodbye_packet());
+    }
+
 #ifdef _WIN32
     if (sock_ >= 0) { ::closesocket(static_cast<SOCKET>(sock_)); sock_ = -1; }
     WSACleanup();
@@ -304,6 +311,9 @@ bool V2XMeshNetwork::broadcast(SwarmMessage::Type type,
 #endif
 
     ++tx_count_;
+    if (type == SwarmMessage::Type::EDGE_PACKET) {
+        edge_tx_bytes_.fetch_add(bytes.size());
+    }
     return true;
 }
 
@@ -353,6 +363,9 @@ bool V2XMeshNetwork::unicast(uint32_t dst,
 #endif
 
     ++tx_count_;
+    if (type == SwarmMessage::Type::EDGE_PACKET) {
+        edge_tx_bytes_.fetch_add(bytes.size());
+    }
     return true;
 }
 
@@ -419,6 +432,9 @@ void V2XMeshNetwork::recv_loop() {
             msg = SwarmMessage::deserialize(buf.data(), static_cast<size_t>(n));
         }
         if (msg && msg->src_id != local_id_) {  // ignore own broadcasts
+            if (msg->type == SwarmMessage::Type::EDGE_PACKET) {
+                edge_rx_bytes_.fetch_add(static_cast<uint64_t>(n));
+            }
             handle_message(*msg);
             if (msg_cb_) msg_cb_(*msg);
         }
@@ -430,11 +446,32 @@ void V2XMeshNetwork::recv_loop() {
 
  
 void V2XMeshNetwork::heartbeat_loop() {
+    uint32_t loop_count = 0;
     while (running_.load()) {
         broadcast(SwarmMessage::Type::HEARTBEAT, build_heartbeat_payload());
+        broadcast_edge_packet(build_edge_heartbeat_packet());
+        if ((loop_count % 2u) == 0u) {
+            broadcast_edge_packet(build_edge_pose_packet());
+            broadcast_edge_packet(build_edge_health_packet());
+        }
+        if ((loop_count % 3u) == 0u) {
+            broadcast_edge_packet(build_edge_obstacle_packet());
+            broadcast_edge_packet(build_edge_consensus_packet());
+        }
+        if ((loop_count % 5u) == 0u) {
+            const auto threat_packet = build_edge_threat_packet();
+            if (threat_packet.threat_digest.has_value() &&
+                threat_packet.threat_digest->threat_level != "none") {
+                broadcast_edge_packet(threat_packet);
+            }
+        }
+        if (local_health().emergency_fault) {
+            broadcast_edge_packet(build_edge_emergency_packet());
+        }
         expire_stale_peers();
         std::this_thread::sleep_for(
             std::chrono::duration<double>(kHeartbeatInterval_s));
+        ++loop_count;
     }
 }
 
@@ -493,6 +530,7 @@ void V2XMeshNetwork::handle_message(const SwarmMessage& msg) {
     case SwarmMessage::Type::HEARTBEAT:    handle_heartbeat(msg);    break;
     case SwarmMessage::Type::LEADER_ELECT: handle_election(msg);     break;
     case SwarmMessage::Type::POSE_UPDATE:  handle_pose_update(msg);  break;
+    case SwarmMessage::Type::EDGE_PACKET:  handle_edge_packet(msg);  break;
     case SwarmMessage::Type::FORMATION_CMD: break;
     default: break;
     }
@@ -597,9 +635,71 @@ void V2XMeshNetwork::handle_pose_update(const SwarmMessage& msg) {
     peer.last_seen_ts = msg.timestamp;
 }
 
+void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
+    const std::string wire(msg.payload.begin(), msg.payload.end());
+    const auto parsed = parse_edge_packet_json(wire);
+    if (!parsed.ok) {
+        if (logger_) {
+            logger_->warn("V2X edge packet parse rejected from {}: {}", msg.src_id, parsed.error);
+        }
+        return;
+    }
+    if (parsed.packet.sender_id != msg.src_id) {
+        if (logger_) {
+            logger_->warn(
+                "V2X edge packet rejected from {}: envelope sender mismatch ({})",
+                msg.src_id,
+                parsed.packet.sender_id);
+        }
+        return;
+    }
+
+    const auto now_ms = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    const auto observed = edge_state_cache_.observe_packet(parsed.packet, now_ms);
+    if (!observed.accepted) {
+        if (logger_) {
+            logger_->warn("V2X edge packet rejected from {}: {}", msg.src_id, observed.reason);
+        }
+        return;
+    }
+
+    edge_consensus_.observe_packet(parsed.packet, edge_state_cache_);
+
+    std::optional<PeerInfo> updated_peer;
+    if (const auto cached = edge_state_cache_.peer_state(parsed.packet.sender_id); cached.has_value()) {
+        std::lock_guard lock(peers_mutex_);
+        auto& peer = peers_[parsed.packet.sender_id];
+        peer.id = parsed.packet.sender_id;
+        peer.last_seen_ts = static_cast<double>(cached->last_packet_timestamp_ms) / 1000.0;
+        peer.seq_last = cached->last_sequence_number;
+        peer.reachable = !cached->stale;
+        peer.position = cached->position;
+        peer.velocity = cached->velocity;
+        if (parsed.packet.heartbeat.has_value()) {
+            peer.battery_pct = static_cast<float>(parsed.packet.heartbeat->battery_pct);
+            peer.health.battery_pct = static_cast<float>(parsed.packet.heartbeat->battery_pct);
+            peer.health.motor_health = static_cast<float>(parsed.packet.heartbeat->motor_health);
+            peer.health.link_quality = static_cast<float>(parsed.packet.heartbeat->link_quality);
+        }
+        peer.health.link_quality = static_cast<float>(std::clamp(cached->mesh_bandwidth_kbps / 256.0, 0.0, 1.0));
+        peer.health.emergency_fault = cached->emergency_fault;
+        updated_peer = peer;
+    }
+    if (updated_peer.has_value() && peer_cb_) {
+        peer_cb_(*updated_peer);
+    }
+}
+
 // peer liveness and leader-loss detection
 void V2XMeshNetwork::expire_stale_peers() {
     bool leader_lost = false;
+    const auto now_ms = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    edge_state_cache_.expire(now_ms);
+    edge_consensus_.expire(edge_state_cache_);
     {
         std::lock_guard lock(peers_mutex_);
         for (auto& [id, peer] : peers_) {
@@ -635,9 +735,49 @@ std::vector<PeerInfo> V2XMeshNetwork::active_peers() const {
 }
 
 size_t V2XMeshNetwork::peer_count() const {
-    std::lock_guard lock(peers_mutex_);
-    return std::count_if(peers_.begin(), peers_.end(),
-        [](const auto& kv) { return kv.second.reachable; });
+    return edge_state_cache_.peer_count();
+}
+
+size_t V2XMeshNetwork::stale_peer_count() const {
+    return edge_state_cache_.stale_peer_count();
+}
+
+size_t V2XMeshNetwork::safety_eligible_peer_count() const {
+    return edge_state_cache_.safety_eligible_peer_count();
+}
+
+std::string V2XMeshNetwork::consensus_state() const {
+    return edge_consensus_.snapshot(edge_state_cache_).state;
+}
+
+uint64_t V2XMeshNetwork::consensus_epoch() const {
+    return edge_consensus_.snapshot(edge_state_cache_).consensus_epoch;
+}
+
+std::string V2XMeshNetwork::edge_health_status() const {
+    std::lock_guard lock(local_edge_state_mutex_);
+    return local_edge_state_.edge_health_status;
+}
+
+std::string V2XMeshNetwork::autonomy_state() const {
+    std::lock_guard lock(local_edge_state_mutex_);
+    return local_edge_state_.autonomy_state;
+}
+
+float V2XMeshNetwork::mesh_bandwidth_kbps() const {
+    std::lock_guard lock(local_edge_state_mutex_);
+    return static_cast<float>(
+        local_edge_state_.mesh_bandwidth_kbps +
+        ((edge_tx_bytes_.load() + edge_rx_bytes_.load()) / 128.0));
+}
+
+bool V2XMeshNetwork::disconnected_operation() const {
+    std::lock_guard lock(local_edge_state_mutex_);
+    return local_edge_state_.disconnected_operation || edge_state_cache_.disconnected_operation();
+}
+
+bool V2XMeshNetwork::split_swarm_isolated() const {
+    return edge_state_cache_.split_swarm_isolated();
 }
 
 std::vector<uint8_t> V2XMeshNetwork::build_heartbeat_payload() const {
@@ -658,6 +798,199 @@ std::vector<uint8_t> V2XMeshNetwork::build_heartbeat_payload() const {
     p[offset] = static_cast<uint8_t>(health.emergency_fault ? 1 : 0);
     return p;
 }
+
+bool V2XMeshNetwork::broadcast_edge_packet(const EdgePeerPacket& packet) {
+    const auto wire = serialize_edge_packet_json(packet);
+    return broadcast(
+        SwarmMessage::Type::EDGE_PACKET,
+        std::vector<uint8_t>(wire.begin(), wire.end()));
+}
+
+EdgePeerPacket V2XMeshNetwork::build_edge_heartbeat_packet() const {
+    LocalEdgeState edge_state;
+    {
+        std::lock_guard lock(local_edge_state_mutex_);
+        edge_state = local_edge_state_;
+    }
+    const auto health = local_health();
+    EdgePeerPacket packet;
+    packet.packet_type = EdgePacketType::HEARTBEAT;
+    packet.sender_id = local_id_;
+    packet.timestamp_ms = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.sequence_number = ++last_edge_sequence_;
+    packet.trust_epoch = edge_state.trust_epoch;
+    packet.source = edge_state.source;
+    packet.ttl_ms = 900;
+    packet.auth_hook = security_enabled() ? "swarm-security-hook" : "unsigned";
+    packet.heartbeat = HeartbeatPayload{
+        static_cast<int>(peer_count()),
+        static_cast<int>(stale_peer_count()),
+        health.battery_pct,
+        health.motor_health,
+        health.link_quality,
+        health.emergency_fault,
+        edge_health_status(),
+        autonomy_state(),
+    };
+    return packet;
+}
+
+EdgePeerPacket V2XMeshNetwork::build_edge_pose_packet() const {
+    std::lock_guard lock(local_edge_state_mutex_);
+    EdgePeerPacket packet;
+    packet.packet_type = EdgePacketType::POSE_STATE;
+    packet.sender_id = local_id_;
+    packet.timestamp_ms = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.sequence_number = ++last_edge_sequence_;
+    packet.trust_epoch = local_edge_state_.trust_epoch;
+    packet.source = local_edge_state_.source;
+    packet.ttl_ms = 700;
+    packet.auth_hook = security_enabled() ? "swarm-security-hook" : "unsigned";
+    packet.pose_state = PoseStatePayload{
+        local_edge_state_.position,
+        local_edge_state_.velocity,
+        local_edge_state_.localization_confidence,
+    };
+    return packet;
+}
+
+EdgePeerPacket V2XMeshNetwork::build_edge_health_packet() const {
+    std::lock_guard lock(local_edge_state_mutex_);
+    EdgePeerPacket packet;
+    packet.packet_type = EdgePacketType::EDGE_HEALTH;
+    packet.sender_id = local_id_;
+    packet.timestamp_ms = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.sequence_number = ++last_edge_sequence_;
+    packet.trust_epoch = local_edge_state_.trust_epoch;
+    packet.source = local_edge_state_.source;
+    packet.ttl_ms = 1000;
+    packet.auth_hook = security_enabled() ? "swarm-security-hook" : "unsigned";
+    packet.edge_health = EdgeHealthPayload{
+        local_edge_state_.edge_health_status,
+        local_edge_state_.autonomy_state,
+        edge_consensus_.snapshot(edge_state_cache_).state,
+        local_edge_state_.mesh_bandwidth_kbps,
+        local_edge_state_.disconnected_operation,
+    };
+    return packet;
+}
+
+EdgePeerPacket V2XMeshNetwork::build_edge_obstacle_packet() const {
+    std::lock_guard lock(local_edge_state_mutex_);
+    EdgePeerPacket packet;
+    packet.packet_type = EdgePacketType::OBSTACLE_DIGEST;
+    packet.sender_id = local_id_;
+    packet.timestamp_ms = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.sequence_number = ++last_edge_sequence_;
+    packet.trust_epoch = local_edge_state_.trust_epoch;
+    packet.source = local_edge_state_.source;
+    packet.ttl_ms = 1200;
+    packet.auth_hook = security_enabled() ? "swarm-security-hook" : "unsigned";
+    packet.obstacle_digest = ObstacleDigestPayload{
+        local_edge_state_.local_obstacle_count,
+        local_edge_state_.shared_obstacle_count,
+        600,
+        "edge-obstacles",
+    };
+    return packet;
+}
+
+EdgePeerPacket V2XMeshNetwork::build_edge_threat_packet() const {
+    std::lock_guard lock(local_edge_state_mutex_);
+    EdgePeerPacket packet;
+    packet.packet_type = EdgePacketType::THREAT_DIGEST;
+    packet.sender_id = local_id_;
+    packet.timestamp_ms = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.sequence_number = ++last_edge_sequence_;
+    packet.trust_epoch = local_edge_state_.trust_epoch;
+    packet.source = local_edge_state_.source;
+    packet.ttl_ms = 1000;
+    packet.auth_hook = security_enabled() ? "swarm-security-hook" : "unsigned";
+    packet.threat_digest = ThreatDigestPayload{
+        local_edge_state_.threat_level,
+        local_edge_state_.threat_summary,
+        local_edge_state_.threat_level == "none" ? 0.0 : 0.8,
+    };
+    return packet;
+}
+
+EdgePeerPacket V2XMeshNetwork::build_edge_consensus_packet() const {
+    std::lock_guard lock(local_edge_state_mutex_);
+    const auto consensus = edge_consensus_.snapshot(edge_state_cache_);
+    EdgePeerPacket packet;
+    packet.packet_type = EdgePacketType::CONSENSUS_STATE;
+    packet.sender_id = local_id_;
+    packet.timestamp_ms = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.sequence_number = ++last_edge_sequence_;
+    packet.trust_epoch = local_edge_state_.trust_epoch;
+    packet.source = local_edge_state_.source;
+    packet.ttl_ms = 1400;
+    packet.auth_hook = security_enabled() ? "swarm-security-hook" : "unsigned";
+    packet.consensus_state = ConsensusStatePayload{
+        consensus.proposal_type,
+        consensus.state,
+        std::max(consensus.consensus_epoch, local_edge_state_.consensus_epoch),
+        std::max(consensus.quorum_count, static_cast<int>(safety_eligible_peer_count() > 0 ? safety_eligible_peer_count() : 1)),
+        consensus.local_safety_override,
+    };
+    return packet;
+}
+
+EdgePeerPacket V2XMeshNetwork::build_edge_emergency_packet() const {
+    std::lock_guard lock(local_edge_state_mutex_);
+    EdgePeerPacket packet;
+    packet.packet_type = EdgePacketType::EMERGENCY_CORRIDOR;
+    packet.sender_id = local_id_;
+    packet.timestamp_ms = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.sequence_number = ++last_edge_sequence_;
+    packet.trust_epoch = local_edge_state_.trust_epoch;
+    packet.source = local_edge_state_.source;
+    packet.ttl_ms = 1500;
+    packet.auth_hook = security_enabled() ? "swarm-security-hook" : "unsigned";
+    packet.emergency_corridor = EmergencyCorridorPayload{
+        local_edge_state_.position,
+        2.5,
+        1500,
+        "local emergency corridor reservation",
+    };
+    return packet;
+}
+
+EdgePeerPacket V2XMeshNetwork::build_edge_goodbye_packet() const {
+    LocalEdgeState edge_state;
+    {
+        std::lock_guard lock(local_edge_state_mutex_);
+        edge_state = local_edge_state_;
+    }
+    EdgePeerPacket packet;
+    packet.packet_type = EdgePacketType::PEER_GOODBYE;
+    packet.sender_id = local_id_;
+    packet.timestamp_ms = static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.sequence_number = ++last_edge_sequence_;
+    packet.trust_epoch = edge_state.trust_epoch;
+    packet.source = edge_state.source;
+    packet.ttl_ms = 500;
+    packet.auth_hook = security_enabled() ? "swarm-security-hook" : "unsigned";
+    packet.peer_goodbye = PeerGoodbyePayload{"shutdown"};
+    return packet;
+}
+
 void V2XMeshNetwork::configure_security(SwarmSecurityConfig cfg) {
     security_ = std::make_unique<SwarmSecurityContext>(local_id_, std::move(cfg));
 }
@@ -676,6 +1009,11 @@ void V2XMeshNetwork::set_local_health(SwarmHealthMetrics health) {
     health.leadership_score = compute_leadership_score(health);
     std::lock_guard lock(health_mutex_);
     local_health_ = health;
+}
+void V2XMeshNetwork::set_local_edge_state(const LocalEdgeState& state) {
+    std::lock_guard lock(local_edge_state_mutex_);
+    local_edge_state_ = state;
+    edge_consensus_.set_local_safety_override(state.disconnected_operation);
 }
 SwarmHealthMetrics V2XMeshNetwork::local_health() const {
     std::lock_guard lock(health_mutex_);

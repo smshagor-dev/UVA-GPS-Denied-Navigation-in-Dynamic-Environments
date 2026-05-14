@@ -15,6 +15,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BUILD_DIR = "build-local-validate"
+STALE_VCPKG_RE = re.compile(
+    r"(?:CMAKE_TOOLCHAIN_FILE|VCPKG_INSTALLED_DIR|_VCPKG_INSTALLED_DIR|Z_VCPKG_ROOT_DIR)[^=\n]*=([^\r\n]+)",
+    re.IGNORECASE,
+)
 WINDOWS_VCPKG_CANDIDATES = (
     Path(os.environ.get("VCPKG_ROOT", "")) if os.environ.get("VCPKG_ROOT") else None,
     Path(r"D:\tools\vcpkg-full"),
@@ -38,6 +42,58 @@ def detect_toolchain_file() -> Path | None:
     if toolchain.exists():
         return toolchain
     return None
+
+
+def vcpkg_root_from_toolchain(toolchain: Path | None) -> Path | None:
+    if not toolchain:
+        return existing_vcpkg_root()
+    try:
+        return toolchain.resolve().parents[2]
+    except IndexError:
+        return None
+
+
+def normalize_for_compare(path_text: str) -> str:
+    return path_text.replace("\\", "/").rstrip("/").lower()
+
+
+def suggest_alternate_toolchain(missing_toolchain: Path) -> None:
+    d_toolchain = Path(r"D:\tools\vcpkg-full\scripts\buildsystems\vcpkg.cmake")
+    if str(missing_toolchain).lower().startswith("c:\\tools\\vcpkg-full") and d_toolchain.exists():
+        print(f"Hint: C:\\tools was not found, but this D: toolchain exists:")
+        print(f"  python scripts/local_validate.py --toolchain \"{d_toolchain}\"")
+
+
+def cache_has_different_vcpkg_root(cache_path: Path, expected_root: Path | None) -> str | None:
+    if not cache_path.exists() or not expected_root:
+        return None
+    expected = normalize_for_compare(str(expected_root.resolve()))
+    text = cache_path.read_text(encoding="utf-8", errors="ignore")
+    for match in STALE_VCPKG_RE.finditer(text):
+        raw_value = match.group(1).strip()
+        if not raw_value:
+            continue
+        normalized = normalize_for_compare(raw_value)
+        if "/scripts/buildsystems/vcpkg.cmake" in normalized:
+            normalized = normalized.split("/scripts/buildsystems/vcpkg.cmake", 1)[0]
+        elif "/installed" in normalized:
+            normalized = normalized.split("/installed", 1)[0]
+        if "vcpkg" in normalized and normalized != expected:
+            return raw_value
+    return None
+
+
+def refuse_stale_cmake_cache(build_dir: Path, expected_root: Path | None) -> bool:
+    stale_value = cache_has_different_vcpkg_root(build_dir / "CMakeCache.txt", expected_root)
+    if not stale_value:
+        return False
+    print("FAIL: stale CMake cache points to a different vcpkg root.")
+    print(f"  Cache: {build_dir / 'CMakeCache.txt'}")
+    print(f"  Cached value: {stale_value}")
+    print(f"  Expected root: {expected_root}")
+    print("Delete the build directory or run:")
+    print(f"  Remove-Item -Recurse -Force \"{build_dir}\"")
+    return True
 
 
 def print_eigen_install_instructions(toolchain: Path | None) -> None:
@@ -120,8 +176,9 @@ def cmake_configure_command(toolchain: str | None) -> list[str]:
 def with_runtime_path(env: dict[str, str], toolchain: Path | None) -> dict[str, str]:
     updated = dict(env)
     path_entries: list[str] = []
-    if toolchain:
-        vcpkg_root = toolchain.parents[2]
+    vcpkg_root = vcpkg_root_from_toolchain(toolchain)
+    if vcpkg_root:
+        updated["VCPKG_ROOT"] = str(vcpkg_root)
         for candidate in (
             vcpkg_root / "installed" / "x64-windows" / "bin",
             vcpkg_root / "installed" / "x64-windows" / "debug" / "bin",
@@ -162,9 +219,12 @@ def main() -> int:
     toolchain_arg = Path(args.toolchain).resolve() if args.toolchain else detect_toolchain_file()
     if args.toolchain and not toolchain_arg.exists():
         print(f"FAIL: requested toolchain file does not exist: {toolchain_arg}")
+        suggest_alternate_toolchain(toolchain_arg)
         return 1
+    active_vcpkg_root = vcpkg_root_from_toolchain(toolchain_arg)
+    print(f"Active VCPKG_ROOT: {active_vcpkg_root or os.environ.get('VCPKG_ROOT', '<unset>')}")
     if toolchain_arg:
-        print(f"Using CMake toolchain: {toolchain_arg}")
+        print(f"Active CMAKE_TOOLCHAIN_FILE: {toolchain_arg}")
     elif platform.system() == "Windows":
         print("No vcpkg toolchain was auto-detected. CMake will rely on default package search paths.")
 
@@ -195,6 +255,9 @@ def main() -> int:
         print("WARNING: --skip-cpp was requested. C++ configure/build/ctest steps were not run.")
         print("PASS: Python and Go validation completed with C++ checks skipped explicitly.")
         return 0
+
+    if refuse_stale_cmake_cache(REPO_ROOT / BUILD_DIR, active_vcpkg_root):
+        return 1
 
     cpp_env = with_runtime_path(base_env, toolchain_arg)
     completed = run_step(

@@ -835,6 +835,21 @@ class DroneState:
     occupancy_ratio: float = 0.0
     sync_confidence: float = 1.0
     imu_camera_offset_ms: float = 0.0
+    peer_count: int = 0
+    stale_peer_count: int = 0
+    mesh_topology_mode: str = "adaptive_mesh"
+    local_consensus_state: str = "single_node"
+    local_consensus_epoch: int = 0
+    peer_latency_ms: float = 0.0
+    mesh_bandwidth_kbps: float = 0.0
+    disconnected_operation: bool = False
+    edge_health_status: str = "nominal"
+    edge_autonomy_state: str = "backend_assisted"
+    edge_inference_status: str = "idle"
+    edge_inference_fps: float = 0.0
+    edge_inference_confidence: float = 0.0
+    local_obstacle_count: int = 0
+    shared_obstacle_count: int = 0
     peer_clock_offset_ms: float = 0.0
     anchor_visibility_ratio: float = 0.0
     tdoa_weight: float = 0.0
@@ -883,6 +898,9 @@ class DashboardSnapshot:
     packet_loss_pct: float
     cpu_temp_c: float
     gpu_load_pct: float
+    avg_peer_latency_ms: float = 0.0
+    avg_mesh_bandwidth_kbps: float = 0.0
+    mesh_topology_mode: str = "adaptive_mesh"
     election_state: str = "stable"
     clusters: list[dict[str, Any]] = field(default_factory=list)
     critical_alerts: int = 0
@@ -1061,6 +1079,9 @@ class GoControlPlaneClient:
             packet_loss_pct=safe_float(payload.get("packet_loss_pct", 0.0)),
             cpu_temp_c=safe_float(payload.get("cpu_temp_c", 0.0)),
             gpu_load_pct=safe_float(payload.get("gpu_load_pct", 0.0)),
+            avg_peer_latency_ms=safe_float(payload.get("avg_peer_latency_ms", payload.get("avg_latency_ms", 0.0))),
+            avg_mesh_bandwidth_kbps=safe_float(payload.get("avg_mesh_bandwidth_kbps", 0.0)),
+            mesh_topology_mode=safe_text(payload.get("mesh_topology_mode", "adaptive_mesh"), "adaptive_mesh"),
             election_state=safe_text(payload.get("election_state", "stable"), "stable"),
             clusters=[
                 {
@@ -1140,6 +1161,21 @@ class GoControlPlaneClient:
             occupancy_ratio=safe_float(item.get("occupancy_ratio", 0.0), 0.0),
             sync_confidence=safe_float(item.get("sync_confidence", 1.0), 1.0),
             imu_camera_offset_ms=safe_float(item.get("imu_camera_offset_ms", 0.0), 0.0),
+            peer_count=safe_int(item.get("peer_count", 0), 0),
+            stale_peer_count=safe_int(item.get("stale_peer_count", 0), 0),
+            mesh_topology_mode=safe_text(item.get("mesh_topology_mode", "adaptive_mesh"), "adaptive_mesh"),
+            local_consensus_state=safe_text(item.get("local_consensus_state", "single_node"), "single_node"),
+            local_consensus_epoch=safe_int(item.get("local_consensus_epoch", 0), 0),
+            peer_latency_ms=safe_float(item.get("peer_latency_ms", 0.0), 0.0),
+            mesh_bandwidth_kbps=safe_float(item.get("mesh_bandwidth_kbps", 0.0), 0.0),
+            disconnected_operation=bool(item.get("disconnected_operation", False)),
+            edge_health_status=safe_text(item.get("edge_health_status", "nominal"), "nominal"),
+            edge_autonomy_state=safe_text(item.get("edge_autonomy_state", "backend_assisted"), "backend_assisted"),
+            edge_inference_status=safe_text(item.get("edge_inference_status", "idle"), "idle"),
+            edge_inference_fps=safe_float(item.get("edge_inference_fps", 0.0), 0.0),
+            edge_inference_confidence=safe_float(item.get("edge_inference_confidence", 0.0), 0.0),
+            local_obstacle_count=safe_int(item.get("local_obstacle_count", 0), 0),
+            shared_obstacle_count=safe_int(item.get("shared_obstacle_count", 0), 0),
             peer_clock_offset_ms=safe_float(item.get("peer_clock_offset_ms", 0.0), 0.0),
             anchor_visibility_ratio=safe_float(item.get("anchor_visibility_ratio", 0.0), 0.0),
             tdoa_weight=safe_float(item.get("tdoa_weight", 0.0), 0.0),
@@ -1853,6 +1889,21 @@ class SwarmBackend:
                         occupancy_ratio=safe_float(getattr(runtime, "occupancy_ratio", 0.0), 0.0),
                         sync_confidence=safe_float(getattr(runtime, "sync_confidence", 1.0), 1.0),
                         imu_camera_offset_ms=safe_float(getattr(runtime, "imu_camera_offset_ms", 0.0), 0.0),
+                        peer_count=safe_int(getattr(runtime, "peer_count", max(0, len(peer_map) - 1)), max(0, len(peer_map) - 1)),
+                        stale_peer_count=safe_int(getattr(runtime, "stale_peer_count", 0), 0),
+                        mesh_topology_mode=safe_text(getattr(runtime, "mesh_topology_mode", "adaptive_mesh"), "adaptive_mesh"),
+                        local_consensus_state=safe_text(getattr(runtime, "local_consensus_state", "peer_quorum" if len(peer_map) > 1 else "single_node"), "single_node"),
+                        local_consensus_epoch=safe_int(getattr(runtime, "local_consensus_epoch", 1), 1),
+                        peer_latency_ms=safe_float(getattr(runtime, "peer_latency_ms", float(self._network.avg_latency_ms()) if self._network is not None else 0.0), 0.0),
+                        mesh_bandwidth_kbps=safe_float(getattr(runtime, "mesh_bandwidth_kbps", 64.0 + max(0, len(peer_map) - 1) * 22.0), 0.0),
+                        disconnected_operation=bool(getattr(runtime, "disconnected_operation", False)),
+                        edge_health_status=safe_text(getattr(runtime, "edge_health_status", "nominal"), "nominal"),
+                        edge_autonomy_state=safe_text(getattr(runtime, "edge_autonomy_state", "distributed_autonomy"), "distributed_autonomy"),
+                        edge_inference_status=safe_text(getattr(runtime, "edge_inference_status", "active"), "active"),
+                        edge_inference_fps=safe_float(getattr(runtime, "edge_inference_fps", 12.0), 0.0),
+                        edge_inference_confidence=safe_float(getattr(runtime, "edge_inference_confidence", 0.74), 0.74),
+                        local_obstacle_count=safe_int(getattr(runtime, "local_obstacle_count", max(0, int(safe_float(getattr(runtime, "occupancy_ratio", 0.0), 0.0) * 20))), 0),
+                        shared_obstacle_count=safe_int(getattr(runtime, "shared_obstacle_count", max(0, int(safe_float(getattr(runtime, "occupancy_ratio", 0.0), 0.0) * 28))), 0),
                         peer_clock_offset_ms=safe_float(getattr(runtime, "peer_clock_offset_ms", 0.0), 0.0),
                         anchor_visibility_ratio=safe_float(getattr(runtime, "anchor_visibility_ratio", 0.0), 0.0),
                         tdoa_weight=safe_float(getattr(runtime, "tdoa_weight", 0.0), 0.0),
@@ -1894,6 +1945,9 @@ class SwarmBackend:
                 packet_loss_pct=float(self._network.packet_loss_pct()) if self._network is not None else 0.0,
                 cpu_temp_c=float(stats.cpu_temp_c),
                 gpu_load_pct=float(stats.gpu_pct),
+                avg_peer_latency_ms=sum(state.peer_latency_ms for state in states) / max(len(states), 1),
+                avg_mesh_bandwidth_kbps=sum(state.mesh_bandwidth_kbps for state in states) / max(len(states), 1),
+                mesh_topology_mode=states[0].mesh_topology_mode if states else "adaptive_mesh",
                 election_state="election-ready" if any(state.election_ready for state in states) else "degraded",
                 clusters=self._cluster_snapshot(states),
                 critical_alerts=self._critical_alert_count(states),
@@ -2101,6 +2155,21 @@ class SwarmBackend:
                     occupancy_ratio=occupancy_ratio,
                     sync_confidence=sync_confidence,
                     imu_camera_offset_ms=(1.5 + idx * 0.9) * math.sin(elapsed * 0.14 + idx),
+                    peer_count=max(1, min(6, len(self._ids) - 1)),
+                    stale_peer_count=0 if reachable else 1,
+                    mesh_topology_mode="adaptive_mesh",
+                    local_consensus_state="peer_quorum" if idx else "leader_sync",
+                    local_consensus_epoch=20 + idx,
+                    peer_latency_ms=5.0 + abs(math.sin(elapsed * 0.4 + idx)) * 4.0,
+                    mesh_bandwidth_kbps=110.0 + idx * 12.0 + abs(math.cos(elapsed * 0.3 + idx)) * 20.0,
+                    disconnected_operation=not reachable and idx % 3 == 0,
+                    edge_health_status="nominal" if reachable and security_state == "TRUSTED" else "degraded",
+                    edge_autonomy_state="distributed_autonomy" if reachable else "local_only",
+                    edge_inference_status="simulation",
+                    edge_inference_fps=14.0 + idx,
+                    edge_inference_confidence=0.70 + 0.04 * math.sin(elapsed * 0.2 + idx),
+                    local_obstacle_count=2 + (idx % 4),
+                    shared_obstacle_count=4 + (idx % 5),
                     peer_clock_offset_ms=2.5 * math.sin(elapsed * 0.19 + idx),
                     anchor_visibility_ratio=max(0.0, min(1.0, anchor_visibility / 6.0)),
                     tdoa_weight=max(0.0, min(1.0, tdoa_conf * 0.9)),
@@ -2138,6 +2207,9 @@ class SwarmBackend:
             packet_loss_pct=max(0.0, 1.4 * math.sin(elapsed * 0.2 + 0.5)),
             cpu_temp_c=states[0].cpu_temp_c,
             gpu_load_pct=states[0].gpu_load_pct,
+            avg_peer_latency_ms=sum(state.peer_latency_ms for state in states) / max(len(states), 1),
+            avg_mesh_bandwidth_kbps=sum(state.mesh_bandwidth_kbps for state in states) / max(len(states), 1),
+            mesh_topology_mode="adaptive_mesh",
             election_state="stable" if states[0].election_ready else "re-election",
             clusters=self._cluster_snapshot(states),
             critical_alerts=self._critical_alert_count(states),
@@ -3252,6 +3324,162 @@ class NetworkHealthGraph(pg.PlotWidget):
         
         self._lat_curve.setData(x_lat, arr_lat)
         self._loss_curve.setData(x_loss, arr_loss)
+
+
+class EdgeTopologyMap(pg.PlotWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        style_plot_widget(self, "Y", "X")
+        self.setAspectLocked(True)
+        self.setYRange(-20, 20)
+        self.setXRange(-20, 20)
+        self._edges = self.plot(pen=pg.mkPen(_rgba(ACCENT, 0.45), width=1))
+        self._nodes = pg.ScatterPlotItem(size=12, pen=pg.mkPen(TEXT, width=1), brush=pg.mkBrush(_rgba(ACCENT, 0.75)))
+        self.addItem(self._nodes)
+
+    def ingest(self, snapshot: DashboardSnapshot) -> None:
+        states = snapshot.states
+        if not states:
+            self._nodes.setData([], [])
+            self._edges.setData([], [])
+            return
+        points: list[dict[str, Any]] = []
+        edge_x: list[float] = []
+        edge_y: list[float] = []
+        leader = next((state for state in states if state.drone_id == snapshot.leader_id), states[0])
+        for state in states:
+            color = ACCENT_ALT if state.drone_id == leader.drone_id else DANGER if state.disconnected_operation else SUCCESS if state.edge_health_status == "nominal" else WARN
+            points.append(
+                {
+                    "pos": (state.position[0], state.position[1]),
+                    "data": state.drone_id,
+                    "brush": pg.mkBrush(_rgba(color, 0.85)),
+                    "pen": pg.mkPen(TEXT, width=1),
+                    "size": 14 if state.drone_id == leader.drone_id else 11,
+                }
+            )
+            if state.drone_id != leader.drone_id:
+                edge_x.extend([leader.position[0], state.position[0], np.nan])
+                edge_y.extend([leader.position[1], state.position[1], np.nan])
+        self._nodes.setData(points)
+        self._edges.setData(edge_x, edge_y)
+
+
+class EdgeLatencyGraph(pg.PlotWidget):
+    def __init__(self, poll_hz: int) -> None:
+        super().__init__()
+        style_plot_widget(self, "Edge Sync")
+        self._window = 360
+        self._poll_hz = max(poll_hz, 1)
+        self._t0 = time.time()
+        self._lat_history = deque(maxlen=self._window)
+        self._bw_history = deque(maxlen=self._window)
+        self._lat_curve = self.plot(pen=pg.mkPen(CYAN, width=2), name="Peer Latency (ms)")
+        self._bw_curve = self.plot(pen=pg.mkPen(ACCENT_ALT, width=2), name="Mesh BW (kbps)")
+
+    def ingest(self, avg_peer_latency_ms: float, avg_mesh_bandwidth_kbps: float) -> None:
+        now = time.time() - self._t0
+        self._lat_history.append(avg_peer_latency_ms)
+        self._bw_history.append(avg_mesh_bandwidth_kbps)
+        arr_lat = np.array(self._lat_history, dtype=float)
+        arr_bw = np.array(self._bw_history, dtype=float)
+        x_lat = np.linspace(max(0.0, now - len(arr_lat) / self._poll_hz), now, len(arr_lat))
+        x_bw = np.linspace(max(0.0, now - len(arr_bw) / self._poll_hz), now, len(arr_bw))
+        self._lat_curve.setData(x_lat, arr_lat)
+        self._bw_curve.setData(x_bw, arr_bw)
+
+
+class EdgeSwarmPage(QWidget):
+    def __init__(self, poll_hz: int) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+
+        self._banner = QLabel("SIMULATION / DEMO EDGE DATA")
+        self._banner.setAlignment(Qt.AlignCenter)
+        self._banner.setVisible(False)
+        self._banner.setStyleSheet(
+            f"background: rgba(139, 92, 246, 0.16); color:{SIM_PURPLE}; border:1px solid rgba(139, 92, 246, 0.45); border-radius:8px; padding:8px; font-weight:800;"
+        )
+        layout.addWidget(self._banner)
+
+        self._summary = QLabel("Edge swarm state unavailable")
+        self._summary.setWordWrap(True)
+        self._summary.setStyleSheet(f"color:{TEXT}; font-size:12px; font-weight:600;")
+        layout.addWidget(self._summary)
+
+        top_row = QHBoxLayout()
+        self._topology = EdgeTopologyMap()
+        self._topology.setMinimumHeight(190)
+        self._latency = EdgeLatencyGraph(poll_hz)
+        self._latency.setMinimumHeight(190)
+        top_row.addWidget(self._topology, 1)
+        top_row.addWidget(self._latency, 1)
+        layout.addLayout(top_row)
+
+        self._peer_table = QTableWidget(0, 6)
+        self._peer_table.setHorizontalHeaderLabels(["Drone", "Peers", "Stale", "Consensus", "Autonomy", "Health"])
+        self._peer_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self._peer_table.verticalHeader().setVisible(False)
+        self._peer_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._peer_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self._peer_table.setShowGrid(False)
+        layout.addWidget(self._peer_table)
+
+        self._inference_table = QTableWidget(0, 6)
+        self._inference_table.setHorizontalHeaderLabels(["Drone", "Inference", "Confidence", "Local Obs", "Shared Obs", "Disconnected"])
+        self._inference_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self._inference_table.verticalHeader().setVisible(False)
+        self._inference_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._inference_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self._inference_table.setShowGrid(False)
+        layout.addWidget(self._inference_table)
+
+    @staticmethod
+    def _set_item(table: QTableWidget, row: int, col: int, value: str, color: str | None = None) -> None:
+        item = QTableWidgetItem(value)
+        item.setTextAlignment(Qt.AlignCenter)
+        if color is not None:
+            item.setForeground(QColor(color))
+        table.setItem(row, col, item)
+
+    def ingest(self, snapshot: DashboardSnapshot) -> None:
+        simulation = snapshot.simulation_enabled or snapshot.backend_mode.startswith("simulation")
+        states = snapshot.states
+        disconnected = sum(1 for state in states if state.disconnected_operation)
+        avg_peer_count = sum(state.peer_count for state in states) / max(len(states), 1)
+        avg_conf = sum(state.edge_inference_confidence for state in states) / max(len(states), 1)
+        self._banner.setVisible(simulation)
+        self._summary.setText(
+            f"Topology: {snapshot.mesh_topology_mode}  |  Avg peers: {avg_peer_count:.1f}  |  "
+            f"Peer latency: {snapshot.avg_peer_latency_ms:.1f} ms  |  Mesh bandwidth: {snapshot.avg_mesh_bandwidth_kbps:.1f} kbps  |  "
+            f"Disconnected nodes: {disconnected}  |  Inference confidence: {avg_conf:.2f}"
+        )
+        self._topology.ingest(snapshot)
+        self._latency.ingest(snapshot.avg_peer_latency_ms or snapshot.avg_latency_ms, snapshot.avg_mesh_bandwidth_kbps)
+
+        self._peer_table.setRowCount(len(states))
+        self._inference_table.setRowCount(len(states))
+        for row, state in enumerate(states):
+            peer_color = DANGER if state.stale_peer_count > 0 else SUCCESS if state.peer_count > 0 else WARN
+            consensus_color = SUCCESS if "quorum" in state.local_consensus_state or "sync" in state.local_consensus_state else WARN
+            health_color = SUCCESS if state.edge_health_status == "nominal" else WARN if state.edge_health_status not in {"fault", "isolated"} else DANGER
+            inference_color = SUCCESS if state.edge_inference_status == "active" else WARN if state.edge_inference_status not in {"fault", "blocked"} else DANGER
+            disconnected_color = AMBER if state.disconnected_operation else SUCCESS
+            self._set_item(self._peer_table, row, 0, str(state.drone_id))
+            self._set_item(self._peer_table, row, 1, str(state.peer_count), peer_color)
+            self._set_item(self._peer_table, row, 2, str(state.stale_peer_count), DANGER if state.stale_peer_count > 0 else TEXT)
+            self._set_item(self._peer_table, row, 3, state.local_consensus_state.replace("_", " "), consensus_color)
+            self._set_item(self._peer_table, row, 4, state.edge_autonomy_state.replace("_", " "), ACCENT)
+            self._set_item(self._peer_table, row, 5, state.edge_health_status.upper(), health_color)
+
+            self._set_item(self._inference_table, row, 0, str(state.drone_id))
+            self._set_item(self._inference_table, row, 1, state.edge_inference_status.replace("_", " "), inference_color)
+            self._set_item(self._inference_table, row, 2, f"{state.edge_inference_confidence:.2f}")
+            self._set_item(self._inference_table, row, 3, str(state.local_obstacle_count))
+            self._set_item(self._inference_table, row, 4, str(state.shared_obstacle_count))
+            self._set_item(self._inference_table, row, 5, "YES" if state.disconnected_operation else "NO", disconnected_color)
 
 class ComputeLoadGraph(pg.PlotWidget):
     def __init__(self, poll_hz: int) -> None:
@@ -4557,6 +4785,7 @@ class DashboardWindow(QMainWindow):
         self._tdoa_page = TdoaAnchorPage()
         self._replay_page = ReplayAnalysisPage()
         self._mission_page = MissionPlanningPage()
+        self._edge_swarm_page = EdgeSwarmPage(self._poll_hz)
 
         self._tabs.addTab(self._drift, "VIO Drift")
         self._tabs.addTab(self._mcss_graph, "MCSS Consensus")
@@ -4568,6 +4797,7 @@ class DashboardWindow(QMainWindow):
         self._tabs.addTab(self._tdoa_page, "TDOA/UWB")
         self._tabs.addTab(self._replay_page, "Replay")
         self._tabs.addTab(self._mission_page, "Mission")
+        self._tabs.addTab(self._edge_swarm_page, "Edge Swarm")
         self._graph_box = QGroupBox("Telemetry Graphs")
         self._graph_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         graph_layout = QVBoxLayout(self._graph_box)
@@ -4854,6 +5084,7 @@ class DashboardWindow(QMainWindow):
             self._tdoa_page.ingest(selected_state)
             self._replay_page.ingest(selected_state, snapshot)
             self._mission_page.ingest(snapshot, selected_state)
+            self._edge_swarm_page.ingest(snapshot)
 
             leader_id = snapshot.leader_id if snapshot.leader_id else "?"
             avg_battery = sum(state.battery_pct for state in snapshot.states) / max(len(snapshot.states), 1)
@@ -4901,7 +5132,8 @@ class DashboardWindow(QMainWindow):
                 f"{len(snapshot.clusters)} clusters | {len(snapshot.missions)} missions tracked",
                 accent=SUCCESS if snapshot.critical_alerts == 0 else WARN if snapshot.critical_alerts < 3 else DANGER,
             )
-            self._status_runtime.set_value(snapshot.backend_mode.upper(), ACCENT if snapshot.backend_mode != "simulation" else SIM_PURPLE)
+            runtime_accent = SIM_PURPLE if snapshot.backend_mode == "simulation" else ACCENT_ALT if snapshot.backend_mode == "edge_swarm" else ACCENT
+            self._status_runtime.set_value(snapshot.backend_mode.upper(), runtime_accent)
             self._status_backend.set_value("ONLINE" if snapshot.backend_mode else "OFFLINE", CYAN)
             reality_label = "REAL" if localization_data_source == "real" and not snapshot.simulation_enabled else localization_data_source.upper()
             reality_accent = EMERALD if reality_label == "REAL" else SIM_PURPLE if "SIM" in reality_label else WARN

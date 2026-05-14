@@ -7,19 +7,28 @@
   "runtime_modes_supported": [
     "simulation",
     "bench",
-    "production"
+    "production",
+    "edge_swarm"
   ],
   "global_configuration": {
-    "runtime_mode": "bench",
+    "runtime_mode": "edge_swarm",
     "anchor_config_path": "config/anchors.example.json",
     "lidar_config_path": "config/lidar.example.json",
     "detector_labels_path": "config/detector_labels.example.json",
     "telemetry_publish_rate_hz": 5,
-    "backend_mode": "production",
+    "backend_mode": "edge_swarm",
     "safety_manager_enabled": true,
     "simulation_fallback_enabled": false,
     "pre_arm_required": true,
-    "bench_validation_required": true
+    "bench_validation_required": true,
+    "edge_swarm_defaults": {
+      "mesh_topology_mode": "adaptive_mesh",
+      "peer_sync_interval_ms": 100,
+      "consensus_timeout_ms": 350,
+      "stale_peer_timeout_ms": 900,
+      "allow_disconnected_operation": true,
+      "shared_awareness_budget_kbps": 180
+    }
   },
   "runtime_sessions": [
     {

@@ -134,12 +134,16 @@ std::string_view to_string(RuntimeMode mode) {
     case RuntimeMode::SIMULATION: return "simulation";
     case RuntimeMode::BENCH: return "bench";
     case RuntimeMode::PRODUCTION: return "production";
+    case RuntimeMode::EDGE_SWARM: return "edge_swarm";
     }
     return "simulation";
 }
 
 RuntimeMode parse_runtime_mode(std::string_view value) {
     const auto normalized = lowercase(value);
+    if (normalized == "edge_swarm" || normalized == "edge-swarm" || normalized == "edge") {
+        return RuntimeMode::EDGE_SWARM;
+    }
     if (normalized == "bench") {
         return RuntimeMode::BENCH;
     }
@@ -199,14 +203,14 @@ RuntimeValidationResult validate_runtime_configuration(const RuntimeValidationIn
         result.errors.push_back("an external TDOA source is required outside simulation mode");
     }
 
-    if (input.runtime_mode == RuntimeMode::PRODUCTION) {
+    if (input.runtime_mode == RuntimeMode::PRODUCTION || input.runtime_mode == RuntimeMode::EDGE_SWARM) {
         if (input.has_csv_source) {
             result.ok = false;
-            result.errors.push_back("CSV playback is not allowed in production mode");
+            result.errors.push_back("CSV playback is not allowed in production or edge_swarm mode");
         }
         if (!input.has_udp_source && !input.has_serial_source) {
             result.ok = false;
-            result.errors.push_back("production mode requires live UDP or serial TDOA input");
+            result.errors.push_back("production and edge_swarm modes require live UDP or serial TDOA input");
         }
     }
 
@@ -367,7 +371,7 @@ RuntimeValidationResult validate_lidar_runtime_configuration(const LidarRuntimeV
     if (!input.lidar_initialized) {
         result.ok = false;
         result.errors.push_back(
-            "required LiDAR is unavailable; production/bench mode cannot continue without live LiDAR initialization");
+            "required LiDAR is unavailable; bench/production/edge_swarm mode cannot continue without live LiDAR initialization");
     }
     return result;
 }

@@ -4,8 +4,14 @@
 
 cmake_minimum_required(VERSION 3.20)
 
+if(DEFINED ENV{VCPKG_ROOT})
+    file(TO_CMAKE_PATH "$ENV{VCPKG_ROOT}" _DRONE_VCPKG_ROOT)
+else()
+    set(_DRONE_VCPKG_ROOT "")
+endif()
+
 if(WIN32 AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    set(_DRONE_VCPKG_TOOLCHAIN "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+    set(_DRONE_VCPKG_TOOLCHAIN "${_DRONE_VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
     if(EXISTS "${_DRONE_VCPKG_TOOLCHAIN}")
         set(CMAKE_TOOLCHAIN_FILE "${_DRONE_VCPKG_TOOLCHAIN}" CACHE STRING "vcpkg toolchain file")
     elseif(EXISTS "D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake")
@@ -71,7 +77,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if(WIN32)
     foreach(_drone_prefix
-        "$ENV{VCPKG_ROOT}/installed/x64-windows"
+        "${_DRONE_VCPKG_ROOT}/installed/x64-windows"
         "D:/tools/vcpkg-full/installed/x64-windows"
         "C:/tools/vcpkg-full/installed/x64-windows"
         "C:/vcpkg/installed/x64-windows"
@@ -90,8 +96,8 @@ endif()
 set(_DRONE_EIGEN_HINTS
     "$ENV{EIGEN3_DIR}"
     "$ENV{EIGEN3_ROOT}"
-    "$ENV{VCPKG_ROOT}/installed/x64-windows"
-    "$ENV{VCPKG_ROOT}/installed/x64-windows/share/eigen3"
+    "${_DRONE_VCPKG_ROOT}/installed/x64-windows"
+    "${_DRONE_VCPKG_ROOT}/installed/x64-windows/share/eigen3"
     "D:/tools/vcpkg-full/installed/x64-windows"
     "D:/tools/vcpkg-full/installed/x64-windows/share/eigen3"
     "C:/tools/vcpkg-full/installed/x64-windows"
@@ -111,7 +117,7 @@ if(NOT Eigen3_FOUND)
         HINTS
             "$ENV{EIGEN3_INCLUDE_DIR}"
             "$ENV{EIGEN3_ROOT}"
-            "$ENV{VCPKG_ROOT}/installed/x64-windows/include/eigen3"
+            "${_DRONE_VCPKG_ROOT}/installed/x64-windows/include/eigen3"
             "D:/tools/vcpkg-full/installed/x64-windows/include/eigen3"
             "C:/tools/vcpkg-full/installed/x64-windows/include/eigen3"
             "C:/vcpkg/installed/x64-windows/include/eigen3"
@@ -255,6 +261,9 @@ set(CORE_SOURCES
     src/localization/TimeSyncTracker.cpp
     src/localization/UWBSerialDriver.cpp
     src/runtime/RuntimeMode.cpp
+    src/swarm/EdgeConsensusManager.cpp
+    src/swarm/EdgePeerProtocol.cpp
+    src/swarm/SwarmStateCache.cpp
     src/safety/SafetyManager.cpp
     src/swarm/SwarmSecurity.cpp
     src/sensors/BarometerSensor.cpp

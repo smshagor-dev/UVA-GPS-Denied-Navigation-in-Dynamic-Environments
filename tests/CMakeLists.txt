@@ -79,6 +79,9 @@ add_executable(test_navigation_intelligence
     ../src/slam/OccupancyGridMap.cpp
     ../src/vio/EKFEstimator.cpp
     ../src/vio/VIOPipeline.cpp
+    ../src/swarm/EdgeConsensusManager.cpp
+    ../src/swarm/EdgePeerProtocol.cpp
+    ../src/swarm/SwarmStateCache.cpp
     ../src/swarm/V2XMeshNetwork.cpp
     ../src/swarm/SwarmSecurity.cpp
     ../third_party/crypto/monocypher.c
@@ -101,6 +104,9 @@ gtest_discover_tests(test_navigation_intelligence DISCOVERY_TIMEOUT 30 DISCOVERY
 add_executable(test_swarm_security
     test_swarm_security.cpp
     ../src/sensors/MotorSensor.cpp
+    ../src/swarm/EdgeConsensusManager.cpp
+    ../src/swarm/EdgePeerProtocol.cpp
+    ../src/swarm/SwarmStateCache.cpp
     ../src/swarm/SwarmSecurity.cpp
     ../src/swarm/V2XMeshNetwork.cpp
     ../third_party/crypto/monocypher.c
@@ -138,6 +144,18 @@ target_link_libraries(test_telemetry PRIVATE
     GTest::gtest_main
 )
 gtest_discover_tests(test_telemetry DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+
+add_executable(test_edge_swarm
+    test_edge_swarm.cpp
+    ../src/swarm/EdgeConsensusManager.cpp
+    ../src/swarm/EdgePeerProtocol.cpp
+    ../src/swarm/SwarmStateCache.cpp
+)
+target_link_libraries(test_edge_swarm PRIVATE
+    GTest::gtest_main
+    Eigen3::Eigen
+)
+gtest_discover_tests(test_edge_swarm DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
 
 if(HAS_FASTDDS_TRANSPORT)
     add_executable(test_v2x test_v2x.cpp)

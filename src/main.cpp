@@ -1237,9 +1237,30 @@ int main(int argc, char** argv) {
             decision_ctx.tdoa_confidence = tdoa_solution->confidence;
         }
 
+        drone::swarm::LocalEdgeState local_edge_state;
+        local_edge_state.position = fused_pose.position;
+        local_edge_state.velocity = fused_pose.velocity;
+        local_edge_state.localization_confidence = fusion.confidence;
+        local_edge_state.source = localization_data_source;
+        local_edge_state.consensus_epoch = net->consensus_epoch() + 1;
+        local_edge_state.local_obstacle_count = static_cast<int>(lidar_obstacles.size());
+        local_edge_state.shared_obstacle_count = static_cast<int>(lidar_obstacles.size() + net->peer_count());
+        local_edge_state.mesh_bandwidth_kbps = std::max(24.0, static_cast<double>(net->peer_count()) * 36.0);
+        local_edge_state.disconnected_operation =
+            cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM &&
+            (net->safety_eligible_peer_count() == 0 || !telemetry_client.enabled());
+        local_edge_state.trust_epoch = security.trust_epoch;
+        local_edge_state.threat_level =
+            decision_ctx.nearest_lidar_obstacle_m >= 0.0 && decision_ctx.nearest_lidar_obstacle_m < 2.5 ? "collision_risk" : "none";
+        local_edge_state.threat_summary =
+            local_edge_state.threat_level == "none" ? "" : "local obstacle corridor risk";
+        net->set_local_edge_state(local_edge_state);
+
         drone::safety::SafetyContext safety_ctx;
         safety_ctx.runtime_mode = cfg.runtime_mode;
-        safety_ctx.indoor_mode = cfg.runtime_mode != drone::runtime::RuntimeMode::PRODUCTION;
+        safety_ctx.indoor_mode =
+            cfg.runtime_mode != drone::runtime::RuntimeMode::PRODUCTION &&
+            cfg.runtime_mode != drone::runtime::RuntimeMode::EDGE_SWARM;
         safety_ctx.localization_degraded = fusion.degraded;
         safety_ctx.localization_lost = fusion.lost;
         safety_ctx.localization_confidence = fusion.confidence;
@@ -1273,6 +1294,19 @@ int main(int argc, char** argv) {
             anchor_visibility_ratio,
             fusion.tdoa_weight,
             tdoa_solution.has_value() ? tdoa_solution->confidence : 0.0,
+            net->peer_count(),
+            net->stale_peer_count(),
+            net->consensus_state(),
+            net->consensus_epoch(),
+            net->mesh_bandwidth_kbps(),
+            net->disconnected_operation(),
+            net->edge_health_status(),
+            net->autonomy_state(),
+            frame.has_value() ? "active" : "sensor_limited",
+            cam->telemetry_stats().fps,
+            std::clamp(fusion.confidence * 0.55 + sync_status.confidence * 0.45, 0.0, 1.0),
+            static_cast<int>(lidar_obstacles.size()),
+            static_cast<int>(lidar_obstacles.size() + net->peer_count()),
             slam_status.relocalization_count,
             tdoa_ingestor.visible_anchor_count(),
             allowed_plan.has_value() ? allowed_plan->waypoints.size() : 0u,
@@ -1468,6 +1502,28 @@ int main(int argc, char** argv) {
             snapshot.occupancy_ratio = occupancy_status.occupied_ratio;
             snapshot.sync_confidence = sync_status.confidence;
             snapshot.imu_camera_offset_ms = sync_status.imu_camera_offset_ms;
+            snapshot.peer_count = static_cast<int>(net->peer_count());
+            snapshot.stale_peer_count = static_cast<int>(net->stale_peer_count());
+            snapshot.mesh_topology_mode =
+                cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM ? "adaptive_mesh" : "hub_assisted";
+            snapshot.local_consensus_state =
+                cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM
+                    ? net->consensus_state()
+                    : "backend_coordinated";
+            snapshot.local_consensus_epoch = net->consensus_epoch();
+            snapshot.peer_latency_ms = net->avg_latency_ms();
+            snapshot.mesh_bandwidth_kbps = net->mesh_bandwidth_kbps();
+            snapshot.disconnected_operation = net->disconnected_operation();
+            snapshot.edge_health_status = net->edge_health_status();
+            snapshot.edge_autonomy_state = net->autonomy_state();
+            snapshot.edge_inference_status =
+                cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM
+                    ? (frame.has_value() ? "active" : "sensor_limited")
+                    : "backend_assisted";
+            snapshot.edge_inference_fps = camera_stats.fps;
+            snapshot.edge_inference_confidence = std::clamp(fusion.confidence * 0.55 + sync_status.confidence * 0.45, 0.0, 1.0);
+            snapshot.local_obstacle_count = static_cast<int>(lidar_obstacles.size());
+            snapshot.shared_obstacle_count = static_cast<int>(lidar_obstacles.size() + net->peer_count());
             snapshot.security_state = std::string(drone::security::to_string(security.state));
             snapshot.security_summary = security.summary;
             snapshot.security_transition_reason = security.transition_reason;

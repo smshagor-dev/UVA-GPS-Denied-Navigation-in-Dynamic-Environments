@@ -38,7 +38,9 @@ type ServerConfig struct {
 
 func (cfg ServerConfig) normalized() ServerConfig {
 	mode := strings.TrimSpace(strings.ToLower(cfg.Mode))
-	if mode != "production" {
+	switch mode {
+	case "production", "edge_swarm":
+	default:
 		mode = "simulation"
 	}
 	demoFleetSize := cfg.DemoFleetSize
@@ -134,37 +136,57 @@ func (s *Server) seedDigitalTwin(n int) {
 			role = "LEADER"
 		}
 		s.state.UpsertTelemetry(DroneTelemetry{
-			DroneID:                 i,
-			ClusterID:               clusterID,
-			Role:                    role,
-			Source:                  "simulation",
-			Connectivity:            "Mesh",
-			Reachable:               true,
-			Position:                [3]float64{float64(i % 20), float64((i / 20) % 10), 8.0 + float64(i%3)},
-			Velocity:                [3]float64{0.2, 0.1, 0.0},
-			AttitudeRPY:             [3]float64{0.0, 0.0, 0.0},
-			ThrustVector:            [3]float64{0.0, 0.0, 9.81},
-			CommandedAltitudeM:      8.0 + float64(i%3)*0.5,
-			CommandedSpeedMPS:       3.0,
-			ManualTargetPosition:    [3]float64{float64(i % 20), float64((i / 20) % 10), 8.0 + float64(i%3)},
-			ManualControlActive:     false,
-			DriftM:                  0.08 + math.Mod(float64(i), 7)*0.01,
-			BatteryPct:              92.0 - math.Mod(float64(i), 20),
-			RSSIDBm:                 -48.0 - math.Mod(float64(i), 8),
-			CPUTempC:                58.0 + math.Mod(float64(i), 10),
-			GPULoadPct:              42.0 + math.Mod(float64(i), 18),
-			MissionState:            "patrol",
-			LocalizationSource:      "vision-depth-fused",
-			LocalizationDataSource:  "simulation",
-			LocalizationState:       "nominal",
-			LocalizationConfidence:  0.90 - math.Mod(float64(i), 5)*0.04,
-			TDOAConfidence:          0.68 - math.Mod(float64(i), 4)*0.05,
-			ConfidenceTrend:         0.02 - math.Mod(float64(i), 3)*0.01,
-			RelocalizationCount:     (i - 1) / 22,
-			VisibleAnchorCount:      5 - (i % 3),
-			OccupancyRatio:          0.10 + math.Mod(float64(i), 6)*0.02,
-			SyncConfidence:          0.96 - math.Mod(float64(i), 5)*0.05,
-			IMUCameraOffsetMS:       1.2 + math.Mod(float64(i), 4)*0.7,
+			DroneID:                i,
+			ClusterID:              clusterID,
+			Role:                   role,
+			Source:                 "simulation",
+			Connectivity:           "Mesh",
+			Reachable:              true,
+			Position:               [3]float64{float64(i % 20), float64((i / 20) % 10), 8.0 + float64(i%3)},
+			Velocity:               [3]float64{0.2, 0.1, 0.0},
+			AttitudeRPY:            [3]float64{0.0, 0.0, 0.0},
+			ThrustVector:           [3]float64{0.0, 0.0, 9.81},
+			CommandedAltitudeM:     8.0 + float64(i%3)*0.5,
+			CommandedSpeedMPS:      3.0,
+			ManualTargetPosition:   [3]float64{float64(i % 20), float64((i / 20) % 10), 8.0 + float64(i%3)},
+			ManualControlActive:    false,
+			DriftM:                 0.08 + math.Mod(float64(i), 7)*0.01,
+			BatteryPct:             92.0 - math.Mod(float64(i), 20),
+			RSSIDBm:                -48.0 - math.Mod(float64(i), 8),
+			CPUTempC:               58.0 + math.Mod(float64(i), 10),
+			GPULoadPct:             42.0 + math.Mod(float64(i), 18),
+			MissionState:           "patrol",
+			LocalizationSource:     "vision-depth-fused",
+			LocalizationDataSource: "simulation",
+			LocalizationState:      "nominal",
+			LocalizationConfidence: 0.90 - math.Mod(float64(i), 5)*0.04,
+			TDOAConfidence:         0.68 - math.Mod(float64(i), 4)*0.05,
+			ConfidenceTrend:        0.02 - math.Mod(float64(i), 3)*0.01,
+			RelocalizationCount:    (i - 1) / 22,
+			VisibleAnchorCount:     5 - (i % 3),
+			OccupancyRatio:         0.10 + math.Mod(float64(i), 6)*0.02,
+			SyncConfidence:         0.96 - math.Mod(float64(i), 5)*0.05,
+			IMUCameraOffsetMS:      1.2 + math.Mod(float64(i), 4)*0.7,
+			PeerCount: func() int {
+				if n > 1 {
+					return n - 1
+				}
+				return 0
+			}(),
+			StalePeerCount:          0,
+			MeshTopologyMode:        "adaptive_mesh",
+			LocalConsensusState:     "leader_sync",
+			LocalConsensusEpoch:     uint64(100 + i),
+			PeerLatencyMS:           6.0 + math.Mod(float64(i), 4)*1.1,
+			MeshBandwidthKBPS:       120.0 + math.Mod(float64(i), 5)*18.0,
+			DisconnectedOperation:   false,
+			EdgeHealthStatus:        "simulation",
+			EdgeAutonomyState:       "distributed_hold",
+			EdgeInferenceStatus:     "simulation",
+			EdgeInferenceFPS:        14.0 + math.Mod(float64(i), 3),
+			EdgeInferenceConfidence: 0.72 - math.Mod(float64(i), 4)*0.05,
+			LocalObstacleCount:      2 + (i % 4),
+			SharedObstacleCount:     4 + (i % 6),
 			SecurityState:           "TRUSTED",
 			SecuritySummary:         "All trust signals nominal",
 			RemoteCommandAllowed:    true,

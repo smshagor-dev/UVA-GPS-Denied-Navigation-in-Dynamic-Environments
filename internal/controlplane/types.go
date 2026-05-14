@@ -111,6 +111,21 @@ type DroneTelemetry struct {
 	OccupancyRatio           float64         `json:"occupancy_ratio,omitempty"`
 	SyncConfidence           float64         `json:"sync_confidence,omitempty"`
 	IMUCameraOffsetMS        float64         `json:"imu_camera_offset_ms,omitempty"`
+	PeerCount                int             `json:"peer_count,omitempty"`
+	StalePeerCount           int             `json:"stale_peer_count,omitempty"`
+	MeshTopologyMode         string          `json:"mesh_topology_mode,omitempty"`
+	LocalConsensusState      string          `json:"local_consensus_state,omitempty"`
+	LocalConsensusEpoch      uint64          `json:"local_consensus_epoch,omitempty"`
+	PeerLatencyMS            float64         `json:"peer_latency_ms,omitempty"`
+	MeshBandwidthKBPS        float64         `json:"mesh_bandwidth_kbps,omitempty"`
+	DisconnectedOperation    bool            `json:"disconnected_operation,omitempty"`
+	EdgeHealthStatus         string          `json:"edge_health_status,omitempty"`
+	EdgeAutonomyState        string          `json:"edge_autonomy_state,omitempty"`
+	EdgeInferenceStatus      string          `json:"edge_inference_status,omitempty"`
+	EdgeInferenceFPS         float64         `json:"edge_inference_fps,omitempty"`
+	EdgeInferenceConfidence  float64         `json:"edge_inference_confidence,omitempty"`
+	LocalObstacleCount       int             `json:"local_obstacle_count,omitempty"`
+	SharedObstacleCount      int             `json:"shared_obstacle_count,omitempty"`
 	SecurityState            string          `json:"security_state,omitempty"`
 	SecuritySummary          string          `json:"security_summary,omitempty"`
 	SecurityTransitionReason string          `json:"security_transition_reason,omitempty"`
@@ -143,6 +158,8 @@ type FleetSnapshot struct {
 	Drones            []DroneTelemetry `json:"drones"`
 	LeaderID          int              `json:"leader_id"`
 	AvgLatencyMS      float64          `json:"avg_latency_ms"`
+	AvgPeerLatencyMS  float64          `json:"avg_peer_latency_ms"`
+	AvgMeshBandwidth  float64          `json:"avg_mesh_bandwidth_kbps"`
 	PacketLossPct     float64          `json:"packet_loss_pct"`
 	CPUTempC          float64          `json:"cpu_temp_c"`
 	GPULoadPct        float64          `json:"gpu_load_pct"`
@@ -150,6 +167,7 @@ type FleetSnapshot struct {
 	Clusters          []ClusterState   `json:"clusters"`
 	CriticalAlerts    int              `json:"critical_alerts"`
 	BackendMode       string           `json:"backend_mode"`
+	MeshTopologyMode  string           `json:"mesh_topology_mode"`
 	SimulationEnabled bool             `json:"simulation_enabled"`
 	RealDroneCount    int              `json:"real_drone_count"`
 	StaleDroneCount   int              `json:"stale_drone_count"`
@@ -229,6 +247,7 @@ type HealthReport struct {
 	MaxCPUTempC       float64   `json:"max_cpu_temp_c"`
 	UpdatedAt         time.Time `json:"updated_at"`
 	BackendMode       string    `json:"backend_mode"`
+	MeshTopologyMode  string    `json:"mesh_topology_mode"`
 	SimulationEnabled bool      `json:"simulation_enabled"`
 	RealDroneCount    int       `json:"real_drone_count"`
 	StaleDroneCount   int       `json:"stale_drone_count"`
