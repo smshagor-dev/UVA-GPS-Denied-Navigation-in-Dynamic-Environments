@@ -16,10 +16,7 @@ FetchContent_MakeAvailable(googletest)
 
 include(GoogleTest)
 
-set(GTEST_DISCOVERY_MODE POST_BUILD)
-if(NOT CMAKE_CONFIGURATION_TYPES)
-    set(GTEST_DISCOVERY_MODE PRE_TEST)
-endif()
+set(GTEST_DISCOVERY_MODE PRE_TEST)
 
 #  Test: EKF Estimator â”€
 add_executable(test_ekf test_ekf.cpp)
@@ -53,6 +50,7 @@ add_executable(test_autonomy
     ../src/autonomy/DecisionEngine.cpp
     ../src/autonomy/ExperienceMemory.cpp
     ../src/localization/TDOALocalizer.cpp
+    ../src/sensors/CameraSensor.cpp
     ../src/safety/SafetyManager.cpp
 )
 target_include_directories(test_autonomy PRIVATE
@@ -73,10 +71,14 @@ add_executable(test_navigation_intelligence
     ../src/localization/TDOAIngestor.cpp
     ../src/localization/TDOALocalizer.cpp
     ../src/localization/TimeSyncTracker.cpp
+    ../src/runtime/RuntimeMode.cpp
     ../src/safety/SafetyManager.cpp
+    ../src/sensors/CameraSensor.cpp
     ../src/slam/KeyframeManager.cpp
     ../src/slam/MapPlanner.cpp
     ../src/slam/OccupancyGridMap.cpp
+    ../src/vio/EKFEstimator.cpp
+    ../src/vio/VIOPipeline.cpp
     ../src/swarm/V2XMeshNetwork.cpp
     ../src/swarm/SwarmSecurity.cpp
     ../third_party/crypto/monocypher.c

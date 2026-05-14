@@ -116,6 +116,56 @@ The publisher must never silently upgrade simulated or missing telemetry to `rea
 - failures are logged through telemetry client status and warning logs
 - retries remain backoff-controlled by `ControlPlaneTelemetryClient`
 
+## Local Build And Validation
+
+Use the repo-wide validator to prove the Python, Go, and C++ paths are buildable together:
+
+```powershell
+python scripts/local_validate.py
+```
+
+That script now hard-fails if `cmake` is missing, so the C++ path is explicitly validated instead of silently skipped.
+
+To build manually:
+
+```powershell
+cmake -S . -B build-local -DBUILD_TESTS=ON
+cmake --build build-local --config Release --target drone_node
+ctest --test-dir build-local --output-on-failure
+```
+
+See [LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md](/d:/Final%20Project/drone_swarm/docs/LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md) for Windows and Linux dependency setup.
+
+## Telemetry Smoke Tests
+
+Simulation-tagged schema smoke test:
+
+```powershell
+python scripts/telemetry_smoke_test.py --backend-url http://127.0.0.1:8080
+```
+
+Production-mode unavailable-source smoke test:
+
+```powershell
+python scripts/production_telemetry_smoke_test.py --backend-url http://127.0.0.1:8080
+```
+
+Recommended backend startup for both:
+
+```powershell
+$env:DRONE_BACKEND_MODE="production"
+$env:DRONE_BACKEND_SIMULATION_ENABLED="false"
+go run ./cmd/control-plane
+```
+
+What these smoke tests prove:
+
+- dashboard-compatible nested telemetry can be posted end-to-end
+- simulation payloads stay marked `source=simulation`
+- unavailable production payloads stay marked `source=unavailable`
+- production backend does not seed a fake simulation fleet
+- LiDAR payload capping is enforced by the backend snapshot path
+
 ## Safety Note
 
 Backend telemetry is observability only.
@@ -161,3 +211,10 @@ Loss of backend connectivity must not stop the onboard safety manager, autonomy 
   }
 }
 ```
+
+## Current Readiness Level
+
+- onboard telemetry publisher schema: ready for local backend validation
+- cross-language validation flow: ready through `scripts/local_validate.py`
+- bench-demo backend smoke coverage: ready
+- target-hardware production validation: still pending real Linux flight-computer and sensor evidence

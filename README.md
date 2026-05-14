@@ -623,6 +623,21 @@ Main required dependencies:
 - `PCL`
 - `spdlog`
 
+Recommended Windows local setup:
+
+```powershell
+$env:VCPKG_ROOT="D:\tools\vcpkg-full"
+python scripts/local_validate.py --toolchain "D:\tools\vcpkg-full\scripts\buildsystems\vcpkg.cmake"
+```
+
+Manual Windows configure/build/test:
+
+```powershell
+cmake -S . -B build-local-validate -DBUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake
+cmake --build build-local-validate --config Release
+ctest --test-dir build-local-validate --output-on-failure -C Release
+```
+
 Optional dependencies:
 
 - `pybind11` is auto-fetched if not already installed

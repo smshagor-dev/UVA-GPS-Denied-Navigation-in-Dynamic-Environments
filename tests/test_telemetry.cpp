@@ -42,11 +42,11 @@ TEST(ControlPlaneTelemetryClient, SerializesTelemetryPayload) {
         [&](const ControlPlaneTelemetryClient::ParsedEndpoint& endpoint,
             std::string_view body,
             const ControlPlaneTelemetryClient::HeaderList& headers,
-            int timeout_ms) {
+            int timeout_ms) -> ControlPlaneTelemetryClient::HttpResponse {
             EXPECT_EQ(endpoint.host, "127.0.0.1");
             EXPECT_EQ(endpoint.path, "/api/v1/telemetry");
             EXPECT_EQ(timeout_ms, 500);
-            ASSERT_GE(headers.size(), 3u);
+            EXPECT_GE(headers.size(), 3u);
             captured_body.assign(body.begin(), body.end());
             return ControlPlaneTelemetryClient::HttpResponse{true, 202, "accepted"};
         });

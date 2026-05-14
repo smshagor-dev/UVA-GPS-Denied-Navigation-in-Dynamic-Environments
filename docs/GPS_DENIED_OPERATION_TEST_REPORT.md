@@ -148,16 +148,18 @@ Why:
 - `python scripts/bench_check.py --help`
 - `python scripts/pre_arm_check.py --help`
 
+Phase 5 validation additions:
+
+- `python scripts/local_validate.py`
+- `python scripts/telemetry_smoke_test.py --backend-url http://127.0.0.1:8080`
+- `python scripts/production_telemetry_smoke_test.py --backend-url http://127.0.0.1:8080`
+
 ### CMake status
 
-- `cmake` is **missing** in this environment
-- `ctest` is **missing** in this environment
-
-Because of that, these C++ validation commands could not be run:
-
-- `cmake -S . -B build-gps-denied-test -DBUILD_TESTS=ON`
-- `cmake --build build-gps-denied-test --config Release`
-- `ctest --test-dir build-gps-denied-test --output-on-failure`
+- C++ validation is now part of `scripts/local_validate.py`
+- if `cmake` is missing, the script prints install instructions and exits non-zero
+- local build instructions now live in [LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md](/d:/Final%20Project/drone_swarm/docs/LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md)
+- current execution result depends on the local workstation environment and should be recorded after each run
 
 ## 6. GPS-denied test checklist
 
@@ -197,7 +199,7 @@ Exact blockers preventing real GPS-denied flight:
 - missing calibrated anchors
 - missing vendor LiDAR validation
 - missing tethered safety drill evidence
-- missing C++ test execution because `cmake` / `ctest` are unavailable in this environment
+- missing target-platform replay and hardware-backed C++ validation evidence
 
 Additional practical blockers:
 
@@ -225,6 +227,7 @@ Reason:
 
 - As a lab bench demo or engineering demonstration, this is presentable.
 - The backend/dashboard/runtime mode story is now strong enough to show simulation versus real mode honestly.
+- The repository now has a repeatable local validation flow plus two telemetry smoke tests that prove the dashboard-compatible telemetry pipeline works end-to-end without pretending simulation data is real.
 - It should be presented as a **bench/demo prototype**, not a flight-qualified system.
 
 ### Investor technical demo
@@ -254,7 +257,21 @@ Reason:
 - Whether GPS-denied flight is allowed: **No**
 - Whether lab presentation is allowed: **Yes**
 - Whether investor demo is allowed: **Yes, if clearly presented as a bench/research prototype and not a flight-ready product**
-- Exact next step to improve readiness: **run real hardware bench validation and capture evidence by passing `bench_check.py` and `pre_arm_check.py` on the target platform, then execute replay-based VIO/LiDAR/TDOA validation before any tethered indoor hover attempt**
+- Exact next step to improve readiness: **run `scripts/local_validate.py`, start the Go backend in production mode, pass both telemetry smoke tests, then capture real hardware bench evidence by passing `bench_check.py` and `pre_arm_check.py` on the target platform before any tethered indoor hover attempt**
+
+## 11. Phase 5 Readiness Update
+
+Current Phase 5 readiness:
+
+- local C++ build validation path: implemented
+- one-command cross-language validation: implemented
+- simulation telemetry smoke coverage: implemented
+- production-mode unavailable-source smoke coverage: implemented
+- bench-demo command flow: documented
+
+Remaining gap:
+
+- real bench and replay evidence is still required before calling the system flight-ready
 
 ## Bottom-line judgment
 

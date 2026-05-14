@@ -145,6 +145,12 @@ Each `POST /api/v1/telemetry` payload may include these optional nested fields i
 - Unknown extra fields are rejected by backend JSON decoding.
 - Sensor `source` values are preserved when valid and normalized to the allowed source-tag set.
 
+Backend validation notes:
+
+- `scripts/telemetry_smoke_test.py` posts a simulation-tagged payload and verifies the schema round-trips through `POST /api/v1/telemetry` and `GET /api/v1/fleet`.
+- the smoke test also verifies the LiDAR truncation rule by posting more than `256` 2D points and checking the stored snapshot is capped.
+- `scripts/production_telemetry_smoke_test.py` verifies the production backend keeps `backend_mode=production`, does not seed fake simulation drones, and preserves dashboard-visible fields even when sensors are marked `source=unavailable`.
+
 ## Payload Size Limits
 
 - `lidar.points_2d`: maximum `256` points
@@ -173,3 +179,28 @@ Raw frames are intentionally excluded from the fleet snapshot because they:
 - would blur the separation between control telemetry and media transport
 
 Use `preview_url` or `latest_frame_ref` to point the dashboard to an external preview/stream system instead.
+
+## Local Validation And Readiness
+
+Recommended local validation flow:
+
+```powershell
+python scripts/local_validate.py
+python scripts/telemetry_smoke_test.py --backend-url http://127.0.0.1:8080
+python scripts/production_telemetry_smoke_test.py --backend-url http://127.0.0.1:8080
+```
+
+For a production-mode bench demo, start the backend with:
+
+```powershell
+$env:DRONE_BACKEND_MODE="production"
+$env:DRONE_BACKEND_SIMULATION_ENABLED="false"
+go run ./cmd/control-plane
+```
+
+Current readiness level:
+
+- dashboard-compatible telemetry schema: ready for local validation
+- backend schema round-trip smoke coverage: ready
+- real sensor truthfulness: ready for bench/demo use because simulation and unavailable sources remain visibly labeled
+- real flight readiness: not implied by this schema validation alone

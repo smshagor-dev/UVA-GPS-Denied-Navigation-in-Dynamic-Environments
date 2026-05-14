@@ -8,6 +8,8 @@ if(WIN32 AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     set(_DRONE_VCPKG_TOOLCHAIN "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
     if(EXISTS "${_DRONE_VCPKG_TOOLCHAIN}")
         set(CMAKE_TOOLCHAIN_FILE "${_DRONE_VCPKG_TOOLCHAIN}" CACHE STRING "vcpkg toolchain file")
+    elseif(EXISTS "D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake")
+        set(CMAKE_TOOLCHAIN_FILE "D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake" CACHE STRING "vcpkg toolchain file")
     elseif(EXISTS "C:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake")
         set(CMAKE_TOOLCHAIN_FILE "C:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake" CACHE STRING "vcpkg toolchain file")
     endif()
@@ -70,7 +72,9 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(WIN32)
     foreach(_drone_prefix
         "$ENV{VCPKG_ROOT}/installed/x64-windows"
+        "D:/tools/vcpkg-full/installed/x64-windows"
         "C:/tools/vcpkg-full/installed/x64-windows"
+        "C:/vcpkg/installed/x64-windows"
     )
         if(EXISTS "${_drone_prefix}")
             list(APPEND CMAKE_PREFIX_PATH "${_drone_prefix}" "${_drone_prefix}/share")
@@ -83,7 +87,65 @@ endif()
 # 
 
 # 1. Eigen3  linear algebra for EKF/VIO
-find_package(Eigen3 3.4...6 REQUIRED NO_MODULE)
+set(_DRONE_EIGEN_HINTS
+    "$ENV{EIGEN3_DIR}"
+    "$ENV{EIGEN3_ROOT}"
+    "$ENV{VCPKG_ROOT}/installed/x64-windows"
+    "$ENV{VCPKG_ROOT}/installed/x64-windows/share/eigen3"
+    "D:/tools/vcpkg-full/installed/x64-windows"
+    "D:/tools/vcpkg-full/installed/x64-windows/share/eigen3"
+    "C:/tools/vcpkg-full/installed/x64-windows"
+    "C:/tools/vcpkg-full/installed/x64-windows/share/eigen3"
+    "C:/vcpkg/installed/x64-windows"
+    "C:/vcpkg/installed/x64-windows/share/eigen3"
+    "/usr"
+    "/usr/local"
+    "/opt/homebrew"
+)
+
+find_package(Eigen3 3.4...6 QUIET NO_MODULE HINTS ${_DRONE_EIGEN_HINTS})
+
+if(NOT Eigen3_FOUND)
+    find_path(EIGEN3_INCLUDE_DIR
+        NAMES Eigen/Core signature_of_eigen3_matrix_library
+        HINTS
+            "$ENV{EIGEN3_INCLUDE_DIR}"
+            "$ENV{EIGEN3_ROOT}"
+            "$ENV{VCPKG_ROOT}/installed/x64-windows/include/eigen3"
+            "D:/tools/vcpkg-full/installed/x64-windows/include/eigen3"
+            "C:/tools/vcpkg-full/installed/x64-windows/include/eigen3"
+            "C:/vcpkg/installed/x64-windows/include/eigen3"
+            "/usr/include/eigen3"
+            "/usr/local/include/eigen3"
+            "/opt/homebrew/include/eigen3"
+        PATH_SUFFIXES eigen3
+    )
+
+    if(EIGEN3_INCLUDE_DIR)
+        add_library(Eigen3::Eigen INTERFACE IMPORTED)
+        set_target_properties(Eigen3::Eigen PROPERTIES
+            INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}"
+        )
+        set(Eigen3_FOUND TRUE)
+        set(EIGEN3_VERSION "header-only fallback")
+        message(STATUS "Eigen3 headers found via include-only fallback: ${EIGEN3_INCLUDE_DIR}")
+    endif()
+endif()
+
+if(NOT Eigen3_FOUND)
+    message(FATAL_ERROR
+        "Eigen3 headers were not found.\n"
+        "Install Eigen3 and rerun configure.\n"
+        "Windows with vcpkg:\n"
+        "  set VCPKG_ROOT=D:\\tools\\vcpkg-full\n"
+        "  %VCPKG_ROOT%\\vcpkg.exe install eigen3\n"
+        "Ubuntu/Debian:\n"
+        "  sudo apt-get update && sudo apt-get install -y libeigen3-dev\n"
+        "Manual install:\n"
+        "  point EIGEN3_ROOT or EIGEN3_INCLUDE_DIR at the folder containing Eigen/Core"
+    )
+endif()
+
 message(STATUS "Eigen3 found: ${EIGEN3_VERSION}")
 
 # 2. OpenCV  vision, feature extraction, RTSP
@@ -164,7 +226,6 @@ find_package(Threads REQUIRED)
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/crypto
-    ${EIGEN3_INCLUDE_DIR}
     ${OpenCV_INCLUDE_DIRS}
     ${PCL_INCLUDE_DIRS}
 )

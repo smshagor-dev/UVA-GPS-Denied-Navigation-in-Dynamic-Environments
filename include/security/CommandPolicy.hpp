@@ -168,7 +168,7 @@ inline CommandPolicyDecision evaluate_remote_command(const DroneSecurityAssessme
 
     if (!security.remote_command_allowed) {
         out.accepted = false;
-        out.reason = "Remote command rejected by onboard security state";
+        out.reason = "Remote command rejected: blocked by onboard security state";
         return out;
     }
 

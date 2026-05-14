@@ -387,6 +387,9 @@ bool validate_server_certificate(HINTERNET request,
         return false;
     }
     return true;
+}
+#endif
+
 std::string json_double_array(const std::vector<double>& values) {
     std::ostringstream oss;
     oss << "[";
@@ -697,6 +700,9 @@ bool ControlPlaneTelemetryClient::should_publish(std::chrono::steady_clock::time
     }
     if (now < next_retry_not_before_) {
         return false;
+    }
+    if (consecutive_failures_ > 0) {
+        return true;
     }
     if (last_attempt_ == std::chrono::steady_clock::time_point{}) {
         return true;

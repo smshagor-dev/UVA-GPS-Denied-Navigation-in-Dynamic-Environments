@@ -351,7 +351,7 @@ bool has_nonempty_env(std::string_view key) {
 
 std::vector<std::string> split_csv_list(std::string_view value) {
     std::vector<std::string> out;
-    std::stringstream ss(std::string(value));
+    std::stringstream ss{std::string(value)};
     std::string item;
     while (std::getline(ss, item, ',')) {
         item.erase(item.begin(), std::find_if(item.begin(), item.end(), [](unsigned char c) {
@@ -1254,9 +1254,9 @@ int main(int argc, char** argv) {
         safety_ctx.imu_available = !cfg.enable_imu ||
             imu->state() == drone::sensors::SensorState::RUNNING;
         safety_ctx.sensor_fault =
-            (cfg.enable_barometer && barometer->state() == drone::sensors::SensorState::FAULT) ||
-            (cfg.enable_optical_flow && optical_flow->state() == drone::sensors::SensorState::FAULT) ||
-            (cfg.enable_rangefinder && rangefinder->state() == drone::sensors::SensorState::FAULT);
+            (cfg.enable_barometer && barometer->state() == drone::sensors::SensorState::FAILED) ||
+            (cfg.enable_optical_flow && optical_flow->state() == drone::sensors::SensorState::FAILED) ||
+            (cfg.enable_rangefinder && rangefinder->state() == drone::sensors::SensorState::FAILED);
         safety_ctx.motor_locked = motor_state.has_value() &&
             (motor_state->critical_fault || motor_state->average_health < 0.15f);
         safety_ctx.security = security;
