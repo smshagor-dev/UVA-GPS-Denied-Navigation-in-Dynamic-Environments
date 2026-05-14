@@ -152,6 +152,7 @@ struct LocalEdgeState {
     uint64_t trust_epoch{0};
     std::string threat_level{"none"};
     std::string threat_summary{};
+    EdgeSerializationMode serialization_mode{EdgeSerializationMode::JSON};
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
@@ -175,6 +176,7 @@ public:
     bool broadcast(SwarmMessage::Type type, std::vector<uint8_t> payload = {});
     bool unicast  (uint32_t dst, SwarmMessage::Type type, std::vector<uint8_t> payload);
     void configure_security(SwarmSecurityConfig cfg);
+    void set_edge_serialization_mode(EdgeSerializationMode mode);
     [[nodiscard]] bool security_enabled() const;
     [[nodiscard]] std::string security_last_error() const;
     void set_local_health(SwarmHealthMetrics health);
@@ -202,6 +204,8 @@ public:
     [[nodiscard]] float                 mesh_bandwidth_kbps() const;
     [[nodiscard]] bool                  disconnected_operation() const;
     [[nodiscard]] bool                  split_swarm_isolated() const;
+    [[nodiscard]] EdgeSerializationMode edge_serialization_mode() const;
+    [[nodiscard]] EdgeSerializationMetrics edge_serialization_metrics() const;
 
     //  Callbacks 
     void on_message(MessageCallback cb) { msg_cb_  = std::move(cb); }
@@ -273,6 +277,9 @@ private:
     float    packet_loss_pct_{0.0f};
     std::atomic<uint64_t> edge_tx_bytes_{0};
     std::atomic<uint64_t> edge_rx_bytes_{0};
+    mutable std::mutex edge_serialization_metrics_mutex_;
+    EdgeSerializationMode edge_serialization_mode_{EdgeSerializationMode::JSON};
+    EdgeSerializationMetrics edge_serialization_metrics_{};
     mutable std::atomic<uint64_t> last_edge_sequence_{0};
 
     std::shared_ptr<spdlog::logger> logger_{spdlog::get("V2X")};

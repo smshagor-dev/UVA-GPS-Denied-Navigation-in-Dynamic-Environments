@@ -636,8 +636,13 @@ void V2XMeshNetwork::handle_pose_update(const SwarmMessage& msg) {
 }
 
 void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
-    const std::string wire(msg.payload.begin(), msg.payload.end());
-    const auto parsed = parse_edge_packet_json(wire);
+    EdgeSerializationMode mode;
+    {
+        std::lock_guard lock(edge_serialization_metrics_mutex_);
+        mode = edge_serialization_mode_;
+    }
+    EdgeSerializationMetrics parse_metrics;
+    const auto parsed = parse_edge_packet(msg.payload, mode, &parse_metrics);
     if (!parsed.ok) {
         if (logger_) {
             logger_->warn("V2X edge packet parse rejected from {}: {}", msg.src_id, parsed.error);
@@ -653,6 +658,17 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
         }
         return;
     }
+
+    {
+        std::lock_guard lock(edge_serialization_metrics_mutex_);
+        edge_serialization_metrics_.mode = mode;
+        edge_serialization_metrics_.encoded_packet_size_bytes = parse_metrics.encoded_packet_size_bytes;
+        edge_serialization_metrics_.json_equivalent_size_bytes = parse_metrics.json_equivalent_size_bytes;
+        edge_serialization_metrics_.deserialization_time_us = parse_metrics.deserialization_time_us;
+        edge_serialization_metrics_.compression_ratio_vs_json = parse_metrics.compression_ratio_vs_json;
+        edge_serialization_metrics_.estimated = false;
+    }
+    edge_rx_bytes_.fetch_add(msg.payload.size(), std::memory_order_relaxed);
 
     const auto now_ms = static_cast<uint64_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -780,6 +796,16 @@ bool V2XMeshNetwork::split_swarm_isolated() const {
     return edge_state_cache_.split_swarm_isolated();
 }
 
+EdgeSerializationMode V2XMeshNetwork::edge_serialization_mode() const {
+    std::lock_guard lock(edge_serialization_metrics_mutex_);
+    return edge_serialization_mode_;
+}
+
+EdgeSerializationMetrics V2XMeshNetwork::edge_serialization_metrics() const {
+    std::lock_guard lock(edge_serialization_metrics_mutex_);
+    return edge_serialization_metrics_;
+}
+
 std::vector<uint8_t> V2XMeshNetwork::build_heartbeat_payload() const {
     const auto health = local_health();
     std::vector<uint8_t> p(kHeartbeatPayloadSize);
@@ -800,10 +826,25 @@ std::vector<uint8_t> V2XMeshNetwork::build_heartbeat_payload() const {
 }
 
 bool V2XMeshNetwork::broadcast_edge_packet(const EdgePeerPacket& packet) {
-    const auto wire = serialize_edge_packet_json(packet);
-    return broadcast(
-        SwarmMessage::Type::EDGE_PACKET,
-        std::vector<uint8_t>(wire.begin(), wire.end()));
+    EdgeSerializationMode mode;
+    {
+        std::lock_guard lock(edge_serialization_metrics_mutex_);
+        mode = edge_serialization_mode_;
+    }
+    EdgeSerializationMetrics metrics;
+    auto wire = serialize_edge_packet(packet, mode, &metrics);
+    const bool ok = broadcast(SwarmMessage::Type::EDGE_PACKET, wire);
+    if (ok) {
+        std::lock_guard lock(edge_serialization_metrics_mutex_);
+        edge_serialization_metrics_.mode = mode;
+        edge_serialization_metrics_.encoded_packet_size_bytes = metrics.encoded_packet_size_bytes;
+        edge_serialization_metrics_.json_equivalent_size_bytes = metrics.json_equivalent_size_bytes;
+        edge_serialization_metrics_.serialization_time_us = metrics.serialization_time_us;
+        edge_serialization_metrics_.compression_ratio_vs_json = metrics.compression_ratio_vs_json;
+        edge_serialization_metrics_.estimated = false;
+        edge_tx_bytes_.fetch_add(wire.size(), std::memory_order_relaxed);
+    }
+    return ok;
 }
 
 EdgePeerPacket V2XMeshNetwork::build_edge_heartbeat_packet() const {
@@ -994,6 +1035,17 @@ EdgePeerPacket V2XMeshNetwork::build_edge_goodbye_packet() const {
 void V2XMeshNetwork::configure_security(SwarmSecurityConfig cfg) {
     security_ = std::make_unique<SwarmSecurityContext>(local_id_, std::move(cfg));
 }
+void V2XMeshNetwork::set_edge_serialization_mode(EdgeSerializationMode mode) {
+    if (mode == EdgeSerializationMode::PROTOBUF_PLACEHOLDER) {
+        if (logger_) {
+            logger_->warn("V2X: protobuf_placeholder requested; falling back to JSON until protobuf transport is implemented");
+        }
+        mode = EdgeSerializationMode::JSON;
+    }
+    std::lock_guard lock(edge_serialization_metrics_mutex_);
+    edge_serialization_mode_ = mode;
+    edge_serialization_metrics_.mode = mode;
+}
 bool V2XMeshNetwork::security_enabled() const {
     return security_ && security_->enabled();
 }
@@ -1011,8 +1063,11 @@ void V2XMeshNetwork::set_local_health(SwarmHealthMetrics health) {
     local_health_ = health;
 }
 void V2XMeshNetwork::set_local_edge_state(const LocalEdgeState& state) {
-    std::lock_guard lock(local_edge_state_mutex_);
-    local_edge_state_ = state;
+    {
+        std::lock_guard lock(local_edge_state_mutex_);
+        local_edge_state_ = state;
+    }
+    set_edge_serialization_mode(state.serialization_mode);
     edge_consensus_.set_local_safety_override(state.disconnected_operation);
 }
 SwarmHealthMetrics V2XMeshNetwork::local_health() const {

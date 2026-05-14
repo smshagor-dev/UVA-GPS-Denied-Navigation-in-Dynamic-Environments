@@ -118,6 +118,10 @@ type DroneTelemetry struct {
 	LocalConsensusEpoch      uint64          `json:"local_consensus_epoch,omitempty"`
 	PeerLatencyMS            float64         `json:"peer_latency_ms,omitempty"`
 	MeshBandwidthKBPS        float64         `json:"mesh_bandwidth_kbps,omitempty"`
+	EdgeSerializationMode    string          `json:"edge_serialization_mode,omitempty"`
+	EdgeAveragePacketBytes   float64         `json:"edge_average_packet_size_bytes,omitempty"`
+	EdgeBandwidthSavingsPct  float64         `json:"edge_bandwidth_savings_estimate_pct,omitempty"`
+	EdgePacketEncodeLatency  float64         `json:"edge_packet_encode_latency_us,omitempty"`
 	DisconnectedOperation    bool            `json:"disconnected_operation,omitempty"`
 	EdgeHealthStatus         string          `json:"edge_health_status,omitempty"`
 	EdgeAutonomyState        string          `json:"edge_autonomy_state,omitempty"`

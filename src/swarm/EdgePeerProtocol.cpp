@@ -4,13 +4,19 @@
 #include <array>
 #include <cctype>
 #include <charconv>
+#include <chrono>
 #include <cmath>
+#include <cstring>
+#include <limits>
 #include <regex>
 #include <sstream>
 
 namespace drone::swarm {
 
 namespace {
+
+constexpr uint8_t kCborPacketVersion = 1;
+constexpr size_t kCborMaxStringBytes = 512;
 
 std::string lowercase(std::string_view value) {
     std::string out(value.begin(), value.end());
@@ -92,6 +98,437 @@ bool finite_vec3(const Eigen::Vector3d& value) {
     return std::isfinite(value.x()) && std::isfinite(value.y()) && std::isfinite(value.z());
 }
 
+void cbor_push_type_and_len(std::vector<uint8_t>& out, uint8_t major, uint64_t value) {
+    const uint8_t prefix = static_cast<uint8_t>(major << 5);
+    if (value < 24) {
+        out.push_back(static_cast<uint8_t>(prefix | value));
+    } else if (value <= 0xFFu) {
+        out.push_back(static_cast<uint8_t>(prefix | 24u));
+        out.push_back(static_cast<uint8_t>(value));
+    } else if (value <= 0xFFFFu) {
+        out.push_back(static_cast<uint8_t>(prefix | 25u));
+        out.push_back(static_cast<uint8_t>((value >> 8) & 0xFFu));
+        out.push_back(static_cast<uint8_t>(value & 0xFFu));
+    } else if (value <= 0xFFFFFFFFull) {
+        out.push_back(static_cast<uint8_t>(prefix | 26u));
+        for (int shift = 24; shift >= 0; shift -= 8) {
+            out.push_back(static_cast<uint8_t>((value >> shift) & 0xFFu));
+        }
+    } else {
+        out.push_back(static_cast<uint8_t>(prefix | 27u));
+        for (int shift = 56; shift >= 0; shift -= 8) {
+            out.push_back(static_cast<uint8_t>((value >> shift) & 0xFFu));
+        }
+    }
+}
+
+void cbor_push_uint(std::vector<uint8_t>& out, uint64_t value) {
+    cbor_push_type_and_len(out, 0, value);
+}
+
+void cbor_push_int(std::vector<uint8_t>& out, int64_t value) {
+    if (value >= 0) {
+        cbor_push_uint(out, static_cast<uint64_t>(value));
+        return;
+    }
+    cbor_push_type_and_len(out, 1, static_cast<uint64_t>(-1 - value));
+}
+
+void cbor_push_double(std::vector<uint8_t>& out, double value) {
+    out.push_back(0xFB);
+    static_assert(sizeof(double) == sizeof(uint64_t));
+    uint64_t bits = 0;
+    std::memcpy(&bits, &value, sizeof(bits));
+    for (int shift = 56; shift >= 0; shift -= 8) {
+        out.push_back(static_cast<uint8_t>((bits >> shift) & 0xFFu));
+    }
+}
+
+void cbor_push_bool(std::vector<uint8_t>& out, bool value) {
+    out.push_back(value ? 0xF5 : 0xF4);
+}
+
+void cbor_push_string(std::vector<uint8_t>& out, std::string_view value) {
+    cbor_push_type_and_len(out, 3, value.size());
+    out.insert(out.end(), value.begin(), value.end());
+}
+
+void cbor_push_array(std::vector<uint8_t>& out, size_t size) {
+    cbor_push_type_and_len(out, 4, size);
+}
+
+void cbor_push_vec3(std::vector<uint8_t>& out, const Eigen::Vector3d& value) {
+    cbor_push_array(out, 3);
+    cbor_push_double(out, value.x());
+    cbor_push_double(out, value.y());
+    cbor_push_double(out, value.z());
+}
+
+class CborReader {
+public:
+    explicit CborReader(std::span<const uint8_t> bytes) : bytes_(bytes) {}
+
+    [[nodiscard]] bool eof() const { return offset_ == bytes_.size(); }
+    [[nodiscard]] std::string error() const { return error_; }
+
+    std::optional<uint64_t> read_uint() {
+        const auto header = read_header(0);
+        if (!header.has_value()) return std::nullopt;
+        return *header;
+    }
+
+    std::optional<int64_t> read_int() {
+        if (!ensure(1)) return std::nullopt;
+        const uint8_t initial = bytes_[offset_];
+        const uint8_t major = initial >> 5;
+        if (major != 0 && major != 1) {
+            error_ = "expected integer";
+            return std::nullopt;
+        }
+        ++offset_;
+        const auto value = read_len(initial & 0x1F);
+        if (!value.has_value()) return std::nullopt;
+        if (major == 0) return static_cast<int64_t>(*value);
+        if (*value > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+            error_ = "negative integer overflow";
+            return std::nullopt;
+        }
+        return -1 - static_cast<int64_t>(*value);
+    }
+
+    std::optional<double> read_double() {
+        if (!ensure(9)) return std::nullopt;
+        if (bytes_[offset_++] != 0xFB) {
+            error_ = "expected double";
+            return std::nullopt;
+        }
+        uint64_t bits = 0;
+        for (int i = 0; i < 8; ++i) {
+            bits = (bits << 8) | bytes_[offset_++];
+        }
+        double value = 0.0;
+        std::memcpy(&value, &bits, sizeof(value));
+        return value;
+    }
+
+    std::optional<bool> read_bool() {
+        if (!ensure(1)) return std::nullopt;
+        const uint8_t value = bytes_[offset_++];
+        if (value == 0xF4) return false;
+        if (value == 0xF5) return true;
+        error_ = "expected bool";
+        return std::nullopt;
+    }
+
+    std::optional<std::string> read_string() {
+        const auto len = read_header(3);
+        if (!len.has_value()) return std::nullopt;
+        if (*len > kCborMaxStringBytes) {
+            error_ = "string exceeds max size";
+            return std::nullopt;
+        }
+        if (!ensure(static_cast<size_t>(*len))) return std::nullopt;
+        std::string out(
+            reinterpret_cast<const char*>(bytes_.data() + offset_),
+            reinterpret_cast<const char*>(bytes_.data() + offset_ + *len));
+        offset_ += static_cast<size_t>(*len);
+        return out;
+    }
+
+    std::optional<size_t> read_array_size() {
+        const auto len = read_header(4);
+        if (!len.has_value()) return std::nullopt;
+        if (*len > 64) {
+            error_ = "array exceeds max size";
+            return std::nullopt;
+        }
+        return static_cast<size_t>(*len);
+    }
+
+    std::optional<Eigen::Vector3d> read_vec3() {
+        const auto size = read_array_size();
+        if (!size.has_value()) return std::nullopt;
+        if (*size != 3) {
+            error_ = "expected vec3 array";
+            return std::nullopt;
+        }
+        const auto x = read_double();
+        const auto y = read_double();
+        const auto z = read_double();
+        if (!x.has_value() || !y.has_value() || !z.has_value()) return std::nullopt;
+        return Eigen::Vector3d{*x, *y, *z};
+    }
+
+private:
+    bool ensure(size_t count) {
+        if (offset_ + count > bytes_.size()) {
+            error_ = "truncated cbor packet";
+            return false;
+        }
+        return true;
+    }
+
+    std::optional<uint64_t> read_header(uint8_t expected_major) {
+        if (!ensure(1)) return std::nullopt;
+        const uint8_t initial = bytes_[offset_++];
+        const uint8_t major = initial >> 5;
+        if (major != expected_major) {
+            error_ = "unexpected cbor major type";
+            return std::nullopt;
+        }
+        return read_len(initial & 0x1F);
+    }
+
+    std::optional<uint64_t> read_len(uint8_t additional) {
+        if (additional < 24) return additional;
+        if (additional == 24) {
+            if (!ensure(1)) return std::nullopt;
+            return bytes_[offset_++];
+        }
+        if (additional == 25) {
+            if (!ensure(2)) return std::nullopt;
+            uint64_t value = (static_cast<uint64_t>(bytes_[offset_]) << 8) | bytes_[offset_ + 1];
+            offset_ += 2;
+            return value;
+        }
+        if (additional == 26) {
+            if (!ensure(4)) return std::nullopt;
+            uint64_t value = 0;
+            for (int i = 0; i < 4; ++i) value = (value << 8) | bytes_[offset_++];
+            return value;
+        }
+        if (additional == 27) {
+            if (!ensure(8)) return std::nullopt;
+            uint64_t value = 0;
+            for (int i = 0; i < 8; ++i) value = (value << 8) | bytes_[offset_++];
+            return value;
+        }
+        error_ = "indefinite cbor length rejected";
+        return std::nullopt;
+    }
+
+    std::span<const uint8_t> bytes_;
+    size_t offset_{0};
+    std::string error_{};
+};
+
+void write_cbor_payload(std::vector<uint8_t>& out, const EdgePeerPacket& packet) {
+    switch (packet.packet_type) {
+    case EdgePacketType::HEARTBEAT: {
+        const auto& p = packet.heartbeat.value_or(HeartbeatPayload{});
+        cbor_push_array(out, 8);
+        cbor_push_int(out, p.peer_count);
+        cbor_push_int(out, p.stale_peer_count);
+        cbor_push_double(out, p.battery_pct);
+        cbor_push_double(out, p.motor_health);
+        cbor_push_double(out, p.link_quality);
+        cbor_push_bool(out, p.emergency_fault);
+        cbor_push_string(out, p.edge_health_status);
+        cbor_push_string(out, p.autonomy_state);
+        break;
+    }
+    case EdgePacketType::POSE_STATE: {
+        const auto& p = packet.pose_state.value_or(PoseStatePayload{});
+        cbor_push_array(out, 3);
+        cbor_push_vec3(out, p.position);
+        cbor_push_vec3(out, p.velocity);
+        cbor_push_double(out, p.localization_confidence);
+        break;
+    }
+    case EdgePacketType::EDGE_HEALTH: {
+        const auto& p = packet.edge_health.value_or(EdgeHealthPayload{});
+        cbor_push_array(out, 5);
+        cbor_push_string(out, p.edge_health_status);
+        cbor_push_string(out, p.autonomy_state);
+        cbor_push_string(out, p.consensus_state);
+        cbor_push_double(out, p.mesh_bandwidth_kbps);
+        cbor_push_bool(out, p.disconnected_operation);
+        break;
+    }
+    case EdgePacketType::OBSTACLE_DIGEST: {
+        const auto& p = packet.obstacle_digest.value_or(ObstacleDigestPayload{});
+        cbor_push_array(out, 4);
+        cbor_push_int(out, p.local_obstacle_count);
+        cbor_push_int(out, p.shared_obstacle_count);
+        cbor_push_uint(out, p.freshness_ms);
+        cbor_push_string(out, p.digest_id);
+        break;
+    }
+    case EdgePacketType::THREAT_DIGEST: {
+        const auto& p = packet.threat_digest.value_or(ThreatDigestPayload{});
+        cbor_push_array(out, 3);
+        cbor_push_string(out, p.threat_level);
+        cbor_push_string(out, p.summary);
+        cbor_push_double(out, p.confidence);
+        break;
+    }
+    case EdgePacketType::CONSENSUS_STATE: {
+        const auto& p = packet.consensus_state.value_or(ConsensusStatePayload{});
+        cbor_push_array(out, 5);
+        cbor_push_uint(out, static_cast<uint8_t>(p.proposal_type));
+        cbor_push_string(out, p.consensus_state);
+        cbor_push_uint(out, p.consensus_epoch);
+        cbor_push_int(out, p.quorum_count);
+        cbor_push_bool(out, p.local_safety_override);
+        break;
+    }
+    case EdgePacketType::EMERGENCY_CORRIDOR: {
+        const auto& p = packet.emergency_corridor.value_or(EmergencyCorridorPayload{});
+        cbor_push_array(out, 4);
+        cbor_push_vec3(out, p.center);
+        cbor_push_double(out, p.radius_m);
+        cbor_push_uint(out, p.hold_ttl_ms);
+        cbor_push_string(out, p.summary);
+        break;
+    }
+    case EdgePacketType::PEER_GOODBYE: {
+        cbor_push_array(out, 1);
+        cbor_push_string(out, packet.peer_goodbye.value_or(PeerGoodbyePayload{}).reason);
+        break;
+    }
+    }
+}
+
+bool read_cbor_payload(CborReader& reader, EdgePeerPacket& packet, std::string& error) {
+    const auto payload_size = reader.read_array_size();
+    if (!payload_size.has_value()) {
+        error = reader.error();
+        return false;
+    }
+
+    switch (packet.packet_type) {
+    case EdgePacketType::HEARTBEAT: {
+        if (*payload_size != 8) { error = "heartbeat payload shape mismatch"; return false; }
+        HeartbeatPayload p;
+        const auto peer_count = reader.read_int();
+        const auto stale_peer_count = reader.read_int();
+        const auto battery = reader.read_double();
+        const auto motor = reader.read_double();
+        const auto link = reader.read_double();
+        const auto fault = reader.read_bool();
+        const auto health = reader.read_string();
+        const auto autonomy = reader.read_string();
+        if (!peer_count || !stale_peer_count || !battery || !motor || !link || !fault || !health || !autonomy) break;
+        p.peer_count = static_cast<int>(*peer_count);
+        p.stale_peer_count = static_cast<int>(*stale_peer_count);
+        p.battery_pct = *battery;
+        p.motor_health = *motor;
+        p.link_quality = *link;
+        p.emergency_fault = *fault;
+        p.edge_health_status = *health;
+        p.autonomy_state = *autonomy;
+        packet.heartbeat = p;
+        return true;
+    }
+    case EdgePacketType::POSE_STATE: {
+        if (*payload_size != 3) { error = "pose_state payload shape mismatch"; return false; }
+        PoseStatePayload p;
+        const auto pos = reader.read_vec3();
+        const auto vel = reader.read_vec3();
+        const auto conf = reader.read_double();
+        if (!pos || !vel || !conf) break;
+        p.position = *pos;
+        p.velocity = *vel;
+        p.localization_confidence = *conf;
+        packet.pose_state = p;
+        return true;
+    }
+    case EdgePacketType::EDGE_HEALTH: {
+        if (*payload_size != 5) { error = "edge_health payload shape mismatch"; return false; }
+        EdgeHealthPayload p;
+        const auto health = reader.read_string();
+        const auto autonomy = reader.read_string();
+        const auto consensus = reader.read_string();
+        const auto bandwidth = reader.read_double();
+        const auto disconnected = reader.read_bool();
+        if (!health || !autonomy || !consensus || !bandwidth || !disconnected) break;
+        p.edge_health_status = *health;
+        p.autonomy_state = *autonomy;
+        p.consensus_state = *consensus;
+        p.mesh_bandwidth_kbps = *bandwidth;
+        p.disconnected_operation = *disconnected;
+        packet.edge_health = p;
+        return true;
+    }
+    case EdgePacketType::OBSTACLE_DIGEST: {
+        if (*payload_size != 4) { error = "obstacle_digest payload shape mismatch"; return false; }
+        ObstacleDigestPayload p;
+        const auto local = reader.read_int();
+        const auto shared = reader.read_int();
+        const auto freshness = reader.read_uint();
+        const auto digest = reader.read_string();
+        if (!local || !shared || !freshness || !digest) break;
+        p.local_obstacle_count = static_cast<int>(*local);
+        p.shared_obstacle_count = static_cast<int>(*shared);
+        p.freshness_ms = static_cast<uint32_t>(*freshness);
+        p.digest_id = *digest;
+        packet.obstacle_digest = p;
+        return true;
+    }
+    case EdgePacketType::THREAT_DIGEST: {
+        if (*payload_size != 3) { error = "threat_digest payload shape mismatch"; return false; }
+        ThreatDigestPayload p;
+        const auto level = reader.read_string();
+        const auto summary = reader.read_string();
+        const auto confidence = reader.read_double();
+        if (!level || !summary || !confidence) break;
+        p.threat_level = *level;
+        p.summary = *summary;
+        p.confidence = *confidence;
+        packet.threat_digest = p;
+        return true;
+    }
+    case EdgePacketType::CONSENSUS_STATE: {
+        if (*payload_size != 5) { error = "consensus_state payload shape mismatch"; return false; }
+        ConsensusStatePayload p;
+        const auto proposal = reader.read_uint();
+        const auto state = reader.read_string();
+        const auto epoch = reader.read_uint();
+        const auto quorum = reader.read_int();
+        const auto override = reader.read_bool();
+        if (!proposal || !state || !epoch || !quorum || !override) break;
+        if (*proposal > static_cast<uint8_t>(ConsensusProposalType::SPLIT_SWARM_RECOVERY_HINT)) {
+            error = "unknown consensus proposal type";
+            return false;
+        }
+        p.proposal_type = static_cast<ConsensusProposalType>(*proposal);
+        p.consensus_state = *state;
+        p.consensus_epoch = *epoch;
+        p.quorum_count = static_cast<int>(*quorum);
+        p.local_safety_override = *override;
+        packet.consensus_state = p;
+        return true;
+    }
+    case EdgePacketType::EMERGENCY_CORRIDOR: {
+        if (*payload_size != 4) { error = "emergency_corridor payload shape mismatch"; return false; }
+        EmergencyCorridorPayload p;
+        const auto center = reader.read_vec3();
+        const auto radius = reader.read_double();
+        const auto hold = reader.read_uint();
+        const auto summary = reader.read_string();
+        if (!center || !radius || !hold || !summary) break;
+        p.center = *center;
+        p.radius_m = *radius;
+        p.hold_ttl_ms = static_cast<uint32_t>(*hold);
+        p.summary = *summary;
+        packet.emergency_corridor = p;
+        return true;
+    }
+    case EdgePacketType::PEER_GOODBYE: {
+        if (*payload_size != 1) { error = "peer_goodbye payload shape mismatch"; return false; }
+        PeerGoodbyePayload p;
+        const auto reason = reader.read_string();
+        if (!reason) break;
+        p.reason = *reason;
+        packet.peer_goodbye = p;
+        return true;
+    }
+    }
+
+    error = reader.error().empty() ? "malformed cbor payload" : reader.error();
+    return false;
+}
+
 } // namespace
 
 std::string_view to_string(EdgePacketType type) {
@@ -139,6 +576,23 @@ std::optional<ConsensusProposalType> parse_consensus_proposal_type(std::string_v
     if (normalized == "emergency_reroute") return ConsensusProposalType::EMERGENCY_REROUTE;
     if (normalized == "leader_continuity_hint") return ConsensusProposalType::LEADER_CONTINUITY_HINT;
     if (normalized == "split_swarm_recovery_hint") return ConsensusProposalType::SPLIT_SWARM_RECOVERY_HINT;
+    return std::nullopt;
+}
+
+std::string_view to_string(EdgeSerializationMode mode) {
+    switch (mode) {
+    case EdgeSerializationMode::JSON: return "json";
+    case EdgeSerializationMode::CBOR: return "cbor";
+    case EdgeSerializationMode::PROTOBUF_PLACEHOLDER: return "protobuf_placeholder";
+    }
+    return "json";
+}
+
+std::optional<EdgeSerializationMode> parse_edge_serialization_mode(std::string_view value) {
+    const auto normalized = lowercase(value);
+    if (normalized == "json") return EdgeSerializationMode::JSON;
+    if (normalized == "cbor") return EdgeSerializationMode::CBOR;
+    if (normalized == "protobuf_placeholder") return EdgeSerializationMode::PROTOBUF_PLACEHOLDER;
     return std::nullopt;
 }
 
@@ -371,12 +825,152 @@ EdgePacketParseResult parse_edge_packet_json(std::string_view wire) {
     return result;
 }
 
+std::vector<uint8_t> serialize_edge_packet_cbor(const EdgePeerPacket& packet) {
+    std::vector<uint8_t> out;
+    out.reserve(192);
+    // Compact deterministic CBOR array:
+    // [version, type, sender_id, timestamp_ms, sequence, trust_epoch, source, ttl_ms, auth_hook, payload_array]
+    cbor_push_array(out, 10);
+    cbor_push_uint(out, kCborPacketVersion);
+    cbor_push_uint(out, static_cast<uint8_t>(packet.packet_type));
+    cbor_push_uint(out, packet.sender_id);
+    cbor_push_uint(out, packet.timestamp_ms);
+    cbor_push_uint(out, packet.sequence_number);
+    cbor_push_uint(out, packet.trust_epoch);
+    cbor_push_string(out, normalize_edge_source_tag(packet.source));
+    cbor_push_uint(out, packet.ttl_ms);
+    cbor_push_string(out, packet.auth_hook);
+    write_cbor_payload(out, packet);
+    return out;
+}
+
+EdgePacketParseResult parse_edge_packet_cbor(std::span<const uint8_t> wire) {
+    EdgePacketParseResult result;
+    if (wire.empty()) {
+        result.error = "malformed cbor packet";
+        return result;
+    }
+
+    CborReader reader(wire);
+    const auto top_size = reader.read_array_size();
+    if (!top_size.has_value() || *top_size != 10) {
+        result.error = reader.error().empty() ? "malformed cbor packet" : reader.error();
+        return result;
+    }
+
+    const auto version = reader.read_uint();
+    const auto type_value = reader.read_uint();
+    const auto sender_id = reader.read_uint();
+    const auto timestamp_ms = reader.read_uint();
+    const auto sequence_number = reader.read_uint();
+    const auto trust_epoch = reader.read_uint();
+    const auto source = reader.read_string();
+    const auto ttl_ms = reader.read_uint();
+    const auto auth_hook = reader.read_string();
+    if (!version || !type_value || !sender_id || !timestamp_ms || !sequence_number ||
+        !trust_epoch || !source || !ttl_ms || !auth_hook) {
+        result.error = reader.error().empty() ? "missing cbor header field" : reader.error();
+        return result;
+    }
+    if (*version != kCborPacketVersion) {
+        result.error = "unsupported cbor packet version";
+        return result;
+    }
+    if (*type_value > static_cast<uint8_t>(EdgePacketType::PEER_GOODBYE)) {
+        result.error = "unknown packet_type";
+        return result;
+    }
+
+    result.packet.packet_type = static_cast<EdgePacketType>(*type_value);
+    result.packet.sender_id = static_cast<uint32_t>(*sender_id);
+    result.packet.timestamp_ms = *timestamp_ms;
+    result.packet.sequence_number = static_cast<uint32_t>(*sequence_number);
+    result.packet.trust_epoch = *trust_epoch;
+    result.packet.source = normalize_edge_source_tag(*source);
+    result.packet.ttl_ms = static_cast<uint32_t>(*ttl_ms);
+    result.packet.auth_hook = *auth_hook;
+
+    std::string payload_error;
+    if (!read_cbor_payload(reader, result.packet, payload_error)) {
+        result.error = payload_error;
+        return result;
+    }
+    if (!reader.eof()) {
+        result.error = "trailing cbor bytes rejected";
+        return result;
+    }
+    result.ok = true;
+    return result;
+}
+
+std::vector<uint8_t> serialize_edge_packet(
+    const EdgePeerPacket& packet,
+    EdgeSerializationMode mode,
+    EdgeSerializationMetrics* metrics) {
+    const auto started = std::chrono::steady_clock::now();
+    std::vector<uint8_t> wire;
+    if (mode == EdgeSerializationMode::CBOR) {
+        wire = serialize_edge_packet_cbor(packet);
+    } else {
+        const auto json = serialize_edge_packet_json(packet);
+        wire.assign(json.begin(), json.end());
+    }
+    const auto finished = std::chrono::steady_clock::now();
+
+    if (metrics != nullptr) {
+        const auto json_size = serialize_edge_packet_json(packet).size();
+        metrics->mode = mode;
+        metrics->encoded_packet_size_bytes = wire.size();
+        metrics->json_equivalent_size_bytes = json_size;
+        metrics->serialization_time_us =
+            std::chrono::duration<double, std::micro>(finished - started).count();
+        metrics->compression_ratio_vs_json =
+            json_size == 0 ? 1.0 : static_cast<double>(wire.size()) / static_cast<double>(json_size);
+        metrics->estimated = false;
+    }
+    return wire;
+}
+
+EdgePacketParseResult parse_edge_packet(
+    std::span<const uint8_t> wire,
+    EdgeSerializationMode mode,
+    EdgeSerializationMetrics* metrics) {
+    const auto started = std::chrono::steady_clock::now();
+    EdgePacketParseResult parsed;
+    if (mode == EdgeSerializationMode::CBOR) {
+        parsed = parse_edge_packet_cbor(wire);
+    } else {
+        parsed = parse_edge_packet_json(std::string_view(
+            reinterpret_cast<const char*>(wire.data()),
+            wire.size()));
+    }
+    const auto finished = std::chrono::steady_clock::now();
+
+    if (metrics != nullptr) {
+        metrics->mode = mode;
+        metrics->encoded_packet_size_bytes = wire.size();
+        metrics->deserialization_time_us =
+            std::chrono::duration<double, std::micro>(finished - started).count();
+        if (parsed.ok) {
+            const auto json_size = serialize_edge_packet_json(parsed.packet).size();
+            metrics->json_equivalent_size_bytes = json_size;
+            metrics->compression_ratio_vs_json =
+                json_size == 0 ? 1.0 : static_cast<double>(wire.size()) / static_cast<double>(json_size);
+        }
+        metrics->estimated = false;
+    }
+    return parsed;
+}
+
 EdgePacketValidationResult validate_edge_packet(
     const EdgePeerPacket& packet,
     const EdgePacketValidationOptions& options) {
     EdgePacketValidationResult result;
 
-    if (serialize_edge_packet_json(packet).size() > options.max_packet_size_bytes) {
+    const size_t packet_size = options.serialized_packet_size_bytes == 0
+        ? serialize_edge_packet_json(packet).size()
+        : options.serialized_packet_size_bytes;
+    if (packet_size > options.max_packet_size_bytes) {
         result.error = "packet exceeds max size";
         return result;
     }

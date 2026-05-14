@@ -1,636 +1,885 @@
-# System Designer and Developer: Md Shahanur Islam Shagor
-# Project: UVA GPS Denied Navigation in Dynamic Environments
-# Technology: C++, Python, Go, CMake
+# GPS-Denied Autonomous UAV Swarm Platform
 
-# GPS-Denied Drone Swarm Sensor Fusion
+### Edge-computing swarm intelligence, VIO/TDOA localization, secure telemetry, and confidence-aware distributed autonomy
 
-High-performance multi-drone software stack for operating a swarm in GPS-denied environments using onboard sensor fusion, local autonomy, swarm networking, and a real-time operator dashboard.
+![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?style=for-the-badge&logo=cplusplus)
+![Go](https://img.shields.io/badge/Go-Control%20Plane-00ADD8?style=for-the-badge&logo=go)
+![Python](https://img.shields.io/badge/Python-PySide6%20Dashboard-3776AB?style=for-the-badge&logo=python)
+![CMake](https://img.shields.io/badge/CMake-Build%20System-064F8C?style=for-the-badge&logo=cmake)
 
-Do not fly unless pre-arm check passes.
+![GPS Denied](https://img.shields.io/badge/GPS--Denied-Autonomy-black?style=flat-square)
+![UAV Swarm](https://img.shields.io/badge/UAV-Swarm%20Intelligence-blue?style=flat-square)
+![Edge AI](https://img.shields.io/badge/Edge-AI%20Inference-purple?style=flat-square)
+![VIO](https://img.shields.io/badge/VIO-Visual--Inertial%20Odometry-green?style=flat-square)
+![UWB](https://img.shields.io/badge/UWB%2FTDOA-Localization-orange?style=flat-square)
+![LiDAR](https://img.shields.io/badge/LiDAR-Obstacle%20Awareness-red?style=flat-square)
+![Distributed Systems](https://img.shields.io/badge/Distributed-Peer%20Mesh-4B5563?style=flat-square)
+![Secure Telemetry](https://img.shields.io/badge/Secure-Telemetry%20Pipeline-0F766E?style=flat-square)
 
-This project combines:
+![Bench Demo Ready](https://img.shields.io/badge/Bench%20Demo-Ready-brightgreen?style=flat-square)
+![Local Validation](https://img.shields.io/badge/Local%20Validation-Passing-brightgreen?style=flat-square)
+![HIL](https://img.shields.io/badge/HIL-Planned-yellow?style=flat-square)
+![Flight Validation](https://img.shields.io/badge/Flight%20Validation-Not%20Validated-red?style=flat-square)
+![Flight Readiness](https://img.shields.io/badge/Status-NOT%20FLIGHT%20READY-red?style=flat-square)
 
-- `C++20` for onboard real-time perception, estimation, and safety-oriented control
-- `Python / PySide6` for the live monitoring and operator control dashboard
-- `Go` for the fleet-scale control plane with explicit `simulation` and `production` backend modes
+> **Safety and validation notice**  
+> This repository is an advanced research and production-oriented software platform for GPS-denied UAV autonomy. It is **not flight validated**, **not production-radio validated**, and **not approved for free flight**. Treat the implementation as bench-demo-ready software plus architecture-level research until HIL, tethered, and flight-adjacent evidence exists.
 
-The system is designed for environments where GNSS is weak, jammed, or unavailable, and drones must rely on `IMU + camera + LiDAR + V2X mesh` to localize, coordinate, and execute missions.
+---
 
-## 1. Project Goal
+## Table of Contents
 
-The goal of this project is to build a scalable drone swarm stack that can:
+1. [Executive Summary](#executive-summary)
+2. [System Overview](#system-overview)
+3. [Visual Architecture](#visual-architecture)
+4. [Mathematical Modeling](#mathematical-modeling)
+5. [Performance Benchmarking and Estimated Edge Gains](#performance-benchmarking-and-estimated-edge-gains)
+6. [Complexity Analysis](#complexity-analysis)
+7. [Edge AI Workflow](#edge-ai-workflow)
+8. [Security Model](#security-model)
+9. [Edge Failsafe System](#edge-failsafe-system)
+10. [Dashboard](#dashboard)
+11. [Runtime Modes](#runtime-modes)
+12. [Validation Status](#validation-status)
+13. [Hardware Roadmap](#hardware-roadmap)
+14. [HIL and Bench Test Plan](#hil-and-bench-test-plan)
+15. [Research Contribution](#research-contribution)
+16. [Limitations](#limitations)
+17. [Future Work](#future-work)
+18. [Installation and Build](#installation-and-build)
+19. [Repository Map](#repository-map)
+20. [Related Documentation](#related-documentation)
 
-- estimate motion without GPS
-- detect and track objects
-- avoid static and dynamic obstacles
-- elect leaders and maintain formations
-- coordinate missions across many drones
-- expose full fleet state to an operator dashboard
+---
 
-At small scale, one drone can run the onboard pipeline and be monitored locally.
+## Executive Summary
 
-At larger scale, the same onboard logic can connect to the `Go control plane` so drones can be grouped into clusters, commanded, monitored, and audited centrally.
+GPS-denied autonomy is a central problem in modern aerial robotics. Indoor, subterranean, urban-canyon, disaster-response, and contested electromagnetic environments can make GNSS unavailable, unreliable, or actively misleading. A UAV swarm operating in those conditions cannot depend on a single external positioning source or a backend control loop that must remain continuously reachable.
 
-## 2. Core Features
+This platform explores a full-stack architecture for **edge-supervised autonomous UAV swarms**. Each drone runs an onboard C++ autonomy stack with VIO/EKF fusion, UWB/TDOA localization support, LiDAR-aware obstacle reasoning, local mission logic, and a safety manager. Swarm coordination is moved toward peer-to-peer edge communication: drones exchange compact digests, health states, consensus hints, confidence estimates, and emergency corridor reservations over a V2X-style mesh. The Go backend and PySide6 dashboard remain critical for operator visibility, audit, mission injection, and fleet-level supervision, but they are deliberately kept outside the hard real-time safety path.
 
-### Onboard C++ features
+Centralized drone orchestration is attractive because it simplifies mission control, logging, and operator interfaces. It is also fragile under degraded links: the round trip to a backend adds latency, packet loss can block coordinated action, and a central failure can affect the entire swarm. In contrast, **distributed autonomy** improves resilience by allowing each node to continue local navigation and safety behavior when backend connectivity is impaired. It also improves scalability when peer awareness is shared as compact summaries rather than raw sensor streams.
 
-- error-state `EKF` for motion estimation
-- `VIO` pipeline for camera + IMU based odometry
-- `TDOA` localization module for anchor-based GPS-denied ranging fallback
-- localization confidence scoring with degraded / lost-state detection
-- keyframe-based `SLAM` support
-- `ExperienceMemory` layer for per-drone historical risk summarization
-- `DecisionEngine` for autonomy decisions
-- central `SafetyManager` for runtime safety states, mission gating, and indoor motion limits
-- built-in `V2X` swarm networking with optional native `Fast-DDS` transport when installed
-- secure swarm transport helpers in the swarm security module
-- local safety / degraded-mode behavior when hardware or optional dependencies are unavailable
+The research direction is not simply "share more data." Naive shared awareness can be unsafe: a stale or relayed peer detection should not be treated as a local fact. This platform therefore introduces documentation and software support for **confidence-aware edge intelligence**: peer information is aged, trust-epoch checked, stale-peer filtered, and fused as advisory context. Local collision avoidance and emergency descent always remain locally authoritative.
 
-### Fleet / backend features
+The result is a software platform that reads like an aerospace/autonomy research system and behaves like a production-oriented engineering stack:
 
-- telemetry ingest service
-- fleet snapshot endpoint
-- mission scheduling endpoints
-- command fan-out endpoint
-- health monitoring endpoint
-- event/log aggregation endpoint
-- device-registry enforcement for hardened mTLS peers
-- certificate revocation / rotation policy checks
-- hash-chained command and security audit trail
-- critical-command two-person approval workflow
-- signed firmware manifest verification and secure-boot trust checks
-- anti-rollback firmware counters with persisted trust state
-- maintenance-window gating for trusted firmware updates
-- discovery endpoint
-- in-memory fleet state with simulation-only digital twin seeding
+- C++20 onboard autonomy and sensor fusion
+- Go control-plane backend
+- Python/PySide6 operational dashboard
+- runtime separation across simulation, bench, production, and edge_swarm modes
+- secure telemetry, trust epochs, replay-aware communication concepts
+- edge peer packet protocol and state cache
+- distributed consensus manager
+- split-swarm recovery and failsafe architecture
+- bench-demo/local validation pipeline
 
-### Dashboard features
+---
 
-- dark-themed real-time `PySide6` UI
-- 3D swarm trajectory view
-- EKF drift plot
-- swarm status table
-- command console
-- CPU / GPU / battery / link health cards
-- localization source / confidence visibility
-- local `pybind11` mode when bridge builds are available
-- `Go backend` mode for fleet-scale use
-- simulation fallback when neither backend path is available
-- persistent Python dashboard datastore for settings, command history, and last fleet snapshot restore
+## System Overview
 
-## 3. System Architecture
+### Onboard autonomy
 
-```text
-                  +----------------------------------+
-                  |         PySide6 Dashboard        |
-                  |  3D map | drift | health | cmd   |
-                  +-----------------+----------------+
-                                    |
-                       HTTP / WebSocket-like polling
-                                    |
-                  +----------------------------------+
-                  |         Go Control Plane         |
-                  | telemetry | missions | commands  |
-                  | registry  | health   | twin      |
-                  +-----------------+----------------+
-                                    |
-                    telemetry / command distribution
-                                    |
-        +---------------------------------------------------------+
-        |                  Drone Node (C++20)                     |
-        | sensors -> VIO / EKF / TDOA -> autonomy -> swarm -> safety |
-        +---------------------------------------------------------+
-            |          |            |            |
-          IMU        Camera       LiDAR        V2X Mesh
-```
+The onboard node is the real-time autonomy core. It owns local perception, state estimation, local obstacle reasoning, decision generation, and safety gating. It is implemented primarily in C++20 and organized around deterministic update loops where possible.
 
-## 4. Why Three Languages
+Core onboard capabilities include:
 
-### C++
+- visual-inertial odometry and EKF fusion
+- UWB/TDOA localization support for GPS-denied ranging
+- LiDAR obstacle awareness and occupancy-grid support
+- autonomy decision engine
+- local safety manager
+- secure swarm message support
+- edge peer packet exchange
+- runtime telemetry publication
 
-Use C++ where latency and determinism matter:
+### Edge swarm architecture
 
-- sensor drivers
-- EKF propagation
-- visual-inertial estimation
-- TDOA multilateration
-- LiDAR processing
-- onboard autonomy
-- local safety logic
+`edge_swarm` mode extends the platform from backend-visible autonomy to distributed edge autonomy. Each drone publishes compact packets to peers:
 
-### Python
+- heartbeat
+- pose state
+- edge health
+- obstacle digest
+- threat digest
+- consensus state
+- emergency corridor
+- peer goodbye
 
-Use Python where operator productivity and rich desktop UI matter:
+These packets update a bounded peer state cache and support local decisions without making peer consensus mandatory for immediate safety.
 
-- `PySide6` dashboard
-- visualization
-- rapid operator tool iteration
-- local bridge/debug workflows
+### Supervisory backend
 
-### Go
+The Go backend provides:
 
-Use Go where fleet orchestration and concurrent network I/O matter:
-
-- control plane
 - telemetry ingest
-- mission orchestration
-- command fan-out
-- health monitoring
-- state caching
-- dashboard backend
+- fleet snapshot API
+- mission and command endpoints
+- event and audit trails
+- production/simulation backend mode separation
+- dashboard-facing state aggregation
+- security and firmware-trust telemetry propagation
 
-## 5. Repository Layout
+The backend is supervisory, not a hard real-time flight-control dependency.
+
+### Dashboard visualization
+
+The Python/PySide6 dashboard exposes:
+
+- fleet state
+- edge swarm status
+- peer counts and stale peer counts
+- topology-oriented telemetry
+- sensor status
+- runtime mode banners
+- backend simulation/production truthfulness
+- command and mission workflows
+
+### Local safety priority
+
+The system follows a strict safety hierarchy:
 
 ```text
-drone_swarm/
-  CMakeLists.txt
-  go.mod
-  main.py
-  README.md
-  CONTRIBUTE.md
-  DEPLOYMENT.md
-cmd/
-  control-plane/
-    main.go
-docs/
-  GO_SWARM_ARCHITECTURE.md
-firmware/
-  esp32_cam/
-gui/
-  dashboard.py
-include/
-  autonomy/
-  hal/
-  localization/
-  sensors/
-  slam/
-  swarm/
-  vio/
-internal/
-  controlplane/
-    server.go
-    state.go
-    types.go
-scripts/
-  drone_setup.py
-src/
-  autonomy/
-  hal/
-  localization/
-  sensors/
-  slam/
-  swarm/
-  vio/
-  drone_bridge.cpp
-  main.cpp
-tests/
+local immediate safety
+  > local degraded autonomy
+  > fresh peer consensus hints
+  > backend mission intent
 ```
 
-## 6. Main Runtime Components
+Consensus is useful for coordination, but local collision avoidance and emergency descent do not wait for consensus.
 
-### 6.1 `src/main.cpp`
+---
 
-Main onboard drone node.
+## Visual Architecture
 
-Responsibilities:
+### A. Full Edge Node Pipeline
 
-- initialize sensors
-- start `VIO / EKF`
-- initialize TDOA anchors
-- maintain per-drone experience memory
-- run autonomy loop
-- publish health, memory, TDOA, and decision logs
-- enable swarm networking through built-in UDP transport and native `Fast-DDS` transport when available
+```mermaid
+flowchart TD
+    CAM[Camera] --> SI[Sensor Ingest]
+    LIDAR[LiDAR] --> SI
+    IMU[IMU] --> SI
+    UWB[UWB/TDOA] --> SI
 
-Important note:
+    SI --> LP[Local Perception Node]
+    SI --> FUSION[VIO / EKF Fusion]
 
-The current runtime path supports runtime-separated TDOA sources:
+    LP --> MAP[Local Obstacle Map]
+    FUSION --> MAP
+    FUSION --> MISSION[Local Mission Logic]
+    MAP --> MISSION
 
-- `simulation` mode may use synthetic demo TDOA and built-in demo anchors
-- `bench` mode requires a real anchor configuration and may use playback or live external measurements
-- `production` mode requires a real anchor configuration and rejects startup if no live external TDOA/UWB source is configured
+    PEER_IN[Peer Mesh Input] --> CACHE[Swarm State Cache]
+    CACHE --> CONSENSUS[Edge Consensus Manager]
+    CONSENSUS --> MISSION
 
-Reference runtime and anchor files are provided in:
+    MISSION --> SAFETY[Safety Manager]
+    MAP --> SAFETY
+    FUSION --> SAFETY
 
-- `config/runtime.example.json`
-- `config/anchors.example.json`
-- `config/lidar.example.json`
-- `config/detector_labels.example.json`
+    SAFETY --> EMERGENCY[Emergency Decision System]
+    EMERGENCY --> ACT[Actuation Command Output]
+    SAFETY --> ACT
 
-### 6.2 `src/drone_bridge.cpp`
+    ACT --> PEER_OUT[Peer Mesh Output]
+    ACT --> TELEMETRY[Backend / Dashboard Telemetry]
 
-`pybind11` module that exposes selected C++ functionality to Python.
+    BACKEND[Go Backend Supervisory Layer] --> MISSION
+    MISSION --> BACKEND
 
-Responsibilities:
+    SAFETY -. local override priority .-> ACT
+    CONSENSUS -. advisory only .-> MISSION
+```
 
-- expose VIO pose
-- expose system stats
-- expose optional swarm controls
+### B. Swarm Peer Communication Topology
 
-### 6.3 `gui/dashboard.py`
+```mermaid
+flowchart LR
+    subgraph ClusterA[Edge Consensus Cluster]
+        D1[Drone 1<br/>Leader Candidate]
+        D2[Drone 2<br/>Peer Cache]
+        D3[Drone 3<br/>Obstacle Digest]
+        D4[Drone 4<br/>Relay / Follower]
+    end
 
-Operator dashboard.
+    D1 <-- heartbeat / pose / health --> D2
+    D2 <-- obstacle / threat digest --> D3
+    D3 <-- consensus state --> D4
+    D4 <-- emergency corridor --> D1
 
-Responsibilities:
+    D1 --> Backend[Go Control Plane<br/>Supervisory]
+    D2 --> Backend
+    D3 --> Backend
+    D4 --> Backend
+    Backend --> Dashboard[PySide6 Dashboard]
 
-- show real-time drone state
-- issue formation / hold / return-home / emergency commands
-- render trajectories and drift
-- connect either to local `pybind11` or the Go control plane
-- fall back to simulation when needed
+    D1 -. local safety independent .-> D1
+    D2 -. local safety independent .-> D2
+    D3 -. local safety independent .-> D3
+    D4 -. local safety independent .-> D4
+```
 
-### Detector label mapping
+### C. Edge AI Inference Pipeline
 
-The camera detector now supports class-ID-to-semantic-label mapping from JSON so autonomy can reason over labels like `person`, `car`, `tree`, and `drone` instead of raw `class_N` strings.
+```mermaid
+flowchart TD
+    Frame[Camera Frame / Sensor Slice] --> Detector[Onboard Detector / Tracker]
+    LiDAR[LiDAR Scan] --> ObstacleClassifier[Obstacle Classification]
+    Detector --> LocalTracks[Local Tracks]
+    ObstacleClassifier --> LocalDigest[Semantic Obstacle Digest]
+    LocalTracks --> Confidence[Confidence Estimation]
+    LocalDigest --> Confidence
+    Confidence --> Decay[Age / Hop / Trust Decay]
+    Decay --> PeerDigest[Peer-Shareable Digest]
+    PeerDigest --> Mesh[Peer Mesh]
+    PeerDigest --> LocalMap[Local Map Update]
+    Mesh --> RemoteCache[Remote Peer Cache]
+    RemoteCache --> AdvisoryFusion[Confidence-Aware Fusion]
+    AdvisoryFusion --> SafetyGate[Safety Gate]
+```
 
-Reference file:
+### D. Split-Swarm Recovery Flow
 
-- `config/detector_labels.example.json`
+```mermaid
+flowchart TD
+    Split[Mesh Partition Detected] --> LocalOnly[Local-Only Degraded Autonomy]
+    LocalOnly --> LeaderA[Partition A Elects Leader]
+    LocalOnly --> LeaderB[Partition B Elects Leader]
+    LeaderA --> Reconnect[Partitions Reconnect]
+    LeaderB --> Reconnect
+    Reconnect --> CompareEpoch[Compare Consensus Epoch]
+    CompareEpoch --> CompareTrust[Compare Trust Epoch]
+    CompareTrust --> Quorum[Validate Quorum Health]
+    Quorum --> SelectLeader[Deterministic Leader Preference]
+    SelectLeader --> LooseFormation[Loose Rejoin Formation]
+    LooseFormation --> MissionRecover[Mission Continuity Reconciliation]
+    MissionRecover --> Normal[Normal Edge Swarm Operation]
+    Quorum -->|invalid| Isolate[Remain Isolated / Degraded]
+    CompareTrust -->|mismatch| Isolate
+```
 
-Any unmapped class is exposed as `unknown_class_ID`, and autonomy treats unknown detections conservatively.
+### E. Backend Telemetry Flow
 
-### 6.4 `cmd/control-plane/main.go`
+```mermaid
+sequenceDiagram
+    participant Drone as C++ Drone Node
+    participant Mesh as Peer Mesh
+    participant Backend as Go Control Plane
+    participant Dashboard as PySide6 Dashboard
+    participant Operator
 
-Fleet backend entrypoint.
+    Drone->>Mesh: Edge peer packets
+    Drone->>Backend: Telemetry snapshot
+    Mesh-->>Drone: Peer state and consensus hints
+    Backend->>Dashboard: Fleet snapshot / health / events
+    Dashboard->>Operator: Topology, safety, source, and mode visibility
+    Operator->>Dashboard: Mission or command intent
+    Dashboard->>Backend: Authenticated command request
+    Backend-->>Drone: Supervisory command when allowed
+    Drone->>Drone: Local safety gate before action
+```
 
-Responsibilities:
+### F. Runtime Mode State Diagram
 
-- start the integrated control-plane server
-- expose fleet API endpoints
-- support telemetry ingest and command routing
-- seed a digital-twin style fleet snapshot for demo use
+```mermaid
+stateDiagram-v2
+    [*] --> simulation
+    simulation --> bench: live sensors configured
+    bench --> production: hardened live runtime
+    production --> edge_swarm: peer mesh + local distributed autonomy
+    edge_swarm --> production: peer mesh disabled
+    bench --> simulation: demo fallback only
 
-### 6.5 `main.py`
+    simulation: synthetic/demo allowed
+    bench: live-sensor oriented validation
+    production: live-sensor only
+    edge_swarm: local distributed autonomy + peer mesh
+```
 
-Project launcher.
+---
 
-Responsibilities:
+## Mathematical Modeling
 
-- start Go control plane if available
-- start C++ drone node if available
-- start the Python dashboard
-- shut all processes down together
+All equations in this section are design models for analysis and HIL planning. They are not flight-validated claims.
 
-## 7. Estimation and Control Calculations
+### A. Confidence propagation
 
-This project is not only a UI or communication system. It contains real estimation and swarm-control logic. The core calculations are summarized below.
-
-### 7.1 EKF state
-
-The onboard error-state EKF tracks:
+For peer-shared AI or obstacle awareness, the receiving node computes:
 
 ```text
-x = [p, v, q, b_a, b_g]
+C_final =
+    C_initial
+    * exp(-lambda_t * Delta t)
+    * exp(-lambda_h * hop_count)
+    * T(epoch)
+    * D(local_consistency)
 ```
 
 Where:
 
-- `p` = position
-- `v` = velocity
-- `q` = attitude quaternion
-- `b_a` = accelerometer bias
-- `b_g` = gyroscope bias
+| Symbol | Meaning |
+|---|---|
+| `C_initial` | confidence assigned by the sender |
+| `Delta t` | message age at receiver |
+| `lambda_t` | time decay constant |
+| `hop_count` | mesh relay count |
+| `lambda_h` | hop-count decay constant |
+| `T(epoch)` | trust epoch compatibility factor |
+| `D(local_consistency)` | local-sensor agreement factor |
 
-### 7.2 IMU propagation
+This prevents stale or relayed peer perception from retaining full influence.
 
-At each IMU step:
-
-```text
-a_corrected = a_measured - b_a
-w_corrected = w_measured - b_g
-v_k+1 = v_k + (R(q_k) * a_corrected + g) * dt
-p_k+1 = p_k + v_k * dt + 0.5 * (R(q_k) * a_corrected + g) * dt^2
-q_k+1 = q_k boxplus (w_corrected * dt)
-```
-
-### 7.3 Visual update
-
-Camera / VIO updates correct drift by minimizing innovation:
+### B. Swarm bandwidth formula
 
 ```text
-r = z - h(x)
-K = P H^T (H P H^T + R)^-1
-x = x + K r
-P = (I - K H) P
+Bandwidth_total ~= N * packet_size * update_rate
 ```
 
-### 7.4 TDOA localization
+Where:
 
-If synchronized anchors or ranging radios are available, the drone can estimate position from time-difference-of-arrival:
+- `N` = number of transmitting drones
+- `packet_size` = serialized packet size
+- `update_rate` = packets per second
+
+For full-mesh exchange:
 
 ```text
-d_i - d_ref = c * (t_i - t_ref)
+B_full_mesh ~= N * (N - 1) * packet_size * update_rate
 ```
 
-The current implementation uses iterative least-squares / Gauss-Newton style multilateration across multiple anchors.
+This motivates compact binary digests and cluster-limited consensus groups.
 
-Anchor geometry is now loaded from JSON configuration rather than being silently hardcoded outside simulation mode. The loader validates:
-
-- minimum of 4 anchors
-- unique anchor IDs
-- finite coordinates
-- geometry quality warnings for anchors that are too close together or nearly collinear/coplanar
-
-### 7.5 Formation control
-
-For a follower drone:
+### C. Latency estimation
 
 ```text
-v_cmd = k_p * (p_target - p_current)
+T_total =
+    T_sensor
+    + T_fusion
+    + T_consensus
+    + T_network
+    + T_actuation
 ```
 
-Collision avoidance is then blended into the final velocity command.
-
-### 7.6 Relative-velocity avoidance
-
-For a peer:
+For safety-critical local behavior:
 
 ```text
-v_rel = v_peer - v_self
-closing_speed = -(v_rel dot d_hat)
-time_to_collision = distance / closing_speed
+T_local_safety = T_sensor + T_fusion + T_safety_policy + T_actuation
 ```
 
-If `time_to_collision` falls below a prediction horizon, avoidance weight is increased.
+The architecture aims to keep emergency and collision-avoidance behavior in `T_local_safety`, not in a backend round-trip.
 
-### 7.7 Experience memory / risk prior
+### D. Edge consensus stability model
 
-The onboard autonomy maintains a lightweight historical memory per drone:
+Let:
 
 ```text
-memory = f(drift trend, battery burn, obstacle frequency, target frequency, dominant labels)
+Q = number of safety-eligible peers supporting a proposal
+Q_min = required quorum
+E_c = consensus epoch
+E_t = trust epoch
+S_peer = peer freshness and safety eligibility
 ```
 
-Per drone, the memory layer summarizes:
-
-- `drift_trend_m_per_min`
-- `battery_burn_pct_per_min`
-- `obstacle_frequency`
-- `target_frequency`
-- `dominant_label`
-- `risk_score`
-
-### 7.8 Drift monitoring
-
-Dashboard drift graph tracks EKF drift over time:
+A proposal is eligible only when:
 
 ```text
-drift = || p_estimated - p_reference ||
+Q >= Q_min
+and E_t is compatible
+and all contributing peers satisfy S_peer = true
 ```
 
-### 7.9 Secure swarm communication
+Consensus is advisory for mission coordination. It is not required for immediate collision avoidance or emergency descent.
 
-The swarm security module provides secure-envelope style handling for inter-drone traffic, including:
+### E. Localization confidence model
 
-- payload protection helpers
-- sender authenticity checks
-- replay rejection logic
-- chain-linked command validation concepts
+Localization confidence can be modeled as a weighted function:
 
-These features are present in the codebase. Swarm traffic can run on the built-in UDP transport everywhere, and can additionally use native `Fast-DDS` transport when that package is installed.
-
-## 8. Scaling Considerations
-
-The project is designed to scale beyond a lab demo.
-
-### 8.1 Why the Go backend matters
-
-If many drones send frequent updates, the dashboard should not connect directly to every drone.
-
-Instead:
-
-- drones publish or forward telemetry
-- the Go backend aggregates fleet state
-- the dashboard reads from a single backend API
-
-### 8.2 Clustered swarm strategy
-
-A clustered model scales better than one flat swarm:
-
-- one cluster leader can summarize local state
-- formation changes can be pushed per cluster
-- health alerts can be aggregated per cluster
-- the operator UI can drill down from fleet -> cluster -> drone
-
-## 9. Go Control Plane Responsibilities
-
-The repository contains a Go control-plane implementation under:
-
-- `cmd/control-plane`
-- `internal/controlplane`
-
-Current implementation status:
-
-- integrated HTTP control-plane service is present
-- telemetry, fleet, mission, command, health, event, and discovery endpoints are present
-- approvals endpoint is present
-- in-memory digital twin state store is present
-- explicit `simulation` / `production` backend modes are present
-- simulation-only digital twin seeding is present
-- dashboard can connect to the backend using `--backend-url`
-
-Current API routes:
-
-- `GET /api/v1/fleet`
-- `POST /api/v1/telemetry`
-- `POST /api/v1/commands`
-- `GET,POST /api/v1/missions`
-- `GET /api/v1/health`
-- `GET /api/v1/events`
-- `GET /api/v1/approvals`
-- `GET /api/v1/discovery`
-
-## 10. Dashboard Operating Modes
-
-### Local lab mode
-
-Use when testing one machine or one drone:
-
-- dashboard reads from `pybind11` if `drone_bridge` is importable
-- local C++ process provides pose / stats directly
-
-### Fleet mode
-
-Use when testing many drones:
-
-- dashboard connects to Go backend
-- backend provides aggregated fleet state
-- dashboard should not directly open per-drone connections
-
-### Simulation fallback mode
-
-Use when the bridge module or backend is unavailable:
-
-- dashboard synthesizes fleet activity for UI validation
-- useful for design/demo work without full runtime dependencies
-
-### Persistent dashboard state
-
-The Python dashboard now keeps a local datastore so the next launch can restore:
-
-- recent command history
-- last selected drone
-- last known fleet snapshot
-- last used backend URL
-- local mission overrides and added simulated drones
-
-## 11. Launch Options
-
-### Option A: unified launcher
-
-```powershell
-$env:DRONE_SWARM_SECRET="replace-with-strong-shared-secret"
-python main.py
+```text
+C_loc =
+    w_vio * C_vio
+    + w_tdoa * C_tdoa
+    + w_sync * C_sync
+    + w_map * C_map
 ```
 
-What it does:
+Subject to:
 
-- starts Go control plane if available
-- starts `drone_node.exe` if available
-- starts the Python dashboard
-- writes logs under `logs/launcher/`
-
-Useful flags:
-
-```powershell
-python main.py --dry-run
-python main.py --skip-go
-python main.py --skip-cpp
-python main.py --skip-gui
+```text
+w_vio + w_tdoa + w_sync + w_map = 1
 ```
 
-### Option B: manual startup
+Where:
 
-#### 1. Go control plane
+- `C_vio` = visual-inertial tracking confidence
+- `C_tdoa` = UWB/TDOA solution confidence
+- `C_sync` = time synchronization quality
+- `C_map` = map or relocalization confidence
 
-```powershell
-$env:DRONE_BACKEND_MODE="production"
-$env:DRONE_BACKEND_SIMULATION_ENABLED="false"
-$env:DRONE_BACKEND_STALE_SEC="5"
-go run ./cmd/control-plane
+### F. VIO drift estimation
+
+The monitoring model tracks drift as:
+
+```text
+drift(t) = || p_estimated(t) - p_reference(t) ||
 ```
 
-Backend runtime notes:
+The drift trend over a window is:
 
-- `DRONE_BACKEND_MODE=production` disables seeded fake drones and disables the simulation flight loop
-- `DRONE_BACKEND_MODE=simulation` allows the demo fleet and continuous motion loop
-- `DRONE_BACKEND_SIMULATION_ENABLED=false` is enforced automatically in `production`
-- `/api/v1/fleet` and `/api/v1/health` now expose `backend_mode`, `simulation_enabled`, `real_drone_count`, and `stale_drone_count`
-- each drone record now exposes `source` as `real`, `simulation`, or `playback`
-- in `production`, the fleet is intentionally empty until real onboard telemetry is received
-
-#### 2. C++ drone node
-
-```powershell
-$env:DRONE_SWARM_SECRET="replace-with-strong-shared-secret"
-build\Release\drone_node.exe --id=1 --esp32=192.168.4.1 --lidar=192.168.1.201:2368 --tdoa-csv=tdoa_measurements.csv
+```text
+drift_rate ~= (drift(t_2) - drift(t_1)) / (t_2 - t_1)
 ```
 
-#### 3. Dashboard in fleet mode
+In real GPS-denied deployments, the reference must come from surveyed anchors, motion-capture, high-confidence UWB/TDOA, or controlled bench truth data.
 
-```powershell
-$env:DRONE_OPERATOR_ID="operator-console-1"
-$env:DRONE_OPERATOR_ROLE="operator"
-$env:DRONE_OPERATOR_SECRET="replace-with-a-strong-operator-secret"
-python gui/dashboard.py --backend-url http://127.0.0.1:8080
+---
+
+## Performance Benchmarking and Estimated Edge Gains
+
+**Benchmark status warning:** These benchmark graphs are estimated/model-based visualizations for research planning. They are not real flight or RF mesh measurements.
+
+Current benchmark material combines architecture-level estimates, local software validation signals, and mock visualization data intended to guide future HIL experiments. The values below should be read as planning targets for a GPS-denied edge swarm, not as measured hardware performance.
+
+| Scenario | Centralized / backend-heavy path | `edge_swarm` path | Evidence label |
+|---|---:|---:|---|
+| Obstacle reaction latency | 120 to 220 ms | 30 to 70 ms | architecture-level estimate |
+| Peer synchronization latency | 80 to 160 ms | 25 to 70 ms | simulation estimate |
+| Consensus propagation delay | 120 to 240 ms | 45 to 110 ms | architecture-level estimate |
+| Obstacle awareness propagation | 100 to 210 ms | 35 to 85 ms | architecture-level estimate |
+| Telemetry bandwidth per peer | 64 to 160 kbps | 24 to 64 kbps | mock visualization data |
+| Backend dependency for safety loop | high | low | architecture property |
+
+The reusable visualization dataset is stored in [docs/benchmarks/edge_swarm_benchmark_mock_data.json](docs/benchmarks/edge_swarm_benchmark_mock_data.json). It is explicitly labeled as mock/model data and should be replaced with synchronized HIL traces once hardware tests are available.
+
+### Estimated Edge Swarm Reaction Latency
+
+```mermaid
+xychart-beta
+    title "Estimated Edge Swarm Reaction Latency"
+    x-axis ["Centralized", "Edge Swarm"]
+    y-axis "Latency (ms)" 0 --> 300
+    bar [220, 65]
 ```
 
-For hardened HTTPS or mTLS fleet mode:
+### Estimated Peer Synchronization Latency
 
-```powershell
-$env:DRONE_OPERATOR_ID="operator-console-1"
-$env:DRONE_OPERATOR_ROLE="operator"
-$env:DRONE_TLS_ENABLED="true"
-$env:DRONE_TLS_CA_FILE="certs/ca.crt"
-$env:DRONE_TLS_CLIENT_CERT_FILE="certs/operator-client.crt"
-$env:DRONE_TLS_CLIENT_KEY_FILE="certs/operator-client.key"
-$env:DRONE_TLS_CLIENT_PFX_FILE="certs/drone-client.pfx"
-python gui/dashboard.py --backend-url https://127.0.0.1:8080
+```mermaid
+xychart-beta
+    title "Estimated Peer Synchronization Latency"
+    x-axis ["Centralized Relay", "Edge Peer Mesh"]
+    y-axis "Latency (ms)" 0 --> 220
+    bar [160, 55]
 ```
 
-Before first hardened run, generate local certificates:
+### Estimated Telemetry Bandwidth Demand
 
-```powershell
-python scripts/generate_tls_certs.py --force
+```mermaid
+xychart-beta
+    title "Estimated Telemetry Bandwidth Demand"
+    x-axis ["JSON Debug", "CBOR Edge", "Future Protobuf"]
+    y-axis "Per-peer kbps" 0 --> 180
+    bar [140, 48, 36]
 ```
 
-Generate a signed firmware manifest for Phase 4 boot trust:
+### Estimated Swarm Scaling Load
 
-```powershell
-python scripts/generate_firmware_manifest.py --measurement fw-secure-2026-04-17 --secret replace-with-a-phase4-signing-secret --secure-boot-attested --bootloader-locked
+```mermaid
+xychart-beta
+    title "Estimated Swarm Scaling Load"
+    x-axis ["2", "4", "6", "8", "10", "12"]
+    y-axis "Relative load" 0 --> 12
+    line "JSON debug digests" [2, 4, 6, 8, 10, 12]
+    line "Binary edge digests" [0.8, 1.6, 2.4, 3.2, 4.0, 4.8]
 ```
 
-The generated operator client certificate uses common name `operator-console-1` by default. In mTLS mode, that identity must match `DRONE_OPERATOR_ID` or command submission will be rejected.
-Role-based command authorization is also enforced by the control plane through `DRONE_OPERATOR_ROLE`. Use `operator` for standard mission control, `commander` for election privileges, and `maintenance` for maintenance-only actions.
-The same generator now also emits `certs/drone-client.pfx` for the native C++ telemetry client. Use `DRONE_TLS_CLIENT_PFX_FILE` when `DRONE_ENABLE_BACKEND_TELEMETRY=true` so the drone can present its own mTLS client certificate to the Go backend.
-For multi-operator approval workflows, configure the control-plane with `DRONE_OPERATOR_CREDENTIALS` using `operator_id:role:secret;...`. Critical actions such as `election` and `emergency_land` now require a second distinct authenticated operator to approve the exact same request.
-For hardened device identity enforcement, configure `DRONE_DEVICE_REGISTRY` or `DRONE_DEVICE_REGISTRY_FILE`. Example:
+### Future Real Benchmark Roadmap
 
-```powershell
-$env:DRONE_DEVICE_REGISTRY="operator-console-1:commander::active;operator-console-2:operator::active;drone-node-1:drone:cluster-01:active"
+Future HIL benchmarking should replace mock/model values with synchronized measurements:
+
+- two-node bench packet latency with monotonic send/receive timestamps
+- three-node stale-peer and recovery timing
+- WiFi/RF congestion packet-loss characterization
+- Jetson/Raspberry Pi thermal throttling and CPU saturation traces
+- CBOR versus JSON encode/decode timing under onboard load
+- emergency corridor propagation timing with backend disconnected
+- tethered validation only after repeatable HIL pass criteria
+
+---
+
+## Complexity Analysis
+
+Let:
+
+- `p` = local sensor points/features
+- `g` = occupancy grid cells
+- `n` = cached peers
+- `m` = peer digests per node
+- `e` = bounded consensus records
+
+| Operation | Complexity | Notes |
+|---|---:|---|
+| Local inference/front-end perception | `O(p)` plus neural inference cost | Model runtime depends on detector backend |
+| Obstacle fusion | `O(g)` full grid or `O(p)` sparse insertion | LiDAR scan density dominates |
+| Peer cache merge | `O(n * m)` | Bounded by configured cache limits |
+| Consensus merge | `O(e)` or `O(n)` current epoch | Consensus remains advisory |
+| Stale-peer filtering | `O(n)` | Required before safety-critical peer use |
+| Swarm synchronization | `O(n)` one-hop, higher with relays | Mesh topology dependent |
+| Edge packet verification | `O(1)` per packet plus signature cost | PQC signatures are proposed future work |
+| Partition merge | `O(n log n)` if sorted, `O(n)` single-pass | Used for split-swarm healing |
+
+Bounded caches are a core design requirement. Without bounded peer and digest histories, recovery after partition healing can create unbounded CPU and bandwidth load at the worst possible time.
+
+---
+
+## Edge AI Workflow
+
+The edge AI workflow is local-first and confidence-aware:
+
+1. Local frame or fused perception slice is captured.
+2. Onboard detector/tracker extracts local awareness.
+3. LiDAR and range sensors contribute obstacle cues.
+4. Semantic digests are generated instead of raw streams.
+5. Confidence is assigned based on detection score, localization confidence, freshness, and local map agreement.
+6. Digests are published to peers at adaptive rates.
+7. Remote digests are decayed by age, hop count, trust epoch, and disagreement with local sensing.
+8. Safety manager gates any command before actuation.
+
+### Distributed awareness
+
+Peer awareness is used for:
+
+- obstacle anticipation
+- formation spacing
+- leader continuity hints
+- emergency corridor reservation
+- degraded mesh visibility
+
+It is not used as an unconditional truth source. Peer intelligence is advisory unless fresh, trusted, and consistent with local sensing.
+
+### Degraded operation
+
+Under degraded network or backend loss:
+
+- continue local autonomy
+- reduce background telemetry
+- maintain heartbeat and emergency packets
+- exclude stale peers from consensus
+- widen separation assumptions
+- prefer safe corridor behavior over mission optimality
+
+---
+
+## Security Model
+
+### Implemented now
+
+The repository includes security-oriented runtime and telemetry components:
+
+- secure swarm transport helpers
+- replay rejection concepts and tests in swarm security
+- trust epoch propagation in telemetry
+- Go backend device/operator authorization support
+- TLS/mTLS support paths
+- signed firmware manifest validation
+- rollback counter and firmware trust telemetry
+- dashboard-visible security state
+- stale-peer rejection in edge peer cache
+
+### Proposed future work
+
+The edge peer protocol currently contains an `auth_hook` placeholder. Production-grade peer packet signing is not yet implemented in the edge packet layer.
+
+Future roadmap:
+
+- explicit packet hash and signature fields
+- replay nonce bound to sender and trust epoch
+- trust revocation and epoch rotation
+- hybrid classical + post-quantum transition
+- CRYSTALS-Kyber / ML-KEM for key establishment
+- Dilithium / ML-DSA-style signatures for packet authentication
+- selective full signing for emergency, consensus, and trust-transition packets
+
+### Trust epoch model
+
+`trust_epoch` represents security freshness. A peer packet should be considered stale or degraded when:
+
+- the peer epoch is older than the local accepted epoch
+- revocation state changed
+- replay suspicion was detected
+- command trust state changed
+
+The proposed PQC roadmap is relevant for long-lifecycle robotics infrastructure, but it is not claimed as implemented operational cryptography in this repository.
+
+---
+
+## Edge Failsafe System
+
+The failsafe system is local-authority first.
+
+### Core behavior
+
+- local safety override has highest priority
+- emergency landing does not require backend permission
+- disconnected operation remains possible when local sensing is healthy
+- stale peers are excluded from safety-critical decisions
+- consensus cannot force an unsafe command
+- split-swarm operation is operator-visible and degraded
+
+### Partition Merge Procedure
+
+```text
+procedure PartitionMerge(P_local, P_remote):
+    A = FilterFreshTrustCompatible(P_local.peers)
+    B = FilterFreshTrustCompatible(P_remote.peers)
+
+    if Size(B) == 0:
+        return LocalOnlyDegraded
+
+    if TrustEpochMismatch(P_local.E_t, P_remote.E_t):
+        return EpochIsolation
+
+    if not QuorumValid(B):
+        return RejectRemoteLeader
+
+    candidates = {P_local.leader, P_remote.leader}
+    L_star = ArgMax(candidates, LeaderScore)
+
+    E_c_star = max(P_local.E_c, P_remote.E_c) + 1
+    M_s_star = ReconcileMissionState(P_local.M_s, P_remote.M_s)
+    O_star = MergeFreshObstacleDigests(P_local.obstacles, P_remote.obstacles)
+
+    return MergedPartition(L_star, E_c_star, M_s_star, O_star)
 ```
 
-The registry is checked against the verified client certificate identity on telemetry, approvals, event access, and signed command submission. You can revoke clients immediately with `DRONE_REVOKED_IDENTITIES` or `DRONE_REVOKED_CERT_FINGERPRINTS`, and you can force certificate rotation by setting `DRONE_CERT_MIN_VALIDITY_HOURS`.
-Phase 4 boot/update trust is configured with `DRONE_FIRMWARE_*`, `DRONE_SECURE_BOOT_ATTESTED`, `DRONE_BOOTLOADER_LOCKED`, and `DRONE_MAINTENANCE_*` variables. In hardened mode the drone runtime now validates a signed firmware manifest, enforces secure-boot attestation, persists a rollback counter under `DRONE_FIRMWARE_STATE_FILE`, and refuses maintenance mode without `DRONE_MAINTENANCE_APPROVAL_TOKEN`.
+Leader preference is deterministic:
 
-The onboard C++ runtime now also evaluates a drone security state from link integrity, timing trust, localization loss, and hardened-profile trust posture. In bridge mode this is exposed as `security_state`, `security_summary`, `link_integrity_score`, and health flags to the dashboard.
-It also keeps a drone-side remote command inbox and policy gate: secure swarm commands such as formation hold, mission sync, and emergency stop are accepted or rejected on the drone itself based on the current onboard security state.
-The onboard runtime now also routes autonomy output through a central `SafetyManager` that enforces `NORMAL`, `DEGRADED_LOCALIZATION`, `LOCALIZATION_LOST`, `LINK_LOST`, `SENSOR_FAULT`, `EMERGENCY_LAND`, and `MOTOR_LOCKED` states. In indoor-oriented bench mode it clamps commanded speed and acceleration, blocks waypoint missions when localization is lost, blocks arming when required sensors are unavailable, and preserves emergency-land priority over all other behavior.
-The node can now also post native telemetry directly to the Go backend when `DRONE_ENABLE_BACKEND_TELEMETRY=true`, which lets the backend/dashboard receive the drone's onboard security posture without depending on the Python bridge. In hardened mode this telemetry path uses HTTPS plus a drone client certificate from `DRONE_TLS_CLIENT_PFX_FILE`.
-The telemetry uplink now supports both Windows and Linux HTTP posting for plain `http://` backends, and includes `Authorization` / `X-Drone-Token` headers derived from `DRONE_SWARM_SECRET` when that secret is set.
+1. highest valid trust epoch
+2. highest quorum health
+3. longest stable uptime
+4. lowest fault score
+5. deterministic node ID fallback
 
-Phase 2 status in `SECURITY_IMPLEMENTATION.md` is now complete end-to-end in the repository:
+### Byzantine fault-tolerant concepts
 
-- per-device registry enforcement for operator and drone mTLS identities
-- certificate revocation by identity or fingerprint
-- certificate rotation enforcement through minimum remaining validity policy
-- role-based operator authorization with signed command validation
-- critical-command second-operator approval flow
-- hash-chained audit trail for commands and security events
+The repository does not claim a validated BFT implementation. The architecture adopts BFT-inspired recovery concepts:
 
-Phase 3 status in `SECURITY_IMPLEMENTATION.md` is now complete end-to-end in the repository:
+- malicious or stale peer rejection
+- quorum validation
+- epoch mismatch isolation
+- consensus timeout fallback
+- deterministic leader conflict resolution
 
-- explicit onboard security-state machine in the C++ runtime
-- remote-command safety plus authorization gating on the drone
-- failsafe/autonomy binding for `HOLD_POSITION`, `RETURN_HOME`, and `EMERGENCY_LAND`
-- security posture propagation through bridge telemetry, native backend telemetry, Go fleet snapshots, and dashboard views
-- backend tests that verify security telemetry fields survive ingest-to-snapshot flow
+Again: local collision avoidance and emergency descent bypass consensus.
 
-Phase 4 status in `SECURITY_IMPLEMENTATION.md` is now complete end-to-end in the repository:
+---
 
-- signed firmware manifest validation in the C++ runtime
-- secure-boot and bootloader-lock attestation enforcement in hardened profiles
-- persisted anti-rollback counter and version checks
-- maintenance-window authorization for firmware updates
-- firmware trust state propagated through native telemetry, backend snapshots, and dashboard views
-- backend validation for `firmware_update` and `maintenance_mode` command workflows
+## Dashboard
 
-#### 4. Dashboard in local mode
+The PySide6 dashboard provides operator-facing visibility for local and fleet operation.
+
+Capabilities include:
+
+- edge swarm telemetry display
+- topology and peer health visibility
+- stale peer count and peer count display
+- localization source and confidence display
+- runtime mode banners
+- simulation/production backend truthfulness
+- mission and command workflows
+- replay and backend status visibility
+- sensor telemetry panels for camera, IMU, LiDAR, TDOA, and replay state
+
+The dashboard is an operations and research visualization tool. It is not a flight certification interface.
+
+---
+
+## Runtime Modes
+
+| Mode | Purpose | Allowed data behavior | Validation meaning |
+|---|---|---|---|
+| `simulation` | UI, digital twin, algorithm bring-up | synthetic/demo data allowed | not real-world proof |
+| `bench` | local hardware and replay-assisted validation | live sensors preferred, replay may support testing | bench-level evidence only |
+| `production` | live-sensor runtime with stricter validation | live sources required for safety-critical paths | not flight proof by itself |
+| `edge_swarm` | distributed local autonomy with peer mesh | live sensors plus peer exchange | architecture/software readiness only |
+
+`edge_swarm` is stricter than `bench`: no hidden simulation fallback should influence safety-critical behavior.
+
+---
+
+## Validation Status
+
+| Validation item | Status | Evidence level |
+|---|---|---|
+| Python syntax and dashboard unit tests | Passing in local validation flow | software validation |
+| Go tests | Passing in local validation flow | backend validation |
+| C++ tests | Passing in local validation flow | unit/integration validation |
+| Edge swarm protocol tests | Passing in local validation flow | protocol/cache/consensus validation |
+| Telemetry smoke tests | Available via scripts | backend/dashboard schema validation |
+| Production telemetry smoke tests | Available via scripts | production-mode backend behavior |
+| HIL validation | Planned | not complete |
+| Real hardware swarm validation | Not complete | no claim |
+| Tethered flight validation | Not complete | no claim |
+| Free flight validation | Not complete | no claim |
+
+**Current verdict: NOT FLIGHT READY.**
+
+The local validation command currently exercises Python, Go, CMake configure/build, and CTest:
 
 ```powershell
-python gui/dashboard.py
-```
-
-## 12. Build Notes
-
-### C++
-
-Main required dependencies:
-
-- `Eigen3`
-- `OpenCV`
-- `PCL`
-- `spdlog`
-
-Recommended Windows local setup:
-
-```powershell
-$env:VCPKG_ROOT="D:\tools\vcpkg-full"
 python scripts/local_validate.py --toolchain "D:\tools\vcpkg-full\scripts\buildsystems\vcpkg.cmake"
 ```
 
-Manual Windows configure/build/test:
+---
+
+## Hardware Roadmap
+
+Recommended future hardware validation stack:
+
+- Jetson Nano or Jetson Orin for onboard inference and fusion
+- Raspberry Pi class companion computer for lower-cost reduced workloads
+- calibrated IMU
+- camera module with known frame timing
+- LiDAR with scan timestamping
+- UWB anchors and TDOA-capable radios
+- mesh radios or WiFi testbed with controllable congestion
+- synchronized logging infrastructure
+- current-limited power bench
+- propeller-off HIL rig
+- tethered validation fixture
+
+Platform-specific risks:
+
+- Jetson Nano thermal throttling
+- Raspberry Pi CPU saturation
+- camera frame drops
+- LiDAR scan delay
+- clock skew and synchronization drift
+- WiFi packet loss and hidden-node congestion
+
+---
+
+## HIL and Bench Test Plan
+
+Required staged plan:
+
+1. **Two-node bench packet test**  
+   Validate heartbeat, pose, edge health, obstacle digest, and consensus state exchange.
+
+2. **Three-node degraded mesh test**  
+   Drop one node or impair link quality; verify stale-peer exclusion and peer cache expiry.
+
+3. **Backend disconnect test**  
+   Run `edge_swarm` without backend availability; verify disconnected operation and local autonomy.
+
+4. **Emergency corridor test**  
+   Trigger an emergency corridor packet and verify peers treat it as high priority without waiting for consensus.
+
+5. **Thermal throttling test**  
+   Run long-duration Jetson/Raspberry Pi workloads and log clocks, CPU/GPU load, and inference latency.
+
+6. **WiFi congestion and packet loss test**  
+   Inject packet loss and bandwidth contention; measure stale-peer transitions, recovery time, and packet jitter.
+
+7. **Synchronization drift test**  
+   Introduce clock skew and verify TTL, trust epoch, and stale-packet rejection behavior.
+
+Measurement equations:
+
+```text
+L_packet = t_receive - t_send
+L_pipeline = t_decision - t_sensor_capture
+skew_peer = t_peer_clock - t_local_clock
+loss_rate = dropped_packets / expected_packets
+B_observed ~= sum(packet_size_i) / measurement_window
+```
+
+---
+
+## Research Contribution
+
+This project contributes an integrated architecture for GPS-denied UAV swarms that combines:
+
+- edge-supervised autonomy
+- confidence-aware peer intelligence
+- explicit simulation/bench/production/edge runtime separation
+- distributed GPS-denied operation
+- resilient autonomy under backend loss
+- split-swarm recovery and deterministic leader conflict resolution
+- secure telemetry and trust epoch propagation
+- dashboard-visible truthfulness around data source and validation state
+
+Its academic novelty lies in combining practical flight-stack concerns with distributed systems concepts: bounded peer caches, advisory consensus, confidence decay, trust epochs, partition healing, and edge AI digest sharing.
+
+---
+
+## Limitations
+
+This section is intentionally blunt.
+
+- No real flight validation is claimed.
+- No free-flight readiness is claimed.
+- No production radio validation is claimed.
+- No full hardware swarm validation is claimed.
+- HIL validation is planned but incomplete.
+- Current edge peer serialization keeps JSON for debug readability and includes a CBOR software prototype.
+- Protobuf transport is a roadmap item; CBOR is not yet production-radio or flight validated.
+- PQC peer authentication is a roadmap item, not operational implementation.
+- BFT recovery is architecture-level design, not a validated consensus protocol.
+- Simulation and playback must not be used as evidence of real-world autonomy performance.
+- Bench-demo validation proves software health, not flight safety.
+
+---
+
+## Future Work
+
+Planned research and engineering directions:
+
+- HIL validation of CBOR edge packet transport
+- protobuf binary edge packet transport
+- adaptive serialization benchmarks
+- real packet signing and explicit replay nonce fields
+- post-quantum authentication experiments
+- HIL swarm validation
+- multi-drone bench and tethered tests
+- autonomous formation control under degraded links
+- adaptive distributed mapping
+- learned obstacle digest compression
+- calibrated UWB/TDOA anchor deployment
+- production radio testing
+- formal safety invariant verification
+
+---
+
+## Installation and Build
+
+### Prerequisites
+
+Required:
+
+- Visual Studio 2022 Build Tools or equivalent C++20 compiler
+- CMake
+- Go 1.22+
+- Python 3.11+
+- vcpkg on Windows
+
+Primary native dependencies:
+
+- Eigen3
+- OpenCV
+- PCL
+- spdlog
+
+Python dashboard dependencies are listed in `requirements.txt`.
+
+### Windows vcpkg setup
+
+```powershell
+git clone https://github.com/microsoft/vcpkg D:\tools\vcpkg-full
+D:\tools\vcpkg-full\bootstrap-vcpkg.bat
+$env:VCPKG_ROOT="D:\tools\vcpkg-full"
+D:\tools\vcpkg-full\vcpkg.exe install pcl:x64-windows opencv:x64-windows eigen3:x64-windows spdlog:x64-windows fmt:x64-windows
+```
+
+### Configure and build
 
 ```powershell
 cmake -S . -B build-local-validate -DBUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake
@@ -638,116 +887,117 @@ cmake --build build-local-validate --config Release
 ctest --test-dir build-local-validate --output-on-failure -C Release
 ```
 
-Optional dependencies:
+### One-command local validation
 
-- `pybind11` is auto-fetched if not already installed
-- native `Fast-DDS` transport is enabled when the package is installed
-- `TensorRT` is only available on systems with NVIDIA runtime support
+```powershell
+python scripts/local_validate.py --toolchain "D:\tools\vcpkg-full\scripts\buildsystems\vcpkg.cmake"
+```
 
-### Python
+### Go backend startup
 
-Main dashboard dependencies:
+Production-like backend mode:
 
-- `PySide6`
-- `pyqtgraph`
-- `PyOpenGL`
-- `numpy`
+```powershell
+$env:DRONE_BACKEND_MODE="production"
+$env:DRONE_BACKEND_SIMULATION_ENABLED="false"
+go run ./cmd/control-plane
+```
 
-### Go
+### Dashboard startup
 
-Main requirement:
+```powershell
+python gui/dashboard.py --backend-url http://127.0.0.1:8080
+```
 
-- `Go 1.22+`
+Local dashboard mode:
 
-## 13. Hardware Targets
+```powershell
+python gui/dashboard.py
+```
 
-Recommended onboard hardware:
+### Telemetry smoke tests
 
-- `Jetson Nano`
-- `Jetson Orin`
-- `Raspberry Pi 4` for reduced workloads
+In one terminal:
 
-Typical sensors:
+```powershell
+$env:DRONE_BACKEND_MODE="production"
+$env:DRONE_BACKEND_SIMULATION_ENABLED="false"
+go run ./cmd/control-plane
+```
 
-- `ESP32-CAM`
-- LiDAR such as `RPLIDAR`
-- IMU devices such as `MPU-6050` or `ICM-42688-P`
-- ESC / motor telemetry feed
+In another terminal:
 
-## 14. Current Engineering Status
+```powershell
+python scripts/telemetry_smoke_test.py --backend-url http://127.0.0.1:8080
+python scripts/production_telemetry_smoke_test.py --backend-url http://127.0.0.1:8080
+```
 
-Implemented in the repository:
+### C++ drone node
 
-- onboard sensor fusion pipeline
-- autonomy decision engine
-- experience-memory driven decision bias
-- TDOA multilateration module
-- external TDOA CSV / UDP / serial ingest paths for real measurement playback/integration
-- localization confidence, source tracking, and degraded/lost navigation modes
-- secure swarm security module
-- built-in swarm networking path with native `Fast-DDS` support when installed
-- `pybind11` bridge with local Windows build support
-- real-time `PySide6` dashboard
-- Go control-plane service
-- unified process launcher
-- loop-relocalization hook and map-planner waypoint generation
-- OpenCV DNN fallback inference path for non-TensorRT machines
-- detector label mapping from class IDs to semantic autonomy labels
-- cross-platform backend telemetry uplink for Windows and Linux `http://` control-plane posting
+Example only; real hardware endpoints must match your bench setup:
 
-Known limitations:
+```powershell
+build-local-validate\Release\drone_node.exe --id=1 --esp32=192.168.4.1 --lidar=192.168.1.201:2368
+```
 
-- native `TensorRT` still requires an NVIDIA GPU/runtime and is not available on AMD-only machines
-- local C++ builds still depend on native packages being installed and discoverable by CMake
-- synthetic TDOA and built-in demo anchors are still available in explicit `simulation` mode and must not be used as proof of real-flight readiness
-- deployment anchor geometry still requires surveyed/calibrated field configuration and real validation logs
-- detector label semantics now map into autonomy, but the deployed label map must still match the actual trained detector model
-- Linux backend telemetry uplink is implemented for plain HTTP, but HTTPS/TLS hardening and backend-side telemetry authentication still need production validation
-- several checked-in build folders may be stale across path or machine changes
-- `scripts/drone_setup.py` is mainly Linux/Jetson oriented
+Do not use this for flight without a validated hardware safety plan.
 
-Verification completed in this workspace on `2026-04-17`:
+---
 
-- `python -m py_compile main.py gui/dashboard.py scripts/drone_setup.py` passed
-- `go test ./...` passed
-- `ctest --test-dir build -C Release --output-on-failure` passed for 47/48 registered tests; `test_v2x` currently fails in two leader-follower avoidance assertions unrelated to Phase 3 security flow
-- Phase 3 security path re-verified across C++ runtime, Go ingest, and dashboard/backend data models
+## Repository Map
 
-What that means:
+```text
+cmd/control-plane/              Go backend entrypoint
+internal/controlplane/          Go fleet state, server, security, API tests
+gui/dashboard.py                PySide6 operational dashboard
+gui/backend_status.py           Backend/runtime status helpers
+include/                        C++ public headers
+src/                            C++ implementation
+src/swarm/                      V2X, security, edge peer protocol, cache, consensus
+src/vio/                        VIO and EKF components
+src/localization/               TDOA/UWB and localization fusion
+src/sensors/                    Camera, LiDAR, IMU, range sensors
+src/autonomy/                   Decision engine and experience memory
+src/safety/                     Safety manager
+tests/                          C++ and Python tests
+scripts/local_validate.py       Python + Go + CMake + CTest validation
+scripts/telemetry_smoke_test.py Backend telemetry smoke test
+docs/                           Architecture, HIL, safety, edge swarm research notes
+config/                         Runtime, anchors, labels, edge protocol configuration
+```
 
-- Python, Go, and the main C++ runtime path are currently healthy in this workspace
-- native `Fast-DDS` transport is now available on this machine
-- `TensorRT` remains hardware-dependent rather than code-blocked
-- old stale build outputs should still not be treated as reliable proof of current build health
+---
 
-## 15. Roadmap
+## Related Documentation
 
-Next logical steps:
+- [Edge Swarm Architecture](docs/EDGE_SWARM_ARCHITECTURE.md)
+- [Edge Node Pipeline](docs/EDGE_NODE_PIPELINE.md)
+- [Edge AI Workflow](docs/EDGE_AI_WORKFLOW.md)
+- [Edge Failsafe Strategy](docs/EDGE_FAILSAFE_STRATEGY.md)
+- [Edge Peer Packet Protocol](docs/EDGE_PEER_PACKET_PROTOCOL.md)
+- [Edge Swarm HIL Test Plan](docs/EDGE_SWARM_HIL_TEST_PLAN.md)
+- [Swarm Latency Optimization](docs/SWARM_LATENCY_OPTIMIZATION.md)
+- [Edge Swarm Performance Estimate](docs/EDGE_SWARM_PERFORMANCE_ESTIMATE.md)
+- [Dashboard Sensor Telemetry Schema](docs/DASHBOARD_SENSOR_TELEMETRY_SCHEMA.md)
+- [Local Build and Bench Demo Guide](docs/LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md)
+- [Security Implementation](SECURITY_IMPLEMENTATION.md)
 
-1. automate Windows DLL-path setup for local `drone_bridge` imports
-2. package serial UWB vendor parsers for specific hardware models
-3. add more automated Go/API tests
-4. deepen loop closure and global map optimization
-5. continue maturing the backend toward production deployment patterns
+---
 
-## 16. Related Documents
+## Final Readiness Statement
 
-- [docs/GO_SWARM_ARCHITECTURE.md](/d:/Final%20Project/drone_swarm/docs/GO_SWARM_ARCHITECTURE.md)
-- [CONTRIBUTE.md](/d:/Final%20Project/drone_swarm/CONTRIBUTE.md)
-- [DEPLOYMENT.md](/d:/Final%20Project/drone_swarm/DEPLOYMENT.md)
+This repository is a serious autonomy research and engineering platform. It contains real software for estimation, autonomy, swarm communication, backend telemetry, dashboard visualization, security-state propagation, and edge peer packet validation.
 
-## 17. Summary
+It is also deliberately honest:
 
-This is a full-stack drone swarm project, not only a flight stack and not only a dashboard.
+```text
+bench-demo software stack: ready
+local validation: passing
+edge_swarm architecture: implemented at protocol/cache/consensus visibility level
+HIL validation: pending
+tethered validation: pending
+free flight validation: not complete
+flight readiness: NOT READY
+```
 
-It combines:
-
-- onboard estimation and autonomy in `C++`
-- real-time operator visualization in `Python`
-- fleet orchestration in `Go`
-
-That split lets the project support:
-
-- local single-drone workflows
-- backend-connected multi-drone monitoring
-- future scaling toward larger coordinated fleets
+The intended next step is disciplined HIL validation, followed by tethered and flight-adjacent testing only after hardware timing, radio behavior, sensor stability, and safety invariants are demonstrated under controlled conditions.

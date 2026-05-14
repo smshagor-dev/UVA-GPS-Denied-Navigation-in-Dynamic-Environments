@@ -1,6 +1,17 @@
 {
   "profile_name": "swarm_edge_protocol_v1",
   "validated_state": "design_only_not_flight_validated",
+  "serialization": {
+    "serialization_mode": "cbor",
+    "supported_modes": [
+      "json",
+      "cbor",
+      "protobuf_placeholder"
+    ],
+    "json_runtime_policy": "bench_debug_only",
+    "binary_transport_required_for_safety_critical_loops": true,
+    "schema_version": 1
+  },
   "mesh_topology_mode": "adaptive_mesh",
   "bandwidth_caps": {
     "per_peer_kbps": 48,

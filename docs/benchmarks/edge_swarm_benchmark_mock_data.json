@@ -1,0 +1,103 @@
+{
+  "dataset_name": "edge_swarm_benchmark_mock_data",
+  "schema_version": 1,
+  "validation_status": "mock_visualization_data_not_flight_validated",
+  "evidence_type": "architecture_level_estimate",
+  "disclaimer": "These values are estimated/model-based visualizations for research planning. They are not real flight, RF mesh, or HIL measurements.",
+  "units": {
+    "latency": "ms",
+    "bandwidth": "kbps",
+    "load": "relative_units"
+  },
+  "reaction_latency": [
+    {
+      "scenario": "Centralized",
+      "latency_ms": 220,
+      "label": "architecture-level estimate"
+    },
+    {
+      "scenario": "Edge Swarm",
+      "latency_ms": 65,
+      "label": "architecture-level estimate"
+    }
+  ],
+  "benchmark_comparison": [
+    {
+      "scenario": "Obstacle reaction latency",
+      "centralized_range_ms": [120, 220],
+      "edge_swarm_range_ms": [30, 70],
+      "evidence_type": "architecture-level estimate"
+    },
+    {
+      "scenario": "Peer synchronization latency",
+      "centralized_range_ms": [80, 160],
+      "edge_swarm_range_ms": [25, 70],
+      "evidence_type": "simulation estimate"
+    },
+    {
+      "scenario": "Consensus propagation delay",
+      "centralized_range_ms": [120, 240],
+      "edge_swarm_range_ms": [45, 110],
+      "evidence_type": "architecture-level estimate"
+    },
+    {
+      "scenario": "Obstacle awareness propagation",
+      "centralized_range_ms": [100, 210],
+      "edge_swarm_range_ms": [35, 85],
+      "evidence_type": "architecture-level estimate"
+    }
+  ],
+  "serialization_size_samples": [
+    {
+      "packet_type": "heartbeat",
+      "json_bytes": 370,
+      "cbor_bytes": 97,
+      "source": "local unit-test benchmark",
+      "not_rf_measured": true
+    },
+    {
+      "packet_type": "obstacle_digest",
+      "json_bytes": 278,
+      "cbor_bytes": 58,
+      "source": "local unit-test benchmark",
+      "not_rf_measured": true
+    },
+    {
+      "packet_type": "consensus_state",
+      "json_bytes": 315,
+      "cbor_bytes": 57,
+      "source": "local unit-test benchmark",
+      "not_rf_measured": true
+    }
+  ],
+  "bandwidth_visualization": [
+    {
+      "transport": "JSON Debug",
+      "per_peer_kbps": 140,
+      "evidence_type": "mock visualization data"
+    },
+    {
+      "transport": "CBOR Edge",
+      "per_peer_kbps": 48,
+      "evidence_type": "mock visualization data"
+    },
+    {
+      "transport": "Future Protobuf",
+      "per_peer_kbps": 36,
+      "evidence_type": "mock visualization data"
+    }
+  ],
+  "scaling_visualization": {
+    "peer_counts": [2, 4, 6, 8, 10, 12],
+    "json_debug_relative_load": [2, 4, 6, 8, 10, 12],
+    "binary_digest_relative_load": [0.8, 1.6, 2.4, 3.2, 4.0, 4.8],
+    "evidence_type": "mock visualization data"
+  },
+  "future_replacement_requirements": [
+    "synchronized HIL send/receive packet timestamps",
+    "multi-node RF mesh latency and packet-loss traces",
+    "thermal and CPU load metadata for each node",
+    "serialization mode and encoded packet size per packet",
+    "explicit run label distinguishing propeller-off HIL, tethered, and flight-adjacent tests"
+  ]
+}

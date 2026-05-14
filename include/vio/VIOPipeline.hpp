@@ -47,6 +47,10 @@ struct RuntimeTelemetry {
     std::string local_consensus_state{"single_node"};
     uint64_t local_consensus_epoch{0};
     double mesh_bandwidth_kbps{0.0};
+    std::string edge_serialization_mode{"json"};
+    double edge_average_packet_size_bytes{0.0};
+    double edge_bandwidth_savings_estimate_pct{0.0};
+    double edge_packet_encode_latency_us{0.0};
     bool disconnected_operation{false};
     std::string edge_health_status{"nominal"};
     std::string edge_autonomy_state{"backend_assisted"};

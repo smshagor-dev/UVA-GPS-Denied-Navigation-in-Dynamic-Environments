@@ -44,6 +44,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <mutex>
+#include <regex>
 #include <sstream>
 #include <tuple>
 #include <string_view>
@@ -147,7 +148,34 @@ struct NodeConfig {
     std::string anchor_config_path{};
     std::string lidar_config_path{};
     std::string detector_labels_path{"config/detector_labels.json"};
+    std::string edge_protocol_config_path{"config/swarm_edge_protocol.json"};
+    std::string edge_serialization_mode{"json"};
 };
+
+std::optional<std::string> extract_local_json_string(const std::string& content, const std::string& key) {
+    const std::regex pattern("\"" + key + "\"\\s*:\\s*\"([^\"]+)\"", std::regex::icase);
+    std::smatch match;
+    if (std::regex_search(content, match, pattern) && match.size() >= 2) {
+        return match[1].str();
+    }
+    return std::nullopt;
+}
+
+void apply_edge_protocol_config(NodeConfig& cfg) {
+    if (cfg.edge_protocol_config_path.empty() || !std::filesystem::exists(cfg.edge_protocol_config_path)) {
+        return;
+    }
+    std::ifstream in(cfg.edge_protocol_config_path);
+    if (!in) {
+        spdlog::warn("Could not open edge protocol config {}", cfg.edge_protocol_config_path);
+        return;
+    }
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+    if (const auto mode = extract_local_json_string(buffer.str(), "serialization_mode")) {
+        cfg.edge_serialization_mode = *mode;
+    }
+}
 
 uint16_t parse_port_or_default(const std::string& value, uint16_t fallback) {
     try {
@@ -277,6 +305,12 @@ void apply_env_overrides(NodeConfig& cfg) {
     }
     if (const auto value = env_var("DRONE_DETECTOR_LABELS")) {
         cfg.detector_labels_path = *value;
+    }
+    if (const auto value = env_var("DRONE_EDGE_PROTOCOL_CONFIG")) {
+        cfg.edge_protocol_config_path = *value;
+    }
+    if (const auto value = env_var("DRONE_EDGE_SERIALIZATION_MODE")) {
+        cfg.edge_serialization_mode = *value;
     }
 }
 
@@ -466,6 +500,8 @@ void apply_cli_overrides(NodeConfig& cfg, int argc, char** argv) {
         else if (key == "anchor-config") cfg.anchor_config_path = val;
         else if (key == "lidar-config") cfg.lidar_config_path = val;
         else if (key == "detector-labels") cfg.detector_labels_path = val;
+        else if (key == "edge-protocol-config") cfg.edge_protocol_config_path = val;
+        else if (key == "edge-serialization") cfg.edge_serialization_mode = val;
     }
 }
 
@@ -474,6 +510,7 @@ NodeConfig parse_args(int argc, char** argv) {
     apply_env_overrides(cfg);
     apply_cli_overrides(cfg, argc, argv);
     apply_runtime_file_overrides(cfg);
+    apply_edge_protocol_config(cfg);
     apply_env_overrides(cfg);
     apply_cli_overrides(cfg, argc, argv);
     cfg.security_profile = normalize_security_profile(cfg.security_profile);
@@ -725,7 +762,7 @@ int main(int argc, char** argv) {
                   std::string(drone::hal::to_string(drone::hal::detect_platform())));
     spdlog::info("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
 
-    // â”€â”€ 1. Sensors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //1. Sensors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     auto imu = std::make_shared<drone::sensors::IMUSensor>(
         "imu0", cfg.imu_device, cfg.imu_i2c_addr);
 
@@ -826,7 +863,7 @@ int main(int argc, char** argv) {
         cam->load_yolo_model(cfg.yolo_engine, 0.45f, 0.5f);
     }
 
-    // â”€â”€ 2. VIO Pipeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //2. VIO Pipeline â”€â”€â”€â”€â”€
     drone::vio::EKFConfig ekf_cfg;
     auto vio = std::make_shared<drone::vio::VIOPipeline>(ekf_cfg);
     vio->set_runtime_mode(cfg.runtime_mode);
@@ -906,9 +943,18 @@ int main(int argc, char** argv) {
     drone::slam::MapPlanner planner;
     drone::slam::OccupancyGridMap occupancy_map;
 
-    // â”€â”€ 3. V2X Swarm Network â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //3. V2X Swarm Network 
     auto net = std::make_shared<drone::swarm::V2XMeshNetwork>(
         cfg.drone_id, cfg.swarm_group, cfg.swarm_port);
+    const auto requested_edge_serialization =
+        drone::swarm::parse_edge_serialization_mode(cfg.edge_serialization_mode)
+            .value_or(drone::swarm::EdgeSerializationMode::JSON);
+    net->set_edge_serialization_mode(requested_edge_serialization);
+    if (requested_edge_serialization == drone::swarm::EdgeSerializationMode::PROTOBUF_PLACEHOLDER) {
+        spdlog::warn("edge_swarm protobuf_placeholder selected; runtime uses JSON compatibility until protobuf is implemented");
+    } else {
+        spdlog::info("edge_swarm serialization mode: {}", drone::swarm::to_string(requested_edge_serialization));
+    }
     drone::swarm::SwarmSecurityConfig security_cfg;
     security_cfg.enabled = true;
     bool placeholder_swarm_secret = false;
@@ -945,7 +991,7 @@ int main(int argc, char** argv) {
         }
     });
 
-    // â”€â”€ 4. Start all subsystems â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //4. Start all subsystems â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (cfg.enable_imu) imu->start();
     if (cfg.enable_camera) cam->start();
     if (cfg.enable_lidar) lidar->start();
@@ -980,7 +1026,7 @@ int main(int argc, char** argv) {
     std::future<void> telemetry_publish_task;
     std::deque<double> replay_confidence_history;
 
-    // â”€â”€ 5. Main loop â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //5. Main loop â”€â”€â”€â”€â”€â”€â”€â”€
     while (!g_shutdown.load()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
@@ -1254,6 +1300,7 @@ int main(int argc, char** argv) {
             decision_ctx.nearest_lidar_obstacle_m >= 0.0 && decision_ctx.nearest_lidar_obstacle_m < 2.5 ? "collision_risk" : "none";
         local_edge_state.threat_summary =
             local_edge_state.threat_level == "none" ? "" : "local obstacle corridor risk";
+        local_edge_state.serialization_mode = requested_edge_serialization;
         net->set_local_edge_state(local_edge_state);
 
         drone::safety::SafetyContext safety_ctx;
@@ -1284,6 +1331,9 @@ int main(int argc, char** argv) {
         const auto safety_status = safety_manager.evaluate(safety_ctx);
         const auto allowed_plan =
             safety_status.mission_command_allowed ? plan : std::optional<drone::slam::MapPlanner::Plan>{};
+        const auto edge_serialization_metrics = net->edge_serialization_metrics();
+        const double edge_bandwidth_savings_pct =
+            std::clamp((1.0 - edge_serialization_metrics.compression_ratio_vs_json) * 100.0, 0.0, 100.0);
 
         vio->set_runtime_telemetry({
             fusion.confidence_trend,
@@ -1299,6 +1349,10 @@ int main(int argc, char** argv) {
             net->consensus_state(),
             net->consensus_epoch(),
             net->mesh_bandwidth_kbps(),
+            std::string(drone::swarm::to_string(net->edge_serialization_mode())),
+            static_cast<double>(edge_serialization_metrics.encoded_packet_size_bytes),
+            edge_bandwidth_savings_pct,
+            edge_serialization_metrics.serialization_time_us,
             net->disconnected_operation(),
             net->edge_health_status(),
             net->autonomy_state(),
@@ -1513,6 +1567,13 @@ int main(int argc, char** argv) {
             snapshot.local_consensus_epoch = net->consensus_epoch();
             snapshot.peer_latency_ms = net->avg_latency_ms();
             snapshot.mesh_bandwidth_kbps = net->mesh_bandwidth_kbps();
+            const auto snapshot_serialization_metrics = net->edge_serialization_metrics();
+            snapshot.edge_serialization_mode = std::string(drone::swarm::to_string(net->edge_serialization_mode()));
+            snapshot.edge_average_packet_size_bytes =
+                static_cast<double>(snapshot_serialization_metrics.encoded_packet_size_bytes);
+            snapshot.edge_bandwidth_savings_estimate_pct =
+                std::clamp((1.0 - snapshot_serialization_metrics.compression_ratio_vs_json) * 100.0, 0.0, 100.0);
+            snapshot.edge_packet_encode_latency_us = snapshot_serialization_metrics.serialization_time_us;
             snapshot.disconnected_operation = net->disconnected_operation();
             snapshot.edge_health_status = net->edge_health_status();
             snapshot.edge_autonomy_state = net->autonomy_state();
@@ -1671,7 +1732,7 @@ int main(int argc, char** argv) {
                      decision.summary);
     }
 
-    // â”€â”€ 6. Graceful shutdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //6. Graceful shutdown 
     spdlog::info("Shutting down subsystemsâ€¦");
     vio->stop();
     net->stop();

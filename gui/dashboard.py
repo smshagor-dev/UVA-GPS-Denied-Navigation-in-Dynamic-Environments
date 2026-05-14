@@ -842,6 +842,10 @@ class DroneState:
     local_consensus_epoch: int = 0
     peer_latency_ms: float = 0.0
     mesh_bandwidth_kbps: float = 0.0
+    edge_serialization_mode: str = "json"
+    edge_average_packet_size_bytes: float = 0.0
+    edge_bandwidth_savings_estimate_pct: float = 0.0
+    edge_packet_encode_latency_us: float = 0.0
     disconnected_operation: bool = False
     edge_health_status: str = "nominal"
     edge_autonomy_state: str = "backend_assisted"
@@ -1168,6 +1172,10 @@ class GoControlPlaneClient:
             local_consensus_epoch=safe_int(item.get("local_consensus_epoch", 0), 0),
             peer_latency_ms=safe_float(item.get("peer_latency_ms", 0.0), 0.0),
             mesh_bandwidth_kbps=safe_float(item.get("mesh_bandwidth_kbps", 0.0), 0.0),
+            edge_serialization_mode=safe_text(item.get("edge_serialization_mode", "json"), "json"),
+            edge_average_packet_size_bytes=safe_float(item.get("edge_average_packet_size_bytes", 0.0), 0.0),
+            edge_bandwidth_savings_estimate_pct=safe_float(item.get("edge_bandwidth_savings_estimate_pct", 0.0), 0.0),
+            edge_packet_encode_latency_us=safe_float(item.get("edge_packet_encode_latency_us", 0.0), 0.0),
             disconnected_operation=bool(item.get("disconnected_operation", False)),
             edge_health_status=safe_text(item.get("edge_health_status", "nominal"), "nominal"),
             edge_autonomy_state=safe_text(item.get("edge_autonomy_state", "backend_assisted"), "backend_assisted"),
@@ -1896,6 +1904,10 @@ class SwarmBackend:
                         local_consensus_epoch=safe_int(getattr(runtime, "local_consensus_epoch", 1), 1),
                         peer_latency_ms=safe_float(getattr(runtime, "peer_latency_ms", float(self._network.avg_latency_ms()) if self._network is not None else 0.0), 0.0),
                         mesh_bandwidth_kbps=safe_float(getattr(runtime, "mesh_bandwidth_kbps", 64.0 + max(0, len(peer_map) - 1) * 22.0), 0.0),
+                        edge_serialization_mode=safe_text(getattr(runtime, "edge_serialization_mode", "json"), "json"),
+                        edge_average_packet_size_bytes=safe_float(getattr(runtime, "edge_average_packet_size_bytes", 0.0), 0.0),
+                        edge_bandwidth_savings_estimate_pct=safe_float(getattr(runtime, "edge_bandwidth_savings_estimate_pct", 0.0), 0.0),
+                        edge_packet_encode_latency_us=safe_float(getattr(runtime, "edge_packet_encode_latency_us", 0.0), 0.0),
                         disconnected_operation=bool(getattr(runtime, "disconnected_operation", False)),
                         edge_health_status=safe_text(getattr(runtime, "edge_health_status", "nominal"), "nominal"),
                         edge_autonomy_state=safe_text(getattr(runtime, "edge_autonomy_state", "distributed_autonomy"), "distributed_autonomy"),
@@ -3450,10 +3462,14 @@ class EdgeSwarmPage(QWidget):
         disconnected = sum(1 for state in states if state.disconnected_operation)
         avg_peer_count = sum(state.peer_count for state in states) / max(len(states), 1)
         avg_conf = sum(state.edge_inference_confidence for state in states) / max(len(states), 1)
+        active_modes = sorted({state.edge_serialization_mode for state in states if state.edge_serialization_mode})
+        avg_packet_size = sum(state.edge_average_packet_size_bytes for state in states) / max(len(states), 1)
+        avg_savings = sum(state.edge_bandwidth_savings_estimate_pct for state in states) / max(len(states), 1)
         self._banner.setVisible(simulation)
         self._summary.setText(
             f"Topology: {snapshot.mesh_topology_mode}  |  Avg peers: {avg_peer_count:.1f}  |  "
             f"Peer latency: {snapshot.avg_peer_latency_ms:.1f} ms  |  Mesh bandwidth: {snapshot.avg_mesh_bandwidth_kbps:.1f} kbps  |  "
+            f"Serialization: {','.join(active_modes) or 'json'} {avg_packet_size:.0f} B est. save {avg_savings:.0f}%  |  "
             f"Disconnected nodes: {disconnected}  |  Inference confidence: {avg_conf:.2f}"
         )
         self._topology.ingest(snapshot)
