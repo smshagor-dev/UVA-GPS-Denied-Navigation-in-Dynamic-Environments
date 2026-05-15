@@ -13,6 +13,19 @@
     "schema_version": 1
   },
   "mesh_topology_mode": "adaptive_mesh",
+  "auth": {
+    "mode": "hmac_sha256",
+    "allow_unsigned_in_simulation": true,
+    "allow_unsigned_in_bench": false,
+    "trust_epoch": 1,
+    "max_clock_skew_ms": 2000,
+    "shared_secret_env": "DRONE_SWARM_SECRET",
+    "pqc_roadmap": {
+      "signature": "ML-DSA/Dilithium",
+      "key_establishment": "ML-KEM/Kyber",
+      "status": "planned"
+    }
+  },
   "bandwidth_caps": {
     "per_peer_kbps": 48,
     "swarm_awareness_kbps": 180,

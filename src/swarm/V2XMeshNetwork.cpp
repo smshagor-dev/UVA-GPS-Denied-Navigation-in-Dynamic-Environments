@@ -9,6 +9,7 @@
 #include "swarm/V2XMeshNetwork.hpp"
 #include "swarm/EdgePeerProtocol.hpp"
 #include "swarm/SwarmSecurity.hpp"
+#include "security/PeerPacketAuth.hpp"
 #include <cstring>
 #include <stdexcept>
 #include <algorithm>
@@ -673,6 +674,39 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
     const auto now_ms = static_cast<uint64_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count());
+
+    const auto last_sequence = edge_state_cache_.last_sequence_number(parsed.packet.sender_id);
+    const auto auth = drone::security::verifyPacket(parsed.packet, packet_auth_config_, now_ms, last_sequence);
+    {
+        std::lock_guard lock(edge_serialization_metrics_mutex_);
+        edge_serialization_metrics_.auth_mode = std::string(drone::security::to_string(packet_auth_config_.mode));
+        edge_serialization_metrics_.last_auth_result = std::string(drone::security::to_string(auth.result));
+        edge_serialization_metrics_.pqc_ready_status =
+            packet_auth_config_.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER
+                ? "roadmap_only"
+                : "planned";
+        edge_last_auth_result_ = edge_serialization_metrics_.last_auth_result;
+        if (auth.result == drone::security::PacketAuthResult::MISSING_SIGNATURE) {
+            edge_serialization_metrics_.unsigned_packets = edge_unsigned_packets_.fetch_add(1) + 1;
+        } else {
+            edge_serialization_metrics_.unsigned_packets = edge_unsigned_packets_.load();
+        }
+    }
+    if (!auth.accepted()) {
+        const auto failures = edge_auth_failures_.fetch_add(1) + 1;
+        {
+            std::lock_guard lock(edge_serialization_metrics_mutex_);
+            edge_serialization_metrics_.auth_failures = failures;
+        }
+        if (logger_) {
+            logger_->warn("V2X edge packet auth rejected from {}: {} ({})",
+                          msg.src_id,
+                          drone::security::to_string(auth.result),
+                          auth.reason);
+        }
+        return;
+    }
+
     const auto observed = edge_state_cache_.observe_packet(parsed.packet, now_ms);
     if (!observed.accepted) {
         if (logger_) {
@@ -832,7 +866,29 @@ bool V2XMeshNetwork::broadcast_edge_packet(const EdgePeerPacket& packet) {
         mode = edge_serialization_mode_;
     }
     EdgeSerializationMetrics metrics;
-    auto wire = serialize_edge_packet(packet, mode, &metrics);
+    auto signed_packet = packet;
+    const auto auth = drone::security::signPacket(signed_packet, packet_auth_config_);
+    {
+        std::lock_guard lock(edge_serialization_metrics_mutex_);
+        edge_serialization_metrics_.auth_mode = std::string(drone::security::to_string(packet_auth_config_.mode));
+        edge_serialization_metrics_.last_auth_result = std::string(drone::security::to_string(auth.result));
+        edge_serialization_metrics_.pqc_ready_status =
+            packet_auth_config_.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER
+                ? "roadmap_only"
+                : "planned";
+        edge_last_auth_result_ = edge_serialization_metrics_.last_auth_result;
+        edge_serialization_metrics_.auth_failures = edge_auth_failures_.load();
+        edge_serialization_metrics_.unsigned_packets = edge_unsigned_packets_.load();
+    }
+    if (!auth.accepted()) {
+        if (logger_) {
+            logger_->warn("V2X edge packet signing skipped: {} ({})",
+                          drone::security::to_string(auth.result),
+                          auth.reason);
+        }
+        return false;
+    }
+    auto wire = serialize_edge_packet(signed_packet, mode, &metrics);
     const bool ok = broadcast(SwarmMessage::Type::EDGE_PACKET, wire);
     if (ok) {
         std::lock_guard lock(edge_serialization_metrics_mutex_);
@@ -841,6 +897,14 @@ bool V2XMeshNetwork::broadcast_edge_packet(const EdgePeerPacket& packet) {
         edge_serialization_metrics_.json_equivalent_size_bytes = metrics.json_equivalent_size_bytes;
         edge_serialization_metrics_.serialization_time_us = metrics.serialization_time_us;
         edge_serialization_metrics_.compression_ratio_vs_json = metrics.compression_ratio_vs_json;
+        edge_serialization_metrics_.auth_mode = std::string(drone::security::to_string(packet_auth_config_.mode));
+        edge_serialization_metrics_.last_auth_result = std::string(drone::security::to_string(auth.result));
+        edge_serialization_metrics_.auth_failures = edge_auth_failures_.load();
+        edge_serialization_metrics_.unsigned_packets = edge_unsigned_packets_.load();
+        edge_serialization_metrics_.pqc_ready_status =
+            packet_auth_config_.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER
+                ? "roadmap_only"
+                : "planned";
         edge_serialization_metrics_.estimated = false;
         edge_tx_bytes_.fetch_add(wire.size(), std::memory_order_relaxed);
     }
@@ -1034,6 +1098,27 @@ EdgePeerPacket V2XMeshNetwork::build_edge_goodbye_packet() const {
 
 void V2XMeshNetwork::configure_security(SwarmSecurityConfig cfg) {
     security_ = std::make_unique<SwarmSecurityContext>(local_id_, std::move(cfg));
+}
+void V2XMeshNetwork::configure_packet_auth(drone::security::PacketAuthConfig cfg) {
+    packet_auth_config_ = std::move(cfg);
+    {
+        std::lock_guard lock(edge_serialization_metrics_mutex_);
+        edge_serialization_metrics_.auth_mode = std::string(drone::security::to_string(packet_auth_config_.mode));
+        edge_serialization_metrics_.pqc_ready_status =
+            packet_auth_config_.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER
+                ? "roadmap_only"
+                : "planned";
+    }
+    if (logger_) {
+        if (packet_auth_config_.mode == drone::security::AuthMode::NONE &&
+            !(packet_auth_config_.runtime_profile == "simulation" &&
+              packet_auth_config_.allow_unsigned_in_simulation)) {
+            logger_->warn("V2X packet auth mode is none outside explicit simulation allowance");
+        }
+        if (packet_auth_config_.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER) {
+            logger_->warn("PQC hybrid auth is roadmap-only in this build.");
+        }
+    }
 }
 void V2XMeshNetwork::set_edge_serialization_mode(EdgeSerializationMode mode) {
     if (mode == EdgeSerializationMode::PROTOBUF_PLACEHOLDER) {

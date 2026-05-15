@@ -307,8 +307,9 @@ Bounded cache sizes and rate-limited packet classes are required to keep this co
 
 Current implementation status:
 
-- edge peer packets carry an `auth_hook` placeholder rather than a production cryptographic signature
-- implemented validation covers packet structure, maximum size, TTL expiry, sequence freshness, source normalization, stale-peer exclusion, and safety gating
+- edge peer packets now use `PeerPacketAuth`; `hmac_sha256` is implemented for bench/HIL packet authentication
+- implemented validation covers packet structure, maximum size, TTL expiry, sequence freshness, source normalization, trust epoch checks, signature checks, stale-peer exclusion, and safety gating
+- post-quantum authentication is not implemented yet; `pqc_hybrid_placeholder` is a safe unsupported roadmap mode
 - cryptographic signing and post-quantum verification are proposed future work, not flight-validated or production-implemented behavior
 
 Future `edge_swarm` security should support crypto-agile peer authentication with a hybrid classical and post-quantum path. The intended design is:

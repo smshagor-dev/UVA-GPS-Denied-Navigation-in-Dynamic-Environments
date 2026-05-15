@@ -22,8 +22,17 @@ The method combines:
 - compact peer telemetry and obstacle digests
 - confidence decay under age, hop count, trust mismatch, and disagreement
 - bounded peer caches with stale-peer exclusion
+- packet authentication before peer cache, consensus, or emergency corridor action
 - BFT-inspired partition rejoin and deterministic leader conflict resolution
 - backend supervision for audit rather than hard real-time control
+
+## Packet Authentication And PQC Roadmap
+
+The current edge peer packet implementation uses `PeerPacketAuth`. `hmac_sha256` is implemented now for bench and HIL validation. It provides real tamper detection and replay-aware verification while keeping packet size and verification latency small.
+
+This is not post-quantum authentication. Long-lifecycle UAV systems need a post-quantum path because packet captures, keys, and deployed airframes may remain relevant across many years. The roadmap is hybrid classical plus PQC: ML-DSA/Dilithium for packet signatures, ML-KEM/Kyber for key establishment, trust epoch rotation for key and revocation events, and replay nonce or sequence binding for every peer packet.
+
+Limitations remain: shared-secret HMAC does not provide per-node non-repudiation, compromised node secrets remain high impact, and PQC performance and MTU costs must be measured before safety-critical deployment.
 
 ## Academic Contribution
 

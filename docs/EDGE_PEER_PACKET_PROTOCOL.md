@@ -1,6 +1,6 @@
 # Edge Peer Packet Protocol
 
-The `edge_swarm` peer protocol carries compact drone-to-drone state over the existing V2X mesh as `SwarmMessage::EDGE_PACKET`. The implementation now supports a JSON debug path and a first production-oriented CBOR binary path through the same `EdgePeerProtocol` validation surface. JSON remains useful for bench visibility and replay inspection; CBOR is the preferred low-latency edge runtime prototype.
+The `edge_swarm` peer protocol carries compact drone-to-drone state over the existing V2X mesh as `SwarmMessage::EDGE_PACKET`. The implementation now supports a JSON debug path, deterministic CBOR packets, and packet authentication through `PeerPacketAuth`. JSON remains useful for bench visibility and replay inspection; CBOR is the preferred low-latency edge runtime prototype.
 
 ## Envelope
 
@@ -15,7 +15,11 @@ Every packet has the same envelope:
 | `trust_epoch` | Security/runtime trust epoch associated with the sender state. |
 | `source` | Normalized to `real`, `playback`, `simulation`, or `unavailable`. |
 | `ttl_ms` | Packet time-to-live. Expired or zero-TTL packets are rejected. |
-| `auth_hook` | Signature/authentication placeholder for the current implementation. Current values are `swarm-security-hook` or `unsigned`. |
+| `auth_hook` | Authentication metadata. `hmac_sha256:<hex>` is implemented; `unsigned` is allowed only in explicit simulation/debug configuration. |
+
+Current implemented auth mode: `hmac_sha256`. Current non-PQC limitation: HMAC is symmetric shared-secret authentication and is not a post-quantum signature scheme.
+
+`pqc_hybrid_placeholder` is roadmap-only. If selected, verification returns unsupported and logs: `PQC hybrid auth is roadmap-only in this build.`
 | `payload` | Type-specific packet data. |
 
 The default packet size limit is 1400 bytes so peer packets fit a conservative UDP/mesh MTU. Validation can use the actual encoded wire size, so CBOR packets are bounded by their binary size rather than by their JSON-equivalent debug rendering. `V2XMeshNetwork` still enforces the larger transport payload limit before send.
@@ -97,6 +101,26 @@ The bandwidth-savings field is an estimate against the JSON-equivalent packet si
 ## Validation Rules
 
 Malformed JSON or CBOR packets, missing required envelope fields, missing required payloads, expired packets, unknown packet types, zero sender ids, stale sequence numbers, oversized packets, non-finite pose vectors, and invalid emergency corridor radii are rejected.
+
+Packet verification runs before peer cache or consensus updates. Safety-critical peer packets with missing or invalid signatures are rejected. Emergency corridor packets may be parsed for visibility, but peer-driven emergency action still requires successful authentication.
+
+```text
+function verify_peer_packet(packet, peer_state, auth_config):
+    if packet.timestamp is stale:
+        reject STALE_TIMESTAMP
+    if packet.sequence <= peer_state.last_sequence:
+        reject REPLAY_DETECTED
+    if packet.trust_epoch != peer_state.trust_epoch:
+        reject STALE_EPOCH
+    canonical = canonicalize(packet without signature)
+    if auth_config.mode == hmac_sha256:
+        expected = HMAC_SHA256(secret, canonical)
+        if !constant_time_equal(expected, packet.signature):
+            reject INVALID_SIGNATURE
+    if auth_config.mode == pqc_hybrid_placeholder:
+        reject UNSUPPORTED_ROADMAP_MODE
+    accept
+```
 
 Stale peers are excluded from safety-critical peer eligibility and consensus support. Consensus never gates local collision avoidance or emergency landing; local safety and emergency handling always win.
 

@@ -43,6 +43,11 @@ struct EdgeSerializationMetrics {
     double serialization_time_us{0.0};
     double deserialization_time_us{0.0};
     double compression_ratio_vs_json{1.0};
+    uint64_t auth_failures{0};
+    uint64_t unsigned_packets{0};
+    std::string auth_mode{"none"};
+    std::string last_auth_result{"accepted"};
+    std::string pqc_ready_status{"not_implemented"};
     bool estimated{false};
 };
 

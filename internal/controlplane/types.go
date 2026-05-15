@@ -122,6 +122,11 @@ type DroneTelemetry struct {
 	EdgeAveragePacketBytes   float64         `json:"edge_average_packet_size_bytes,omitempty"`
 	EdgeBandwidthSavingsPct  float64         `json:"edge_bandwidth_savings_estimate_pct,omitempty"`
 	EdgePacketEncodeLatency  float64         `json:"edge_packet_encode_latency_us,omitempty"`
+	AuthMode                 string          `json:"auth_mode,omitempty"`
+	AuthFailures             int             `json:"auth_failures,omitempty"`
+	UnsignedPackets          int             `json:"unsigned_packets,omitempty"`
+	LastAuthResult           string          `json:"last_auth_result,omitempty"`
+	PQCReadyStatus           string          `json:"pqc_ready_status,omitempty"`
 	DisconnectedOperation    bool            `json:"disconnected_operation,omitempty"`
 	EdgeHealthStatus         string          `json:"edge_health_status,omitempty"`
 	EdgeAutonomyState        string          `json:"edge_autonomy_state,omitempty"`

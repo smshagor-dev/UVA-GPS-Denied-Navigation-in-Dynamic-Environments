@@ -73,6 +73,7 @@ add_executable(test_navigation_intelligence
     ../src/localization/TimeSyncTracker.cpp
     ../src/runtime/RuntimeMode.cpp
     ../src/safety/SafetyManager.cpp
+    ../src/security/PeerPacketAuth.cpp
     ../src/sensors/CameraSensor.cpp
     ../src/slam/KeyframeManager.cpp
     ../src/slam/MapPlanner.cpp
@@ -104,6 +105,7 @@ gtest_discover_tests(test_navigation_intelligence DISCOVERY_TIMEOUT 30 DISCOVERY
 add_executable(test_swarm_security
     test_swarm_security.cpp
     ../src/sensors/MotorSensor.cpp
+    ../src/security/PeerPacketAuth.cpp
     ../src/swarm/EdgeConsensusManager.cpp
     ../src/swarm/EdgePeerProtocol.cpp
     ../src/swarm/SwarmStateCache.cpp
@@ -147,6 +149,7 @@ gtest_discover_tests(test_telemetry DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_
 
 add_executable(test_edge_swarm
     test_edge_swarm.cpp
+    ../src/security/PeerPacketAuth.cpp
     ../src/swarm/EdgeConsensusManager.cpp
     ../src/swarm/EdgePeerProtocol.cpp
     ../src/swarm/SwarmStateCache.cpp

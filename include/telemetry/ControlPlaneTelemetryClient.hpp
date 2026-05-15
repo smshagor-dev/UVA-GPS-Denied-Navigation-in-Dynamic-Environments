@@ -130,6 +130,11 @@ struct TelemetrySnapshot {
     double edge_average_packet_size_bytes{0.0};
     double edge_bandwidth_savings_estimate_pct{0.0};
     double edge_packet_encode_latency_us{0.0};
+    std::string auth_mode{"none"};
+    uint64_t auth_failures{0};
+    uint64_t unsigned_packets{0};
+    std::string last_auth_result{"accepted"};
+    std::string pqc_ready_status{"not_implemented"};
     bool disconnected_operation{false};
     std::string edge_health_status{"nominal"};
     std::string edge_autonomy_state{"backend_assisted"};

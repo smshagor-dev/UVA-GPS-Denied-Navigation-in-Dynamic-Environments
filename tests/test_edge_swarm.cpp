@@ -3,12 +3,15 @@
 #include <array>
 #include <chrono>
 #include <iostream>
+#include <utility>
 
 #include "swarm/EdgeConsensusManager.hpp"
 #include "swarm/EdgePeerProtocol.hpp"
 #include "swarm/SwarmStateCache.hpp"
+#include "security/PeerPacketAuth.hpp"
 
 using namespace drone::swarm;
+using namespace drone::security;
 
 namespace {
 
@@ -104,6 +107,16 @@ bool equivalent_header(const EdgePeerPacket& lhs, const EdgePeerPacket& rhs) {
 }
 
 } // namespace
+
+PacketAuthConfig auth_config(std::string profile = "edge_swarm") {
+    PacketAuthConfig cfg;
+    cfg.mode = AuthMode::HMAC_SHA256;
+    cfg.shared_secret = "unit-test-shared-secret";
+    cfg.trust_epoch = 1;
+    cfg.max_clock_skew_ms = 2000;
+    cfg.runtime_profile = std::move(profile);
+    return cfg;
+}
 
 TEST(EdgePeerProtocol, ValidHeartbeatParse) {
     const auto wire = serialize_edge_packet_json(heartbeat(7, 1000, 1));
@@ -261,6 +274,106 @@ TEST(EdgePeerProtocol, StaleSequenceRejected) {
     const auto observed = cache.observe_packet(heartbeat(7, 1100, 10), 1100);
     EXPECT_FALSE(observed.accepted);
     EXPECT_EQ(observed.reason, "stale sequence number");
+}
+
+TEST(PeerPacketAuth, HmacSignedPacketVerifies) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+
+    const auto verified = verifyPacket(packet, cfg, 1000);
+    EXPECT_EQ(verified.result, PacketAuthResult::ACCEPTED);
+}
+
+TEST(PeerPacketAuth, TamperedPayloadRejected) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    packet.heartbeat->battery_pct = 12.0;
+
+    const auto verified = verifyPacket(packet, cfg, 1000);
+    EXPECT_EQ(verified.result, PacketAuthResult::INVALID_SIGNATURE);
+}
+
+TEST(PeerPacketAuth, TamperedSenderRejected) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    packet.sender_id = 8;
+
+    const auto verified = verifyPacket(packet, cfg, 1000);
+    EXPECT_EQ(verified.result, PacketAuthResult::INVALID_SIGNATURE);
+}
+
+TEST(PeerPacketAuth, MissingSignatureRejectedInEdgeSwarm) {
+    auto packet = heartbeat(7, 1000, 1);
+    packet.auth_hook = "unsigned";
+
+    const auto verified = verifyPacket(packet, auth_config("edge_swarm"), 1000);
+    EXPECT_EQ(verified.result, PacketAuthResult::MISSING_SIGNATURE);
+}
+
+TEST(PeerPacketAuth, UnsignedAllowedOnlyInSimulationWhenConfigured) {
+    auto packet = heartbeat(7, 1000, 1);
+    packet.source = "simulation";
+    packet.auth_hook = "unsigned";
+    auto cfg = auth_config("simulation");
+    cfg.mode = AuthMode::NONE;
+    cfg.allow_unsigned_in_simulation = true;
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000).result, PacketAuthResult::ACCEPTED);
+
+    cfg.runtime_profile = "edge_swarm";
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000).result, PacketAuthResult::MISSING_SIGNATURE);
+}
+
+TEST(PeerPacketAuth, StaleTrustEpochRejected) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    packet.trust_epoch = 2;
+
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000).result, PacketAuthResult::STALE_EPOCH);
+}
+
+TEST(PeerPacketAuth, StaleSequenceRejected) {
+    auto packet = heartbeat(7, 1000, 10);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000, 10).result, PacketAuthResult::REPLAY_DETECTED);
+}
+
+TEST(PeerPacketAuth, PqcPlaceholderReturnsUnsupported) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    cfg.mode = AuthMode::PQC_HYBRID_PLACEHOLDER;
+
+    const auto verified = verifyPacket(packet, cfg, 1000);
+    EXPECT_EQ(verified.result, PacketAuthResult::UNSUPPORTED);
+    EXPECT_EQ(verified.reason, "PQC hybrid auth is roadmap-only in this build.");
+}
+
+TEST(PeerPacketAuth, AuthFailurePreventsCacheUpdate) {
+    SwarmStateCache cache;
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+
+    const auto verified = verifyPacket(packet, cfg, 1000);
+    ASSERT_FALSE(verified.accepted());
+    EXPECT_EQ(cache.peer_count(), 0u);
+}
+
+TEST(PeerPacketAuth, EmergencyCorridorRequiresAuthBeforePeerAction) {
+    auto packet = emergency_corridor(2, 2000, 1);
+    packet.auth_hook = "unsigned";
+    auto cfg = auth_config();
+    EdgeConsensusManager manager(1, 2);
+    manager.set_local_safety_override(true);
+
+    EXPECT_EQ(verifyPacket(packet, cfg, 2000).result, PacketAuthResult::MISSING_SIGNATURE);
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 2000).result, PacketAuthResult::ACCEPTED);
+    EXPECT_TRUE(manager.should_accept_emergency_packet(packet));
 }
 
 TEST(SwarmStateCache, PeerBecomesStaleAfterTimeout) {

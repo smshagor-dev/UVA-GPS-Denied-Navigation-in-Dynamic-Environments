@@ -261,6 +261,7 @@ set(CORE_SOURCES
     src/localization/TimeSyncTracker.cpp
     src/localization/UWBSerialDriver.cpp
     src/runtime/RuntimeMode.cpp
+    src/security/PeerPacketAuth.cpp
     src/swarm/EdgeConsensusManager.cpp
     src/swarm/EdgePeerProtocol.cpp
     src/swarm/SwarmStateCache.cpp

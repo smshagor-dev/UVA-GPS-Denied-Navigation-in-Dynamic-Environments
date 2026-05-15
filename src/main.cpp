@@ -23,6 +23,7 @@
 #include "localization/UWBSerialDriver.hpp"
 #include "security/CommandPolicy.hpp"
 #include "security/FirmwareTrust.hpp"
+#include "security/PeerPacketAuth.hpp"
 #include "telemetry/ControlPlaneTelemetryClient.hpp"
 #include "vio/VIOPipeline.hpp"
 #include "slam/KeyframeManager.hpp"
@@ -150,6 +151,7 @@ struct NodeConfig {
     std::string detector_labels_path{"config/detector_labels.json"};
     std::string edge_protocol_config_path{"config/swarm_edge_protocol.json"};
     std::string edge_serialization_mode{"json"};
+    drone::security::PacketAuthConfig edge_auth{};
 };
 
 std::optional<std::string> extract_local_json_string(const std::string& content, const std::string& key) {
@@ -157,6 +159,31 @@ std::optional<std::string> extract_local_json_string(const std::string& content,
     std::smatch match;
     if (std::regex_search(content, match, pattern) && match.size() >= 2) {
         return match[1].str();
+    }
+    return std::nullopt;
+}
+
+std::optional<bool> extract_local_json_bool(const std::string& content, const std::string& key) {
+    const std::regex pattern("\"" + key + "\"\\s*:\\s*(true|false)", std::regex::icase);
+    std::smatch match;
+    if (std::regex_search(content, match, pattern) && match.size() >= 2) {
+        std::string value = match[1].str();
+        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        return value == "true";
+    }
+    return std::nullopt;
+}
+
+std::optional<uint64_t> extract_local_json_u64(const std::string& content, const std::string& key) {
+    const std::regex pattern("\"" + key + "\"\\s*:\\s*([0-9]+)", std::regex::icase);
+    std::smatch match;
+    if (std::regex_search(content, match, pattern) && match.size() >= 2) {
+        try {
+            return static_cast<uint64_t>(std::stoull(match[1].str()));
+        } catch (const std::exception&) {
+        }
     }
     return std::nullopt;
 }
@@ -172,8 +199,27 @@ void apply_edge_protocol_config(NodeConfig& cfg) {
     }
     std::ostringstream buffer;
     buffer << in.rdbuf();
-    if (const auto mode = extract_local_json_string(buffer.str(), "serialization_mode")) {
+    const std::string content = buffer.str();
+    if (const auto mode = extract_local_json_string(content, "serialization_mode")) {
         cfg.edge_serialization_mode = *mode;
+    }
+    if (const auto mode = extract_local_json_string(content, "mode")) {
+        cfg.edge_auth.mode = drone::security::parse_auth_mode(*mode).value_or(cfg.edge_auth.mode);
+    }
+    if (const auto allow = extract_local_json_bool(content, "allow_unsigned_in_simulation")) {
+        cfg.edge_auth.allow_unsigned_in_simulation = *allow;
+    }
+    if (const auto allow = extract_local_json_bool(content, "allow_unsigned_in_bench")) {
+        cfg.edge_auth.allow_unsigned_in_bench = *allow;
+    }
+    if (const auto epoch = extract_local_json_u64(content, "trust_epoch")) {
+        cfg.edge_auth.trust_epoch = *epoch;
+    }
+    if (const auto skew = extract_local_json_u64(content, "max_clock_skew_ms")) {
+        cfg.edge_auth.max_clock_skew_ms = *skew;
+    }
+    if (const auto env = extract_local_json_string(content, "shared_secret_env")) {
+        cfg.edge_auth.shared_secret_env = *env;
     }
 }
 
@@ -311,6 +357,9 @@ void apply_env_overrides(NodeConfig& cfg) {
     }
     if (const auto value = env_var("DRONE_EDGE_SERIALIZATION_MODE")) {
         cfg.edge_serialization_mode = *value;
+    }
+    if (const auto value = env_var("DRONE_EDGE_AUTH_MODE")) {
+        cfg.edge_auth.mode = drone::security::parse_auth_mode(*value).value_or(cfg.edge_auth.mode);
     }
 }
 
@@ -514,6 +563,10 @@ NodeConfig parse_args(int argc, char** argv) {
     apply_env_overrides(cfg);
     apply_cli_overrides(cfg, argc, argv);
     cfg.security_profile = normalize_security_profile(cfg.security_profile);
+    cfg.edge_auth.runtime_profile =
+        cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION
+            ? "simulation"
+            : (cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM ? "edge_swarm" : cfg.security_profile);
     spdlog::info("CLI config parsed: id={} esp32={} lidar={} group={} yolo={} tdoa_csv={} tdoa_udp={} tdoa_serial={} security_profile={} backend_telemetry={} telemetry_interval_ms={} runtime_mode={} runtime_config={} anchor_config={} lidar_config={} detector_labels={}",
                  cfg.drone_id, cfg.esp32_ip, cfg.lidar_endpoint, cfg.swarm_group, cfg.yolo_engine,
                  cfg.tdoa_measurements_csv.empty() ? std::string("<none>") : cfg.tdoa_measurements_csv,
@@ -974,6 +1027,26 @@ int main(int argc, char** argv) {
         spdlog::warn("DRONE_SWARM_SECRET not set, using development swarm secret");
     }
     net->configure_security(std::move(security_cfg));
+    auto edge_auth_cfg = cfg.edge_auth;
+    edge_auth_cfg.shared_secret = env_var(edge_auth_cfg.shared_secret_env).value_or("");
+    if (edge_auth_cfg.mode == drone::security::AuthMode::NONE &&
+        edge_auth_cfg.runtime_profile != "simulation") {
+        spdlog::error("edge_swarm auth mode 'none' is not allowed outside explicit simulation/debug");
+        return 1;
+    }
+    if (edge_auth_cfg.mode == drone::security::AuthMode::HMAC_SHA256 &&
+        edge_auth_cfg.shared_secret.empty()) {
+        if (hardened_profile || cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM) {
+            spdlog::error("{} is required for hmac_sha256 edge packet auth", edge_auth_cfg.shared_secret_env);
+            return 1;
+        }
+        edge_auth_cfg.shared_secret = "drone-swarm-dev-secret-change-me";
+        spdlog::warn("{} not set, using development edge packet auth secret", edge_auth_cfg.shared_secret_env);
+    }
+    if (edge_auth_cfg.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER) {
+        spdlog::warn("PQC hybrid auth is roadmap-only in this build.");
+    }
+    net->configure_packet_auth(edge_auth_cfg);
 
     slam = std::make_shared<drone::slam::KeyframeManager>(cfg.drone_id, net);
 
@@ -1574,6 +1647,11 @@ int main(int argc, char** argv) {
             snapshot.edge_bandwidth_savings_estimate_pct =
                 std::clamp((1.0 - snapshot_serialization_metrics.compression_ratio_vs_json) * 100.0, 0.0, 100.0);
             snapshot.edge_packet_encode_latency_us = snapshot_serialization_metrics.serialization_time_us;
+            snapshot.auth_mode = snapshot_serialization_metrics.auth_mode;
+            snapshot.auth_failures = snapshot_serialization_metrics.auth_failures;
+            snapshot.unsigned_packets = snapshot_serialization_metrics.unsigned_packets;
+            snapshot.last_auth_result = snapshot_serialization_metrics.last_auth_result;
+            snapshot.pqc_ready_status = snapshot_serialization_metrics.pqc_ready_status;
             snapshot.disconnected_operation = net->disconnected_operation();
             snapshot.edge_health_status = net->edge_health_status();
             snapshot.edge_autonomy_state = net->autonomy_state();

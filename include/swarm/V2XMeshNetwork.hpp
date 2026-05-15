@@ -25,6 +25,7 @@
 
 #include "swarm/EdgeConsensusManager.hpp"
 #include "swarm/SwarmStateCache.hpp"
+#include "security/PeerPacketAuth.hpp"
 #include "sensors/LidarSensor.hpp"
 
 namespace drone::swarm {
@@ -176,6 +177,7 @@ public:
     bool broadcast(SwarmMessage::Type type, std::vector<uint8_t> payload = {});
     bool unicast  (uint32_t dst, SwarmMessage::Type type, std::vector<uint8_t> payload);
     void configure_security(SwarmSecurityConfig cfg);
+    void configure_packet_auth(drone::security::PacketAuthConfig cfg);
     void set_edge_serialization_mode(EdgeSerializationMode mode);
     [[nodiscard]] bool security_enabled() const;
     [[nodiscard]] std::string security_last_error() const;
@@ -280,6 +282,10 @@ private:
     mutable std::mutex edge_serialization_metrics_mutex_;
     EdgeSerializationMode edge_serialization_mode_{EdgeSerializationMode::JSON};
     EdgeSerializationMetrics edge_serialization_metrics_{};
+    drone::security::PacketAuthConfig packet_auth_config_{};
+    std::atomic<uint64_t> edge_auth_failures_{0};
+    std::atomic<uint64_t> edge_unsigned_packets_{0};
+    std::string edge_last_auth_result_{"accepted"};
     mutable std::atomic<uint64_t> last_edge_sequence_{0};
 
     std::shared_ptr<spdlog::logger> logger_{spdlog::get("V2X")};
