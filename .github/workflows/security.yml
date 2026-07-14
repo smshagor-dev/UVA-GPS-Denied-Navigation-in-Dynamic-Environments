@@ -156,22 +156,31 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language:
-          - c-cpp
-          - python
-          - go
+        include:
+          - language: c-cpp
+            build-mode: manual
+          - language: python
+            build-mode: none
+          - language: go
+            build-mode: manual
     steps:
       - uses: actions/checkout@v4
 
-      - uses: github/codeql-action/init@v3
+      - uses: actions/setup-go@v5
+        if: matrix.language == 'go'
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
-          build-mode: ${{ matrix.language == 'c-cpp' && 'manual' || 'none' }}
+          build-mode: ${{ matrix.build-mode }}
 
       - uses: ./.github/actions/setup-linux-deps
         if: matrix.language == 'c-cpp'
 
-      - name: Build for CodeQL
+      - name: Build C/C++ for CodeQL
         if: matrix.language == 'c-cpp'
         shell: bash
         run: |
@@ -179,7 +188,14 @@ jobs:
           cmake --preset validation-linux-gcc
           cmake --build --preset validation-linux-gcc
 
-      - uses: github/codeql-action/analyze@v3
+      - name: Build Go for CodeQL
+        if: matrix.language == 'go'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          go build ./...
+
+      - uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
 
