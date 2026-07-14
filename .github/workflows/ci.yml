@@ -456,6 +456,7 @@ jobs:
         with:
           name: ctest-windows-msvc-validation-${{ github.sha }}
           path: ${{ runner.temp }}\ctest-windows-msvc-validation
+          if-no-files-found: ignore
           retention-days: 14
 
   windows-msvc-debug:
@@ -501,6 +502,7 @@ jobs:
         with:
           name: ctest-windows-msvc-debug-${{ github.sha }}
           path: ${{ runner.temp }}\ctest-windows-msvc-debug
+          if-no-files-found: ignore
           retention-days: 14
 
   windows-msvc-release:
@@ -546,6 +548,7 @@ jobs:
         with:
           name: ctest-windows-msvc-release-${{ github.sha }}
           path: ${{ runner.temp }}\ctest-windows-msvc-release
+          if-no-files-found: ignore
           retention-days: 14
 
   full-validator:
