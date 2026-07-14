@@ -25,8 +25,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: false
@@ -82,7 +82,7 @@ jobs:
             sha256sum ./* > SHA256SUMS.txt
           )
       - name: Upload Linux release artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: release-linux-${{ github.sha }}
           path: |
@@ -95,8 +95,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
       - uses: ./.github/actions/setup-vcpkg
@@ -120,12 +120,12 @@ jobs:
         run: cmake --preset windows-msvc-release-package -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
       - name: Build
         shell: pwsh
-        run: cmake --build --preset windows-msvc-release-package
+        run: cmake --build --preset windows-msvc-release-package --parallel
       - name: Test
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\release\windows" | Out-Null
-          ctest --preset windows-msvc-release-package --output-on-failure --output-junit "$env:RUNNER_TEMP\release\windows\junit.xml"
+          ctest --preset windows-msvc-release-package --parallel 2 --output-on-failure --output-junit "$env:RUNNER_TEMP\release\windows\junit.xml"
       - name: Install
         shell: pwsh
         run: cmake --install build/windows-msvc-release-package --config Release --prefix "$env:RUNNER_TEMP\windows-install"
@@ -144,7 +144,7 @@ jobs:
           }
           $lines | Set-Content -LiteralPath "$env:RUNNER_TEMP\release\windows\SHA256SUMS.txt"
       - name: Upload Windows release artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: release-windows-${{ github.sha }}
           path: ${{ runner.temp }}\release\windows
@@ -161,7 +161,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
           path: ${{ runner.temp }}/release-bundle
 

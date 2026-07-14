@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Install actionlint
         shell: bash
@@ -58,15 +58,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements.txt
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: false
@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -135,9 +135,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
           cache: pip
@@ -160,7 +160,7 @@ jobs:
 
       - name: Python syntax validation
         shell: bash
-        run: python3 -m py_compile tests/__init__.py tests/test_dashboard_backend_status.py main.py scripts/generate_firmware_manifest.py scripts/drone_setup.py scripts/bench_check.py scripts/local_validate.py scripts/generate_tls_certs.py scripts/pre_arm_check.py scripts/production_telemetry_smoke_test.py scripts/telemetry_smoke_test.py gui/dashboard.py gui/backend_status.py
+        run: python3 -m py_compile tests/__init__.py tests/test_dashboard_backend_status.py main.py scripts/generate_firmware_manifest.py scripts/drone_setup.py scripts/bench_check.py scripts/local_validate.py scripts/generate_tls_certs.py scripts/pre_arm_check.py scripts/production_telemetry_smoke_test.py scripts/telemetry_smoke_test.py gui/dashboard.py gui/backend_status.py gui/operator_console.py
 
       - name: Python unit tests with coverage
         shell: bash
@@ -173,7 +173,7 @@ jobs:
 
       - name: Upload Python coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: python-coverage-${{ github.sha }}
           path: ${{ runner.temp }}/python-coverage
@@ -184,9 +184,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: false
@@ -212,7 +212,7 @@ jobs:
 
       - name: Upload Go coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: go-coverage-${{ github.sha }}
           path: ${{ runner.temp }}/go-coverage
@@ -223,7 +223,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup-linux-deps
 
@@ -256,7 +256,7 @@ jobs:
 
       - name: Upload Linux GCC reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ctest-linux-gcc-validation-${{ github.sha }}
           path: ${{ runner.temp }}/ctest-linux-gcc-validation
@@ -268,7 +268,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -292,7 +292,7 @@ jobs:
           ctest --preset linux-gcc-debug --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-gcc-debug/junit.xml"
       - name: Upload Linux GCC Debug reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ctest-linux-gcc-debug-${{ github.sha }}
           path: ${{ runner.temp }}/ctest-linux-gcc-debug
@@ -304,7 +304,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -328,7 +328,7 @@ jobs:
           ctest --preset linux-gcc-release --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-gcc-release/junit.xml"
       - name: Upload Linux GCC Release reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ctest-linux-gcc-release-${{ github.sha }}
           path: ${{ runner.temp }}/ctest-linux-gcc-release
@@ -339,7 +339,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -364,7 +364,7 @@ jobs:
           ctest --preset linux-clang-release --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-clang-release/junit.xml"
       - name: Upload Linux Clang Release reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ctest-linux-clang-release-${{ github.sha }}
           path: ${{ runner.temp }}/ctest-linux-clang-release
@@ -376,7 +376,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -400,7 +400,7 @@ jobs:
           ctest --preset linux-clang-debug --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-clang-debug/junit.xml"
       - name: Upload Linux Clang Debug reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ctest-linux-clang-debug-${{ github.sha }}
           path: ${{ runner.temp }}/ctest-linux-clang-debug
@@ -409,11 +409,11 @@ jobs:
   windows-msvc-validation:
     name: Windows MSVC Validation
     runs-on: windows-2022
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
 
@@ -442,17 +442,17 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: cmake --build --preset validation-msvc
+        run: cmake --build --preset validation-msvc --parallel
 
       - name: Test
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\ctest-windows-msvc-validation" | Out-Null
-          ctest --preset validation-msvc --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-validation\junit.xml"
+          ctest --preset validation-msvc --parallel 2 --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-validation\junit.xml"
 
       - name: Upload Windows validation reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ctest-windows-msvc-validation-${{ github.sha }}
           path: ${{ runner.temp }}\ctest-windows-msvc-validation
@@ -462,10 +462,10 @@ jobs:
     name: Windows MSVC Debug
     if: github.event_name != 'pull_request'
     runs-on: windows-2022
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
       - uses: ./.github/actions/setup-vcpkg
@@ -489,15 +489,15 @@ jobs:
         run: cmake --preset windows-msvc-debug -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
       - name: Build
         shell: pwsh
-        run: cmake --build --preset windows-msvc-debug
+        run: cmake --build --preset windows-msvc-debug --parallel
       - name: Test
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\ctest-windows-msvc-debug" | Out-Null
-          ctest --preset windows-msvc-debug --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-debug\junit.xml"
+          ctest --preset windows-msvc-debug --parallel 2 --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-debug\junit.xml"
       - name: Upload Windows Debug reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ctest-windows-msvc-debug-${{ github.sha }}
           path: ${{ runner.temp }}\ctest-windows-msvc-debug
@@ -507,10 +507,10 @@ jobs:
     name: Windows MSVC Release
     if: github.event_name != 'pull_request'
     runs-on: windows-2022
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
       - uses: ./.github/actions/setup-vcpkg
@@ -534,15 +534,15 @@ jobs:
         run: cmake --preset windows-msvc-release -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
       - name: Build
         shell: pwsh
-        run: cmake --build --preset windows-msvc-release
+        run: cmake --build --preset windows-msvc-release --parallel
       - name: Test
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\ctest-windows-msvc-release" | Out-Null
-          ctest --preset windows-msvc-release --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-release\junit.xml"
+          ctest --preset windows-msvc-release --parallel 2 --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-release\junit.xml"
       - name: Upload Windows Release reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: ctest-windows-msvc-release-${{ github.sha }}
           path: ${{ runner.temp }}\ctest-windows-msvc-release
@@ -553,13 +553,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements.txt
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: false
@@ -581,7 +581,7 @@ jobs:
             --report "${RUNNER_TEMP}/local-validate/local_validate_report.json"
       - name: Upload validator report
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: local-validator-${{ github.sha }}
           path: ${{ runner.temp }}/local-validate
@@ -592,7 +592,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -623,7 +623,7 @@ jobs:
             --manifest-out "${RUNNER_TEMP}/install-manifest/install-manifest.json"
       - name: Upload install manifest
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: install-consumer-${{ github.sha }}
           path: |

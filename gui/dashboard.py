@@ -26,7 +26,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib import error, parse, request
 
 import numpy as np
@@ -80,6 +80,7 @@ from gui.dashboard_contract import (
     parse_replay_payload,
     parse_tdoa_payload,
 )
+from gui.operator_console import OperatorConsoleView
 
 
 DARK_BG = "#05090F"
@@ -3014,6 +3015,109 @@ class MetricCard(QFrame):
         self._subtitle.setText(subtitle)
 
 
+class UILogSink:
+    def __init__(
+        self, status_bar: QStatusBar, delegate: CommandConsole | None = None
+    ) -> None:
+        self._status_bar = status_bar
+        self._delegate = delegate
+
+    def append_log(self, message: str) -> None:
+        logger.info("dashboard ui message: %s", message)
+        self._status_bar.showMessage(message, 5000)
+        if self._delegate is not None:
+            self._delegate.append_log(message)
+
+    def set_pending_approvals(self, approvals: dict[str, str]) -> None:
+        if self._delegate is not None:
+            self._delegate.set_pending_approvals(approvals)
+
+
+class DashboardToolDialog(QDialog):
+    def __init__(
+        self, title: str, tabs: list[tuple[str, QWidget]], parent: QWidget | None = None
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(1360, 900)
+        self.setModal(False)
+        self.setStyleSheet(f"QDialog {{ background: {DARK_BG}; color: {TEXT}; }}")
+        self._tab_indexes: dict[str, int] = {}
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+        self._tab_widget = QTabWidget()
+        self._tab_widget.setDocumentMode(True)
+        self._tab_widget.setStyleSheet(
+            f"QTabWidget::pane {{ border: 1px solid {BORDER}; border-radius: 8px; background: {PANEL_ALT}; top: -1px; }}"
+            f" QTabBar::tab {{ background: {PANEL_BG}; color: {TEXT_DIM}; padding: 10px 16px; border: 1px solid {BORDER};"
+            f" border-bottom: none; min-width: 110px; font-weight: 700; }}"
+            f" QTabBar::tab:selected {{ background: {PANEL_ALT}; color: {TEXT}; border-top: 1px solid {ACCENT}; }}"
+            f" QTabBar::tab:!selected:hover {{ color: {TEXT}; }}"
+        )
+        for index, (label, widget) in enumerate(tabs):
+            self._tab_indexes[label] = index
+            self._tab_widget.addTab(widget, label)
+        layout.addWidget(self._tab_widget)
+
+    def present(self, tab_name: str | None = None) -> None:
+        if tab_name in self._tab_indexes:
+            self._tab_widget.setCurrentIndex(self._tab_indexes[tab_name])
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+
+class LazyDashboardToolDialog(QDialog):
+    def __init__(
+        self,
+        title: str,
+        tab_factories: list[tuple[str, Callable[[], QWidget]]],
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(1180, 820)
+        self.setModal(False)
+        self.setStyleSheet(f"QDialog {{ background: {DARK_BG}; color: {TEXT}; }}")
+        self._tab_factories = tab_factories
+        self._built_tabs: dict[str, QWidget] = {}
+        self._tab_indexes: dict[str, int] = {}
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+        self._tab_widget = QTabWidget()
+        self._tab_widget.setDocumentMode(True)
+        self._tab_widget.setStyleSheet(
+            f"QTabWidget::pane {{ border: 1px solid {BORDER}; border-radius: 8px; background: {PANEL_ALT}; top: -1px; }}"
+            f" QTabBar::tab {{ background: {PANEL_BG}; color: {TEXT_DIM}; padding: 10px 16px; border: 1px solid {BORDER};"
+            f" border-bottom: none; min-width: 110px; font-weight: 700; }}"
+            f" QTabBar::tab:selected {{ background: {PANEL_ALT}; color: {TEXT}; border-top: 1px solid {ACCENT}; }}"
+            f" QTabBar::tab:!selected:hover {{ color: {TEXT}; }}"
+        )
+        layout.addWidget(self._tab_widget)
+
+    def ensure_built(self) -> None:
+        if self._built_tabs:
+            return
+        for index, (label, factory) in enumerate(self._tab_factories):
+            widget = factory()
+            self._built_tabs[label] = widget
+            self._tab_indexes[label] = index
+            self._tab_widget.addTab(widget, label)
+
+    def built_widget(self, label: str) -> QWidget | None:
+        return self._built_tabs.get(label)
+
+    def present(self, tab_name: str | None = None) -> None:
+        self.ensure_built()
+        if tab_name in self._tab_indexes:
+            self._tab_widget.setCurrentIndex(self._tab_indexes[tab_name])
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+
 class StatusPill(QFrame):
     def __init__(self, title: str, accent: str = ACCENT) -> None:
         super().__init__()
@@ -4762,6 +4866,275 @@ class AutonomyHighlightsTable(QTableWidget):
         self.resizeRowsToContents()
 
 
+class AnalyticsWorkbenchPage(QWidget):
+    def __init__(self, drone_ids: list[int], poll_hz: int) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+
+        self._tabs = QTabWidget()
+        self._tabs.setDocumentMode(True)
+        self._tabs.setStyleSheet(
+            f"QTabWidget::pane {{ border: 1px solid {BORDER}; border-radius: 8px; background: {PANEL_ALT}; top: -1px; }}"
+            f" QTabBar::tab {{ background: {PANEL_BG}; color: {TEXT_DIM}; padding: 8px 14px; border: 1px solid {BORDER};"
+            f" border-bottom: none; min-width: 96px; }}"
+            f" QTabBar::tab:selected {{ background: {PANEL_ALT}; color: {TEXT}; border-top: 1px solid {ACCENT}; font-weight: 700; }}"
+        )
+        layout.addWidget(self._tabs)
+
+        self._map3d = Map3DView()
+        self._map3d.setMinimumHeight(640)
+        self._tabs.addTab(self._map3d, "3D Map")
+
+        graphs_page = QWidget()
+        graphs_layout = QGridLayout(graphs_page)
+        graphs_layout.setContentsMargins(8, 8, 8, 8)
+        graphs_layout.setHorizontalSpacing(10)
+        graphs_layout.setVerticalSpacing(10)
+        self._drift = DriftGraph(drone_ids, poll_hz)
+        self._mcss = MCSSScoreGraph(drone_ids, poll_hz)
+        self._network = NetworkHealthGraph(poll_hz)
+        self._compute = ComputeLoadGraph(poll_hz)
+        for widget in (self._drift, self._mcss, self._network, self._compute):
+            widget.setMinimumHeight(220)
+        graphs_layout.addWidget(self._drift, 0, 0)
+        graphs_layout.addWidget(self._mcss, 0, 1)
+        graphs_layout.addWidget(self._network, 1, 0)
+        graphs_layout.addWidget(self._compute, 1, 1)
+        self._tabs.addTab(graphs_page, "Graphs")
+
+        tables_page = QWidget()
+        tables_layout = QVBoxLayout(tables_page)
+        tables_layout.setContentsMargins(8, 8, 8, 8)
+        tables_layout.setSpacing(10)
+        self._fleet_table = SwarmTable()
+        self._metrics_table = AdvancedMetricsTable()
+        self._autonomy_table = AutonomyHighlightsTable()
+        self._security_table = AutonomySecurityTable()
+        for widget in (
+            self._fleet_table,
+            self._metrics_table,
+            self._autonomy_table,
+            self._security_table,
+        ):
+            widget.setMinimumHeight(180)
+            tables_layout.addWidget(widget, 1)
+        self._tabs.addTab(tables_page, "Tables")
+
+    def ingest(self, snapshot: DashboardSnapshot) -> None:
+        self._map3d.ingest(snapshot.states)
+        self._drift.ingest(snapshot.states)
+        self._mcss.ingest(snapshot.states)
+        self._network.ingest(snapshot.avg_latency_ms, snapshot.packet_loss_pct)
+        self._compute.ingest(snapshot.cpu_temp_c, snapshot.gpu_load_pct)
+        self._fleet_table.ingest(snapshot.states)
+        self._metrics_table.ingest(snapshot)
+        self._autonomy_table.ingest(snapshot)
+        self._security_table.ingest(snapshot)
+
+    def show_tab(self, name: str) -> None:
+        mapping = {"3D Map": 0, "Graphs": 1, "Tables": 2}
+        if name in mapping:
+            self._tabs.setCurrentIndex(mapping[name])
+
+
+class RuntimeSettingsPage(QWidget):
+    settings_applied = Signal(object)
+    fullscreen_requested = Signal()
+
+    def __init__(
+        self,
+        backend_url: str,
+        poll_hz: int,
+        drone_ids: list[int],
+        operator_role: str,
+        security_profile: str,
+        ui_fps_limit: int,
+        aux_fps_limit: int,
+    ) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+
+        intro = QLabel(
+            "Live dashboard settings. These controls affect the real UI/runtime behavior and do not insert demo data."
+        )
+        intro.setWordWrap(True)
+        intro.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px;")
+        layout.addWidget(intro)
+
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(10)
+
+        self._backend_url = QLineEdit(backend_url)
+        self._backend_url.setReadOnly(True)
+        self._poll_hz = QSpinBox()
+        self._poll_hz.setRange(1, 60)
+        self._poll_hz.setValue(max(1, poll_hz))
+        self._poll_hz.setEnabled(False)
+        self._drone_ids = QLineEdit(",".join(str(drone_id) for drone_id in drone_ids))
+        self._drone_ids.setReadOnly(True)
+        self._role = QComboBox()
+        self._role.addItems(["operator", "commander", "maintenance"])
+        self._role.setCurrentText(operator_role)
+        self._security_profile = QLineEdit(security_profile)
+        self._security_profile.setReadOnly(True)
+        self._ui_fps = QSpinBox()
+        self._ui_fps.setRange(4, 30)
+        self._ui_fps.setValue(max(4, ui_fps_limit))
+        self._aux_fps = QSpinBox()
+        self._aux_fps.setRange(1, 15)
+        self._aux_fps.setValue(max(1, aux_fps_limit))
+
+        fields = [
+            ("Backend URL", self._backend_url),
+            ("Poll Hz", self._poll_hz),
+            ("Drone IDs", self._drone_ids),
+            ("Operator Role", self._role),
+            ("Security Profile", self._security_profile),
+            ("Main UI FPS", self._ui_fps),
+            ("Dialog FPS", self._aux_fps),
+        ]
+        for row, (label_text, widget) in enumerate(fields):
+            label = QLabel(label_text)
+            label.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px; font-weight:700;")
+            grid.addWidget(label, row, 0)
+            grid.addWidget(widget, row, 1)
+        layout.addLayout(grid)
+
+        note = QLabel(
+            "Backend URL, Poll Hz, Drone IDs, and Security Profile are shown from the active runtime. Role and FPS limits apply immediately."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet(f"color:{TEXT_DIM}; font-size:11px;")
+        layout.addWidget(note)
+
+        buttons = QHBoxLayout()
+        apply_btn = QPushButton("APPLY LIVE SETTINGS")
+        apply_btn.setCursor(Qt.PointingHandCursor)
+        apply_btn.clicked.connect(lambda: self.settings_applied.emit(self.values()))
+        fullscreen_btn = QPushButton("TOGGLE FULLSCREEN")
+        fullscreen_btn.setCursor(Qt.PointingHandCursor)
+        fullscreen_btn.clicked.connect(self.fullscreen_requested.emit)
+        for button in (apply_btn, fullscreen_btn):
+            button.setStyleSheet(
+                f"QPushButton {{ background: rgba(79, 163, 255, 0.12); color:{CYAN}; border:1px solid rgba(79, 163, 255, 0.35); border-radius:8px; padding:10px 14px; font-weight:700; }}"
+                f"QPushButton:hover {{ background: rgba(79, 163, 255, 0.2); color:{TEXT}; }}"
+            )
+            buttons.addWidget(button)
+        buttons.addStretch(1)
+        layout.addLayout(buttons)
+        layout.addStretch(1)
+
+    def values(self) -> dict[str, Any]:
+        return {
+            "operator_role": self._role.currentText(),
+            "ui_fps_limit": int(self._ui_fps.value()),
+            "aux_fps_limit": int(self._aux_fps.value()),
+        }
+
+
+class SecurityWorkbenchPage(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+        self._overview = SafetyPanel()
+        self._detail = DroneDetailPanel()
+        self._autonomy = AutonomyHighlightsTable()
+        self._security = AutonomySecurityTable()
+        self._autonomy.setMinimumHeight(170)
+        self._security.setMinimumHeight(190)
+        layout.addWidget(self._overview)
+        layout.addWidget(self._detail)
+        layout.addWidget(self._autonomy, 1)
+        layout.addWidget(self._security, 1)
+
+    def ingest(
+        self, snapshot: DashboardSnapshot, selected_state: DroneState | None
+    ) -> None:
+        self._overview.ingest(snapshot)
+        self._detail.ingest(selected_state)
+        self._autonomy.ingest(snapshot)
+        self._security.ingest(snapshot)
+
+
+class SystemHealthWorkbenchPage(QWidget):
+    def __init__(self, poll_hz: int) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+        self._summary = QLabel("System health overview")
+        self._summary.setWordWrap(True)
+        self._summary.setStyleSheet(f"color:{TEXT}; font-size:12px; font-weight:600;")
+        self._modes = OperationalModesPanel()
+        self._localization = LocalizationStatusPanel()
+        graphs = QWidget()
+        graphs_layout = QGridLayout(graphs)
+        graphs_layout.setContentsMargins(0, 0, 0, 0)
+        graphs_layout.setHorizontalSpacing(10)
+        graphs_layout.setVerticalSpacing(10)
+        self._compute = ComputeLoadGraph(poll_hz)
+        self._network = NetworkHealthGraph(poll_hz)
+        self._compute.setMinimumHeight(220)
+        self._network.setMinimumHeight(220)
+        graphs_layout.addWidget(self._compute, 0, 0)
+        graphs_layout.addWidget(self._network, 0, 1)
+        layout.addWidget(self._summary)
+        layout.addWidget(self._modes)
+        layout.addWidget(self._localization)
+        layout.addWidget(graphs)
+
+    def ingest(self, snapshot: DashboardSnapshot, backend_mode: str) -> None:
+        online = sum(1 for state in snapshot.states if state.reachable)
+        avg_battery = sum(state.battery_pct for state in snapshot.states) / max(
+            1, len(snapshot.states)
+        )
+        self._summary.setText(
+            f"Online {online}/{len(snapshot.states)} | CPU {snapshot.cpu_temp_c:.1f} C | GPU {snapshot.gpu_load_pct:.0f}% | "
+            f"Latency {snapshot.avg_latency_ms:.1f} ms | Loss {snapshot.packet_loss_pct:.1f}% | Avg battery {avg_battery:.1f}%"
+        )
+        self._modes.ingest(snapshot, backend_mode)
+        self._localization.ingest(snapshot)
+        self._compute.ingest(snapshot.cpu_temp_c, snapshot.gpu_load_pct)
+        self._network.ingest(snapshot.avg_latency_ms, snapshot.packet_loss_pct)
+
+
+class BenchValidationWorkbenchPage(QWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+        self._summary = QLabel(
+            "Bench validation workspace for replay, sensor wiring, and live connection checks."
+        )
+        self._summary.setWordWrap(True)
+        self._summary.setStyleSheet(f"color:{TEXT}; font-size:12px; font-weight:600;")
+        self._replay = ReplayAnalysisPage()
+        self._sensor_status = SensorConnectionStatusTable()
+        self._fleet = FleetOverviewPanel()
+        layout.addWidget(self._summary)
+        layout.addWidget(self._replay, 1)
+        layout.addWidget(self._sensor_status, 1)
+        layout.addWidget(self._fleet, 1)
+
+    def ingest(
+        self,
+        snapshot: DashboardSnapshot,
+        selected_state: DroneState | None,
+        env_manager: DroneEnvManager,
+    ) -> None:
+        self._replay.ingest(selected_state, snapshot)
+        self._sensor_status.ingest(snapshot, env_manager)
+        self._fleet.ingest(snapshot)
+
+
 class SensorConnectionStatusTable(QWidget):
     HEADERS = [
         "Sensor",
@@ -5724,13 +6097,24 @@ class DashboardWindow(QMainWindow):
         self._frame_counter = 0
         self._last_snapshot: DashboardSnapshot | None = None
         self._last_snapshot_persist_s = 0.0
+        self._ui_refresh_interval_s = 1.0 / max(
+            1, safe_int(saved_settings.get("ui_fps_limit"), min(self._poll_hz, 12))
+        )
+        self._aux_refresh_interval_s = 1.0 / max(
+            1, safe_int(saved_settings.get("aux_fps_limit"), min(self._poll_hz, 4))
+        )
+        self._last_ui_render_at = 0.0
+        self._last_aux_render_at = 0.0
         self._compact_layout = False
         self._selected_drone_id = safe_int(
             saved_settings.get("selected_drone_id"), drone_ids[0] if drone_ids else 0
         ) or (drone_ids[0] if drone_ids else None)
         self._last_backend_url = backend_url or ""
         self._operator_role = normalize_operator_role(
-            os.environ.get("DRONE_OPERATOR_ROLE", "operator")
+            safe_text(
+                saved_settings.get("operator_role"),
+                os.environ.get("DRONE_OPERATOR_ROLE", "operator"),
+            )
         )
         self._security_profile = normalize_security_profile(
             os.environ.get("DRONE_SECURITY_PROFILE", "lab")
@@ -5754,6 +6138,7 @@ class DashboardWindow(QMainWindow):
 
         self.setWindowTitle("UVA GPS-Denied Swarm Control Center (Lab Mode)")
         self.resize(1680, 980)
+        self.setMinimumSize(900, 620)
         self._apply_theme()
         self._build_ui()
         self._wire_threads()
@@ -5876,302 +6261,11 @@ class DashboardWindow(QMainWindow):
         )
 
     def _build_ui(self) -> None:
-        central = QWidget()
-        root = QVBoxLayout(central)
-        root.setContentsMargins(16, 14, 16, 14)
-        root.setSpacing(14)
-        self.setCentralWidget(central)
-
-        header = QHBoxLayout()
-        title_block = QVBoxLayout()
-        title = QLabel("GPS-Denied Drone Swarm")
-        title.setObjectName("heroTitle")
-        subtitle = QLabel(
-            "Realtime monitoring, command orchestration, and EKF/V2X observability"
+        self._console_view = OperatorConsoleView(
+            Path(__file__).resolve().parent.parent / "docs" / "assets"
         )
-        subtitle.setObjectName("heroSub")
-        title_block.addWidget(title)
-        title_block.addWidget(subtitle)
-
-        self._mode_label = QLabel(
-            compose_operator_status(self._backend.mode, "unavailable")
-        )
-        self._mode_label.setStyleSheet(
-            f"color:{ACCENT}; font-size:12px; font-weight:700;"
-        )
-        role_accent = (
-            ACCENT_ALT
-            if self._operator_role == "commander"
-            else WARN if self._operator_role == "maintenance" else CYAN
-        )
-        self._role_label = QLabel(f"Role: {self._operator_role.upper()}")
-        self._role_label.setStyleSheet(
-            f"color:{role_accent}; font-size:12px; font-weight:700;"
-        )
-        self._clock_label = QLabel()
-        self._clock_label.setStyleSheet(f"color:{TEXT_DIM}; font-size:12px;")
-        self._presentation_btn = QPushButton("PRESENTATION MODE")
-        self._presentation_btn.setCursor(Qt.PointingHandCursor)
-        self._presentation_btn.clicked.connect(self._toggle_presentation_mode)
-        self._presentation_btn.setStyleSheet(
-            f"QPushButton {{ background: rgba(0, 210, 255, 0.08); color:{ACCENT}; border:1px solid rgba(0, 210, 255, 0.4); border-radius:8px; padding:8px 12px; font-size:11px; font-weight:800; letter-spacing:1px; }}"
-            f"QPushButton:hover {{ background: rgba(0, 210, 255, 0.16); color:{TEXT}; }}"
-        )
-
-        right_header = QVBoxLayout()
-        right_header.addWidget(self._presentation_btn, alignment=Qt.AlignRight)
-        right_header.addWidget(self._mode_label, alignment=Qt.AlignRight)
-        right_header.addWidget(self._role_label, alignment=Qt.AlignRight)
-        right_header.addWidget(self._clock_label, alignment=Qt.AlignRight)
-
-        header.addLayout(title_block)
-        header.addStretch(1)
-        header.addLayout(right_header)
-        root.addLayout(header)
-
-        status_strip = QHBoxLayout()
-        status_strip.setSpacing(10)
-        self._status_runtime = StatusPill("Runtime Mode", ACCENT)
-        self._status_backend = StatusPill("Backend", CYAN)
-        self._status_reality = StatusPill("Telemetry", SIM_PURPLE)
-        self._status_drones = StatusPill("Drone Count", EMERALD)
-        self._status_latency = StatusPill("Latency", CYAN)
-        self._status_compute = StatusPill("CPU / GPU", WARN)
-        self._status_link = StatusPill("Link Quality", SUCCESS)
-        self._status_operator = StatusPill("Operator", MAGENTA)
-        self._status_safety = StatusPill("Safety", SUCCESS)
-        for widget in (
-            self._status_runtime,
-            self._status_backend,
-            self._status_reality,
-            self._status_drones,
-            self._status_latency,
-            self._status_compute,
-            self._status_link,
-            self._status_operator,
-            self._status_safety,
-        ):
-            status_strip.addWidget(widget)
-        root.addLayout(status_strip)
-
-        cards = QGridLayout()
-        cards.setHorizontalSpacing(12)
-        cards.setVerticalSpacing(12)
-        self._leader_card = MetricCard("LEADER", ACCENT_ALT)
-        self._cpu_card = MetricCard("CPU TEMP", WARN)
-        self._gpu_card = MetricCard("GPU LOAD", ACCENT)
-        self._battery_card = MetricCard("SWARM BATTERY", SUCCESS)
-        self._link_card = MetricCard("MESH HEALTH", CYAN)
-        self._drift_card = MetricCard("AVG EKF DRIFT", MAGENTA)
-        self._alerts_card = MetricCard("CRITICAL ALERTS", DANGER)
-        for idx, card in enumerate(
-            [
-                self._leader_card,
-                self._cpu_card,
-                self._gpu_card,
-                self._battery_card,
-                self._link_card,
-                self._drift_card,
-                self._alerts_card,
-            ]
-        ):
-            cards.addWidget(card, 0, idx)
-        root.addLayout(cards)
-
-        self._body_frame = QWidget()
-        self._body_shell = QHBoxLayout(self._body_frame)
-        self._body_shell.setContentsMargins(0, 0, 0, 0)
-        self._body_shell.setSpacing(14)
-
-        self._left_panel = QWidget()
-        self._left_layout = QVBoxLayout(self._left_panel)
-        self._left_layout.setContentsMargins(0, 0, 0, 0)
-        self._left_layout.setSpacing(14)
-
-        self._right_panel = QWidget()
-        self._right_layout = QVBoxLayout(self._right_panel)
-        self._right_layout.setContentsMargins(0, 0, 0, 0)
-        self._right_layout.setSpacing(14)
-
-        self._stack_panel = QWidget()
-        self._stack_layout = QVBoxLayout(self._stack_panel)
-        self._stack_layout.setContentsMargins(0, 0, 0, 0)
-        self._stack_layout.setSpacing(14)
-
-        self._left_scroll = QScrollArea()
-        self._left_scroll.setWidgetResizable(True)
-        self._left_scroll.setFrameShape(QFrame.NoFrame)
-        self._left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._left_scroll.setStyleSheet(
-            f"QScrollArea {{ background: transparent; border: none; }}"
-        )
-        self._left_scroll.setWidget(self._left_panel)
-
-        self._right_scroll = QScrollArea()
-        self._right_scroll.setWidgetResizable(True)
-        self._right_scroll.setFrameShape(QFrame.NoFrame)
-        self._right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._right_scroll.setStyleSheet(
-            f"QScrollArea {{ background: transparent; border: none; }}"
-        )
-        self._right_scroll.setWidget(self._right_panel)
-
-        self._stack_scroll = QScrollArea()
-        self._stack_scroll.setWidgetResizable(True)
-        self._stack_scroll.setFrameShape(QFrame.NoFrame)
-        self._stack_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._stack_scroll.setStyleSheet(
-            f"QScrollArea {{ background: transparent; border: none; }}"
-        )
-        self._stack_scroll.setWidget(self._stack_panel)
-
-        self._map_box = QGroupBox("3D Map View")
-        self._map_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        map_layout = QVBoxLayout(self._map_box)
-        map_layout.setContentsMargins(10, 16, 10, 10)
-        self._map = Map3DView()
-        self._map.setMinimumHeight(430)
-        self._map.setMaximumHeight(540)
-        map_layout.addWidget(self._map)
-
-        self._tabs = QTabWidget()
-        self._tabs.setStyleSheet(
-            f"QTabWidget::pane {{ border: 1px solid {BORDER}; border-radius: 6px; background: {PANEL_ALT}; top: -1px; }}"
-            f" QTabBar::tab {{ background: {PANEL_BG}; color: {TEXT_DIM}; padding: 10px 16px; border: 1px solid {BORDER};"
-            f" border-bottom: none; min-width: 110px; }}"
-            f" QTabBar::tab:selected {{ background: {PANEL_ALT}; color: {TEXT}; border-top: 1px solid {ACCENT}; font-weight: 700; }}"
-            f" QTabBar::tab:!selected:hover {{ color: {TEXT}; }}"
-        )
-        self._tabs.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self._tabs.setMinimumHeight(250)
-        self._tabs.setMaximumHeight(320)
-
-        self._drift = DriftGraph(self._ids, self._poll_hz)
-        self._mcss_graph = MCSSScoreGraph(self._ids, self._poll_hz)
-        self._net_graph = NetworkHealthGraph(self._poll_hz)
-        self._comp_graph = ComputeLoadGraph(self._poll_hz)
-        self._camera_page = CameraPreviewPage()
-        self._lidar_page = LidarMappingPage()
-        self._imu_page = IMULiveGraphPage(self._poll_hz)
-        self._tdoa_page = TdoaAnchorPage()
-        self._replay_page = ReplayAnalysisPage()
-        self._mission_page = MissionPlanningPage()
-        self._edge_swarm_page = EdgeSwarmPage(self._poll_hz)
-
-        self._tabs.addTab(self._drift, "VIO Drift")
-        self._tabs.addTab(self._mcss_graph, "MCSS Consensus")
-        self._tabs.addTab(self._net_graph, "V2X Network")
-        self._tabs.addTab(self._comp_graph, "Core Logic")
-        self._tabs.addTab(self._camera_page, "Camera")
-        self._tabs.addTab(self._lidar_page, "LiDAR Map")
-        self._tabs.addTab(self._imu_page, "IMU Live")
-        self._tabs.addTab(self._tdoa_page, "TDOA/UWB")
-        self._tabs.addTab(self._replay_page, "Replay")
-        self._tabs.addTab(self._mission_page, "Mission")
-        self._tabs.addTab(self._edge_swarm_page, "Edge Swarm")
-        self._graph_box = QGroupBox("Telemetry Graphs")
-        self._graph_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        graph_layout = QVBoxLayout(self._graph_box)
-        graph_layout.setContentsMargins(10, 16, 10, 10)
-        graph_layout.addWidget(self._tabs)
-
-        self._console = CommandConsole()
-        self._console.set_operator_role(self._operator_role)
-
-        self._table_container = QWidget()
-        table_container_layout = QVBoxLayout(self._table_container)
-        table_container_layout.setContentsMargins(0, 0, 0, 0)
-        table_container_layout.setSpacing(10)
-
-        table_box = QGroupBox("Swarm Status Table")
-        table_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        table_layout = QVBoxLayout(table_box)
-        self._table = SwarmTable()
-        self._table.setMinimumHeight(150)
-        table_layout.addWidget(self._table)
-        table_container_layout.addWidget(table_box)
-
-        metrics_box = QGroupBox("Advanced Metrics (VIO, MCSS, V2X)")
-        metrics_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        metrics_layout = QVBoxLayout(metrics_box)
-        self._metrics_table = AdvancedMetricsTable()
-        self._metrics_table.setMinimumHeight(130)
-        metrics_layout.addWidget(self._metrics_table)
-        table_container_layout.addWidget(metrics_box)
-
-        autonomy_box = QGroupBox("Autonomy & Zero-Trust Matrix")
-        autonomy_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        autonomy_layout = QVBoxLayout(autonomy_box)
-        self._autonomy_security_table = AutonomySecurityTable()
-        self._autonomy_security_table.setMinimumHeight(170)
-        autonomy_layout.addWidget(self._autonomy_security_table)
-        table_container_layout.addWidget(autonomy_box)
-
-        autonomy_highlights_box = QGroupBox("Autonomy Highlights Table")
-        autonomy_highlights_box.setSizePolicy(
-            QSizePolicy.Expanding, QSizePolicy.Expanding
-        )
-        autonomy_highlights_layout = QVBoxLayout(autonomy_highlights_box)
-        self._autonomy_highlights_table = AutonomyHighlightsTable()
-        self._autonomy_highlights_table.setMinimumHeight(130)
-        autonomy_highlights_layout.addWidget(self._autonomy_highlights_table)
-        table_container_layout.addWidget(autonomy_highlights_box)
-
-        sensor_status_box = QGroupBox("Sensor Connection Status Table")
-        sensor_status_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        sensor_status_layout = QVBoxLayout(sensor_status_box)
-        self._sensor_status_table = SensorConnectionStatusTable()
-        self._sensor_status_table.setMinimumHeight(220)
-        sensor_status_layout.addWidget(self._sensor_status_table)
-        table_container_layout.addWidget(sensor_status_box)
-
-        self._fleet_overview = FleetOverviewPanel()
-        self._fleet_overview.setMinimumHeight(280)
-        table_container_layout.addWidget(self._fleet_overview)
-
-        resource_box = QGroupBox("Jetson Health Cards")
-        resource_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        resource_layout = QGridLayout(resource_box)
-        self._cpu_health = MetricCard("CPU TEMP", WARN)
-        self._gpu_health = MetricCard("GPU LOAD", ACCENT)
-        self._loss_health = MetricCard("PACKET LOSS", DANGER)
-        self._latency_health = MetricCard("AVG LATENCY", CYAN)
-        self._motor_health = MetricCard("MOTOR HEALTH", SUCCESS)
-        self._election_health = MetricCard("MCSS ELECTION", MAGENTA)
-        resource_layout.addWidget(self._cpu_health, 0, 0)
-        resource_layout.addWidget(self._gpu_health, 0, 1)
-        resource_layout.addWidget(self._loss_health, 1, 0)
-        resource_layout.addWidget(self._latency_health, 1, 1)
-        resource_layout.addWidget(self._motor_health, 2, 0)
-        resource_layout.addWidget(self._election_health, 2, 1)
-        self._detail = DroneDetailPanel()
-        side_stack = QVBoxLayout()
-        side_widget = QWidget()
-        side_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        side_widget.setLayout(side_stack)
-        side_stack.setContentsMargins(0, 0, 0, 0)
-        side_stack.setSpacing(14)
-        side_stack.addWidget(resource_box)
-        side_stack.addWidget(self._detail)
-        side_stack.setStretch(0, 1)
-        side_stack.setStretch(1, 1)
-        self._side_widget = side_widget
-
-        self._sidebar = SidebarNav()
-        self._sidebar.setMinimumWidth(220)
-        self._sidebar.setMaximumWidth(250)
-
-        self._ops_panel = OperationalModesPanel()
-        self._loc_panel = LocalizationStatusPanel()
-        self._safety_panel = SafetyPanel()
-
-        app_shell = QHBoxLayout()
-        app_shell.setSpacing(14)
-        app_shell.addWidget(self._sidebar, 0)
-        app_shell.addWidget(self._body_frame, 1)
-        root.addLayout(app_shell, 1)
-        self._update_responsive_layout()
-
+        self._table = self._console_view.vehicle_table
+        self.setCentralWidget(self._console_view)
         status = QStatusBar()
         status.setStyleSheet(
             f"QStatusBar {{ background:{PANEL_BG}; color:{TEXT_DIM}; }}"
@@ -6179,63 +6273,350 @@ class DashboardWindow(QMainWindow):
         self._fps_label = QLabel("UI FPS: --")
         status.addPermanentWidget(self._fps_label)
         self.setStatusBar(status)
+        self._build_auxiliary_dialogs()
+        self._console_view.sidebar_menu_requested.connect(self._handle_sidebar_menu)
+        self._console = UILogSink(status, delegate=self._command_console)
+
+    def _build_auxiliary_dialogs(self) -> None:
+        self._command_console = CommandConsole()
+        self._command_console.command_requested.connect(self._dispatch_command)
+        self._modes_panel: OperationalModesPanel | None = None
+        self._localization_panel: LocalizationStatusPanel | None = None
+        self._safety_panel: SafetyPanel | None = None
+        self._fleet_overview: FleetOverviewPanel | None = None
+        self._drone_detail: DroneDetailPanel | None = None
+        self._mission_page: MissionPlanningPage | None = None
+        self._edge_page: EdgeSwarmPage | None = None
+        self._analytics_page: AnalyticsWorkbenchPage | None = None
+        self._settings_page: RuntimeSettingsPage | None = None
+        self._security_workbench: SecurityWorkbenchPage | None = None
+        self._system_health_page: SystemHealthWorkbenchPage | None = None
+        self._bench_validation_page: BenchValidationWorkbenchPage | None = None
+        self._sensor_status: SensorConnectionStatusTable | None = None
+        self._camera_page: CameraPreviewPage | None = None
+        self._lidar_page: LidarMappingPage | None = None
+        self._imu_page: IMULiveGraphPage | None = None
+        self._tdoa_page: TdoaAnchorPage | None = None
+        self._replay_page: ReplayAnalysisPage | None = None
+
+        self._command_dialog = DashboardToolDialog(
+            "Command Console",
+            [("Commands", self._command_console)],
+            self,
+        )
+        self._operations_dialog = LazyDashboardToolDialog(
+            "Operations",
+            [
+                ("Overview", self._build_fleet_overview_panel),
+                ("Selected Drone", self._build_drone_detail_panel),
+                ("Mission", self._build_mission_page),
+                ("Localization", self._build_localization_panel),
+                ("Safety", self._build_safety_panel),
+                ("Modes", self._build_modes_panel),
+                ("Edge Swarm", self._build_edge_page),
+            ],
+            self,
+        )
+        self._sensors_dialog = LazyDashboardToolDialog(
+            "Sensors & Diagnostics",
+            [
+                ("Sensor Status", self._build_sensor_status_page),
+                ("Camera", self._build_camera_page),
+                ("LiDAR", self._build_lidar_page),
+                ("IMU", self._build_imu_page),
+                ("TDOA/UWB", self._build_tdoa_page),
+                ("Replay", self._build_replay_page),
+            ],
+            self,
+        )
+        self._analytics_dialog = LazyDashboardToolDialog(
+            "Analytics & Tables",
+            [("Analytics", self._build_analytics_page)],
+            self,
+        )
+        self._settings_dialog = LazyDashboardToolDialog(
+            "Settings",
+            [("Runtime Settings", self._build_settings_page)],
+            self,
+        )
+        self._security_dialog = LazyDashboardToolDialog(
+            "Safety & Security",
+            [("Security Workspace", self._build_security_workbench)],
+            self,
+        )
+        self._system_health_dialog = LazyDashboardToolDialog(
+            "System Health",
+            [("System Health", self._build_system_health_page)],
+            self,
+        )
+        self._bench_validation_dialog = LazyDashboardToolDialog(
+            "Bench Validation",
+            [("Bench Validation", self._build_bench_validation_page)],
+            self,
+        )
+
+        self._console_view.commands_button.clicked.connect(self._open_command_dialog)
+        self._console_view.operations_button.clicked.connect(
+            self._open_operations_dialog
+        )
+        self._console_view.sensors_button.clicked.connect(self._open_sensors_dialog)
+        self._console_view.analytics_button.clicked.connect(self._open_analytics_dialog)
+
+        self._command_console.set_operator_role(self._operator_role)
+        self._command_console.set_pending_approvals(self._pending_approvals)
+
+    def _build_modes_panel(self) -> QWidget:
+        if self._modes_panel is None:
+            self._modes_panel = OperationalModesPanel()
+        return self._modes_panel
+
+    def _build_localization_panel(self) -> QWidget:
+        if self._localization_panel is None:
+            self._localization_panel = LocalizationStatusPanel()
+        return self._localization_panel
+
+    def _build_safety_panel(self) -> QWidget:
+        if self._safety_panel is None:
+            self._safety_panel = SafetyPanel()
+            self._safety_panel._estop.setEnabled(True)
+            self._safety_panel._estop.clicked.connect(
+                lambda: self._dispatch_command(CommandRequest("emergency_land", {}))
+            )
+        return self._safety_panel
+
+    def _build_fleet_overview_panel(self) -> QWidget:
+        if self._fleet_overview is None:
+            self._fleet_overview = FleetOverviewPanel()
+        return self._fleet_overview
+
+    def _build_drone_detail_panel(self) -> QWidget:
+        if self._drone_detail is None:
+            self._drone_detail = DroneDetailPanel()
+        return self._drone_detail
+
+    def _build_mission_page(self) -> QWidget:
+        if self._mission_page is None:
+            self._mission_page = MissionPlanningPage()
+            self._mission_page.action_requested.connect(self._dispatch_command)
+        return self._mission_page
+
+    def _build_edge_page(self) -> QWidget:
+        if self._edge_page is None:
+            self._edge_page = EdgeSwarmPage(self._poll_hz)
+        return self._edge_page
+
+    def _build_analytics_page(self) -> QWidget:
+        if self._analytics_page is None:
+            self._analytics_page = AnalyticsWorkbenchPage(self._ids, self._poll_hz)
+        return self._analytics_page
+
+    def _build_settings_page(self) -> QWidget:
+        if self._settings_page is None:
+            self._settings_page = RuntimeSettingsPage(
+                self._last_backend_url,
+                self._poll_hz,
+                self._ids,
+                self._operator_role,
+                self._security_profile,
+                max(1, round(1.0 / self._ui_refresh_interval_s)),
+                max(1, round(1.0 / self._aux_refresh_interval_s)),
+            )
+            self._settings_page.settings_applied.connect(self._apply_runtime_settings)
+            self._settings_page.fullscreen_requested.connect(
+                self._toggle_presentation_mode
+            )
+        return self._settings_page
+
+    def _build_security_workbench(self) -> QWidget:
+        if self._security_workbench is None:
+            self._security_workbench = SecurityWorkbenchPage()
+        return self._security_workbench
+
+    def _build_system_health_page(self) -> QWidget:
+        if self._system_health_page is None:
+            self._system_health_page = SystemHealthWorkbenchPage(self._poll_hz)
+        return self._system_health_page
+
+    def _build_bench_validation_page(self) -> QWidget:
+        if self._bench_validation_page is None:
+            self._bench_validation_page = BenchValidationWorkbenchPage()
+        return self._bench_validation_page
+
+    def _build_sensor_status_page(self) -> QWidget:
+        if self._sensor_status is None:
+            self._sensor_status = SensorConnectionStatusTable()
+        return self._sensor_status
+
+    def _build_camera_page(self) -> QWidget:
+        if self._camera_page is None:
+            self._camera_page = CameraPreviewPage()
+        return self._camera_page
+
+    def _build_lidar_page(self) -> QWidget:
+        if self._lidar_page is None:
+            self._lidar_page = LidarMappingPage()
+        return self._lidar_page
+
+    def _build_imu_page(self) -> QWidget:
+        if self._imu_page is None:
+            self._imu_page = IMULiveGraphPage(self._poll_hz)
+        return self._imu_page
+
+    def _build_tdoa_page(self) -> QWidget:
+        if self._tdoa_page is None:
+            self._tdoa_page = TdoaAnchorPage()
+        return self._tdoa_page
+
+    def _build_replay_page(self) -> QWidget:
+        if self._replay_page is None:
+            self._replay_page = ReplayAnalysisPage()
+        return self._replay_page
+
+    def _open_command_dialog(self) -> None:
+        self._command_dialog.present()
+
+    def _open_operations_dialog(self) -> None:
+        self._operations_dialog.present()
+        if self._last_snapshot is not None:
+            self._refresh_auxiliary_views(
+                self._last_snapshot, self._selected_state(self._last_snapshot.states)
+            )
+
+    def _open_sensors_dialog(self) -> None:
+        self._sensors_dialog.present()
+        if self._last_snapshot is not None:
+            self._refresh_auxiliary_views(
+                self._last_snapshot, self._selected_state(self._last_snapshot.states)
+            )
+
+    def _open_analytics_dialog(self) -> None:
+        self._analytics_dialog.present()
+        if self._last_snapshot is not None:
+            self._refresh_auxiliary_views(
+                self._last_snapshot, self._selected_state(self._last_snapshot.states)
+            )
+
+    def _open_settings_dialog(self) -> None:
+        self._settings_dialog.present()
+
+    def _open_security_dialog(self) -> None:
+        self._security_dialog.present("Security Workspace")
+        if self._last_snapshot is not None:
+            self._refresh_auxiliary_views(
+                self._last_snapshot, self._selected_state(self._last_snapshot.states)
+            )
+
+    def _open_system_health_dialog(self) -> None:
+        self._system_health_dialog.present("System Health")
+        if self._last_snapshot is not None:
+            self._refresh_auxiliary_views(
+                self._last_snapshot, self._selected_state(self._last_snapshot.states)
+            )
+
+    def _open_bench_validation_dialog(self) -> None:
+        self._bench_validation_dialog.present("Bench Validation")
+        if self._last_snapshot is not None:
+            self._refresh_auxiliary_views(
+                self._last_snapshot, self._selected_state(self._last_snapshot.states)
+            )
+
+    def _open_analytics_view(self, tab_name: str) -> None:
+        self._analytics_dialog.present("Analytics")
+        page = self._build_analytics_page()
+        page.show_tab(tab_name)
+        if self._last_snapshot is not None:
+            self._refresh_auxiliary_views(
+                self._last_snapshot, self._selected_state(self._last_snapshot.states)
+            )
+
+    def _apply_runtime_settings(self, values: dict[str, Any]) -> None:
+        self._operator_role = normalize_operator_role(
+            safe_text(values.get("operator_role"), self._operator_role)
+        )
+        ui_fps_limit = max(4, safe_int(values.get("ui_fps_limit"), 12))
+        aux_fps_limit = max(1, safe_int(values.get("aux_fps_limit"), 4))
+        self._ui_refresh_interval_s = 1.0 / ui_fps_limit
+        self._aux_refresh_interval_s = 1.0 / aux_fps_limit
+        self._command_console.set_operator_role(self._operator_role)
+        if self._last_snapshot is not None:
+            self._console_view.ingest(
+                self._last_snapshot, self._selected_drone_id, self._operator_role
+            )
+        self._persist_settings()
+        self._console.append_log(
+            f"runtime settings applied: role={self._operator_role}, main_fps={ui_fps_limit}, dialog_fps={aux_fps_limit}"
+        )
+
+    def _handle_sidebar_menu(self, menu_name: str) -> None:
+        self._console_view.set_sidebar_active(menu_name)
+        sidebar_actions = {
+            "Dashboard": lambda: self.activateWindow(),
+            "Map": lambda: self._open_analytics_view("3D Map"),
+            "Plan": lambda: self._operations_dialog.present("Mission"),
+            "Vehicles": lambda: self._operations_dialog.present("Overview"),
+            "Analysis": self._open_system_health_dialog,
+            "Settings": self._open_settings_dialog,
+            "Help": lambda: self._command_dialog.present("Commands"),
+        }
+        action = sidebar_actions.get(menu_name)
+        if action is not None:
+            action()
+            if self._last_snapshot is not None:
+                self._refresh_auxiliary_views(
+                    self._last_snapshot,
+                    self._selected_state(self._last_snapshot.states),
+                )
+
+    def _refresh_auxiliary_views(
+        self, snapshot: DashboardSnapshot, selected_state: DroneState | None
+    ) -> None:
+        if self._operations_dialog.isVisible():
+            if self._modes_panel is not None:
+                self._modes_panel.ingest(snapshot, self._backend.mode)
+            if self._localization_panel is not None:
+                self._localization_panel.ingest(snapshot)
+            if self._safety_panel is not None:
+                self._safety_panel.ingest(snapshot)
+            if self._fleet_overview is not None:
+                self._fleet_overview.ingest(snapshot)
+            if self._drone_detail is not None:
+                self._drone_detail.ingest(selected_state)
+            if self._mission_page is not None:
+                self._mission_page.ingest(snapshot, selected_state)
+            if self._edge_page is not None:
+                self._edge_page.ingest(snapshot)
+        if self._analytics_dialog.isVisible() and self._analytics_page is not None:
+            self._analytics_page.ingest(snapshot)
+        if self._security_dialog.isVisible() and self._security_workbench is not None:
+            self._security_workbench.ingest(snapshot, selected_state)
+        if (
+            self._system_health_dialog.isVisible()
+            and self._system_health_page is not None
+        ):
+            self._system_health_page.ingest(snapshot, self._backend.mode)
+        if (
+            self._bench_validation_dialog.isVisible()
+            and self._bench_validation_page is not None
+        ):
+            self._bench_validation_page.ingest(
+                snapshot, selected_state, self._env_manager
+            )
+        if self._sensors_dialog.isVisible():
+            if self._sensor_status is not None:
+                self._sensor_status.ingest(snapshot, self._env_manager)
+            if self._camera_page is not None:
+                self._camera_page.ingest(selected_state)
+            if self._lidar_page is not None:
+                self._lidar_page.ingest(selected_state)
+            if self._imu_page is not None:
+                self._imu_page.ingest(selected_state)
+            if self._tdoa_page is not None:
+                self._tdoa_page.ingest(selected_state)
+            if self._replay_page is not None:
+                self._replay_page.ingest(selected_state, snapshot)
 
     def _update_responsive_layout(self) -> None:
-        compact = self.width() < 1280
-        if compact == self._compact_layout and self._body_shell.count():
-            return
-        self._compact_layout = compact
-
-        while self._body_shell.count():
-            item = self._body_shell.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.setParent(None)
-
-        for layout in (self._left_layout, self._right_layout, self._stack_layout):
-            while layout.count():
-                item = layout.takeAt(0)
-                widget = item.widget()
-                if widget is not None:
-                    widget.setParent(None)
-
-        if compact:
-            self._map.setMinimumHeight(320)
-            self._map.setMaximumHeight(400)
-            self._tabs.setMinimumHeight(240)
-            self._tabs.setMaximumHeight(300)
-            self._stack_layout.addWidget(self._ops_panel)
-            self._stack_layout.addWidget(self._loc_panel)
-            self._stack_layout.addWidget(self._safety_panel)
-            self._stack_layout.addWidget(self._map_box)
-            self._stack_layout.addWidget(self._graph_box)
-            self._stack_layout.addWidget(self._console)
-            self._stack_layout.addWidget(self._table_container)
-            self._stack_layout.addWidget(self._side_widget)
-            self._stack_layout.addStretch(1)
-            self._body_shell.addWidget(self._stack_scroll, 1)
-            return
-
-        self._map.setMinimumHeight(430)
-        self._map.setMaximumHeight(540)
-        self._tabs.setMinimumHeight(250)
-        self._tabs.setMaximumHeight(320)
-        self._left_layout.addWidget(self._map_box)
-        self._left_layout.addWidget(self._ops_panel)
-        self._left_layout.addWidget(self._table_container)
-        self._left_layout.setStretch(0, 5)
-        self._left_layout.setStretch(1, 3)
-        self._left_layout.addStretch(1)
-
-        self._right_layout.addWidget(self._loc_panel)
-        self._right_layout.addWidget(self._safety_panel)
-        self._right_layout.addWidget(self._graph_box)
-        self._right_layout.addWidget(self._console)
-        self._right_layout.addWidget(self._side_widget)
-        self._right_layout.addStretch(1)
-
-        self._body_shell.addWidget(self._left_scroll, 3)
-        self._body_shell.addWidget(self._right_scroll, 2)
+        self._compact_layout = self.width() < 1280
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -6243,11 +6624,7 @@ class DashboardWindow(QMainWindow):
 
     def _wire_threads(self) -> None:
         self._telemetry.snapshot_ready.connect(self._on_snapshot)
-        self._telemetry.log_ready.connect(self._console.append_log)
-        self._commands.log_ready.connect(self._console.append_log)
         self._commands.command_completed.connect(self._on_command_completed)
-        self._console.command_requested.connect(self._dispatch_command)
-        self._mission_page.action_requested.connect(self._dispatch_command)
         self._table.itemSelectionChanged.connect(self._sync_selected_drone_from_table)
 
         self._clock = QTimer(self)
@@ -6266,8 +6643,6 @@ class DashboardWindow(QMainWindow):
         self._commands.start()
 
     def _restore_persisted_state(self) -> None:
-        for line in self._store.load_recent_commands(12):
-            self._console.append_log(line)
         self._sync_pending_approvals_from_backend()
         self._refresh_approval_status()
         snapshot = self._store.load_snapshot()
@@ -6275,22 +6650,14 @@ class DashboardWindow(QMainWindow):
             self._on_snapshot(snapshot)
 
     def _update_clock(self) -> None:
-        self._clock_label.setText(time.strftime("%Y-%m-%d  %H:%M:%S"))
+        self._console_view.set_clock(time.strftime("%Y-%m-%d  %H:%M:%S"))
 
     def _toggle_presentation_mode(self) -> None:
         self._presentation_mode = not self._presentation_mode
         if self._presentation_mode:
             self.showFullScreen()
-            self._presentation_btn.setText("EXIT PRESENTATION")
-            self._presentation_btn.setStyleSheet(
-                f"QPushButton {{ background: rgba(52, 211, 153, 0.12); color:{EMERALD}; border:1px solid rgba(52, 211, 153, 0.45); border-radius:8px; padding:8px 12px; font-size:11px; font-weight:800; letter-spacing:1px; }}"
-            )
         else:
             self.showNormal()
-            self._presentation_btn.setText("PRESENTATION MODE")
-            self._presentation_btn.setStyleSheet(
-                f"QPushButton {{ background: rgba(0, 210, 255, 0.08); color:{ACCENT}; border:1px solid rgba(0, 210, 255, 0.4); border-radius:8px; padding:8px 12px; font-size:11px; font-weight:800; letter-spacing:1px; }}"
-            )
 
     def _flush_fps(self) -> None:
         self._fps_label.setText(f"UI FPS: {self._frame_counter}")
@@ -6305,6 +6672,8 @@ class DashboardWindow(QMainWindow):
             self.statusBar().showMessage(
                 f"Pending approval required: {pending_summary}"
             )
+        else:
+            self.statusBar().clearMessage()
 
     def _sync_pending_approvals_from_backend(self) -> None:
         approvals = self._backend.pending_approvals()
@@ -6323,240 +6692,24 @@ class DashboardWindow(QMainWindow):
             if (snapshot.timestamp - self._last_snapshot_persist_s) >= 1.0:
                 self._store.save_snapshot(snapshot)
                 self._last_snapshot_persist_s = snapshot.timestamp
-            self._frame_counter += 1
-            localization_data_source = summarize_localization_data_source(
-                [state.localization_data_source for state in snapshot.states]
-            )
-            self._mode_label.setText(
-                compose_operator_status(
-                    snapshot.backend_mode,
-                    localization_data_source,
-                    simulation_enabled=snapshot.simulation_enabled,
-                    real_drone_count=snapshot.real_drone_count,
-                    stale_drone_count=snapshot.stale_drone_count,
-                )
-            )
-            mode_accent = (
-                DANGER
-                if localization_data_source == "simulation"
-                or snapshot.simulation_enabled
-                or snapshot.real_drone_count <= 0
-                else (
-                    WARN
-                    if localization_data_source in {"playback", "unavailable"}
-                    or snapshot.stale_drone_count > 0
-                    else ACCENT
-                )
-            )
-            self._mode_label.setStyleSheet(
-                f"color:{mode_accent}; font-size:12px; font-weight:700;"
-            )
-            self._ops_panel.ingest(snapshot, self._backend.mode)
-            self._loc_panel.ingest(snapshot)
-            self._safety_panel.ingest(snapshot)
-            role_chip_accent = (
-                ACCENT_ALT
-                if self._operator_role == "commander"
-                else WARN if self._operator_role == "maintenance" else CYAN
-            )
-
-            self._map.ingest(snapshot.states)
-            self._drift.ingest(snapshot.states)
-            self._mcss_graph.ingest(snapshot.states)
-            self._net_graph.ingest(snapshot.avg_latency_ms, snapshot.packet_loss_pct)
-            self._comp_graph.ingest(snapshot.cpu_temp_c, snapshot.gpu_load_pct)
-            self._table.ingest(snapshot.states)
-            self._metrics_table.ingest(snapshot)
-            self._autonomy_security_table.ingest(snapshot)
-            self._autonomy_highlights_table.ingest(snapshot)
-            self._sensor_status_table.ingest(snapshot, self._env_manager)
-            self._fleet_overview.ingest(snapshot)
-            self._select_row_for_drone()
             selected_state = self._selected_state(snapshot.states)
-            self._detail.ingest(selected_state)
-            self._camera_page.ingest(selected_state)
-            self._lidar_page.ingest(selected_state)
-            self._imu_page.ingest(selected_state)
-            self._tdoa_page.ingest(selected_state)
-            self._replay_page.ingest(selected_state, snapshot)
-            self._mission_page.ingest(snapshot, selected_state)
-            self._edge_swarm_page.ingest(snapshot)
-
-            leader_id = snapshot.leader_id if snapshot.leader_id else "?"
-            avg_battery = sum(state.battery_pct for state in snapshot.states) / max(
-                len(snapshot.states), 1
-            )
-            avg_drift = sum(state.drift_m for state in snapshot.states) / max(
-                len(snapshot.states), 1
-            )
-            avg_motor = sum(state.motor_health for state in snapshot.states) / max(
-                len(snapshot.states), 1
-            )
-            avg_localization = sum(
-                state.localization_confidence for state in snapshot.states
-            ) / max(len(snapshot.states), 1)
-            ready_count = sum(1 for state in snapshot.states if state.election_ready)
+            now = time.monotonic()
+            if (now - self._last_ui_render_at) >= self._ui_refresh_interval_s:
+                self._console_view.ingest(
+                    snapshot, self._selected_drone_id, self._operator_role
+                )
+                self._select_row_for_drone()
+                self._last_ui_render_at = now
+                self._frame_counter += 1
+            if (now - self._last_aux_render_at) >= self._aux_refresh_interval_s:
+                self._refresh_auxiliary_views(snapshot, selected_state)
+                self._last_aux_render_at = now
             online = sum(1 for state in snapshot.states if state.reachable)
-            degraded_loc = sum(
-                1 for state in snapshot.states if state.localization_state != "nominal"
-            )
-            leader_state = next(
-                (
-                    state
-                    for state in snapshot.states
-                    if state.drone_id == snapshot.leader_id
-                ),
-                None,
-            )
-            leader_score = (
-                leader_state.leadership_score if leader_state is not None else 0.0
-            )
-
-            self._leader_card.set_data(
-                f"Drone {leader_id}",
-                f"score {leader_score:.3f} | {online}/{len(snapshot.states)} nodes connected",
-                accent=ACCENT_ALT if leader_score >= 0.55 else WARN,
-            )
-            self._cpu_card.set_data(
-                f"{snapshot.cpu_temp_c:.1f} C",
-                "Jetson CPU package",
-                accent=WARN if snapshot.cpu_temp_c < 70 else DANGER,
-            )
-            self._gpu_card.set_data(
-                f"{snapshot.gpu_load_pct:.0f}%",
-                "CUDA / graphics load",
-                accent=ACCENT if snapshot.gpu_load_pct < 85 else WARN,
-            )
-            self._battery_card.set_data(
-                f"{avg_battery:.0f}%",
-                "average swarm battery",
-                accent=SUCCESS if avg_battery > 35 else WARN,
-            )
-            self._link_card.set_data(
-                f"{online}/{len(snapshot.states)}",
-                f"loss {snapshot.packet_loss_pct:.1f}% | latency {snapshot.avg_latency_ms:.1f} ms",
-                accent=CYAN if snapshot.packet_loss_pct < 5 else WARN,
-            )
-            self._drift_card.set_data(
-                f"{avg_localization:.2f}",
-                f"localization confidence | drift {avg_drift:.3f} m",
-                accent=MAGENTA if avg_localization >= 0.70 else WARN,
-            )
-            self._alerts_card.set_data(
-                str(snapshot.critical_alerts),
-                f"{len(snapshot.clusters)} clusters | {len(snapshot.missions)} missions tracked",
-                accent=(
-                    SUCCESS
-                    if snapshot.critical_alerts == 0
-                    else WARN if snapshot.critical_alerts < 3 else DANGER
-                ),
-            )
-            runtime_accent = (
-                SIM_PURPLE
-                if snapshot.backend_mode == "simulation"
-                else ACCENT_ALT if snapshot.backend_mode == "edge_swarm" else ACCENT
-            )
-            self._status_runtime.set_value(
-                snapshot.backend_mode.upper(), runtime_accent
-            )
-            self._status_backend.set_value(
-                "ONLINE" if snapshot.backend_mode else "OFFLINE", CYAN
-            )
-            reality_label = (
-                "REAL"
-                if localization_data_source == "real"
-                and not snapshot.simulation_enabled
-                else localization_data_source.upper()
-            )
-            reality_accent = (
-                EMERALD
-                if reality_label == "REAL"
-                else SIM_PURPLE if "SIM" in reality_label else WARN
-            )
-            self._status_reality.set_value(reality_label, reality_accent)
-            self._status_drones.set_value(
-                f"{snapshot.real_drone_count}/{len(snapshot.states)} real",
-                EMERALD if snapshot.real_drone_count > 0 else WARN,
-            )
-            self._status_latency.set_value(
-                f"{snapshot.avg_latency_ms:.1f} ms",
-                CYAN if snapshot.avg_latency_ms < 20 else WARN,
-            )
-            self._status_compute.set_value(
-                f"{snapshot.cpu_temp_c:.0f}C / {snapshot.gpu_load_pct:.0f}%",
-                WARN if snapshot.cpu_temp_c < 75 else DANGER,
-            )
-            avg_link = sum(
-                state.link_integrity_score for state in snapshot.states
-            ) / max(len(snapshot.states), 1)
-            self._status_link.set_value(
-                f"{avg_link*100.0:.0f}%",
-                SUCCESS if avg_link >= 0.7 else WARN if avg_link >= 0.45 else DANGER,
-            )
-            self._status_operator.set_value(
-                self._operator_role.upper(), role_chip_accent
-            )
-            safety_state = "NORMAL"
-            safety_accent = SUCCESS
-            if snapshot.stale_drone_count > 0:
-                safety_state = "LINK_LOST"
-                safety_accent = AMBER
-            elif degraded_loc > 0:
-                safety_state = "DEGRADED"
-                safety_accent = WARN
-            if localization_data_source == "simulation" or snapshot.simulation_enabled:
-                safety_state = "SIMULATION"
-                safety_accent = SIM_PURPLE
-            self._status_safety.set_value(safety_state, safety_accent)
-
-            self._cpu_health.set_data(
-                f"{snapshot.cpu_temp_c:.1f} C",
-                "thermal headroom",
-                accent=(
-                    SUCCESS
-                    if snapshot.cpu_temp_c < 68
-                    else WARN if snapshot.cpu_temp_c < 78 else DANGER
-                ),
-            )
-            self._gpu_health.set_data(
-                f"{snapshot.gpu_load_pct:.0f}%",
-                "GPU load",
-                accent=ACCENT if snapshot.gpu_load_pct < 90 else WARN,
-            )
-            self._loss_health.set_data(
-                f"{snapshot.packet_loss_pct:.1f}%",
-                "mesh reliability",
-                accent=(
-                    SUCCESS
-                    if snapshot.packet_loss_pct < 2
-                    else WARN if snapshot.packet_loss_pct < 5 else DANGER
-                ),
-            )
-            self._latency_health.set_data(
-                f"{snapshot.avg_latency_ms:.1f} ms",
-                "inter-drone latency",
-                accent=CYAN if snapshot.avg_latency_ms < 10 else WARN,
-            )
-            self._motor_health.set_data(
-                f"{avg_motor * 100.0:.0f}%",
-                "average propulsion health",
-                accent=(
-                    SUCCESS
-                    if avg_motor >= 0.75
-                    else WARN if avg_motor >= 0.55 else DANGER
-                ),
-            )
-            self._election_health.set_data(
-                f"{ready_count}/{len(snapshot.states)}",
-                snapshot.election_state.replace("-", " "),
-                accent=MAGENTA if ready_count else DANGER,
-            )
-
+            leader_id = snapshot.leader_id if snapshot.leader_id is not None else "?"
             self.statusBar().showMessage(
                 f"Leader: {leader_id} | Nodes online: {online}/{len(snapshot.states)} | "
-                f"Avg drift: {avg_drift:.3f} m | Loc degraded: {degraded_loc}/{len(snapshot.states)} | "
-                f"Motor: {avg_motor * 100.0:.0f}% | Election-ready: {ready_count}/{len(snapshot.states)} | "
-                f"Critical alerts: {snapshot.critical_alerts}"
+                f"Latency: {snapshot.avg_latency_ms:.1f} ms | Packet loss: {snapshot.packet_loss_pct:.1f}% | "
+                f"CPU: {snapshot.cpu_temp_c:.1f} C | GPU: {snapshot.gpu_load_pct:.0f}%"
             )
         except Exception as exc:
             logger.exception("snapshot render failed")
@@ -6779,19 +6932,18 @@ class DashboardWindow(QMainWindow):
         if item is None:
             return
         try:
-            self._selected_drone_id = int(item.text())
+            selected_drone_id = int(item.text())
         except ValueError:
             return
+        self._selected_drone_id = selected_drone_id
         logger.info("Dashboard selected drone id=%s", self._selected_drone_id)
         if self._last_snapshot is not None:
-            selected_state = self._selected_state(self._last_snapshot.states)
-            self._detail.ingest(selected_state)
-            self._camera_page.ingest(selected_state)
-            self._lidar_page.ingest(selected_state)
-            self._imu_page.ingest(selected_state)
-            self._tdoa_page.ingest(selected_state)
-            self._replay_page.ingest(selected_state, self._last_snapshot)
-            self._mission_page.ingest(self._last_snapshot, selected_state)
+            self._console_view.ingest(
+                self._last_snapshot, self._selected_drone_id, self._operator_role
+            )
+            self._refresh_auxiliary_views(
+                self._last_snapshot, self._selected_state(self._last_snapshot.states)
+            )
         self._persist_settings()
 
     def _dispatch_command(self, request: CommandRequest) -> None:
@@ -6945,6 +7097,7 @@ class DashboardWindow(QMainWindow):
             self._ids.remove(drone_id)
             if self._selected_drone_id == drone_id:
                 self._selected_drone_id = self._ids[0] if self._ids else None
+        self._console.append_log(message)
         self._store.save_command(request_obj, message)
         self._persist_settings()
 
@@ -6954,6 +7107,9 @@ class DashboardWindow(QMainWindow):
             "poll_hz": str(self._poll_hz),
             "backend_url": self._last_backend_url,
             "selected_drone_id": str(self._selected_drone_id or 0),
+            "operator_role": self._operator_role,
+            "ui_fps_limit": str(max(1, round(1.0 / self._ui_refresh_interval_s))),
+            "aux_fps_limit": str(max(1, round(1.0 / self._aux_refresh_interval_s))),
         }
         for drone_id, mission in self._backend.mission_overrides.items():
             values[f"mission_override_{drone_id}"] = mission
