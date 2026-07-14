@@ -108,6 +108,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: ./.github/actions/setup-linux-deps
 
@@ -126,7 +128,7 @@ jobs:
 
       - name: Run clang-tidy
         shell: bash
-        run: python3 scripts/run_clang_tidy.py --build-dir build/linux-gcc-release-minimal
+        run: python3 scripts/run_clang_tidy.py --build-dir build/linux-gcc-release-minimal --changed-only
 
   python-ci:
     name: Python CI

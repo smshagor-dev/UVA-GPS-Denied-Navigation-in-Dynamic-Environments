@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -21,6 +22,11 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="CMake build directory containing compile_commands.json",
     )
+    parser.add_argument(
+        "--changed-only",
+        action="store_true",
+        help="Lint only changed compiled translation units for the current git range.",
+    )
     return parser.parse_args()
 
 
@@ -28,7 +34,9 @@ def collect_compiled_sources(build_dir: Path) -> list[Path]:
     compile_commands = build_dir / "compile_commands.json"
     commands = json.loads(compile_commands.read_text(encoding="utf-8"))
 
-    allowed_roots = tuple((REPO_ROOT / directory).resolve() for directory in DEFAULT_DIRS)
+    allowed_roots = tuple(
+        (REPO_ROOT / directory).resolve() for directory in DEFAULT_DIRS
+    )
     files: list[Path] = []
     seen: set[Path] = set()
 
@@ -51,6 +59,62 @@ def collect_compiled_sources(build_dir: Path) -> list[Path]:
     return sorted(files)
 
 
+def git_stdout(*args: str) -> str:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return completed.stdout.strip()
+
+
+def resolve_diff_range() -> str | None:
+    event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+    base_ref = os.environ.get("GITHUB_BASE_REF", "")
+
+    try:
+        if event_name == "pull_request" and base_ref:
+            remote_base = f"origin/{base_ref}"
+            merge_base = git_stdout("merge-base", "HEAD", remote_base)
+            return f"{merge_base}..HEAD"
+
+        git_stdout("rev-parse", "HEAD^")
+        return "HEAD^..HEAD"
+    except subprocess.CalledProcessError:
+        return None
+
+
+def collect_changed_sources(compiled_sources: list[Path]) -> list[Path]:
+    diff_range = resolve_diff_range()
+    if diff_range is None:
+        return compiled_sources
+
+    try:
+        changed_output = git_stdout(
+            "diff",
+            "--name-only",
+            "--diff-filter=ACMR",
+            diff_range,
+            "--",
+            *DEFAULT_DIRS,
+        )
+    except subprocess.CalledProcessError:
+        return compiled_sources
+
+    if not changed_output:
+        return []
+
+    changed_paths = {
+        (REPO_ROOT / line).resolve()
+        for line in changed_output.splitlines()
+        if line.endswith((".c", ".cc", ".cpp", ".cxx"))
+    }
+    return [path for path in compiled_sources if path in changed_paths]
+
+
 def main() -> int:
     args = parse_args()
     clang_tidy = shutil.which("clang-tidy")
@@ -65,8 +129,14 @@ def main() -> int:
         return 1
 
     files = collect_compiled_sources(build_dir)
+    if args.changed_only:
+        files = collect_changed_sources(files)
+
     if not files:
-        print("PASS: no compiled C++ translation units found for clang-tidy.")
+        if args.changed_only:
+            print("PASS: no changed compiled C++ translation units require clang-tidy.")
+        else:
+            print("PASS: no compiled C++ translation units found for clang-tidy.")
         return 0
 
     command = [
