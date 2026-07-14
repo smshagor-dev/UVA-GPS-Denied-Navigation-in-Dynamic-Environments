@@ -33,7 +33,8 @@ jobs:
           curl -fsSLo "${RUNNER_TEMP}/${archive}" \
             "https://github.com/rhysd/actionlint/releases/download/${version}/${archive}"
           tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" actionlint
-          install "${RUNNER_TEMP}/actionlint" /usr/local/bin/actionlint
+          chmod +x "${RUNNER_TEMP}/actionlint"
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
 
       - name: Print tool versions
         shell: bash
@@ -186,7 +187,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
 
       - name: Print tool versions
         shell: bash

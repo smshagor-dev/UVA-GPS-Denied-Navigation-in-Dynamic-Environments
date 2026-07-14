@@ -21,8 +21,7 @@
       "inherits": "base",
       "generator": "Visual Studio 17 2022",
       "architecture": {
-        "value": "x64",
-        "strategy": "external"
+        "value": "x64"
       },
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",

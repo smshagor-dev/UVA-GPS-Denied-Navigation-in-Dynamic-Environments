@@ -11,7 +11,6 @@ Checks: >-
 WarningsAsErrors: 'clang-analyzer-*,bugprone-*,cert-*'
 HeaderFilterRegex: '^(include|src|tests)/'
 FormatStyle: none
-AnalyzeTemporaryDtors: false
 CheckOptions:
   - key: readability-identifier-naming.NamespaceCase
     value: lower_case

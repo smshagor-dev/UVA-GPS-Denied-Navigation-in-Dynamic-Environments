@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -23,14 +24,31 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def collect_sources() -> list[Path]:
+def collect_compiled_sources(build_dir: Path) -> list[Path]:
+    compile_commands = build_dir / "compile_commands.json"
+    commands = json.loads(compile_commands.read_text(encoding="utf-8"))
+
+    allowed_roots = tuple((REPO_ROOT / directory).resolve() for directory in DEFAULT_DIRS)
     files: list[Path] = []
-    for directory in DEFAULT_DIRS:
-        root = REPO_ROOT / directory
-        if not root.exists():
+    seen: set[Path] = set()
+
+    for entry in commands:
+        candidate = Path(entry["file"])
+        if not candidate.is_absolute():
+            candidate = (Path(entry["directory"]) / candidate).resolve()
+        else:
+            candidate = candidate.resolve()
+
+        if candidate in seen:
             continue
-        files.extend(sorted(root.rglob("*.cpp")))
-    return files
+
+        if not any(root in candidate.parents for root in allowed_roots):
+            continue
+
+        seen.add(candidate)
+        files.append(candidate)
+
+    return sorted(files)
 
 
 def main() -> int:
@@ -46,9 +64,9 @@ def main() -> int:
         print(f"FAIL: compile_commands.json not found in {build_dir}")
         return 1
 
-    files = collect_sources()
+    files = collect_compiled_sources(build_dir)
     if not files:
-        print("PASS: no C++ translation units found for clang-tidy.")
+        print("PASS: no compiled C++ translation units found for clang-tidy.")
         return 0
 
     command = [
