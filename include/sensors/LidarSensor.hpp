@@ -167,8 +167,6 @@ private:
     float voxel_leaf_{0.05f};   // 5 cm voxel grid
     float range_min_{0.3f};
     float range_max_{80.0f};
-    int   outlier_neighbors_{10};
-    float outlier_std_mult_{1.0f};
 };
 
 } // namespace drone::sensors

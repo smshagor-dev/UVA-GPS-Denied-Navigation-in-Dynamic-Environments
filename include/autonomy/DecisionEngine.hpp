@@ -111,7 +111,7 @@ struct DecisionCommand {
 
 class DecisionEngine {
 public:
-    explicit DecisionEngine(DecisionConfig cfg = {});
+    explicit DecisionEngine(DecisionConfig cfg = DecisionConfig{});
 
     [[nodiscard]] DecisionCommand update(const DecisionContext& ctx);
     void reset();

@@ -86,8 +86,8 @@ public:
     // Non-copyable, movable
     SensorBase(const SensorBase&)            = delete;
     SensorBase& operator=(const SensorBase&) = delete;
-    SensorBase(SensorBase&&)                 = default;
-    SensorBase& operator=(SensorBase&&)      = default;
+    SensorBase(SensorBase&&)                 = delete;
+    SensorBase& operator=(SensorBase&&)      = delete;
 
     //  Lifecycle 
     virtual bool initialize()                = 0;

@@ -1,49 +1,60 @@
-﻿# System Designer and Developer: Md Shahanur Islam Shagor
+# System Designer and Developer: Md Shahanur Islam Shagor
 # Project: UVA GPS Denied Navigation in Dynamic Environments
 # Technology: C++, Python, Go, CMake
 
-cmake_minimum_required(VERSION 3.20)
-
-# Fetch GoogleTest
-include(FetchContent)
-FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG        v1.14.0
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(googletest)
+cmake_minimum_required(VERSION 3.24)
 
 include(GoogleTest)
 
 set(GTEST_DISCOVERY_MODE PRE_TEST)
 
-#  Test: EKF Estimator â”€
+add_library(drone_test_support INTERFACE)
+target_include_directories(drone_test_support INTERFACE
+    "${PROJECT_SOURCE_DIR}/include"
+    "${PROJECT_SOURCE_DIR}/third_party/crypto"
+)
+target_include_directories(drone_test_support SYSTEM INTERFACE
+    ${DRONE_OPENCV_INCLUDE_DIRS}
+    ${DRONE_PCL_INCLUDE_DIRS}
+)
+target_link_libraries(drone_test_support INTERFACE
+    GTest::gtest_main
+)
+
+function(drone_register_gtest target labels)
+    drone_apply_project_warnings(${target})
+    drone_enable_sanitizers(${target})
+    drone_set_target_output_dirs(${target} "tests" "tests" "tests")
+    gtest_discover_tests(${target}
+        DISCOVERY_TIMEOUT 30
+        DISCOVERY_MODE ${GTEST_DISCOVERY_MODE}
+        PROPERTIES LABELS "${labels}"
+    )
+endfunction()
+
 add_executable(test_ekf test_ekf.cpp)
 target_link_libraries(test_ekf PRIVATE
+    drone_test_support
     sensor_fusion_core
-    GTest::gtest_main
     Eigen3::Eigen
 )
-gtest_discover_tests(test_ekf DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+drone_register_gtest(test_ekf "unit;navigation")
 
-#  Test: Sensor Base 
 add_executable(test_sensors test_sensors.cpp)
 target_link_libraries(test_sensors PRIVATE
+    drone_test_support
     sensor_fusion_core
-    GTest::gtest_main
 )
-gtest_discover_tests(test_sensors DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+drone_register_gtest(test_sensors "unit;sensor;simulation")
 
-#  Test: V2X Mesh 
 add_executable(test_slam test_slam.cpp)
 target_link_libraries(test_slam PRIVATE
+    drone_test_support
     sensor_fusion_core
-    GTest::gtest_main
     Eigen3::Eigen
-    ${OpenCV_LIBS}
+    ${DRONE_OPENCV_LIBS}
 )
-gtest_discover_tests(test_slam DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+drone_register_gtest(test_slam "unit;simulation")
 
 add_executable(test_autonomy
     test_autonomy.cpp
@@ -53,16 +64,15 @@ add_executable(test_autonomy
     ../src/sensors/CameraSensor.cpp
     ../src/safety/SafetyManager.cpp
 )
-target_include_directories(test_autonomy PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
-)
 target_link_libraries(test_autonomy PRIVATE
-    GTest::gtest_main
+    drone_test_support
     Eigen3::Eigen
-    ${OpenCV_LIBS}
+    ${DRONE_OPENCV_LIBS}
+    ${DRONE_PCL_LIBS}
     spdlog::spdlog
 )
-gtest_discover_tests(test_autonomy DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+target_compile_definitions(test_autonomy PRIVATE ${DRONE_PCL_COMPILE_DEFINITIONS})
+drone_register_gtest(test_autonomy "unit;navigation;simulation")
 
 add_executable(test_navigation_intelligence
     test_navigation_intelligence.cpp
@@ -75,6 +85,8 @@ add_executable(test_navigation_intelligence
     ../src/safety/SafetyManager.cpp
     ../src/security/PeerPacketAuth.cpp
     ../src/sensors/CameraSensor.cpp
+    ../src/sensors/IMUSensor.cpp
+    ../src/sensors/LidarSensor.cpp
     ../src/slam/KeyframeManager.cpp
     ../src/slam/MapPlanner.cpp
     ../src/slam/OccupancyGridMap.cpp
@@ -88,19 +100,18 @@ add_executable(test_navigation_intelligence
     ../third_party/crypto/monocypher.c
     ../third_party/crypto/sha3.c
 )
-target_include_directories(test_navigation_intelligence PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
-)
 target_link_libraries(test_navigation_intelligence PRIVATE
-    GTest::gtest_main
+    drone_test_support
     Eigen3::Eigen
-    ${OpenCV_LIBS}
+    ${DRONE_OPENCV_LIBS}
+    ${DRONE_PCL_LIBS}
+    ${DRONE_SECURITY_LIBS}
     spdlog::spdlog
-    ${PCL_LIBRARIES}
     $<$<BOOL:${MSVC}>:Ws2_32>
     $<$<BOOL:${MSVC}>:bcrypt>
 )
-gtest_discover_tests(test_navigation_intelligence DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+target_compile_definitions(test_navigation_intelligence PRIVATE ${DRONE_PCL_COMPILE_DEFINITIONS})
+drone_register_gtest(test_navigation_intelligence "unit;navigation;sensor;swarm;telemetry;security;simulation")
 
 add_executable(test_swarm_security
     test_swarm_security.cpp
@@ -114,38 +125,31 @@ add_executable(test_swarm_security
     ../third_party/crypto/monocypher.c
     ../third_party/crypto/sha3.c
 )
-target_include_directories(test_swarm_security PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/crypto
-)
 target_link_libraries(test_swarm_security PRIVATE
-    GTest::gtest_main
+    drone_test_support
     Eigen3::Eigen
-    ${OpenCV_LIBS}
+    ${DRONE_OPENCV_LIBS}
+    ${DRONE_PCL_LIBS}
+    ${DRONE_SECURITY_LIBS}
     spdlog::spdlog
     $<$<BOOL:${MSVC}>:bcrypt>
 )
-gtest_discover_tests(test_swarm_security DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+target_compile_definitions(test_swarm_security PRIVATE ${DRONE_PCL_COMPILE_DEFINITIONS})
+drone_register_gtest(test_swarm_security "unit;security;swarm;simulation")
 
 add_executable(test_boot_trust
     test_boot_trust.cpp
     ../third_party/crypto/sha3.c
 )
-target_include_directories(test_boot_trust PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/crypto
-)
-target_link_libraries(test_boot_trust PRIVATE
-    GTest::gtest_main
-)
-gtest_discover_tests(test_boot_trust DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+target_link_libraries(test_boot_trust PRIVATE drone_test_support)
+drone_register_gtest(test_boot_trust "unit;security")
 
 add_executable(test_telemetry test_telemetry.cpp)
 target_link_libraries(test_telemetry PRIVATE
+    drone_test_support
     sensor_fusion_core
-    GTest::gtest_main
 )
-gtest_discover_tests(test_telemetry DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+drone_register_gtest(test_telemetry "unit;telemetry")
 
 add_executable(test_edge_swarm
     test_edge_swarm.cpp
@@ -155,24 +159,21 @@ add_executable(test_edge_swarm
     ../src/swarm/SwarmStateCache.cpp
 )
 target_link_libraries(test_edge_swarm PRIVATE
-    GTest::gtest_main
+    drone_test_support
     Eigen3::Eigen
 )
-gtest_discover_tests(test_edge_swarm DISCOVERY_TIMEOUT 30 DISCOVERY_MODE ${GTEST_DISCOVERY_MODE})
+drone_register_gtest(test_edge_swarm "unit;security;swarm")
 
-if(HAS_FASTDDS_TRANSPORT)
+if(DRONE_HAVE_FASTDDS_TRANSPORT)
     add_executable(test_v2x test_v2x.cpp)
     target_link_libraries(test_v2x PRIVATE
+        drone_test_support
         sensor_fusion_core
-        GTest::gtest_main
-        $<$<BOOL:${fastdds_FOUND}>:fastdds>
-        $<$<BOOL:${fastrtps_FOUND}>:fastrtps>
+        ${DRONE_FASTDDS_LINK_LIBS}
     )
+    drone_apply_project_warnings(test_v2x)
+    drone_enable_sanitizers(test_v2x)
+    drone_set_target_output_dirs(test_v2x "tests" "tests" "tests")
     add_test(NAME test_v2x COMMAND $<TARGET_FILE:test_v2x>)
+    set_tests_properties(test_v2x PROPERTIES LABELS "integration;swarm;simulation")
 endif()
-# System Designer and Developer: Md Shahanur Islam Shagor
-# Project: UVA GPS Denied Navigation in Dynamic Environments
-# Technology: C++, Python, Go, CMake
-# System Designer and Developer: Md Shahanur Islam Shagor
-# Project: UVA GPS Denied Navigation in Dynamic Environments
-# Technology: C++, Python, Go, CMake

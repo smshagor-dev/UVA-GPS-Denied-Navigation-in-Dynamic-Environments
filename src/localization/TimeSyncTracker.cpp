@@ -5,6 +5,9 @@
 
 namespace drone::localization {
 
+TimeSyncTracker::TimeSyncTracker()
+    : TimeSyncTracker(Config{}) {}
+
 TimeSyncTracker::TimeSyncTracker(Config cfg)
     : cfg_(cfg) {}
 

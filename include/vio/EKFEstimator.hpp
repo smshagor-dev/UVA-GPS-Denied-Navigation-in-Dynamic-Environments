@@ -84,7 +84,7 @@ struct PoseEstimate {
     // Derived
     [[nodiscard]] Eigen::Matrix3d R_wb() const { return orientation.toRotationMatrix(); }
     [[nodiscard]] Eigen::Vector3d euler_zyx_deg() const {
-        return orientation.toRotationMatrix().canonicalEulerAngles(2,1,0) *
+        return orientation.toRotationMatrix().eulerAngles(2,1,0) *
                (180.0 / std::numbers::pi_v<double>);
     }
 
@@ -94,7 +94,7 @@ struct PoseEstimate {
  
 class EKFEstimator {
 public:
-    explicit EKFEstimator(EKFConfig cfg = {});
+    explicit EKFEstimator(EKFConfig cfg = EKFConfig{});
 
     //  Initialize with known pose 
     void reset(const Eigen::Vector3d& p0       = Eigen::Vector3d::Zero(),

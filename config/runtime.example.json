@@ -1,0 +1,25 @@
+{
+  "system_name": "UVA_GPS_DENIED_RUNTIME_SAMPLE",
+  "version": "1.0",
+  "dataset_type": "non_production_example",
+  "description": "Minimal non-production runtime example that points to safe sample configuration files.",
+  "coordinate_frame": "local_enu",
+  "runtime_modes_supported": [
+    "simulation",
+    "bench",
+    "production",
+    "edge_swarm"
+  ],
+  "global_configuration": {
+    "runtime_mode": "bench",
+    "anchor_config_path": "config/anchors.example.json",
+    "lidar_config_path": "config/lidar.example.json",
+    "detector_labels_path": "config/detector_labels.example.json",
+    "telemetry_publish_rate_hz": 5,
+    "backend_mode": "bench",
+    "safety_manager_enabled": true,
+    "simulation_fallback_enabled": false,
+    "pre_arm_required": true,
+    "bench_validation_required": true
+  }
+}

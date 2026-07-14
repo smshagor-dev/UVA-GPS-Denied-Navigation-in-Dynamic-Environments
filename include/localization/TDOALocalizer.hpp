@@ -43,7 +43,8 @@ public:
         double damping{1.0e-3};
     };
 
-    explicit TDOALocalizer(Config cfg = {});
+    TDOALocalizer();
+    explicit TDOALocalizer(Config cfg);
 
     void set_anchors(std::vector<Anchor> anchors);
     [[nodiscard]] const std::vector<Anchor>& anchors() const { return anchors_; }

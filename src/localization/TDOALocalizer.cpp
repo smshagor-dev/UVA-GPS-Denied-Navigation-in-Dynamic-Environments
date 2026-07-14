@@ -18,6 +18,9 @@ constexpr double kMinDistanceM = 1.0e-3;
 
 } // namespace
 
+TDOALocalizer::TDOALocalizer()
+    : TDOALocalizer(Config{}) {}
+
 TDOALocalizer::TDOALocalizer(Config cfg)
     : cfg_(cfg) {
     drone::utils::get_or_create_logger("TDOA")->info(

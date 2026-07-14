@@ -110,7 +110,6 @@ def cmd_setup(args: argparse.Namespace) -> None:
         "esptool>=4.6",
         "cryptography>=45.0",
         "spdlog",
-        "rich",
     ]
 
     info("Installing Python dependenciesâ€¦")

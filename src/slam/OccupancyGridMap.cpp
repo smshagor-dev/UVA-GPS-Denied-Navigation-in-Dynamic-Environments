@@ -5,6 +5,9 @@
 
 namespace drone::slam {
 
+OccupancyGridMap::OccupancyGridMap()
+    : OccupancyGridMap(Config{}) {}
+
 OccupancyGridMap::OccupancyGridMap(Config cfg)
     : cfg_(cfg)
     , cells_(static_cast<size_t>(cfg_.width_cells * cfg_.height_cells), 0) {}

@@ -1,4 +1,4 @@
-# GPS-Denied Operation Test Report
+﻿# GPS-Denied Operation Test Report
 
 ## 1. Final verdict
 
@@ -47,96 +47,96 @@ Why:
 
 ### Real IMU usage
 
-- Real Linux IMU path exists in [src/sensors/IMUSensor.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/sensors/IMUSensor.cpp).
-- IMU device/env wiring is visible in [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp) and [include/sensors/IMUSensor.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/sensors/IMUSensor.hpp).
-- Bench/pre-arm scripts check IMU device presence/open in [scripts/bench_check.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/scripts/bench_check.py) and [scripts/pre_arm_check.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/scripts/pre_arm_check.py).
+- Real Linux IMU path exists in [src/sensors/IMUSensor.cpp](../src/sensors/IMUSensor.cpp).
+- IMU device/env wiring is visible in [src/main.cpp](../src/main.cpp) and [include/sensors/IMUSensor.hpp](../include/sensors/IMUSensor.hpp).
+- Bench/pre-arm scripts check IMU device presence/open in [scripts/bench_check.py](../scripts/bench_check.py) and [scripts/pre_arm_check.py](../scripts/pre_arm_check.py).
 - Limitation: no evidence here that a real IMU was connected and exercised.
 
 ### Camera stream usage
 
-- Real OpenCV/RTSP camera path exists in [src/sensors/CameraSensor.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/sensors/CameraSensor.cpp) and [include/sensors/CameraSensor.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/sensors/CameraSensor.hpp).
-- Camera env/runtime wiring exists in [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp).
+- Real OpenCV/RTSP camera path exists in [src/sensors/CameraSensor.cpp](../src/sensors/CameraSensor.cpp) and [include/sensors/CameraSensor.hpp](../include/sensors/CameraSensor.hpp).
+- Camera env/runtime wiring exists in [src/main.cpp](../src/main.cpp).
 - Bench/pre-arm scripts attempt to open the real stream.
 - Limitation: no evidence here that the real stream was opened on hardware during this audit.
 
 ### Real VIO frontend
 
-- Real visual frontend functions exist in [src/vio/VIOPipeline.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/vio/VIOPipeline.cpp) via `run_visual_frontend(...)`.
-- Placeholder visual path is restricted by `visual_placeholder_allowed(...)`, with tests in [tests/test_navigation_intelligence.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_navigation_intelligence.cpp).
+- Real visual frontend functions exist in [src/vio/VIOPipeline.cpp](../src/vio/VIOPipeline.cpp) via `run_visual_frontend(...)`.
+- Placeholder visual path is restricted by `visual_placeholder_allowed(...)`, with tests in [tests/test_navigation_intelligence.cpp](../tests/test_navigation_intelligence.cpp).
 - Limitation: implemented, but not proven against real replay or flight-camera data.
 
 ### EKF update
 
-- EKF core and visual update integration exist in [src/vio/EKFEstimator.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/vio/EKFEstimator.cpp) and [src/vio/VIOPipeline.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/vio/VIOPipeline.cpp).
-- Existing unit tests for estimator behavior exist in [tests/test_ekf.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_ekf.cpp).
+- EKF core and visual update integration exist in [src/vio/EKFEstimator.cpp](../src/vio/EKFEstimator.cpp) and [src/vio/VIOPipeline.cpp](../src/vio/VIOPipeline.cpp).
+- Existing unit tests for estimator behavior exist in [tests/test_ekf.cpp](../tests/test_ekf.cpp).
 - Limitation: C++ tests were not executable here because `cmake`/`ctest` are unavailable.
 
 ### TDOA/UWB real ingest
 
-- Real CSV/UDP/serial ingest exists in [src/localization/TDOAIngestor.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/localization/TDOAIngestor.cpp) and [src/localization/UWBSerialDriver.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/localization/UWBSerialDriver.cpp).
-- Tests cover config/ingest behavior in [tests/test_navigation_intelligence.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_navigation_intelligence.cpp).
+- Real CSV/UDP/serial ingest exists in [src/localization/TDOAIngestor.cpp](../src/localization/TDOAIngestor.cpp) and [src/localization/UWBSerialDriver.cpp](../src/localization/UWBSerialDriver.cpp).
+- Tests cover config/ingest behavior in [tests/test_navigation_intelligence.cpp](../tests/test_navigation_intelligence.cpp).
 - Limitation: no live measurement evidence from real anchors/UWB radios.
 
 ### Synthetic/demo fallback blocking
 
-- Runtime mode validation and synthetic fallback restriction exist in [src/runtime/RuntimeMode.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/runtime/RuntimeMode.cpp) and [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp).
+- Runtime mode validation and synthetic fallback restriction exist in [src/runtime/RuntimeMode.cpp](../src/runtime/RuntimeMode.cpp) and [src/main.cpp](../src/main.cpp).
 - Bench/production reject silent simulation fallback paths at startup.
 - This is a strong software improvement.
 
 ### Anchor config loading
 
-- Real anchor JSON loading/validation exists in [src/runtime/RuntimeMode.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/runtime/RuntimeMode.cpp) and is used in [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp).
-- Example config exists in [config/anchors.example.json](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/config/anchors.example.json).
+- Real anchor JSON loading/validation exists in [src/runtime/RuntimeMode.cpp](../src/runtime/RuntimeMode.cpp) and is used in [src/main.cpp](../src/main.cpp).
+- Example config exists in [config/anchors.example.json](../config/anchors.example.json).
 - Limitation: no proof of surveyed/calibrated real deployment anchors.
 
 ### LiDAR UDP receive/parsing
 
-- LiDAR UDP receive path exists in [src/sensors/LidarSensor.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/sensors/LidarSensor.cpp) with `receive_udp_packet()`.
-- Parser interface and config path exist in [include/sensors/LidarSensor.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/sensors/LidarSensor.hpp) and [config/lidar.example.json](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/config/lidar.example.json).
+- LiDAR UDP receive path exists in [src/sensors/LidarSensor.cpp](../src/sensors/LidarSensor.cpp) with `receive_udp_packet()`.
+- Parser interface and config path exist in [include/sensors/LidarSensor.hpp](../include/sensors/LidarSensor.hpp) and [config/lidar.example.json](../config/lidar.example.json).
 - Limitation: generic parser exists, but no vendor-specific validation was demonstrated.
 
 ### Obstacle generation
 
-- LiDAR obstacle generation is wired through `obstacles_from_lidar(...)` in [src/swarm/V2XMeshNetwork.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/swarm/V2XMeshNetwork.cpp) and used in [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp).
-- Sensor-level tests exist in [tests/test_sensors.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_sensors.cpp).
+- LiDAR obstacle generation is wired through `obstacles_from_lidar(...)` in [src/swarm/V2XMeshNetwork.cpp](../src/swarm/V2XMeshNetwork.cpp) and used in [src/main.cpp](../src/main.cpp).
+- Sensor-level tests exist in [tests/test_sensors.cpp](../tests/test_sensors.cpp).
 - Limitation: not operationally proven on a real LiDAR stream.
 
 ### Semantic detector label mapping
 
-- Detector label loading exists in [src/sensors/CameraSensor.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/sensors/CameraSensor.cpp).
-- Autonomy uses semantic labels in [src/autonomy/DecisionEngine.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/autonomy/DecisionEngine.cpp).
-- Example mapping exists in [config/detector_labels.example.json](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/config/detector_labels.example.json).
+- Detector label loading exists in [src/sensors/CameraSensor.cpp](../src/sensors/CameraSensor.cpp).
+- Autonomy uses semantic labels in [src/autonomy/DecisionEngine.cpp](../src/autonomy/DecisionEngine.cpp).
+- Example mapping exists in [config/detector_labels.example.json](../config/detector_labels.example.json).
 - Limitation: deployed detector model mapping still needs real validation.
 
 ### Safety manager
 
-- Central safety manager exists in [include/safety/SafetyManager.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/safety/SafetyManager.hpp) and [src/safety/SafetyManager.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/safety/SafetyManager.cpp).
-- Main loop integration exists in [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp).
-- Safety tests exist in [tests/test_autonomy.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_autonomy.cpp).
+- Central safety manager exists in [include/safety/SafetyManager.hpp](../include/safety/SafetyManager.hpp) and [src/safety/SafetyManager.cpp](../src/safety/SafetyManager.cpp).
+- Main loop integration exists in [src/main.cpp](../src/main.cpp).
+- Safety tests exist in [tests/test_autonomy.cpp](../tests/test_autonomy.cpp).
 - Limitation: not proven in a real tethered drill.
 
 ### Pre-arm check
 
-- Strict pre-arm no-fly gate exists in [scripts/pre_arm_check.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/scripts/pre_arm_check.py).
+- Strict pre-arm no-fly gate exists in [scripts/pre_arm_check.py](../scripts/pre_arm_check.py).
 - It fails on simulation mode, fake/non-real backend data, stale telemetry, missing sensors/config, and low localization confidence.
 - Limitation: no evidence of successful real-hardware execution.
 
 ### bench_check.py
 
-- Bench gate exists in [scripts/bench_check.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/scripts/bench_check.py).
+- Bench gate exists in [scripts/bench_check.py](../scripts/bench_check.py).
 - It verifies runtime mode, anchor config, LiDAR config, camera open, IMU open, backend reachability, and dashboard-visible backend mode.
 - Limitation: no evidence of successful real-hardware execution.
 
 ### Backend production mode
 
-- Production backend mode is implemented in [internal/controlplane/server.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/internal/controlplane/server.go), [internal/controlplane/state.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/internal/controlplane/state.go), and [cmd/control-plane/main.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/cmd/control-plane/main.go).
-- Go API tests cover this in [internal/controlplane/server_api_test.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/internal/controlplane/server_api_test.go).
+- Production backend mode is implemented in [internal/controlplane/server.go](../internal/controlplane/server.go), [internal/controlplane/state.go](../internal/controlplane/state.go), and [cmd/control-plane/main.go](../cmd/control-plane/main.go).
+- Go API tests cover this in [internal/controlplane/server_api_test.go](../internal/controlplane/server_api_test.go).
 
 ### Dashboard real/simulation warning
 
-- Dashboard warning composition exists in [gui/backend_status.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/gui/backend_status.py).
-- UI ingestion of backend mode / real drone count / stale count exists in [gui/dashboard.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/gui/dashboard.py).
-- Python tests cover warning behavior in [tests/test_dashboard_backend_status.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_dashboard_backend_status.py).
+- Dashboard warning composition exists in [gui/backend_status.py](../gui/backend_status.py).
+- UI ingestion of backend mode / real drone count / stale count exists in [gui/dashboard.py](../gui/dashboard.py).
+- Python tests cover warning behavior in [tests/test_dashboard_backend_status.py](../tests/test_dashboard_backend_status.py).
 
 ## 5. Commands run
 
@@ -158,7 +158,7 @@ Phase 5 validation additions:
 
 - C++ validation is now part of `scripts/local_validate.py`
 - if `cmake` is missing, the script prints install instructions and exits non-zero
-- local build instructions now live in [LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md](/d:/Final%20Project/drone_swarm/docs/LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md)
+- local build instructions now live in [LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md](LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md)
 - current execution result depends on the local workstation environment and should be recorded after each run
 
 ## 6. GPS-denied test checklist
@@ -277,4 +277,4 @@ Remaining gap:
 
 This system is strong as a **lab bench research prototype** and increasingly well-structured as production-oriented software, but it is **not real-flight-ready** for GPS-denied operation yet.
 
-The key missing ingredient is no longer “missing software pieces.” It is **real validation evidence**.
+The key missing ingredient is no longer â€œmissing software pieces.â€ It is **real validation evidence**.

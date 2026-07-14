@@ -105,9 +105,19 @@ std::string read_env(const char* key) {
     if (key == nullptr) {
         return {};
     }
+#ifdef _WIN32
+    char* buffer = nullptr;
+    size_t size = 0;
+    if (_dupenv_s(&buffer, &size, key) == 0 && buffer != nullptr) {
+        std::string value(buffer);
+        free(buffer);
+        return value;
+    }
+#else
     if (const char* value = std::getenv(key)) {
         return value;
     }
+#endif
     return {};
 }
 

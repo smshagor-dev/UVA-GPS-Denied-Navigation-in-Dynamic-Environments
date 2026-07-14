@@ -1,258 +1,99 @@
-﻿# System Designer and Developer: Md Shahanur Islam Shagor
+# System Designer and Developer: Md Shahanur Islam Shagor
 # Project: UVA GPS Denied Navigation in Dynamic Environments
 # Technology: C++, Python, Go, CMake
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.24)
 
-if(DEFINED ENV{VCPKG_ROOT})
-    file(TO_CMAKE_PATH "$ENV{VCPKG_ROOT}" _DRONE_VCPKG_ROOT)
-else()
-    set(_DRONE_VCPKG_ROOT "")
+if(POLICY CMP0144)
+    cmake_policy(SET CMP0144 NEW)
 endif()
 
-if(WIN32 AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    set(_DRONE_VCPKG_TOOLCHAIN "${_DRONE_VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
-    if(EXISTS "${_DRONE_VCPKG_TOOLCHAIN}")
-        set(CMAKE_TOOLCHAIN_FILE "${_DRONE_VCPKG_TOOLCHAIN}" CACHE STRING "vcpkg toolchain file")
-    elseif(EXISTS "D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake")
-        set(CMAKE_TOOLCHAIN_FILE "D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake" CACHE STRING "vcpkg toolchain file")
-    elseif(EXISTS "C:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake")
-        set(CMAKE_TOOLCHAIN_FILE "C:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake" CACHE STRING "vcpkg toolchain file")
+if(WIN32 AND NOT DEFINED CMAKE_TOOLCHAIN_FILE AND DEFINED ENV{VCPKG_ROOT})
+    file(TO_CMAKE_PATH "$ENV{VCPKG_ROOT}" _drone_vcpkg_root)
+    if(EXISTS "${_drone_vcpkg_root}/scripts/buildsystems/vcpkg.cmake")
+        set(CMAKE_TOOLCHAIN_FILE
+            "${_drone_vcpkg_root}/scripts/buildsystems/vcpkg.cmake"
+            CACHE STRING "vcpkg toolchain file")
     endif()
 endif()
 
 project(DroneSwarmSensorFusion VERSION 2.0.0 LANGUAGES C CXX)
 
-# 
-# C++20 Standard â€“ required for concepts, ranges, and coroutines
-# 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+include(CompilerWarnings)
+include(Sanitizers)
+include(Dependencies)
+
+option(DRONE_BUILD_TESTS "Build native tests" ON)
+option(DRONE_ENABLE_FASTDDS "Enable Fast-DDS transport support when available" ON)
+option(DRONE_ENABLE_TENSORRT "Enable TensorRT inference support when available" OFF)
+option(DRONE_ENABLE_PYTHON_BINDINGS "Build the pybind11 bridge module" ON)
+option(DRONE_FETCH_PYBIND11 "Fetch pybind11 when no package is available" ON)
+option(DRONE_FETCH_GOOGLETEST "Fetch GoogleTest when no package is available" ON)
+option(DRONE_WARNINGS_AS_ERRORS "Treat project warnings as errors" OFF)
+option(DRONE_ENABLE_ASAN "Enable AddressSanitizer on supported toolchains" OFF)
+option(DRONE_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer on supported toolchains" OFF)
+option(DRONE_ENABLE_CPACK "Enable archive packaging via CPack" OFF)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Build type defaults
-if(NOT CMAKE_BUILD_TYPE)
+if(MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+endif()
+
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
-message(STATUS "Build type : ${CMAKE_BUILD_TYPE}")
-message(STATUS "Compiler   : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-
-# 
-# Compiler Flags
-# 
-if(MSVC)
-    add_compile_options(
-        /W4
-        /EHsc
-        /permissive-
-        /wd4100
-        /utf-8
-        $<$<CONFIG:Release>:/O2>
-        $<$<CONFIG:Release>:/DNDEBUG>
-        $<$<CONFIG:RelWithDebInfo>:/O2>
-        $<$<CONFIG:RelWithDebInfo>:/Zi>
-        $<$<CONFIG:Debug>:/Od>
-        $<$<CONFIG:Debug>:/Zi>
-    )
-else()
-    add_compile_options(
-        -Wall -Wextra -Wpedantic
-        -Wno-unused-parameter
-        $<$<CONFIG:Release>:-O3 -march=native -DNDEBUG>
-        $<$<CONFIG:Debug>:-g3 -fsanitize=address,undefined>
-        $<$<CONFIG:RelWithDebInfo>:-O2 -g>
-    )
-
-    add_link_options(
-        $<$<CONFIG:Debug>:-fsanitize=address,undefined>
-    )
-endif()
-
-# 
-# CMake Module Path
-# 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
-if(WIN32)
-    foreach(_drone_prefix
-        "${_DRONE_VCPKG_ROOT}/installed/x64-windows"
-        "D:/tools/vcpkg-full/installed/x64-windows"
-        "C:/tools/vcpkg-full/installed/x64-windows"
-        "C:/vcpkg/installed/x64-windows"
-    )
-        if(EXISTS "${_drone_prefix}")
-            list(APPEND CMAKE_PREFIX_PATH "${_drone_prefix}" "${_drone_prefix}/share")
-        endif()
-    endforeach()
-endif()
-
-# 
-# External Dependencies
-# 
-
-# 1. Eigen3  linear algebra for EKF/VIO
-set(_DRONE_EIGEN_HINTS
-    "$ENV{EIGEN3_DIR}"
-    "$ENV{EIGEN3_ROOT}"
-    "${_DRONE_VCPKG_ROOT}/installed/x64-windows"
-    "${_DRONE_VCPKG_ROOT}/installed/x64-windows/share/eigen3"
-    "D:/tools/vcpkg-full/installed/x64-windows"
-    "D:/tools/vcpkg-full/installed/x64-windows/share/eigen3"
-    "C:/tools/vcpkg-full/installed/x64-windows"
-    "C:/tools/vcpkg-full/installed/x64-windows/share/eigen3"
-    "C:/vcpkg/installed/x64-windows"
-    "C:/vcpkg/installed/x64-windows/share/eigen3"
-    "/usr"
-    "/usr/local"
-    "/opt/homebrew"
-)
-
-find_package(Eigen3 3.4...6 QUIET NO_MODULE HINTS ${_DRONE_EIGEN_HINTS})
-
-if(NOT Eigen3_FOUND)
-    find_path(EIGEN3_INCLUDE_DIR
-        NAMES Eigen/Core signature_of_eigen3_matrix_library
-        HINTS
-            "$ENV{EIGEN3_INCLUDE_DIR}"
-            "$ENV{EIGEN3_ROOT}"
-            "${_DRONE_VCPKG_ROOT}/installed/x64-windows/include/eigen3"
-            "D:/tools/vcpkg-full/installed/x64-windows/include/eigen3"
-            "C:/tools/vcpkg-full/installed/x64-windows/include/eigen3"
-            "C:/vcpkg/installed/x64-windows/include/eigen3"
-            "/usr/include/eigen3"
-            "/usr/local/include/eigen3"
-            "/opt/homebrew/include/eigen3"
-        PATH_SUFFIXES eigen3
-    )
-
-    if(EIGEN3_INCLUDE_DIR)
-        add_library(Eigen3::Eigen INTERFACE IMPORTED)
-        set_target_properties(Eigen3::Eigen PROPERTIES
-            INTERFACE_INCLUDE_DIRECTORIES "${EIGEN3_INCLUDE_DIR}"
+function(drone_set_target_output_dirs target runtime_subdir library_subdir archive_subdir)
+    foreach(config Debug Release RelWithDebInfo MinSizeRel)
+        string(TOUPPER "${config}" config_upper)
+        set_target_properties(${target} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY_${config_upper} "${PROJECT_BINARY_DIR}/${runtime_subdir}/${config}"
+            LIBRARY_OUTPUT_DIRECTORY_${config_upper} "${PROJECT_BINARY_DIR}/${library_subdir}/${config}"
+            ARCHIVE_OUTPUT_DIRECTORY_${config_upper} "${PROJECT_BINARY_DIR}/${archive_subdir}/${config}"
+            PDB_OUTPUT_DIRECTORY_${config_upper} "${PROJECT_BINARY_DIR}/${archive_subdir}/${config}"
         )
-        set(Eigen3_FOUND TRUE)
-        set(EIGEN3_VERSION "header-only fallback")
-        message(STATUS "Eigen3 headers found via include-only fallback: ${EIGEN3_INCLUDE_DIR}")
-    endif()
-endif()
+    endforeach()
+endfunction()
 
-if(NOT Eigen3_FOUND)
-    message(FATAL_ERROR
-        "Eigen3 headers were not found.\n"
-        "Install Eigen3 and rerun configure.\n"
-        "Windows with vcpkg:\n"
-        "  set VCPKG_ROOT=D:\\tools\\vcpkg-full\n"
-        "  %VCPKG_ROOT%\\vcpkg.exe install eigen3\n"
-        "Ubuntu/Debian:\n"
-        "  sudo apt-get update && sudo apt-get install -y libeigen3-dev\n"
-        "Manual install:\n"
-        "  point EIGEN3_ROOT or EIGEN3_INCLUDE_DIR at the folder containing Eigen/Core"
-    )
-endif()
+function(drone_append_build_interface_paths out_var)
+    set(_wrapped_paths "")
+    foreach(path IN LISTS ARGN)
+        list(APPEND _wrapped_paths "$<BUILD_INTERFACE:${path}>")
+    endforeach()
+    set(${out_var} "${_wrapped_paths}" PARENT_SCOPE)
+endfunction()
 
-message(STATUS "Eigen3 found: ${EIGEN3_VERSION}")
+function(drone_append_install_interface_paths out_var)
+    set(_wrapped_paths "")
+    foreach(path IN LISTS ARGN)
+        list(APPEND _wrapped_paths "$<INSTALL_INTERFACE:${path}>")
+    endforeach()
+    set(${out_var} "${_wrapped_paths}" PARENT_SCOPE)
+endfunction()
 
-# 2. OpenCV  vision, feature extraction, RTSP
-find_package(OpenCV 4.5 REQUIRED
-    COMPONENTS core imgproc highgui calib3d features2d video dnn)
-message(STATUS "OpenCV found: ${OpenCV_VERSION}")
+drone_resolve_dependencies()
 
-# 3. PCL  point cloud processing for LiDAR SLAM
-find_package(PCL 1.12 REQUIRED
-    COMPONENTS common io filters segmentation kdtree search)
-message(STATUS "PCL found: ${PCL_VERSION}")
-
-# 4. Fast-DDS (eProsima)  V2X mesh communication
-find_package(nlohmann_json QUIET CONFIG)
-find_package(fastdds QUIET CONFIG)
-find_package(fastrtps QUIET CONFIG)
-if(fastdds_FOUND OR fastrtps_FOUND)
-    message(STATUS "Fast-DDS transport found")
-    set(HAS_FASTDDS_TRANSPORT TRUE)
+drone_append_build_interface_paths(DRONE_OPENCV_BUILD_INCLUDE_DIRS ${DRONE_OPENCV_INCLUDE_DIRS})
+drone_append_build_interface_paths(DRONE_PCL_BUILD_INCLUDE_DIRS ${DRONE_PCL_INCLUDE_DIRS})
+drone_append_install_interface_paths(DRONE_OPENCV_INSTALL_INCLUDE_DIRS ${DRONE_OPENCV_INCLUDE_DIRS})
+drone_append_install_interface_paths(DRONE_PCL_INSTALL_INCLUDE_DIRS ${DRONE_PCL_INCLUDE_DIRS})
+if(DRONE_HAVE_TENSORRT)
+    drone_append_build_interface_paths(DRONE_TENSORRT_BUILD_INCLUDE_DIRS ${DRONE_TENSORRT_INCLUDE_DIR})
+    drone_append_install_interface_paths(DRONE_TENSORRT_INSTALL_INCLUDE_DIRS ${DRONE_TENSORRT_INCLUDE_DIR})
 else()
-    message(STATUS "Fast-DDS transport not found - built-in UDP swarm transport will be used")
-    set(HAS_FASTDDS_TRANSPORT FALSE)
+    set(DRONE_TENSORRT_BUILD_INCLUDE_DIRS "")
+    set(DRONE_TENSORRT_INSTALL_INCLUDE_DIRS "")
 endif()
 
-# 5. spdlog  structured logging
-find_package(spdlog REQUIRED)
-message(STATUS "spdlog found")
-
-# 6. pybind11  Python/C++ GUI bridge
-find_package(pybind11 QUIET)
-if(pybind11_FOUND)
-    message(STATUS "pybind11 found: ${pybind11_VERSION}")
-    set(HAS_PYBIND TRUE)
-else()
-    include(FetchContent)
-    FetchContent_Declare(
-        pybind11
-        GIT_REPOSITORY https://github.com/pybind/pybind11.git
-        GIT_TAG        v2.13.6
-        GIT_SHALLOW    TRUE
-    )
-    FetchContent_MakeAvailable(pybind11)
-    if(TARGET pybind11::module)
-        message(STATUS "pybind11 fetched: ${pybind11_VERSION}")
-        set(HAS_PYBIND TRUE)
-    else()
-        message(STATUS "pybind11 unavailable - Python bindings disabled")
-        set(HAS_PYBIND FALSE)
-    endif()
-endif()
-
-# 7. TensorRT (optional, Jetson Nano / NVIDIA platform)
-find_library(TENSORRT_LIB nvinfer
-    HINTS
-        $ENV{TENSORRT_ROOT}/lib
-        $ENV{TENSORRT_ROOT}/lib/x64
-        /usr/lib/aarch64-linux-gnu
-        /usr/lib/x86_64-linux-gnu)
-find_path(TENSORRT_INCLUDE NvInfer.h
-    HINTS
-        $ENV{TENSORRT_ROOT}/include
-        /usr/include/aarch64-linux-gnu
-        /usr/local/include)
-if(TENSORRT_LIB AND TENSORRT_INCLUDE)
-    message(STATUS "TensorRT found: ${TENSORRT_LIB}")
-    set(HAS_TENSORRT TRUE)
-else()
-    message(STATUS "TensorRT not found - YOLOv8n inference will use OpenCV DNN fallback")
-    set(HAS_TENSORRT FALSE)
-endif()
-
-# 8. Threads
-find_package(Threads REQUIRED)
-
-# 
-# Global Include Directories
-# 
-include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/crypto
-    ${OpenCV_INCLUDE_DIRS}
-    ${PCL_INCLUDE_DIRS}
-)
-
-if(HAS_TENSORRT)
-    include_directories(${TENSORRT_INCLUDE})
-endif()
-
-# 
-# Preprocessor Definitions
-# 
-add_compile_definitions(
-    $<$<BOOL:${HAS_FASTDDS_TRANSPORT}>:DRONE_HAS_FASTDDS_TRANSPORT>
-    $<$<BOOL:${HAS_TENSORRT}>:DRONE_HAS_TENSORRT>
-    DRONE_LOG_LEVEL=1
-)
-
-# 
-# Library: sensor_fusion_core
-# 
-set(CORE_SOURCES
+set(DRONE_CORE_SOURCES
     src/autonomy/DecisionEngine.cpp
     src/autonomy/ExperienceMemory.cpp
     src/localization/LocalizationFusion.cpp
@@ -286,77 +127,168 @@ set(CORE_SOURCES
     third_party/crypto/sha3.c
 )
 
-add_library(sensor_fusion_core STATIC ${CORE_SOURCES})
-
-target_link_libraries(sensor_fusion_core PUBLIC
-    Eigen3::Eigen
-    ${OpenCV_LIBS}
-    ${PCL_LIBRARIES}
-    Threads::Threads
-    spdlog::spdlog
-    $<$<BOOL:${fastdds_FOUND}>:fastdds>
-    $<$<BOOL:${fastrtps_FOUND}>:fastrtps>
-    $<$<BOOL:${HAS_TENSORRT}>:${TENSORRT_LIB}>
-    $<$<BOOL:${MSVC}>:bcrypt>
-    $<$<BOOL:${WIN32}>:crypt32>
-    $<$<BOOL:${WIN32}>:ncrypt>
-    $<$<BOOL:${WIN32}>:Ws2_32>
+add_library(sensor_fusion_core STATIC)
+target_sources(sensor_fusion_core PRIVATE ${DRONE_CORE_SOURCES})
+target_compile_features(sensor_fusion_core PUBLIC cxx_std_20)
+set_target_properties(sensor_fusion_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(sensor_fusion_core
+    PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/third_party/crypto>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-
-target_compile_definitions(sensor_fusion_core PRIVATE
-    ${PCL_DEFINITIONS}
+target_include_directories(sensor_fusion_core
+    SYSTEM PUBLIC
+        ${DRONE_OPENCV_BUILD_INCLUDE_DIRS}
+        ${DRONE_PCL_BUILD_INCLUDE_DIRS}
+        ${DRONE_TENSORRT_BUILD_INCLUDE_DIRS}
+        ${DRONE_OPENCV_INSTALL_INCLUDE_DIRS}
+        ${DRONE_PCL_INSTALL_INCLUDE_DIRS}
+        ${DRONE_TENSORRT_INSTALL_INCLUDE_DIRS}
 )
+target_link_libraries(sensor_fusion_core
+    PUBLIC
+        Eigen3::Eigen
+        Threads::Threads
+        spdlog::spdlog
+        ${DRONE_SECURITY_LIBS}
+        ${DRONE_OPENCV_LIBS}
+        ${DRONE_PCL_LIBS}
+    PRIVATE
+        ${DRONE_FASTDDS_LINK_LIBS}
+        $<$<BOOL:${DRONE_HAVE_TENSORRT}>:${DRONE_TENSORRT_LIB}>
+        $<$<BOOL:${WIN32}>:Ws2_32>
+        $<$<BOOL:${WIN32}>:bcrypt>
+        $<$<BOOL:${WIN32}>:crypt32>
+        $<$<BOOL:${WIN32}>:ncrypt>
+)
+target_compile_definitions(sensor_fusion_core
+    PUBLIC
+        $<$<BOOL:${DRONE_HAVE_FASTDDS_TRANSPORT}>:DRONE_HAS_FASTDDS_TRANSPORT>
+        $<$<BOOL:${DRONE_HAVE_TENSORRT}>:DRONE_HAS_TENSORRT>
+        ${DRONE_PCL_COMPILE_DEFINITIONS}
+)
+drone_apply_project_warnings(sensor_fusion_core)
+drone_enable_sanitizers(sensor_fusion_core)
+drone_set_target_output_dirs(sensor_fusion_core "bin" "lib" "lib")
 
-# 
-# Executable: drone_node  (main entry point per drone)
-# 
 add_executable(drone_node src/main.cpp)
 target_link_libraries(drone_node PRIVATE sensor_fusion_core)
+drone_apply_project_warnings(drone_node)
+drone_enable_sanitizers(drone_node)
+drone_set_target_output_dirs(drone_node "bin" "lib" "lib")
 
-# 
-# Pybind11 Module: drone_bridge  (Python GUI â†” C++ core)
-# 
-if(HAS_PYBIND)
+if(DRONE_ENABLE_PYTHON_BINDINGS AND DRONE_HAVE_PYTHON_BINDINGS)
     pybind11_add_module(drone_bridge src/drone_bridge.cpp)
-    target_link_libraries(drone_bridge PRIVATE sensor_fusion_core)
-    message(STATUS "drone_bridge Python module: ENABLED")
+    target_include_directories(drone_bridge SYSTEM PRIVATE
+        ${DRONE_OPENCV_INCLUDE_DIRS}
+        ${DRONE_PCL_INCLUDE_DIRS}
+        $<$<BOOL:${DRONE_HAVE_TENSORRT}>:${DRONE_TENSORRT_INCLUDE_DIR}>
+    )
+    target_compile_definitions(drone_bridge PRIVATE ${DRONE_PCL_COMPILE_DEFINITIONS})
+    target_link_libraries(drone_bridge PRIVATE
+        sensor_fusion_core
+        ${DRONE_OPENCV_LIBS}
+        ${DRONE_PCL_LIBS}
+        $<$<BOOL:${DRONE_HAVE_TENSORRT}>:${DRONE_TENSORRT_LIB}>
+    )
+    drone_apply_project_warnings(drone_bridge)
+    drone_enable_sanitizers(drone_bridge)
+    drone_set_target_output_dirs(drone_bridge "python" "python" "python")
 endif()
 
-# 
-# Tests
-# 
-option(BUILD_TESTS "Build unit tests" ON)
-if(BUILD_TESTS)
+if(DRONE_BUILD_TESTS)
+    drone_enable_googletest()
     enable_testing()
     add_subdirectory(tests)
 endif()
 
-# 
-# Install Rules
-# 
 install(TARGETS drone_node sensor_fusion_core
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
+    EXPORT DroneSwarmTargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
-install(DIRECTORY include/ DESTINATION include)
 
-# 
-# Summary
-# 
+if(TARGET drone_bridge)
+    install(TARGETS drone_bridge
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
+
+install(DIRECTORY include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.hpp"
+)
+
+install(DIRECTORY third_party/crypto/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    FILES_MATCHING PATTERN "*.h"
+)
+
+install(FILES
+    LICENSE
+    NOTICE
+    README.md
+    DEPLOYMENT.md
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}
+)
+
+install(FILES
+    config/runtime.example.json
+    config/anchors.example.json
+    config/lidar.example.json
+    config/detector_labels.example.json
+    config/swarm_edge_protocol.example.json
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/${PROJECT_NAME}/config
+)
+
+configure_package_config_file(
+    "${PROJECT_SOURCE_DIR}/cmake/DroneSwarmSensorFusionConfig.cmake.in"
+    "${PROJECT_BINARY_DIR}/DroneSwarmSensorFusionConfig.cmake"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+)
+
+write_basic_package_version_file(
+    "${PROJECT_BINARY_DIR}/DroneSwarmSensorFusionConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}"
+    COMPATIBILITY SameMajorVersion
+)
+
+install(EXPORT DroneSwarmTargets
+    FILE DroneSwarmSensorFusionTargets.cmake
+    NAMESPACE DroneSwarm::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+)
+
+install(FILES
+    "${PROJECT_BINARY_DIR}/DroneSwarmSensorFusionConfig.cmake"
+    "${PROJECT_BINARY_DIR}/DroneSwarmSensorFusionConfigVersion.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+)
+
+if(DRONE_ENABLE_CPACK)
+    set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+    set(CPACK_PACKAGE_VENDOR "Md Shahanur Islam Shagor")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
+    set(CPACK_RESOURCE_FILE_README "${PROJECT_SOURCE_DIR}/README.md")
+    if(WIN32)
+        set(CPACK_GENERATOR "ZIP")
+    else()
+        set(CPACK_GENERATOR "TGZ")
+    endif()
+    include(CPack)
+endif()
+
 message(STATUS "")
-message(STATUS "â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—")
-message(STATUS "â•‘   Drone Swarm Sensor Fusion  Build Config   â•‘")
-message(STATUS "â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£")
-message(STATUS "â•‘  Fast-DDS native : ${HAS_FASTDDS_TRANSPORT}")
-message(STATUS "â•‘  TensorRT        : ${HAS_TENSORRT}")
-message(STATUS "â•‘  pybind11 GUI    : ${HAS_PYBIND}")
-message(STATUS "â•‘  Build Type      : ${CMAKE_BUILD_TYPE}")
-message(STATUS "â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•")
+message(STATUS "DroneSwarmSensorFusion configuration summary")
+message(STATUS "  Build type          : ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Compiler            : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "  Tests               : ${DRONE_BUILD_TESTS}")
+message(STATUS "  Python bindings     : ${DRONE_PYTHON_BINDINGS_STATUS}")
+message(STATUS "  Fast-DDS transport  : ${DRONE_FASTDDS_STATUS}")
+message(STATUS "  TensorRT inference  : ${DRONE_TENSORRT_STATUS}")
+message(STATUS "  Install prefix      : ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")
-# System Designer and Developer: Md Shahanur Islam Shagor
-# Project: UVA GPS Denied Navigation in Dynamic Environments
-# Technology: C++, Python, Go, CMake
-# System Designer and Developer: Md Shahanur Islam Shagor
-# Project: UVA GPS Denied Navigation in Dynamic Environments
-# Technology: C++, Python, Go, CMake

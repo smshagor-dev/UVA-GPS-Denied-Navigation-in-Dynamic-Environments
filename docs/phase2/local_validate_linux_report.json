@@ -1,0 +1,109 @@
+{
+  "platform": "Linux-6.18.33.1-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "preset": "validation-linux-gcc",
+  "config": "Release",
+  "steps": [
+    {
+      "title": "Python version",
+      "command": [
+        "/usr/bin/python3",
+        "--version"
+      ],
+      "returncode": 0
+    },
+    {
+      "title": "Go version",
+      "command": [
+        "go",
+        "version"
+      ],
+      "returncode": 0
+    },
+    {
+      "title": "CMake version",
+      "command": [
+        "cmake",
+        "--version"
+      ],
+      "returncode": 0
+    },
+    {
+      "title": "CTest version",
+      "command": [
+        "ctest",
+        "--version"
+      ],
+      "returncode": 0
+    },
+    {
+      "title": "Python syntax check",
+      "command": [
+        "python",
+        "-m",
+        "py_compile",
+        "tests/__init__.py",
+        "tests/test_dashboard_backend_status.py",
+        "main.py",
+        "scripts/generate_firmware_manifest.py",
+        "scripts/drone_setup.py",
+        "scripts/bench_check.py",
+        "scripts/local_validate.py",
+        "scripts/generate_tls_certs.py",
+        "scripts/pre_arm_check.py",
+        "scripts/production_telemetry_smoke_test.py",
+        "scripts/telemetry_smoke_test.py",
+        "gui/dashboard.py",
+        "gui/backend_status.py"
+      ],
+      "returncode": 0
+    },
+    {
+      "title": "Python unit tests",
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "tests.test_dashboard_backend_status"
+      ],
+      "returncode": 0
+    },
+    {
+      "title": "Go test suite",
+      "command": [
+        "go",
+        "test",
+        "./..."
+      ],
+      "returncode": 0
+    },
+    {
+      "title": "CMake configure",
+      "command": [
+        "cmake",
+        "--preset",
+        "validation-linux-gcc"
+      ],
+      "returncode": 0
+    },
+    {
+      "title": "CMake build",
+      "command": [
+        "cmake",
+        "--build",
+        "--preset",
+        "validation-linux-gcc"
+      ],
+      "returncode": 0
+    },
+    {
+      "title": "CTest",
+      "command": [
+        "ctest",
+        "--preset",
+        "validation-linux-gcc"
+      ],
+      "returncode": 0
+    }
+  ],
+  "status": "PASS"
+}

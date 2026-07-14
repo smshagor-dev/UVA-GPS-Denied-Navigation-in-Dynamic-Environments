@@ -44,7 +44,8 @@ public:
 
     using FrameCallback = std::function<void(const cv::Mat&, double timestamp)>;
 
-    explicit ESP32CamInterface(Config cfg = {});
+    ESP32CamInterface();
+    explicit ESP32CamInterface(Config cfg);
     ~ESP32CamInterface();
 
     bool     connect();

@@ -1,4 +1,4 @@
-# Onboard Sensor Telemetry Publisher
+﻿# Onboard Sensor Telemetry Publisher
 
 ## Purpose
 
@@ -134,7 +134,7 @@ cmake --build build-local --config Release --target drone_node
 ctest --test-dir build-local --output-on-failure
 ```
 
-See [LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md](/d:/Final%20Project/drone_swarm/docs/LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md) for Windows and Linux dependency setup.
+See [LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md](LOCAL_BUILD_AND_BENCH_DEMO_GUIDE.md) for Windows and Linux dependency setup.
 
 ## Telemetry Smoke Tests
 

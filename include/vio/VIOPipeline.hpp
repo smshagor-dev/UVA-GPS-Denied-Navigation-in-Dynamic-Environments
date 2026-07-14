@@ -129,7 +129,7 @@ class VIOPipeline {
 public:
     using PoseCallback = std::function<void(const PoseEstimate&)>;
 
-    explicit VIOPipeline(EKFConfig cfg = {})
+    explicit VIOPipeline(EKFConfig cfg = EKFConfig{})
         : ekf_(cfg) {}
 
     ~VIOPipeline() { stop(); }

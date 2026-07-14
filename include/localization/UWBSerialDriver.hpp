@@ -17,7 +17,8 @@ public:
         size_t max_batch_size{32};
     };
 
-    explicit UWBSerialDriver(Config cfg = {});
+    UWBSerialDriver();
+    explicit UWBSerialDriver(Config cfg);
     ~UWBSerialDriver();
 
     bool start();

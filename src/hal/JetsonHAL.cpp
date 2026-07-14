@@ -68,7 +68,8 @@ std::string_view to_string(Platform p) {
 
  
 // SystemStats
- 
+
+#ifdef __linux__
 static float read_sysfs_float(const std::string& path, float scale = 1.0f) {
     std::ifstream f(path);
     if (!f.is_open()) return 0.0f;
@@ -76,6 +77,7 @@ static float read_sysfs_float(const std::string& path, float scale = 1.0f) {
     f >> val;
     return val * scale;
 }
+#endif
 
 SystemStats read_system_stats() {
     SystemStats s{};
@@ -185,6 +187,9 @@ SystemStats read_system_stats() {
  
 // ESP32CamInterface
  
+ESP32CamInterface::ESP32CamInterface()
+    : ESP32CamInterface(Config{}) {}
+
 ESP32CamInterface::ESP32CamInterface(Config cfg)
     : cfg_(std::move(cfg)) {
     logger_ = spdlog::get("HAL_ESP32");
@@ -342,6 +347,8 @@ bool I2CDevice::write_register(uint8_t reg, uint8_t val) {
     uint8_t buf[2] = {reg, val};
     return ::write(fd_, buf, 2) == 2;
 #else
+    (void)reg;
+    (void)val;
     return true;
 #endif
 }
@@ -351,6 +358,7 @@ bool I2CDevice::read_registers(uint8_t reg, uint8_t* buf, size_t len) {
     if (::write(fd_, &reg, 1) != 1) return false;
     return ::read(fd_, buf, len) == static_cast<ssize_t>(len);
 #else
+    (void)reg;
     std::memset(buf, 0, len);
     return true;
 #endif

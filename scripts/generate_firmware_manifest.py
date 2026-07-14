@@ -58,7 +58,7 @@ def main() -> int:
     print(f"firmware manifest written to {out_path}")
     print("Set the following environment variables for hardened runtime:")
     print(f"  DRONE_FIRMWARE_MANIFEST_FILE={out_path}")
-    print(f"  DRONE_FIRMWARE_SIGNING_SECRET={args.secret}")
+    print("  DRONE_FIRMWARE_SIGNING_SECRET=<set this locally to the secret used for signing>")
     return 0
 
 

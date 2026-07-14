@@ -29,6 +29,9 @@ double slope_per_minute(double x0, double y0, double x1, double y1) {
 
 } // namespace
 
+ExperienceMemory::ExperienceMemory()
+    : ExperienceMemory(Config{}) {}
+
 ExperienceMemory::ExperienceMemory(Config cfg)
     : cfg_(cfg) {
     drone::utils::get_or_create_logger("MEMORY")->info(
@@ -126,7 +129,6 @@ MemoryPrior ExperienceMemory::summarize_queue(const std::deque<Observation>& que
 
     size_t hazards = 0;
     size_t targets = 0;
-    size_t with_labels = 0;
     size_t localization_dropouts = 0;
     size_t low_feature_observations = 0;
     double localization_conf_sum = 0.0;
@@ -144,7 +146,6 @@ MemoryPrior ExperienceMemory::summarize_queue(const std::deque<Observation>& que
         }
         if (!obs.primary_label.empty()) {
             ++label_histogram[obs.primary_label];
-            ++with_labels;
         }
         if (!obs.localization_source.empty()) {
             ++localization_histogram[obs.localization_source];

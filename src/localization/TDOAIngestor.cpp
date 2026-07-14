@@ -139,6 +139,9 @@ std::optional<TDOALocalizer::Measurement> parse_measurement_line(std::string lin
 
 } // namespace
 
+TDOAIngestor::TDOAIngestor()
+    : TDOAIngestor(Config{}) {}
+
 TDOAIngestor::TDOAIngestor(Config cfg)
     : cfg_(std::move(cfg)) {}
 

@@ -26,7 +26,8 @@ public:
         size_t max_batch_size{32};
     };
 
-    explicit TDOAIngestor(Config cfg = {});
+    TDOAIngestor();
+    explicit TDOAIngestor(Config cfg);
     ~TDOAIngestor();
 
     bool start();

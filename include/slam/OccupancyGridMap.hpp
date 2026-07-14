@@ -26,7 +26,8 @@ public:
         size_t visible_anchor_count{0};
     };
 
-    explicit OccupancyGridMap(Config cfg = {});
+    OccupancyGridMap();
+    explicit OccupancyGridMap(Config cfg);
 
     void clear();
     void integrate_lidar(const drone::sensors::LidarMeasurement& scan, const Eigen::Vector3d& drone_position);

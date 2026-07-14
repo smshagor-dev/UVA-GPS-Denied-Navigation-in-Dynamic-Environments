@@ -58,6 +58,9 @@ std::optional<TDOALocalizer::Measurement> parse_serial_measurement(std::string l
 
 } // namespace
 
+UWBSerialDriver::UWBSerialDriver()
+    : UWBSerialDriver(Config{}) {}
+
 UWBSerialDriver::UWBSerialDriver(Config cfg)
     : cfg_(std::move(cfg)) {}
 

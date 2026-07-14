@@ -19,8 +19,8 @@
 ![Distributed Systems](https://img.shields.io/badge/Distributed-Peer%20Mesh-4B5563?style=flat-square)
 ![Secure Telemetry](https://img.shields.io/badge/Secure-Telemetry%20Pipeline-0F766E?style=flat-square)
 
-![Bench Demo Ready](https://img.shields.io/badge/Bench%20Demo-Ready-brightgreen?style=flat-square)
-![Local Validation](https://img.shields.io/badge/Local%20Validation-Passing-brightgreen?style=flat-square)
+![Bench Demo](https://img.shields.io/badge/Bench%20Demo-Oriented-blue?style=flat-square)
+![Local Validation](https://img.shields.io/badge/Local%20Validation-Workspace%20Dependent-yellow?style=flat-square)
 ![HIL](https://img.shields.io/badge/HIL-Planned-yellow?style=flat-square)
 ![RF Validation](https://img.shields.io/badge/RF%20Validation-Pending-yellow?style=flat-square)
 ![Flight Validation](https://img.shields.io/badge/Flight%20Validation-Not%20Validated-red?style=flat-square)
@@ -829,7 +829,7 @@ The dashboard is an operations and research visualization tool. It is not a flig
 The local validation command currently exercises Python, Go, CMake configure/build, and CTest:
 
 ```powershell
-python scripts/local_validate.py --toolchain "D:\tools\vcpkg-full\scripts\buildsystems\vcpkg.cmake"
+python scripts/local_validate.py --toolchain "$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
 ```
 
 ---
@@ -957,45 +957,147 @@ Planned research and engineering directions:
 
 ### Prerequisites
 
-Required:
+Verified on 2026-07-14:
 
-- Visual Studio 2022 Build Tools or equivalent C++20 compiler
-- CMake
-- Go 1.22+
-- Python 3.11+
-- vcpkg on Windows
+- Windows 11 + Visual Studio 17 2022 + MSVC x64
+- CMake 4.4.0
+- Go 1.26.4
+- Python 3.14.5
+- `vcpkg` manifest mode with `VCPKG_ROOT` set
 
-Primary native dependencies:
+Supported but not fully verified in this phase:
 
-- Eigen3
-- OpenCV
-- PCL
-- spdlog
+- Linux GCC and Clang via `CMakePresets.json`
+- Linux sanitizer presets for GCC/Clang
+
+Blocked in this phase:
+
+- Linux runtime validation in WSL Ubuntu because `cmake` was not installed in the Linux environment on 2026-07-14
+
+Required native dependencies:
+
+- `Eigen3`
+- `OpenCV`
+- `PCL`
+- `spdlog`
+
+Optional native dependencies:
+
+- `pybind11` for `drone_bridge`
+- `Fast-DDS` for native DDS transport
+- `TensorRT` for GPU inference
 
 Python dashboard dependencies are listed in `requirements.txt`.
 
 ### Windows vcpkg setup
 
 ```powershell
-git clone https://github.com/microsoft/vcpkg D:\tools\vcpkg-full
-D:\tools\vcpkg-full\bootstrap-vcpkg.bat
-$env:VCPKG_ROOT="D:\tools\vcpkg-full"
-D:\tools\vcpkg-full\vcpkg.exe install pcl:x64-windows opencv:x64-windows eigen3:x64-windows spdlog:x64-windows fmt:x64-windows
+git clone https://github.com/microsoft/vcpkg $env:USERPROFILE\vcpkg
+$env:VCPKG_ROOT="$env:USERPROFILE\vcpkg"
+& "$env:VCPKG_ROOT\bootstrap-vcpkg.bat"
 ```
 
-### Configure and build
+The Phase 2 presets use manifest mode automatically. Do not pre-install individual packages unless you are intentionally warming the cache.
+
+### Windows configure, build, and test
+
+Verified commands:
 
 ```powershell
-cmake -S . -B build-local-validate -DBUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake
-cmake --build build-local-validate --config Release
-ctest --test-dir build-local-validate --output-on-failure -C Release
+cmake --preset windows-msvc-release
+cmake --build --preset windows-msvc-release
+ctest --preset windows-msvc-release
+
+cmake --preset windows-msvc-debug
+cmake --build --preset windows-msvc-debug
+ctest --preset windows-msvc-debug
 ```
+
+Observed results on 2026-07-14:
+
+- Release: `112/112` CTest PASS
+- Debug: `112/112` CTest PASS
+
+### Optional feature presets
+
+Available tracked presets include:
+
+- `windows-msvc-release`
+- `windows-msvc-debug`
+- `validation-msvc`
+- `windows-msvc-release-werror`
+- `windows-msvc-release-minimal`
+- `windows-msvc-release-full`
+- `linux-gcc-debug`
+- `linux-gcc-release`
+- `validation-linux-gcc`
+- `linux-clang-debug`
+- `linux-clang-release`
+- `linux-gcc-asan-ubsan`
+- `linux-clang-asan-ubsan`
+- `linux-gcc-release-werror`
+- `linux-gcc-release-minimal`
+
+Behavior notes:
+
+- `pybind11`: package config first, then FetchContent fallback
+- `Fast-DDS`: optional, prints explicit fallback status
+- `TensorRT`: optional, disabled by default
+- `windows-msvc-release-minimal`: disables Python bindings
+- `windows-msvc-release-full`: enables the `fastdds` manifest feature
 
 ### One-command local validation
 
 ```powershell
-python scripts/local_validate.py --toolchain "D:\tools\vcpkg-full\scripts\buildsystems\vcpkg.cmake"
+$env:VCPKG_ROOT="$env:USERPROFILE\vcpkg"
+python scripts/local_validate.py
 ```
+
+Verified result on 2026-07-14:
+
+- Python syntax: PASS
+- Python unit tests: `12/12` PASS
+- Go tests: PASS
+- Native preset `validation-msvc`: `112/112` CTest PASS
+
+`scripts/local_validate.py` now auto-discovers `vcpkg` from `VCPKG_ROOT`, `PATH`, or `%USERPROFILE%\vcpkg` on Windows.
+
+### Linux presets
+
+Documented commands:
+
+```bash
+cmake --preset linux-gcc-release
+cmake --build --preset linux-gcc-release
+ctest --preset linux-gcc-release
+
+cmake --preset linux-clang-release
+cmake --build --preset linux-clang-release
+ctest --preset linux-clang-release
+```
+
+Status on 2026-07-14:
+
+- `SUPPORTED BUT NOT VERIFIED`
+- WSL Ubuntu existed, but `cmake` was missing, so Linux runtime validation stayed blocked
+
+### Installation
+
+Verified command:
+
+```powershell
+cmake --install build\windows-msvc-release --config Release --prefix build\install-check
+```
+
+The install tree now contains:
+
+- `bin/drone_node.exe`
+- `lib/sensor_fusion_core.lib`
+- `lib/drone_bridge.cp314-win_amd64.pyd`
+- public headers, including vendored `sha3.h` and `monocypher.h`
+- example config JSON files
+- `LICENSE`, `NOTICE`, `README.md`, `DEPLOYMENT.md`
+- exported CMake package files under `lib/cmake/DroneSwarmSensorFusion`
 
 ### Go backend startup
 
@@ -1018,6 +1120,26 @@ Local dashboard mode:
 ```powershell
 python gui/dashboard.py
 ```
+
+### Configuration source of truth
+
+Active default runtime configuration is loaded from:
+
+- `config/runtime.json`
+- `config/anchors.json`
+- `config/lidar.json`
+- `config/detector_labels.json`
+- `config/swarm_edge_protocol.json`
+
+Safe non-production templates are provided at:
+
+- `config/runtime.example.json`
+- `config/anchors.example.json`
+- `config/lidar.example.json`
+- `config/detector_labels.example.json`
+- `config/swarm_edge_protocol.example.json`
+
+Use the example files as starting points only. Review and replace every value for your own environment before bench or production use.
 
 ### Telemetry smoke tests
 
@@ -1158,6 +1280,14 @@ drone_swarm/
 - [Edge Swarm Research Notes](docs/EDGE_SWARM_RESEARCH_NOTES.md)
 - [Benchmark Mock Data](docs/benchmarks/edge_swarm_benchmark_mock_data.json)
 - [Documentation Visual Assets](docs/assets/README.md)
+
+## License
+
+This repository is licensed under the [Apache License 2.0](LICENSE).
+
+Copyright 2026 Md Shahanur Islam Shagor.
+
+Repository dependencies, vendored third-party components, and external tools remain governed by their respective licenses.
 
 ---
 

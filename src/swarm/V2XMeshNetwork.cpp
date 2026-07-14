@@ -376,7 +376,8 @@ bool V2XMeshNetwork::send_formation(const FormationCommand& cmd) {
         return false;
     }
 
-    std::vector<uint8_t> payload(sizeof(uint8_t) + sizeof(float) * 2 + sizeof(double) * 3);
+    std::vector<uint8_t> payload(
+        sizeof(uint8_t) + sizeof(float) * 3 + sizeof(double) * 3);
     size_t offset = 0;
 
     payload[offset++] = static_cast<uint8_t>(cmd.shape);

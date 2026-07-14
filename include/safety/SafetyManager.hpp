@@ -68,7 +68,7 @@ struct SafetyDecision {
 
 class SafetyManager {
 public:
-    explicit SafetyManager(SafetyConfig cfg = {});
+    explicit SafetyManager(SafetyConfig cfg = SafetyConfig{});
 
     [[nodiscard]] SafetyDecision evaluate(const SafetyContext& ctx) const;
     void enforce(const SafetyDecision& safety,

@@ -30,9 +30,6 @@ static constexpr uint8_t MPU_CONFIG      = 0x1A;
 static constexpr uint8_t MPU_GYRO_CONFIG = 0x1B;
 static constexpr uint8_t MPU_ACCEL_CONFIG= 0x1C;
 static constexpr uint8_t MPU_ACCEL_XOUT  = 0x3B;
-static constexpr uint8_t MPU_GYRO_XOUT   = 0x43;
-static constexpr uint8_t MPU_TEMP_OUT    = 0x41;
-
 static constexpr double kAccelScale_2G  = 9.81 / 16384.0;  // m/sÂ²/LSB
 static constexpr double kGyroScale_250  =
     (250.0 / 32768.0) * (std::numbers::pi_v<double> / 180.0); // rad/s/LSB
@@ -65,21 +62,24 @@ bool IMUSensor::initialize() {
         return false;
     }
 
-    // Sample rate: 1kHz / (1 + SMPLRT_DIV=0) = 1kHz
-    uint8_t smplrt[2] = {MPU_SMPLRT_DIV, 0x00};
-    ::write(fd_, smplrt, 2);
+    auto write_register = [this](uint8_t reg, uint8_t value, std::string_view step) {
+        const uint8_t command[2] = {reg, value};
+        if (::write(fd_, command, sizeof(command)) != static_cast<ssize_t>(sizeof(command))) {
+            report_error("Failed to configure MPU-6050 " + std::string(step));
+            set_state(SensorState::FAILED);
+            ::close(fd_);
+            fd_ = -1;
+            return false;
+        }
+        return true;
+    };
 
-    // DLPF config: 94Hz bandwidth
-    uint8_t dlpf[2] = {MPU_CONFIG, 0x02};
-    ::write(fd_, dlpf, 2);
-
-    // Gyro range: Â±250 deg/s
-    uint8_t gyro_cfg[2] = {MPU_GYRO_CONFIG, 0x00};
-    ::write(fd_, gyro_cfg, 2);
-
-    // Accel range: Â±2g
-    uint8_t accel_cfg[2] = {MPU_ACCEL_CONFIG, 0x00};
-    ::write(fd_, accel_cfg, 2);
+    if (!write_register(MPU_SMPLRT_DIV, 0x00, "sample rate") ||
+        !write_register(MPU_CONFIG, 0x02, "DLPF") ||
+        !write_register(MPU_GYRO_CONFIG, 0x00, "gyro range") ||
+        !write_register(MPU_ACCEL_CONFIG, 0x00, "accel range")) {
+        return false;
+    }
 #else
     // Simulation mode on non-Linux (x86 dev/CI)
     logger_->warn("[{}] Non-Linux platform  running in simulation mode", id_);
@@ -140,38 +140,34 @@ ImuMeasurement IMUSensor::read_raw() {
     m.source_id = id_;
 
 #ifdef __linux__
-    if (fd_ < 0) goto simulate;
-
-    {
+    if (fd_ >= 0) {
         // Burst-read 14 bytes starting at ACCEL_XOUT_H
         uint8_t reg = MPU_ACCEL_XOUT;
-        if (::write(fd_, &reg, 1) != 1) goto simulate;
+        if (::write(fd_, &reg, 1) == 1) {
+            uint8_t raw[14]{};
+            if (::read(fd_, raw, 14) == 14) {
+                auto to_int16 = [](uint8_t h, uint8_t l) -> int16_t {
+                    return static_cast<int16_t>((h << 8) | l);
+                };
 
-        uint8_t raw[14]{};
-        if (::read(fd_, raw, 14) != 14) goto simulate;
+                m.accel_mps2.x() = to_int16(raw[0],  raw[1])  * kAccelScale_2G;
+                m.accel_mps2.y() = to_int16(raw[2],  raw[3])  * kAccelScale_2G;
+                m.accel_mps2.z() = to_int16(raw[4],  raw[5])  * kAccelScale_2G;
 
-        auto to_int16 = [](uint8_t h, uint8_t l) -> int16_t {
-            return static_cast<int16_t>((h << 8) | l);
-        };
+                const int16_t raw_temp = to_int16(raw[6], raw[7]);
+                m.temperature_c = raw_temp / 340.0f + 36.53f;
 
-        m.accel_mps2.x() = to_int16(raw[0],  raw[1])  * kAccelScale_2G;
-        m.accel_mps2.y() = to_int16(raw[2],  raw[3])  * kAccelScale_2G;
-        m.accel_mps2.z() = to_int16(raw[4],  raw[5])  * kAccelScale_2G;
+                m.gyro_rads.x() = to_int16(raw[8],  raw[9])  * kGyroScale_250;
+                m.gyro_rads.y() = to_int16(raw[10], raw[11]) * kGyroScale_250;
+                m.gyro_rads.z() = to_int16(raw[12], raw[13]) * kGyroScale_250;
 
-        const int16_t raw_temp = to_int16(raw[6], raw[7]);
-        m.temperature_c = raw_temp / 340.0f + 36.53f;
-
-        m.gyro_rads.x() = to_int16(raw[8],  raw[9])  * kGyroScale_250;
-        m.gyro_rads.y() = to_int16(raw[10], raw[11]) * kGyroScale_250;
-        m.gyro_rads.z() = to_int16(raw[12], raw[13]) * kGyroScale_250;
-
-        m.quality     = SensorState::RUNNING;
-        m.confidence  = 1.0f;
-        return m;
+                m.quality     = SensorState::RUNNING;
+                m.confidence  = 1.0f;
+                return m;
+            }
+        }
     }
 #endif
-
-simulate:
     // Deterministic simulation: stationary with small noise
     const double t = m.timestamp;
     std::mt19937_64 rng(static_cast<uint64_t>(t * 1e6));

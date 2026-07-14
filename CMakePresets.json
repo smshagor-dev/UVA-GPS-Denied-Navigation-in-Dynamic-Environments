@@ -1,0 +1,213 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "DRONE_BUILD_TESTS": "ON",
+        "DRONE_WARNINGS_AS_ERRORS": "OFF"
+      }
+    },
+    {
+      "name": "windows-msvc-base",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Visual Studio 17 2022",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows",
+        "VCPKG_MANIFEST_FEATURES": "tests",
+        "DRONE_FETCH_PYBIND11": "ON"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "linux-base",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "windows-msvc-debug",
+      "inherits": "windows-msvc-base",
+      "binaryDir": "${sourceDir}/build/windows-msvc-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "windows-msvc-release",
+      "inherits": "windows-msvc-base",
+      "binaryDir": "${sourceDir}/build/windows-msvc-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "validation-msvc",
+      "inherits": "windows-msvc-release",
+      "binaryDir": "${sourceDir}/build/validation-msvc"
+    },
+    {
+      "name": "windows-msvc-release-werror",
+      "inherits": "windows-msvc-release",
+      "binaryDir": "${sourceDir}/build/windows-msvc-release-werror",
+      "cacheVariables": {
+        "DRONE_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "windows-msvc-release-full",
+      "inherits": "windows-msvc-release",
+      "binaryDir": "${sourceDir}/build/windows-msvc-release-full",
+      "cacheVariables": {
+        "VCPKG_MANIFEST_FEATURES": "tests;fastdds"
+      }
+    },
+    {
+      "name": "windows-msvc-release-minimal",
+      "inherits": "windows-msvc-release",
+      "binaryDir": "${sourceDir}/build/windows-msvc-release-minimal",
+      "cacheVariables": {
+        "DRONE_ENABLE_PYTHON_BINDINGS": "OFF",
+        "VCPKG_MANIFEST_FEATURES": "tests"
+      }
+    },
+    {
+      "name": "linux-gcc-debug",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/build/linux-gcc-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "linux-gcc-release",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/build/linux-gcc-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "validation-linux-gcc",
+      "inherits": "linux-gcc-release",
+      "binaryDir": "${sourceDir}/build/validation-linux-gcc"
+    },
+    {
+      "name": "linux-clang-debug",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/build/linux-clang-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "linux-clang-release",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/build/linux-clang-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "linux-gcc-asan-ubsan",
+      "inherits": "linux-gcc-debug",
+      "binaryDir": "${sourceDir}/build/linux-gcc-asan-ubsan",
+      "cacheVariables": {
+        "DRONE_ENABLE_ASAN": "ON",
+        "DRONE_ENABLE_UBSAN": "ON"
+      }
+    },
+    {
+      "name": "linux-clang-asan-ubsan",
+      "inherits": "linux-clang-debug",
+      "binaryDir": "${sourceDir}/build/linux-clang-asan-ubsan",
+      "cacheVariables": {
+        "DRONE_ENABLE_ASAN": "ON",
+        "DRONE_ENABLE_UBSAN": "ON"
+      }
+    },
+    {
+      "name": "linux-gcc-release-werror",
+      "inherits": "linux-gcc-release",
+      "binaryDir": "${sourceDir}/build/linux-gcc-release-werror",
+      "cacheVariables": {
+        "DRONE_WARNINGS_AS_ERRORS": "ON"
+      }
+    },
+    {
+      "name": "linux-gcc-release-minimal",
+      "inherits": "linux-gcc-release",
+      "binaryDir": "${sourceDir}/build/linux-gcc-release-minimal",
+      "cacheVariables": {
+        "DRONE_ENABLE_PYTHON_BINDINGS": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "windows-msvc-debug", "configurePreset": "windows-msvc-debug", "configuration": "Debug" },
+    { "name": "windows-msvc-release", "configurePreset": "windows-msvc-release", "configuration": "Release" },
+    { "name": "validation-msvc", "configurePreset": "validation-msvc", "configuration": "Release" },
+    { "name": "windows-msvc-release-werror", "configurePreset": "windows-msvc-release-werror", "configuration": "Release" },
+    { "name": "windows-msvc-release-full", "configurePreset": "windows-msvc-release-full", "configuration": "Release" },
+    { "name": "windows-msvc-release-minimal", "configurePreset": "windows-msvc-release-minimal", "configuration": "Release" },
+    { "name": "linux-gcc-debug", "configurePreset": "linux-gcc-debug" },
+    { "name": "linux-gcc-release", "configurePreset": "linux-gcc-release" },
+    { "name": "validation-linux-gcc", "configurePreset": "validation-linux-gcc" },
+    { "name": "linux-clang-debug", "configurePreset": "linux-clang-debug" },
+    { "name": "linux-clang-release", "configurePreset": "linux-clang-release" },
+    { "name": "linux-gcc-asan-ubsan", "configurePreset": "linux-gcc-asan-ubsan" },
+    { "name": "linux-clang-asan-ubsan", "configurePreset": "linux-clang-asan-ubsan" },
+    { "name": "linux-gcc-release-werror", "configurePreset": "linux-gcc-release-werror" },
+    { "name": "linux-gcc-release-minimal", "configurePreset": "linux-gcc-release-minimal" }
+  ],
+  "testPresets": [
+    { "name": "windows-msvc-debug", "configurePreset": "windows-msvc-debug", "configuration": "Debug", "output": { "outputOnFailure": true } },
+    { "name": "windows-msvc-release", "configurePreset": "windows-msvc-release", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "validation-msvc", "configurePreset": "validation-msvc", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "windows-msvc-release-werror", "configurePreset": "windows-msvc-release-werror", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "windows-msvc-release-full", "configurePreset": "windows-msvc-release-full", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "windows-msvc-release-minimal", "configurePreset": "windows-msvc-release-minimal", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "linux-gcc-debug", "configurePreset": "linux-gcc-debug", "output": { "outputOnFailure": true } },
+    { "name": "linux-gcc-release", "configurePreset": "linux-gcc-release", "output": { "outputOnFailure": true } },
+    { "name": "validation-linux-gcc", "configurePreset": "validation-linux-gcc", "output": { "outputOnFailure": true } },
+    { "name": "linux-clang-debug", "configurePreset": "linux-clang-debug", "output": { "outputOnFailure": true } },
+    { "name": "linux-clang-release", "configurePreset": "linux-clang-release", "output": { "outputOnFailure": true } },
+    { "name": "linux-gcc-asan-ubsan", "configurePreset": "linux-gcc-asan-ubsan", "output": { "outputOnFailure": true } },
+    { "name": "linux-clang-asan-ubsan", "configurePreset": "linux-clang-asan-ubsan", "output": { "outputOnFailure": true } },
+    { "name": "linux-gcc-release-werror", "configurePreset": "linux-gcc-release-werror", "output": { "outputOnFailure": true } },
+    { "name": "linux-gcc-release-minimal", "configurePreset": "linux-gcc-release-minimal", "output": { "outputOnFailure": true } }
+  ]
+}

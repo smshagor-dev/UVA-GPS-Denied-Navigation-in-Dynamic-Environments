@@ -12,9 +12,9 @@
   ],
   "global_configuration": {
     "runtime_mode": "edge_swarm",
-    "anchor_config_path": "config/anchors.example.json",
-    "lidar_config_path": "config/lidar.example.json",
-    "detector_labels_path": "config/detector_labels.example.json",
+    "anchor_config_path": "config/anchors.json",
+    "lidar_config_path": "config/lidar.json",
+    "detector_labels_path": "config/detector_labels.json",
     "telemetry_publish_rate_hz": 5,
     "backend_mode": "edge_swarm",
     "safety_manager_enabled": true,

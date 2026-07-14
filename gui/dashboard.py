@@ -749,7 +749,6 @@ def _add_windows_dll_dirs(root: Path) -> None:
         return
     candidates = [
         Path(os.environ.get("VCPKG_ROOT", "")) / "installed" / "x64-windows" / "bin",
-        Path("C:/tools/vcpkg-full/installed/x64-windows/bin"),
         Path(sys.base_prefix),
         Path(sys.base_prefix) / "DLLs",
         root / "build-runtime-check" / "Release",
@@ -1383,9 +1382,10 @@ class SwarmBackend:
         if not hasattr(self._bridge, "SwarmSecurityConfig") or not hasattr(self._network, "configure_security"):
             logger.info("SwarmBackend bridge lacks swarm security bindings; mesh commands stay unsecured")
             return
-        secret = os.environ.get("DRONE_SWARM_SECRET", "").strip() or "drone-swarm-dev-secret-change-me"
-        if secret == "drone-swarm-dev-secret-change-me":
-            logger.warning("SwarmBackend mesh sidecar using development swarm secret fallback")
+        secret = os.environ.get("DRONE_SWARM_SECRET", "").strip()
+        if not secret:
+            logger.warning("SwarmBackend mesh sidecar security is disabled because DRONE_SWARM_SECRET is not set")
+            return
         try:
             security_cfg = self._bridge.SwarmSecurityConfig()
             security_cfg.enabled = True
@@ -4449,13 +4449,13 @@ class CommandConsole(QGroupBox):
         if action == "maintenance_mode":
             return CommandRequest("maintenance_mode", {
                 **payload,
-                "maintenance_token_id": safe_text(os.environ.get("DRONE_MAINTENANCE_APPROVAL_TOKEN", "maintenance-window-1"), "maintenance-window-1"),
+                "maintenance_token_id": safe_text(os.environ.get("DRONE_MAINTENANCE_APPROVAL_TOKEN", ""), ""),
             })
         if action == "firmware_update":
             rollback_counter = safe_int(os.environ.get("DRONE_FIRMWARE_ROLLBACK_COUNTER", "1"), 1) + 1
             return CommandRequest("firmware_update", {
                 **payload,
-                "maintenance_token_id": safe_text(os.environ.get("DRONE_MAINTENANCE_APPROVAL_TOKEN", "maintenance-window-1"), "maintenance-window-1"),
+                "maintenance_token_id": safe_text(os.environ.get("DRONE_MAINTENANCE_APPROVAL_TOKEN", ""), ""),
                 "maintenance_window": True,
                 "firmware_version": safe_text(os.environ.get("DRONE_FIRMWARE_VERSION", "2.0.0"), "2.0.0"),
                 "firmware_measurement": safe_text(os.environ.get("DRONE_FIRMWARE_MEASUREMENT", "fw-secure-local"), "fw-secure-local"),

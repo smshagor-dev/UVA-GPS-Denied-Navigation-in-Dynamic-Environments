@@ -38,7 +38,8 @@ public:
         double caution_risk_threshold{0.62};
     };
 
-    explicit ExperienceMemory(Config cfg = {});
+    ExperienceMemory();
+    explicit ExperienceMemory(Config cfg);
 
     void observe(uint32_t drone_id,
                  const vio::PoseEstimate& pose,

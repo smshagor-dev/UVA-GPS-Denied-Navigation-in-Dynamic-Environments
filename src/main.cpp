@@ -1009,7 +1009,7 @@ int main(int argc, char** argv) {
         spdlog::info("edge_swarm serialization mode: {}", drone::swarm::to_string(requested_edge_serialization));
     }
     drone::swarm::SwarmSecurityConfig security_cfg;
-    security_cfg.enabled = true;
+    security_cfg.enabled = false;
     bool placeholder_swarm_secret = false;
     if (const auto secret = env_var("DRONE_SWARM_SECRET")) {
         security_cfg.swarm_secret = *secret;
@@ -1018,13 +1018,18 @@ int main(int argc, char** argv) {
             spdlog::error("DRONE_SWARM_SECRET is a placeholder value and cannot be used in {} mode", cfg.security_profile);
             return 1;
         }
+        if (!placeholder_swarm_secret) {
+            security_cfg.enabled = true;
+        }
     } else if (hardened_profile) {
         spdlog::error("DRONE_SWARM_SECRET is required in {} mode", cfg.security_profile);
         return 1;
     } else {
-        security_cfg.swarm_secret = "drone-swarm-dev-secret-change-me";
         placeholder_swarm_secret = true;
-        spdlog::warn("DRONE_SWARM_SECRET not set, using development swarm secret");
+        spdlog::warn("DRONE_SWARM_SECRET not set; swarm mesh security is disabled in lab mode");
+    }
+    if (!security_cfg.enabled && placeholder_swarm_secret) {
+        spdlog::warn("Swarm mesh security remains disabled until a non-placeholder DRONE_SWARM_SECRET is configured");
     }
     net->configure_security(std::move(security_cfg));
     auto edge_auth_cfg = cfg.edge_auth;
@@ -1040,8 +1045,8 @@ int main(int argc, char** argv) {
             spdlog::error("{} is required for hmac_sha256 edge packet auth", edge_auth_cfg.shared_secret_env);
             return 1;
         }
-        edge_auth_cfg.shared_secret = "drone-swarm-dev-secret-change-me";
-        spdlog::warn("{} not set, using development edge packet auth secret", edge_auth_cfg.shared_secret_env);
+        spdlog::warn("{} not set; edge packet auth is disabled outside hardened profiles", edge_auth_cfg.shared_secret_env);
+        edge_auth_cfg.mode = drone::security::AuthMode::NONE;
     }
     if (edge_auth_cfg.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER) {
         spdlog::warn("PQC hybrid auth is roadmap-only in this build.");
@@ -1064,7 +1069,7 @@ int main(int argc, char** argv) {
         }
     });
 
-    //4. Start all subsystems â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    //4. Start all subsystems
     if (cfg.enable_imu) imu->start();
     if (cfg.enable_camera) cam->start();
     if (cfg.enable_lidar) lidar->start();
