@@ -10,7 +10,9 @@ import urllib.error
 import urllib.request
 
 
-def request_json(method: str, url: str, payload: dict | None = None) -> tuple[int, dict]:
+def request_json(
+    method: str, url: str, payload: dict | None = None
+) -> tuple[int, dict]:
     data = None
     headers = {"Accept": "application/json"}
     if payload is not None:
@@ -150,7 +152,11 @@ def production_unavailable_payload() -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--backend-url", required=True, help="Base Go control-plane URL, for example http://127.0.0.1:8080")
+    parser.add_argument(
+        "--backend-url",
+        required=True,
+        help="Base Go control-plane URL, for example http://127.0.0.1:8080",
+    )
     args = parser.parse_args()
 
     base_url = args.backend_url.rstrip("/")
@@ -159,34 +165,61 @@ def main() -> int:
     if status != 200:
         return fail(f"initial fleet GET failed: status={status} body={before}")
     if before.get("backend_mode") != "production":
-        return fail(f"expected backend_mode=production before posting telemetry, got {before.get('backend_mode')!r}")
+        return fail(
+            f"expected backend_mode=production before posting telemetry, got {before.get('backend_mode')!r}"
+        )
     if before.get("simulation_enabled") is not False:
-        return fail(f"expected simulation_enabled=false in production mode, got {before.get('simulation_enabled')!r}")
+        return fail(
+            f"expected simulation_enabled=false in production mode, got {before.get('simulation_enabled')!r}"
+        )
     if looks_like_seeded_demo_fleet(before.get("drones", [])):
-        return fail("production backend already has seeded simulation drones; restart it in production mode with simulation disabled")
+        return fail(
+            "production backend already has seeded simulation drones; restart it in production mode with simulation disabled"
+        )
 
     payload = production_unavailable_payload()
     status, post_body = request_json("POST", f"{base_url}/api/v1/telemetry", payload)
     if status != 202:
-        return fail(f"telemetry POST was not accepted: status={status} body={post_body}")
+        return fail(
+            f"telemetry POST was not accepted: status={status} body={post_body}"
+        )
 
     status, after = request_json("GET", f"{base_url}/api/v1/fleet")
     if status != 200:
         return fail(f"fleet GET after telemetry failed: status={status} body={after}")
     if after.get("backend_mode") != "production":
-        return fail(f"expected backend_mode=production after telemetry, got {after.get('backend_mode')!r}")
+        return fail(
+            f"expected backend_mode=production after telemetry, got {after.get('backend_mode')!r}"
+        )
     if after.get("simulation_enabled") is not False:
-        return fail(f"expected simulation_enabled=false after telemetry, got {after.get('simulation_enabled')!r}")
+        return fail(
+            f"expected simulation_enabled=false after telemetry, got {after.get('simulation_enabled')!r}"
+        )
     if looks_like_seeded_demo_fleet(after.get("drones", [])):
-        return fail("production backend contains the seeded simulation demo fleet after POST")
+        return fail(
+            "production backend contains the seeded simulation demo fleet after POST"
+        )
 
-    target = next((drone for drone in after.get("drones", []) if drone.get("drone_id") == payload["drone_id"]), None)
+    target = next(
+        (
+            drone
+            for drone in after.get("drones", [])
+            if drone.get("drone_id") == payload["drone_id"]
+        ),
+        None,
+    )
     if target is None:
-        return fail(f"posted production unavailable payload for drone_id={payload['drone_id']} did not appear in fleet snapshot")
+        return fail(
+            f"posted production unavailable payload for drone_id={payload['drone_id']} did not appear in fleet snapshot"
+        )
     if target.get("source") != "unavailable":
-        return fail(f"expected top-level source=unavailable, got {target.get('source')!r}")
+        return fail(
+            f"expected top-level source=unavailable, got {target.get('source')!r}"
+        )
     if after.get("real_drone_count") != 0:
-        return fail(f"expected real_drone_count=0 for unavailable-only payload, got {after.get('real_drone_count')!r}")
+        return fail(
+            f"expected real_drone_count=0 for unavailable-only payload, got {after.get('real_drone_count')!r}"
+        )
     if "stale_drone_count" not in after:
         return fail("fleet snapshot did not expose stale_drone_count")
 
@@ -199,7 +232,9 @@ def main() -> int:
     ]
     missing_snapshot_fields = [field for field in required_fields if field not in after]
     if missing_snapshot_fields:
-        return fail(f"fleet snapshot is missing dashboard-visible fields: {missing_snapshot_fields}")
+        return fail(
+            f"fleet snapshot is missing dashboard-visible fields: {missing_snapshot_fields}"
+        )
 
     required_drone_fields = [
         "source",
@@ -210,13 +245,21 @@ def main() -> int:
         "tdoa",
         "replay",
     ]
-    missing_drone_fields = [field for field in required_drone_fields if field not in target]
+    missing_drone_fields = [
+        field for field in required_drone_fields if field not in target
+    ]
     if missing_drone_fields:
-        return fail(f"fleet drone payload is missing dashboard-visible fields: {missing_drone_fields}")
+        return fail(
+            f"fleet drone payload is missing dashboard-visible fields: {missing_drone_fields}"
+        )
 
     print("PASS: production telemetry unavailable-source path behaved as expected.")
-    print(f"backend_mode={after.get('backend_mode')} simulation_enabled={after.get('simulation_enabled')} real_drone_count={after.get('real_drone_count')}")
-    print(f"drone_id={payload['drone_id']} source={target.get('source')} localization_data_source={target.get('localization_data_source')}")
+    print(
+        f"backend_mode={after.get('backend_mode')} simulation_enabled={after.get('simulation_enabled')} real_drone_count={after.get('real_drone_count')}"
+    )
+    print(
+        f"drone_id={payload['drone_id']} source={target.get('source')} localization_data_source={target.get('localization_data_source')}"
+    )
     return 0
 
 

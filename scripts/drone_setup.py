@@ -3,7 +3,7 @@
 # Project: UVA GPS Denied Navigation in Dynamic Environments
 # Technology: C++, Python, Go, CMake
 
-# 
+#
 # drone_setup.py    Automated Build / Flash / Environment Setup Script
 # Drone Swarm Sensor Fusion  |  Phase 1  Build System
 #
@@ -16,7 +16,7 @@
 #   python3 scripts/drone_setup.py run --id=1     # launch drone_node
 #   python3 scripts/drone_setup.py gui            # launch PySide6 dashboard
 #   python3 scripts/drone_setup.py all            # full pipeline
-# 
+#
 from __future__ import annotations
 
 import argparse
@@ -29,32 +29,48 @@ import time
 from pathlib import Path
 from typing import Optional
 
+
 #  ANSI colors â”€
 class C:
-    RED    = "\033[91m"
-    GREEN  = "\033[92m"
+    RED = "\033[91m"
+    GREEN = "\033[92m"
     YELLOW = "\033[93m"
-    CYAN   = "\033[96m"
-    BOLD   = "\033[1m"
-    RESET  = "\033[0m"
+    CYAN = "\033[96m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
 
-def ok(msg: str)   -> None: print(f"{C.GREEN}  âœ”  {C.RESET}{msg}")
-def err(msg: str)  -> None: print(f"{C.RED}  âœ˜  {C.RESET}{msg}")
-def info(msg: str) -> None: print(f"{C.CYAN}  â–¶  {C.RESET}{msg}")
-def warn(msg: str) -> None: print(f"{C.YELLOW}  âš   {C.RESET}{msg}")
-def hdr(msg: str)  -> None:
+
+def ok(msg: str) -> None:
+    print(f"{C.GREEN}  âœ”  {C.RESET}{msg}")
+
+
+def err(msg: str) -> None:
+    print(f"{C.RED}  âœ˜  {C.RESET}{msg}")
+
+
+def info(msg: str) -> None:
+    print(f"{C.CYAN}  â–¶  {C.RESET}{msg}")
+
+
+def warn(msg: str) -> None:
+    print(f"{C.YELLOW}  âš   {C.RESET}{msg}")
+
+
+def hdr(msg: str) -> None:
     w = 60
     print(f"\n{C.BOLD}{C.CYAN}{'â”€'*w}")
     print(f"  {msg}")
     print(f"{'â”€'*w}{C.RESET}")
 
+
 #  Paths â”€
-ROOT       = Path(__file__).resolve().parent.parent
-BUILD_DIR  = ROOT / "build"
-FIRMWARE   = ROOT / "firmware" / "esp32_cam"
+ROOT = Path(__file__).resolve().parent.parent
+BUILD_DIR = ROOT / "build"
+FIRMWARE = ROOT / "firmware" / "esp32_cam"
 GUI_SCRIPT = ROOT / "gui" / "dashboard.py"
 
-#  Detect platform 
+
+#  Detect platform
 def detect_platform() -> str:
     machine = platform.machine().lower()
     if "aarch64" in machine:
@@ -64,11 +80,17 @@ def detect_platform() -> str:
         return "rpi"
     return "x86"
 
+
 PLAT = detect_platform()
 
-# 
-def run(cmd: str | list, cwd: Optional[Path] = None,
-        check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
+
+#
+def run(
+    cmd: str | list,
+    cwd: Optional[Path] = None,
+    check: bool = True,
+    capture: bool = False,
+) -> subprocess.CompletedProcess:
     """Run a shell command with live output or captured output."""
     if isinstance(cmd, str):
         cmd_list = cmd.split()
@@ -93,9 +115,10 @@ def run(cmd: str | list, cwd: Optional[Path] = None,
             sys.exit(1)
         return e
 
-# 
+
+#
 # STEP 1: Environment Setup
-# 
+#
 def cmd_setup(args: argparse.Namespace) -> None:
     hdr("STEP 1  Environment & Dependency Setup")
 
@@ -129,11 +152,18 @@ def cmd_setup(args: argparse.Namespace) -> None:
 
 def _setup_linux(args: argparse.Namespace) -> None:
     APT_PKGS = [
-        "cmake", "ninja-build", "build-essential", "git",
-        "libeigen3-dev", "libopencv-dev", "libpcl-dev",
-        "libspdlog-dev", "pybind11-dev",
+        "cmake",
+        "ninja-build",
+        "build-essential",
+        "git",
+        "libeigen3-dev",
+        "libopencv-dev",
+        "libpcl-dev",
+        "libspdlog-dev",
+        "pybind11-dev",
         "python3-pyside6",
-        "libssl-dev", "libasio-dev",
+        "libssl-dev",
+        "libasio-dev",
     ]
 
     # Jetson extras
@@ -157,15 +187,30 @@ def _install_fastdds() -> None:
         ok("Fast-DDS source already present  skipping clone")
     else:
         fastdds_dir.parent.mkdir(parents=True, exist_ok=True)
-        run(["git", "clone", "--depth=1", "--branch", "v2.13.0",
-             "https://github.com/eProsima/Fast-DDS.git",
-             str(fastdds_dir)])
+        run(
+            [
+                "git",
+                "clone",
+                "--depth=1",
+                "--branch",
+                "v2.13.0",
+                "https://github.com/eProsima/Fast-DDS.git",
+                str(fastdds_dir),
+            ]
+        )
 
     build = fastdds_dir / "build"
     build.mkdir(exist_ok=True)
-    run(["cmake", "..", "-GNinja",
-         "-DCMAKE_BUILD_TYPE=Release",
-         "-DCOMPILE_EXAMPLES=OFF"], cwd=build)
+    run(
+        [
+            "cmake",
+            "..",
+            "-GNinja",
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DCOMPILE_EXAMPLES=OFF",
+        ],
+        cwd=build,
+    )
     run(["ninja", "-j4"], cwd=build)
     run(["sudo", "ninja", "install"], cwd=build)
     ok("Fast-DDS installed")
@@ -174,11 +219,11 @@ def _install_fastdds() -> None:
 def _check_dependencies() -> None:
     hdr("Dependency Check")
     checks = {
-        "cmake"       : "cmake --version",
-        "g++"         : "g++ --version",
-        "python3"     : f"{sys.executable} --version",
-        "git"         : "git --version",
-        "esptool.py"  : "esptool.py version",
+        "cmake": "cmake --version",
+        "g++": "g++ --version",
+        "python3": f"{sys.executable} --version",
+        "git": "git --version",
+        "esptool.py": "esptool.py version",
     }
     all_ok = True
     for name, cmd in checks.items():
@@ -193,9 +238,10 @@ def _check_dependencies() -> None:
     if not all_ok:
         warn("Some dependencies missing  build may fail")
 
-# 
+
+#
 # STEP 2: Build
-# 
+#
 def cmd_build(args: argparse.Namespace) -> None:
     hdr("STEP 2  CMake Build")
 
@@ -208,7 +254,8 @@ def cmd_build(args: argparse.Namespace) -> None:
 
     build_type = "Debug" if args.debug else "Release"
     cmake_args = [
-        "cmake", "..",
+        "cmake",
+        "..",
         f"-DCMAKE_BUILD_TYPE={build_type}",
         "-GNinja",
         f"-DBUILD_TESTS={'ON' if args.tests else 'OFF'}",
@@ -236,9 +283,10 @@ def cmd_build(args: argparse.Namespace) -> None:
         err("drone_node binary not found after build!")
         sys.exit(1)
 
-# 
+
+#
 # STEP 3: Flash ESP32-CAM
-# 
+#
 def cmd_flash(args: argparse.Namespace) -> None:
     hdr("STEP 3  ESP32-CAM Flash")
 
@@ -277,15 +325,20 @@ def _flash_arduino_cli(port: str) -> None:
         run(["arduino-cli", "lib", "install", lib])
 
     info("Compiling firmwareâ€¦")
-    run(["arduino-cli", "compile",
-         "--fqbn", "esp32:esp32:ai_thinker",
-         str(FIRMWARE)])
+    run(["arduino-cli", "compile", "--fqbn", "esp32:esp32:ai_thinker", str(FIRMWARE)])
 
     info(f"Uploading to {port}â€¦")
-    run(["arduino-cli", "upload",
-         "--fqbn", "esp32:esp32:ai_thinker",
-         "--port", port,
-         str(FIRMWARE)])
+    run(
+        [
+            "arduino-cli",
+            "upload",
+            "--fqbn",
+            "esp32:esp32:ai_thinker",
+            "--port",
+            port,
+            str(FIRMWARE),
+        ]
+    )
     ok("Firmware flashed successfully")
 
 
@@ -296,22 +349,37 @@ def _flash_esptool(port: str) -> None:
         err("Please build with Arduino IDE or arduino-cli first")
         sys.exit(1)
 
-    run(["esptool.py",
-         "--chip", "esp32",
-         "--port", port,
-         "--baud", "921600",
-         "--before", "default_reset",
-         "--after", "hard_reset",
-         "write_flash", "-z",
-         "--flash_mode", "dio",
-         "--flash_freq", "80m",
-         "--flash_size", "detect",
-         "0x1000", str(firmware_bin)])
+    run(
+        [
+            "esptool.py",
+            "--chip",
+            "esp32",
+            "--port",
+            port,
+            "--baud",
+            "921600",
+            "--before",
+            "default_reset",
+            "--after",
+            "hard_reset",
+            "write_flash",
+            "-z",
+            "--flash_mode",
+            "dio",
+            "--flash_freq",
+            "80m",
+            "--flash_size",
+            "detect",
+            "0x1000",
+            str(firmware_bin),
+        ]
+    )
     ok("Firmware flashed via esptool.py")
 
-# 
+
+#
 # STEP 4: Run drone_node
-# 
+#
 def cmd_run(args: argparse.Namespace) -> None:
     hdr("STEP 4  Launch Drone Node")
 
@@ -320,10 +388,11 @@ def cmd_run(args: argparse.Namespace) -> None:
         err("drone_node not built. Run: python3 scripts/drone_setup.py build")
         sys.exit(1)
 
-    cmd = [str(binary),
-           f"--id={args.id}",
-           f"--esp32={args.esp32}",
-           f"--lidar={args.lidar}",
+    cmd = [
+        str(binary),
+        f"--id={args.id}",
+        f"--esp32={args.esp32}",
+        f"--lidar={args.lidar}",
     ]
     if args.yolo:
         cmd.append(f"--yolo={args.yolo}")
@@ -331,9 +400,10 @@ def cmd_run(args: argparse.Namespace) -> None:
     info(f"Launching: {' '.join(cmd)}")
     os.execv(str(binary), cmd)  # replace process (handles Ctrl-C cleanly)
 
-# 
+
+#
 # STEP 5: Launch GUI
-# 
+#
 def cmd_gui(args: argparse.Namespace) -> None:
     hdr("STEP 5  PySide6 Dashboard")
 
@@ -343,9 +413,10 @@ def cmd_gui(args: argparse.Namespace) -> None:
 
     os.execv(sys.executable, [sys.executable, str(GUI_SCRIPT)])
 
-# 
+
+#
 # CLI
-# 
+#
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Drone Swarm Sensor Fusion  Automation Script",
@@ -357,7 +428,7 @@ Examples:
   python3 scripts/drone_setup.py flash --port=/dev/ttyUSB0
   python3 scripts/drone_setup.py run --id=2 --esp32=192.168.4.2
   python3 scripts/drone_setup.py all
-"""
+""",
     )
 
     sub = parser.add_subparsers(dest="command")
@@ -367,10 +438,10 @@ Examples:
 
     # build
     bp = sub.add_parser("build", help="Compile C++ project with CMake")
-    bp.add_argument("--clean",  action="store_true", help="Clean before build")
-    bp.add_argument("--debug",  action="store_true", help="Debug build")
-    bp.add_argument("--tests",  action="store_true", help="Build unit tests")
-    bp.add_argument("--jobs",   type=int,            help="Parallel jobs (default: nproc)")
+    bp.add_argument("--clean", action="store_true", help="Clean before build")
+    bp.add_argument("--debug", action="store_true", help="Debug build")
+    bp.add_argument("--tests", action="store_true", help="Build unit tests")
+    bp.add_argument("--jobs", type=int, help="Parallel jobs (default: nproc)")
 
     # flash
     fp = sub.add_parser("flash", help="Flash ESP32-CAM firmware")
@@ -378,18 +449,18 @@ Examples:
 
     # run
     rp = sub.add_parser("run", help="Launch drone_node")
-    rp.add_argument("--id",    default="1",             help="Drone ID")
-    rp.add_argument("--esp32", default="192.168.4.1",   help="ESP32-CAM IP")
+    rp.add_argument("--id", default="1", help="Drone ID")
+    rp.add_argument("--esp32", default="192.168.4.1", help="ESP32-CAM IP")
     rp.add_argument("--lidar", default="192.168.1.201:2368", help="LiDAR endpoint")
-    rp.add_argument("--yolo",  default="models/yolov8n.engine", help="TRT engine path")
+    rp.add_argument("--yolo", default="models/yolov8n.engine", help="TRT engine path")
 
     # gui
     sub.add_parser("gui", help="Launch PySide6 dashboard")
 
     # all
     ap = sub.add_parser("all", help="setup  build  flash  run")
-    ap.add_argument("--port",  default=None)
-    ap.add_argument("--id",    default="1")
+    ap.add_argument("--port", default=None)
+    ap.add_argument("--id", default="1")
     ap.add_argument("--esp32", default="192.168.4.1")
     ap.add_argument("--lidar", default="192.168.1.201:2368")
 
@@ -401,16 +472,19 @@ Examples:
     print(f"{'â•'*60}{C.RESET}\n")
 
     dispatch = {
-        "setup" : cmd_setup,
-        "build" : cmd_build,
-        "flash" : cmd_flash,
-        "run"   : cmd_run,
-        "gui"   : cmd_gui,
+        "setup": cmd_setup,
+        "build": cmd_build,
+        "flash": cmd_flash,
+        "run": cmd_run,
+        "gui": cmd_gui,
     }
 
     if args.command == "all":
         # synthesise sub-args
-        args.clean = False; args.debug = False; args.tests = False; args.jobs = None
+        args.clean = False
+        args.debug = False
+        args.tests = False
+        args.jobs = None
         cmd_setup(args)
         cmd_build(args)
         cmd_flash(args)

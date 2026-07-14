@@ -172,20 +172,20 @@ func TestTelemetryIngestTruncatesOversizedSensorArrays(t *testing.T) {
 	}
 
 	body, err := json.Marshal(DroneTelemetry{
-		DroneID:       88,
-		ClusterID:     "cluster-09",
-		Role:          "FOLLOWER",
-		Source:        "real",
-		Connectivity:  "Mesh",
-		Reachable:     true,
-		Position:      [3]float64{0, 0, 1},
-		Velocity:      [3]float64{0, 0, 0},
-		AttitudeRPY:   [3]float64{},
-		ThrustVector:  [3]float64{0, 0, 9.81},
-		MissionState:  "hold-position",
-		LiDAR:         LiDARTelemetry{Status: "live", Source: "real", Points2D: points, PointCount: len(points)},
-		Replay:        ReplayTelemetry{Status: "playback", Active: true, Source: "playback", ConfidenceSeries: confidence},
-		Timestamp:     time.Now().UTC(),
+		DroneID:      88,
+		ClusterID:    "cluster-09",
+		Role:         "FOLLOWER",
+		Source:       "real",
+		Connectivity: "Mesh",
+		Reachable:    true,
+		Position:     [3]float64{0, 0, 1},
+		Velocity:     [3]float64{0, 0, 0},
+		AttitudeRPY:  [3]float64{},
+		ThrustVector: [3]float64{0, 0, 9.81},
+		MissionState: "hold-position",
+		LiDAR:        LiDARTelemetry{Status: "live", Source: "real", Points2D: points, PointCount: len(points)},
+		Replay:       ReplayTelemetry{Status: "playback", Active: true, Source: "playback", ConfidenceSeries: confidence},
+		Timestamp:    time.Now().UTC(),
 	})
 	if err != nil {
 		t.Fatalf("marshal telemetry: %v", err)

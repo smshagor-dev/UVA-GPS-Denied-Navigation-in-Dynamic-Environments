@@ -19,19 +19,41 @@ DEFAULT_CERT_DIR = ROOT / "certs"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate local CA/server/client certificates for drone_swarm")
-    parser.add_argument("--output-dir", default=str(DEFAULT_CERT_DIR), help="directory to write generated certs")
-    parser.add_argument("--server-name", default="drone-control-plane", help="server certificate common name")
-    parser.add_argument("--operator-id", default="operator-console-1", help="operator client certificate common name")
-    parser.add_argument("--drone-id", default="drone-node-1", help="drone client certificate common name")
-    parser.add_argument("--days", type=int, default=365, help="certificate lifetime in days")
+    parser = argparse.ArgumentParser(
+        description="Generate local CA/server/client certificates for drone_swarm"
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=str(DEFAULT_CERT_DIR),
+        help="directory to write generated certs",
+    )
+    parser.add_argument(
+        "--server-name",
+        default="drone-control-plane",
+        help="server certificate common name",
+    )
+    parser.add_argument(
+        "--operator-id",
+        default="operator-console-1",
+        help="operator client certificate common name",
+    )
+    parser.add_argument(
+        "--drone-id",
+        default="drone-node-1",
+        help="drone client certificate common name",
+    )
+    parser.add_argument(
+        "--days", type=int, default=365, help="certificate lifetime in days"
+    )
     parser.add_argument(
         "--server-san",
         action="append",
         default=["127.0.0.1", "localhost"],
         help="server subjectAltName entry; can be repeated",
     )
-    parser.add_argument("--force", action="store_true", help="overwrite existing certificate material")
+    parser.add_argument(
+        "--force", action="store_true", help="overwrite existing certificate material"
+    )
     return parser.parse_args()
 
 
@@ -130,7 +152,9 @@ def sign_certificate(
             ),
             critical=True,
         )
-        .add_extension(x509.SubjectKeyIdentifier.from_public_key(public_key), critical=False)
+        .add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(public_key), critical=False
+        )
     )
 
     if not is_ca:
@@ -153,7 +177,9 @@ def sign_certificate(
                 general_names.append(x509.IPAddress(ipaddress.ip_address(entry)))
             except ValueError:
                 general_names.append(x509.DNSName(entry))
-        builder = builder.add_extension(x509.SubjectAlternativeName(general_names), critical=False)
+        builder = builder.add_extension(
+            x509.SubjectAlternativeName(general_names), critical=False
+        )
 
     return builder.sign(private_key=issuer_key, algorithm=hashes.SHA256())
 
@@ -232,7 +258,9 @@ def main() -> int:
     write_certificate(out_dir / "operator-client.crt", operator_cert, args.force)
     write_private_key(out_dir / "drone-client.key", drone_key, args.force)
     write_certificate(out_dir / "drone-client.crt", drone_cert, args.force)
-    write_pkcs12_bundle(out_dir / "drone-client.pfx", drone_cert, drone_key, ca_cert, args.force)
+    write_pkcs12_bundle(
+        out_dir / "drone-client.pfx", drone_cert, drone_key, ca_cert, args.force
+    )
 
     print(f"certificate bundle written to {out_dir}")
     print("generated files:")

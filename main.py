@@ -62,16 +62,51 @@ class ManagedProcess:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Launch the drone swarm stack")
-    parser.add_argument("--skip-go", action="store_true", help="skip Go control-plane startup")
-    parser.add_argument("--skip-cpp", action="store_true", help="skip C++ drone node startup")
-    parser.add_argument("--skip-gui", action="store_true", help="skip PySide6 dashboard startup")
-    parser.add_argument("--dry-run", action="store_true", help="print commands without executing them")
-    parser.add_argument("--drone-id", type=int, default=int(os.environ.get("DRONE_NODE_ID", "1")), help="local drone id for drone_node")
-    parser.add_argument("--esp32", default=os.environ.get("DRONE_ESP32_IP", "192.168.4.1"), help="ESP32 camera IP for drone_node")
-    parser.add_argument("--lidar", default=os.environ.get("DRONE_LIDAR_ENDPOINT", "192.168.1.201:2368"), help="LiDAR endpoint for drone_node")
-    parser.add_argument("--go-port", type=int, default=int(os.environ.get("DRONE_GO_PORT", "8080")), help="Go control-plane port")
-    parser.add_argument("--dashboard-poll-hz", type=int, default=int(os.environ.get("DRONE_DASHBOARD_POLL_HZ", "20")), help="dashboard polling rate")
-    parser.add_argument("--dashboard-ids", default=os.environ.get("DRONE_DASHBOARD_IDS", "1,2,3,4,5"), help="comma-separated drone ids for dashboard")
+    parser.add_argument(
+        "--skip-go", action="store_true", help="skip Go control-plane startup"
+    )
+    parser.add_argument(
+        "--skip-cpp", action="store_true", help="skip C++ drone node startup"
+    )
+    parser.add_argument(
+        "--skip-gui", action="store_true", help="skip PySide6 dashboard startup"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="print commands without executing them"
+    )
+    parser.add_argument(
+        "--drone-id",
+        type=int,
+        default=int(os.environ.get("DRONE_NODE_ID", "1")),
+        help="local drone id for drone_node",
+    )
+    parser.add_argument(
+        "--esp32",
+        default=os.environ.get("DRONE_ESP32_IP", "192.168.4.1"),
+        help="ESP32 camera IP for drone_node",
+    )
+    parser.add_argument(
+        "--lidar",
+        default=os.environ.get("DRONE_LIDAR_ENDPOINT", "192.168.1.201:2368"),
+        help="LiDAR endpoint for drone_node",
+    )
+    parser.add_argument(
+        "--go-port",
+        type=int,
+        default=int(os.environ.get("DRONE_GO_PORT", "8080")),
+        help="Go control-plane port",
+    )
+    parser.add_argument(
+        "--dashboard-poll-hz",
+        type=int,
+        default=int(os.environ.get("DRONE_DASHBOARD_POLL_HZ", "20")),
+        help="dashboard polling rate",
+    )
+    parser.add_argument(
+        "--dashboard-ids",
+        default=os.environ.get("DRONE_DASHBOARD_IDS", "1,2,3,4,5"),
+        help="comma-separated drone ids for dashboard",
+    )
     return parser.parse_args()
 
 
@@ -196,7 +231,12 @@ def validate_runtime_security(env: dict[str, str], backend_url: str) -> None:
     profile = normalize_security_profile(env.get("DRONE_SECURITY_PROFILE", "lab"))
     if profile == "lab":
         return
-    if env.get("DRONE_TLS_ENABLED", "").strip().lower() not in {"1", "true", "yes", "on"}:
+    if env.get("DRONE_TLS_ENABLED", "").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
         raise RuntimeError("field/production mode requires DRONE_TLS_ENABLED=true")
     if not backend_url.lower().startswith("https://"):
         raise RuntimeError("field/production mode requires an https DRONE_BACKEND_URL")
@@ -209,12 +249,28 @@ def validate_runtime_security(env: dict[str, str], backend_url: str) -> None:
     ]
     missing = [key for key in required if not env.get(key, "").strip()]
     if missing:
-        raise RuntimeError(f"field/production mode missing TLS settings: {', '.join(missing)}")
-    if env.get("DRONE_TLS_REQUIRE_CLIENT_CERT", "").strip().lower() not in {"1", "true", "yes", "on"}:
-        raise RuntimeError("field/production mode requires DRONE_TLS_REQUIRE_CLIENT_CERT=true")
-    if env.get("DRONE_ENABLE_BACKEND_TELEMETRY", "").strip().lower() in {"1", "true", "yes", "on"}:
+        raise RuntimeError(
+            f"field/production mode missing TLS settings: {', '.join(missing)}"
+        )
+    if env.get("DRONE_TLS_REQUIRE_CLIENT_CERT", "").strip().lower() not in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        raise RuntimeError(
+            "field/production mode requires DRONE_TLS_REQUIRE_CLIENT_CERT=true"
+        )
+    if env.get("DRONE_ENABLE_BACKEND_TELEMETRY", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
         if not env.get("DRONE_TLS_CLIENT_PFX_FILE", "").strip():
-            raise RuntimeError("field/production mode with backend telemetry requires DRONE_TLS_CLIENT_PFX_FILE")
+            raise RuntimeError(
+                "field/production mode with backend telemetry requires DRONE_TLS_CLIENT_PFX_FILE"
+            )
 
 
 def main() -> int:
@@ -246,14 +302,24 @@ def main() -> int:
         processes: list[ManagedProcess] = []
         env = os.environ.copy()
         env.setdefault("PYTHONUNBUFFERED", "1")
-        tls_enabled = env.get("DRONE_TLS_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
+        tls_enabled = env.get("DRONE_TLS_ENABLED", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         default_scheme = "https" if tls_enabled else "http"
-        go_url = env.get("DRONE_BACKEND_URL", f"{default_scheme}://127.0.0.1:{args.go_port}")
+        go_url = env.get(
+            "DRONE_BACKEND_URL", f"{default_scheme}://127.0.0.1:{args.go_port}"
+        )
         validate_runtime_security(env, go_url)
 
         if not args.skip_go:
             if is_tcp_port_in_use(args.go_port):
-                logger.warning("go-control-plane launch skipped because port %s is already in use", args.go_port)
+                logger.warning(
+                    "go-control-plane launch skipped because port %s is already in use",
+                    args.go_port,
+                )
                 print(
                     f"Go control-plane launch skipped because port {args.go_port} is already in use. "
                     f"Reusing existing backend at {go_url}.",
@@ -262,7 +328,10 @@ def main() -> int:
             else:
                 go_cmd = find_go_launcher()
                 if go_cmd is None:
-                    print("Go control-plane not found. Install Go or provide a built control-plane.exe.", file=sys.stderr)
+                    print(
+                        "Go control-plane not found. Install Go or provide a built control-plane.exe.",
+                        file=sys.stderr,
+                    )
                 else:
                     processes.append(
                         ManagedProcess(
@@ -276,7 +345,10 @@ def main() -> int:
         if not args.skip_cpp:
             drone_node = find_drone_node()
             if drone_node is None:
-                print("C++ drone_node.exe not found. Build target `drone_node` first.", file=sys.stderr)
+                print(
+                    "C++ drone_node.exe not found. Build target `drone_node` first.",
+                    file=sys.stderr,
+                )
             else:
                 processes.append(
                     ManagedProcess(
@@ -301,7 +373,9 @@ def main() -> int:
                 "--poll-hz",
                 str(args.dashboard_poll_hz),
             ]
-            if not args.skip_go and any(p.name == "go-control-plane" for p in processes):
+            if not args.skip_go and any(
+                p.name == "go-control-plane" for p in processes
+            ):
                 dashboard_cmd.extend(["--backend-url", go_url])
             processes.append(
                 ManagedProcess(
@@ -312,7 +386,10 @@ def main() -> int:
             )
 
         if not processes:
-            print("Nothing to launch. All components are disabled or unavailable.", file=sys.stderr)
+            print(
+                "Nothing to launch. All components are disabled or unavailable.",
+                file=sys.stderr,
+            )
             return 1
 
         print_plan(processes)
@@ -331,7 +408,9 @@ def main() -> int:
                     print(f"Failed to start {spec.name}: {exc}", file=sys.stderr)
                     return 1 if spec.required else 0
                 started.append(spec)
-                print(f"Started {spec.name} (pid={spec.process.pid if spec.process else '?'})")
+                print(
+                    f"Started {spec.name} (pid={spec.process.pid if spec.process else '?'})"
+                )
                 if spec.name == "go-control-plane":
                     time.sleep(1.2)
 
@@ -342,7 +421,9 @@ def main() -> int:
                         continue
                     code = spec.process.poll()
                     if code is not None:
-                        print(f"{spec.name} exited with code {code}. Shutting down the remaining stack.")
+                        print(
+                            f"{spec.name} exited with code {code}. Shutting down the remaining stack."
+                        )
                         return code if spec.required else 0
                 time.sleep(0.5)
         except KeyboardInterrupt:

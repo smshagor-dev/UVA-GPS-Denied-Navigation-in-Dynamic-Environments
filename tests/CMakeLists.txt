@@ -23,6 +23,7 @@ target_link_libraries(drone_test_support INTERFACE
 
 function(drone_register_gtest target labels)
     drone_apply_project_warnings(${target})
+    drone_enable_coverage(${target})
     drone_enable_sanitizers(${target})
     drone_set_target_output_dirs(${target} "tests" "tests" "tests")
     gtest_discover_tests(${target}
@@ -172,6 +173,7 @@ if(DRONE_HAVE_FASTDDS_TRANSPORT)
         ${DRONE_FASTDDS_LINK_LIBS}
     )
     drone_apply_project_warnings(test_v2x)
+    drone_enable_coverage(test_v2x)
     drone_enable_sanitizers(test_v2x)
     drone_set_target_output_dirs(test_v2x "tests" "tests" "tests")
     add_test(NAME test_v2x COMMAND $<TARGET_FILE:test_v2x>)

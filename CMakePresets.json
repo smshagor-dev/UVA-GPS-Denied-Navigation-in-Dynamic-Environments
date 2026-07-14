@@ -174,6 +174,31 @@
       "cacheVariables": {
         "DRONE_ENABLE_PYTHON_BINDINGS": "OFF"
       }
+    },
+    {
+      "name": "linux-gcc-coverage",
+      "inherits": "linux-gcc-debug",
+      "binaryDir": "${sourceDir}/build/linux-gcc-coverage",
+      "cacheVariables": {
+        "DRONE_ENABLE_COVERAGE": "ON",
+        "DRONE_ENABLE_PYTHON_BINDINGS": "OFF"
+      }
+    },
+    {
+      "name": "linux-gcc-release-package",
+      "inherits": "linux-gcc-release",
+      "binaryDir": "${sourceDir}/build/linux-gcc-release-package",
+      "cacheVariables": {
+        "DRONE_ENABLE_CPACK": "ON"
+      }
+    },
+    {
+      "name": "windows-msvc-release-package",
+      "inherits": "windows-msvc-release",
+      "binaryDir": "${sourceDir}/build/windows-msvc-release-package",
+      "cacheVariables": {
+        "DRONE_ENABLE_CPACK": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -191,7 +216,10 @@
     { "name": "linux-gcc-asan-ubsan", "configurePreset": "linux-gcc-asan-ubsan" },
     { "name": "linux-clang-asan-ubsan", "configurePreset": "linux-clang-asan-ubsan" },
     { "name": "linux-gcc-release-werror", "configurePreset": "linux-gcc-release-werror" },
-    { "name": "linux-gcc-release-minimal", "configurePreset": "linux-gcc-release-minimal" }
+    { "name": "linux-gcc-release-minimal", "configurePreset": "linux-gcc-release-minimal" },
+    { "name": "linux-gcc-coverage", "configurePreset": "linux-gcc-coverage" },
+    { "name": "linux-gcc-release-package", "configurePreset": "linux-gcc-release-package" },
+    { "name": "windows-msvc-release-package", "configurePreset": "windows-msvc-release-package", "configuration": "Release" }
   ],
   "testPresets": [
     { "name": "windows-msvc-debug", "configurePreset": "windows-msvc-debug", "configuration": "Debug", "output": { "outputOnFailure": true } },
@@ -208,6 +236,9 @@
     { "name": "linux-gcc-asan-ubsan", "configurePreset": "linux-gcc-asan-ubsan", "output": { "outputOnFailure": true } },
     { "name": "linux-clang-asan-ubsan", "configurePreset": "linux-clang-asan-ubsan", "output": { "outputOnFailure": true } },
     { "name": "linux-gcc-release-werror", "configurePreset": "linux-gcc-release-werror", "output": { "outputOnFailure": true } },
-    { "name": "linux-gcc-release-minimal", "configurePreset": "linux-gcc-release-minimal", "output": { "outputOnFailure": true } }
+    { "name": "linux-gcc-release-minimal", "configurePreset": "linux-gcc-release-minimal", "output": { "outputOnFailure": true } },
+    { "name": "linux-gcc-coverage", "configurePreset": "linux-gcc-coverage", "output": { "outputOnFailure": true } },
+    { "name": "linux-gcc-release-package", "configurePreset": "linux-gcc-release-package", "output": { "outputOnFailure": true } },
+    { "name": "windows-msvc-release-package", "configurePreset": "windows-msvc-release-package", "configuration": "Release", "output": { "outputOnFailure": true } }
   ]
 }

@@ -1,0 +1,212 @@
+name: Security
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "20 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install gitleaks
+        shell: bash
+        run: |
+          set -euxo pipefail
+          go install github.com/gitleaks/gitleaks/v8@v8.24.2
+          echo "${HOME}/go/bin" >> "${GITHUB_PATH}"
+
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          gitleaks version
+          echo "commit_sha=${GITHUB_SHA}"
+
+      - name: Scan working tree
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/gitleaks"
+          gitleaks dir . \
+            --config .gitleaks.toml \
+            --redact \
+            --report-format sarif \
+            --report-path "${RUNNER_TEMP}/gitleaks/gitleaks-dir.sarif"
+
+      - name: Scan git history on trusted refs
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          gitleaks git . \
+            --config .gitleaks.toml \
+            --redact \
+            --report-format sarif \
+            --report-path "${RUNNER_TEMP}/gitleaks/gitleaks-git.sarif"
+
+      - name: Upload gitleaks reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-${{ github.sha }}
+          path: ${{ runner.temp }}/gitleaks
+          retention-days: 14
+
+  dependency-security:
+    name: Dependency Security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install vulnerability scanners
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pip-audit
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          echo "${HOME}/go/bin" >> "${GITHUB_PATH}"
+
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 --version
+          pip-audit --version
+          govulncheck -version
+          echo "commit_sha=${GITHUB_SHA}"
+
+      - name: Run pip-audit
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/dependency-security"
+          pip-audit -r requirements.txt -f json -o "${RUNNER_TEMP}/dependency-security/pip-audit.json"
+
+      - name: Run govulncheck
+        shell: bash
+        run: |
+          set -euxo pipefail
+          govulncheck -json ./... > "${RUNNER_TEMP}/dependency-security/govulncheck.json"
+
+      - name: Upload dependency-security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-security-${{ github.sha }}
+          path: ${{ runner.temp }}/dependency-security
+          retention-days: 14
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - c-cpp
+          - python
+          - go
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.language == 'c-cpp' && 'manual' || 'none' }}
+
+      - uses: ./.github/actions/setup-linux-deps
+        if: matrix.language == 'c-cpp'
+
+      - name: Build for CodeQL
+        if: matrix.language == 'c-cpp'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --preset validation-linux-gcc
+          cmake --build --preset validation-linux-gcc
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  security-required:
+    name: Security Required
+    runs-on: ubuntu-24.04
+    if: always()
+    needs:
+      - dependency-review
+      - secret-scanning
+      - dependency-security
+    steps:
+      - name: Enforce required security results
+        shell: bash
+        env:
+          DEP_REVIEW: ${{ needs.dependency-review.result }}
+          SECRET_SCAN: ${{ needs.secret-scanning.result }}
+          DEP_SECURITY: ${{ needs.dependency-security.result }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" == "pull_request" && "${DEP_REVIEW}" != "success" ]]; then
+            echo "Dependency Review failed with status ${DEP_REVIEW}"
+            exit 1
+          fi
+          for status in "${SECRET_SCAN}" "${DEP_SECURITY}"; do
+            if [[ "${status}" != "success" ]]; then
+              echo "Required security dependency failed with status ${status}"
+              exit 1
+            fi
+          done

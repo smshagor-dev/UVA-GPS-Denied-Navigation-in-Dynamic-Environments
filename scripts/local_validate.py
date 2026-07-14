@@ -35,7 +35,9 @@ PY_COMPILE_FILES = [
 def safe_write(text: str, *, stream_name: str = "stdout") -> None:
     stream = getattr(sys, stream_name)
     encoding = getattr(stream, "encoding", None) or "utf-8"
-    sanitized = text.encode(encoding, errors="replace").decode(encoding, errors="replace")
+    sanitized = text.encode(encoding, errors="replace").decode(
+        encoding, errors="replace"
+    )
     stream.write(sanitized)
     stream.flush()
 
@@ -91,10 +93,18 @@ def run_step(
         capture_output=True,
     )
     if completed.stdout:
-        safe_write(completed.stdout if completed.stdout.endswith("\n") else completed.stdout + "\n")
+        safe_write(
+            completed.stdout
+            if completed.stdout.endswith("\n")
+            else completed.stdout + "\n"
+        )
     if completed.stderr:
         safe_write(
-            completed.stderr if completed.stderr.endswith("\n") else completed.stderr + "\n",
+            (
+                completed.stderr
+                if completed.stderr.endswith("\n")
+                else completed.stderr + "\n"
+            ),
             stream_name="stderr",
         )
     return completed
@@ -103,12 +113,23 @@ def run_step(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--preset", help="CMake preset to use for native validation")
-    parser.add_argument("--config", default="Release", help="Build configuration for manual native mode")
-    parser.add_argument("--toolchain", help="Explicit CMake toolchain file path for manual native mode")
+    parser.add_argument(
+        "--config", default="Release", help="Build configuration for manual native mode"
+    )
+    parser.add_argument(
+        "--toolchain", help="Explicit CMake toolchain file path for manual native mode"
+    )
     parser.add_argument("--report", help="Write a JSON validation summary to this path")
-    parser.add_argument("--skip-python", action="store_true", help="Skip Python syntax and unit-test steps")
+    parser.add_argument("--ctest-output-junit", help="Optional CTest JUnit output path")
+    parser.add_argument(
+        "--skip-python",
+        action="store_true",
+        help="Skip Python syntax and unit-test steps",
+    )
     parser.add_argument("--skip-go", action="store_true", help="Skip Go tests")
-    parser.add_argument("--skip-native", action="store_true", help="Skip native CMake build and CTest")
+    parser.add_argument(
+        "--skip-native", action="store_true", help="Skip native CMake build and CTest"
+    )
     return parser.parse_args()
 
 
@@ -117,14 +138,20 @@ def ensure_required_tools(skip_go: bool, skip_native: bool) -> None:
         print_missing_tool("python", "Install Python 3.11+ and rerun validation.")
         raise SystemExit(1)
     if not skip_go and shutil.which("go") is None:
-        print_missing_tool("go", "Install Go from https://go.dev/dl/ and rerun validation.")
+        print_missing_tool(
+            "go", "Install Go from https://go.dev/dl/ and rerun validation."
+        )
         raise SystemExit(1)
     if not skip_native:
         if shutil.which("cmake") is None:
-            print_missing_tool("cmake", "Install CMake and ensure its bin directory is on PATH.")
+            print_missing_tool(
+                "cmake", "Install CMake and ensure its bin directory is on PATH."
+            )
             raise SystemExit(1)
         if shutil.which("ctest") is None:
-            print_missing_tool("ctest", "Install CMake and ensure its bin directory is on PATH.")
+            print_missing_tool(
+                "ctest", "Install CMake and ensure its bin directory is on PATH."
+            )
             raise SystemExit(1)
 
 
@@ -135,7 +162,10 @@ def configure_manual_native(
     env: dict[str, str],
 ) -> tuple[list[str], list[str], list[str]]:
     configure_command = ["cmake", "-S", ".", "-B", BUILD_DIR, "-DDRONE_BUILD_TESTS=ON"]
-    if not any(arg.startswith("-DCMAKE_BUILD_TYPE=") for arg in configure_command) and platform.system() != "Windows":
+    if (
+        not any(arg.startswith("-DCMAKE_BUILD_TYPE=") for arg in configure_command)
+        and platform.system() != "Windows"
+    ):
         configure_command.append(f"-DCMAKE_BUILD_TYPE={config}")
     if toolchain:
         configure_command.append(f"-DCMAKE_TOOLCHAIN_FILE={toolchain}")
@@ -154,6 +184,7 @@ def run_native_validation(
     config: str,
     toolchain: str | None,
     env: dict[str, str],
+    ctest_output_junit: str | None,
 ) -> list[dict[str, object]]:
     steps: list[dict[str, object]] = []
     if preset:
@@ -164,10 +195,22 @@ def run_native_validation(
         ]
     else:
         commands = [
-            ("CMake configure", configure_manual_native(config=config, toolchain=toolchain, env=env)[0]),
-            ("CMake build", configure_manual_native(config=config, toolchain=toolchain, env=env)[1]),
-            ("CTest", configure_manual_native(config=config, toolchain=toolchain, env=env)[2]),
+            (
+                "CMake configure",
+                configure_manual_native(config=config, toolchain=toolchain, env=env)[0],
+            ),
+            (
+                "CMake build",
+                configure_manual_native(config=config, toolchain=toolchain, env=env)[1],
+            ),
+            (
+                "CTest",
+                configure_manual_native(config=config, toolchain=toolchain, env=env)[2],
+            ),
         ]
+
+    if ctest_output_junit:
+        commands[-1][1].extend(["--output-junit", ctest_output_junit])
 
     for title, command in commands:
         completed = run_step(title, command, env=env)
@@ -183,24 +226,30 @@ def run_native_validation(
     return steps
 
 
-def record_tool_versions(env: dict[str, str], skip_go: bool, skip_native: bool) -> list[dict[str, object]]:
+def record_tool_versions(
+    env: dict[str, str], skip_go: bool, skip_native: bool
+) -> list[dict[str, object]]:
     steps: list[dict[str, object]] = []
     commands = [("Python version", [sys.executable, "--version"])]
     if not skip_go:
         commands.append(("Go version", ["go", "version"]))
     if not skip_native:
-        commands.extend([
-            ("CMake version", ["cmake", "--version"]),
-            ("CTest version", ["ctest", "--version"]),
-        ])
+        commands.extend(
+            [
+                ("CMake version", ["cmake", "--version"]),
+                ("CTest version", ["ctest", "--version"]),
+            ]
+        )
 
     for title, command in commands:
         completed = run_step(title, command, env=env)
-        steps.append({
-            "title": title,
-            "command": command,
-            "returncode": completed.returncode,
-        })
+        steps.append(
+            {
+                "title": title,
+                "command": command,
+                "returncode": completed.returncode,
+            }
+        )
         if completed.returncode != 0:
             print(f"FAIL: {title} failed.")
             raise SystemExit(completed.returncode)
@@ -257,7 +306,13 @@ def main() -> int:
             [sys.executable, "-m", "py_compile", *PY_COMPILE_FILES],
             env=env,
         )
-        summary["steps"].append({"title": "Python syntax check", "command": ["python", "-m", "py_compile", *PY_COMPILE_FILES], "returncode": completed.returncode})
+        summary["steps"].append(
+            {
+                "title": "Python syntax check",
+                "command": ["python", "-m", "py_compile", *PY_COMPILE_FILES],
+                "returncode": completed.returncode,
+            }
+        )
         if completed.returncode != 0:
             maybe_write_report(args.report, summary)
             return completed.returncode
@@ -267,14 +322,31 @@ def main() -> int:
             [sys.executable, "-m", "unittest", "tests.test_dashboard_backend_status"],
             env=env,
         )
-        summary["steps"].append({"title": "Python unit tests", "command": ["python", "-m", "unittest", "tests.test_dashboard_backend_status"], "returncode": completed.returncode})
+        summary["steps"].append(
+            {
+                "title": "Python unit tests",
+                "command": [
+                    "python",
+                    "-m",
+                    "unittest",
+                    "tests.test_dashboard_backend_status",
+                ],
+                "returncode": completed.returncode,
+            }
+        )
         if completed.returncode != 0:
             maybe_write_report(args.report, summary)
             return completed.returncode
 
     if not args.skip_go:
         completed = run_step("Go test suite", ["go", "test", "./..."], env=env)
-        summary["steps"].append({"title": "Go test suite", "command": ["go", "test", "./..."], "returncode": completed.returncode})
+        summary["steps"].append(
+            {
+                "title": "Go test suite",
+                "command": ["go", "test", "./..."],
+                "returncode": completed.returncode,
+            }
+        )
         if completed.returncode != 0:
             maybe_write_report(args.report, summary)
             return completed.returncode
@@ -287,6 +359,7 @@ def main() -> int:
                     config=args.config,
                     toolchain=toolchain,
                     env=env,
+                    ctest_output_junit=args.ctest_output_junit,
                 )
             )
         except SystemExit as exc:

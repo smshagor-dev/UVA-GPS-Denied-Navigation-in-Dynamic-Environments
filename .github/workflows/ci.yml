@@ -1,0 +1,661 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  workflow-lint:
+    name: Workflow Lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install actionlint
+        shell: bash
+        run: |
+          set -euxo pipefail
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+          echo "${HOME}/go/bin" >> "${GITHUB_PATH}"
+
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          uname -a
+          actionlint -version
+          go version
+          python3 --version
+          echo "commit_sha=${GITHUB_SHA}"
+
+      - name: Lint workflow YAML
+        shell: bash
+        run: |
+          set -euxo pipefail
+          actionlint -color
+          python3 scripts/audit_workflows.py
+
+  formatting:
+    name: Formatting
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: ./.github/actions/setup-linux-deps
+
+      - name: Install Python formatters
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install black==24.10.0
+
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          clang-format --version
+          python3 --version
+          black --version
+          go version
+          echo "commit_sha=${GITHUB_SHA}"
+
+      - name: Check C++ formatting
+        shell: bash
+        run: python3 scripts/check_clang_format.py
+
+      - name: Check Python formatting
+        shell: bash
+        run: python3 -m black --check main.py gui tests scripts
+
+      - name: Check Go formatting
+        shell: bash
+        run: python3 scripts/check_gofmt.py
+
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-linux-deps
+
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          clang-tidy --version
+          cmake --version
+          echo "preset=linux-gcc-release-minimal"
+          echo "commit_sha=${GITHUB_SHA}"
+
+      - name: Configure compile commands
+        shell: bash
+        run: cmake --preset linux-gcc-release-minimal
+
+      - name: Run clang-tidy
+        shell: bash
+        run: python3 scripts/run_clang_tidy.py --build-dir build/linux-gcc-release-minimal
+
+  python-ci:
+    name: Python CI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt coverage[toml]
+
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 --version
+          python3 -m pip --version
+          echo "commit_sha=${GITHUB_SHA}"
+
+      - name: Python syntax validation
+        shell: bash
+        run: python3 -m py_compile tests/__init__.py tests/test_dashboard_backend_status.py main.py scripts/generate_firmware_manifest.py scripts/drone_setup.py scripts/bench_check.py scripts/local_validate.py scripts/generate_tls_certs.py scripts/pre_arm_check.py scripts/production_telemetry_smoke_test.py scripts/telemetry_smoke_test.py gui/dashboard.py gui/backend_status.py
+
+      - name: Python unit tests with coverage
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/python-coverage"
+          python3 -m coverage run -m unittest tests.test_dashboard_backend_status
+          python3 -m coverage report | tee "${RUNNER_TEMP}/python-coverage/coverage.txt"
+          python3 -m coverage xml -o "${RUNNER_TEMP}/python-coverage/coverage.xml"
+
+      - name: Upload Python coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-coverage-${{ github.sha }}
+          path: ${{ runner.temp }}/python-coverage
+          retention-days: 14
+
+  go-ci:
+    name: Go CI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          go version
+          echo "commit_sha=${GITHUB_SHA}"
+
+      - name: Go vet
+        shell: bash
+        run: go vet ./...
+
+      - name: Go test with race and coverage
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/go-coverage"
+          go test -race -coverprofile="${RUNNER_TEMP}/go-coverage/coverage.out" ./...
+          go tool cover -func="${RUNNER_TEMP}/go-coverage/coverage.out" | tee "${RUNNER_TEMP}/go-coverage/coverage.txt"
+
+      - name: Upload Go coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage-${{ github.sha }}
+          path: ${{ runner.temp }}/go-coverage
+          retention-days: 14
+
+  linux-gcc-validation:
+    name: Linux GCC Validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-linux-deps
+
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          uname -a
+          gcc --version | head -n 1
+          g++ --version | head -n 1
+          cmake --version
+          ctest --version
+          echo "preset=validation-linux-gcc"
+          echo "commit_sha=${GITHUB_SHA}"
+
+      - name: Configure
+        shell: bash
+        run: cmake --preset validation-linux-gcc
+
+      - name: Build
+        shell: bash
+        run: cmake --build --preset validation-linux-gcc
+
+      - name: Test
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/ctest-linux-gcc-validation"
+          ctest --preset validation-linux-gcc --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-gcc-validation/junit.xml"
+
+      - name: Upload Linux GCC reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-linux-gcc-validation-${{ github.sha }}
+          path: ${{ runner.temp }}/ctest-linux-gcc-validation
+          retention-days: 14
+
+  linux-gcc-debug:
+    name: Linux GCC Debug
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          gcc --version | head -n 1
+          cmake --version
+          echo "preset=linux-gcc-debug"
+          echo "commit_sha=${GITHUB_SHA}"
+      - name: Configure
+        shell: bash
+        run: cmake --preset linux-gcc-debug
+      - name: Build
+        shell: bash
+        run: cmake --build --preset linux-gcc-debug
+      - name: Test
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/ctest-linux-gcc-debug"
+          ctest --preset linux-gcc-debug --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-gcc-debug/junit.xml"
+      - name: Upload Linux GCC Debug reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-linux-gcc-debug-${{ github.sha }}
+          path: ${{ runner.temp }}/ctest-linux-gcc-debug
+          retention-days: 14
+
+  linux-gcc-release:
+    name: Linux GCC Release
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          gcc --version | head -n 1
+          cmake --version
+          echo "preset=linux-gcc-release"
+          echo "commit_sha=${GITHUB_SHA}"
+      - name: Configure
+        shell: bash
+        run: cmake --preset linux-gcc-release
+      - name: Build
+        shell: bash
+        run: cmake --build --preset linux-gcc-release
+      - name: Test
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/ctest-linux-gcc-release"
+          ctest --preset linux-gcc-release --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-gcc-release/junit.xml"
+      - name: Upload Linux GCC Release reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-linux-gcc-release-${{ github.sha }}
+          path: ${{ runner.temp }}/ctest-linux-gcc-release
+          retention-days: 14
+
+  linux-clang-release:
+    name: Linux Clang Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          clang --version | head -n 1
+          clang++ --version | head -n 1
+          cmake --version
+          echo "preset=linux-clang-release"
+          echo "commit_sha=${GITHUB_SHA}"
+      - name: Configure
+        shell: bash
+        run: cmake --preset linux-clang-release
+      - name: Build
+        shell: bash
+        run: cmake --build --preset linux-clang-release
+      - name: Test
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/ctest-linux-clang-release"
+          ctest --preset linux-clang-release --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-clang-release/junit.xml"
+      - name: Upload Linux Clang Release reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-linux-clang-release-${{ github.sha }}
+          path: ${{ runner.temp }}/ctest-linux-clang-release
+          retention-days: 14
+
+  linux-clang-debug:
+    name: Linux Clang Debug
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          clang --version | head -n 1
+          cmake --version
+          echo "preset=linux-clang-debug"
+          echo "commit_sha=${GITHUB_SHA}"
+      - name: Configure
+        shell: bash
+        run: cmake --preset linux-clang-debug
+      - name: Build
+        shell: bash
+        run: cmake --build --preset linux-clang-debug
+      - name: Test
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/ctest-linux-clang-debug"
+          ctest --preset linux-clang-debug --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-clang-debug/junit.xml"
+      - name: Upload Linux Clang Debug reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-linux-clang-debug-${{ github.sha }}
+          path: ${{ runner.temp }}/ctest-linux-clang-debug
+          retention-days: 14
+
+  windows-msvc-validation:
+    name: Windows MSVC Validation
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-key-suffix: validation
+
+      - name: Print tool versions
+        shell: pwsh
+        run: |
+          cmake --version
+          ctest --version
+          cl
+          python --version
+          Write-Host "preset=validation-msvc"
+          Write-Host "commit_sha=$env:GITHUB_SHA"
+
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset validation-msvc
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset validation-msvc
+
+      - name: Test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\ctest-windows-msvc-validation" | Out-Null
+          ctest --preset validation-msvc --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-validation\junit.xml"
+
+      - name: Upload Windows validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-windows-msvc-validation-${{ github.sha }}
+          path: ${{ runner.temp }}\ctest-windows-msvc-validation
+          retention-days: 14
+
+  windows-msvc-debug:
+    name: Windows MSVC Debug
+    if: github.event_name != 'pull_request'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-key-suffix: debug
+      - name: Print tool versions
+        shell: pwsh
+        run: |
+          cmake --version
+          ctest --version
+          cl
+          Write-Host "preset=windows-msvc-debug"
+          Write-Host "commit_sha=$env:GITHUB_SHA"
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset windows-msvc-debug
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset windows-msvc-debug
+      - name: Test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\ctest-windows-msvc-debug" | Out-Null
+          ctest --preset windows-msvc-debug --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-debug\junit.xml"
+      - name: Upload Windows Debug reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-windows-msvc-debug-${{ github.sha }}
+          path: ${{ runner.temp }}\ctest-windows-msvc-debug
+          retention-days: 14
+
+  windows-msvc-release:
+    name: Windows MSVC Release
+    if: github.event_name != 'pull_request'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-key-suffix: release
+      - name: Print tool versions
+        shell: pwsh
+        run: |
+          cmake --version
+          ctest --version
+          cl
+          Write-Host "preset=windows-msvc-release"
+          Write-Host "commit_sha=$env:GITHUB_SHA"
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset windows-msvc-release
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset windows-msvc-release
+      - name: Test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\ctest-windows-msvc-release" | Out-Null
+          ctest --preset windows-msvc-release --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-release\junit.xml"
+      - name: Upload Windows Release reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-windows-msvc-release-${{ github.sha }}
+          path: ${{ runner.temp }}\ctest-windows-msvc-release
+          retention-days: 14
+
+  full-validator:
+    name: Full Validator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt
+      - name: Run local validator
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/local-validate"
+          python3 scripts/local_validate.py \
+            --preset validation-linux-gcc \
+            --ctest-output-junit "${RUNNER_TEMP}/local-validate/ctest-junit.xml" \
+            --report "${RUNNER_TEMP}/local-validate/local_validate_report.json"
+      - name: Upload validator report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-validator-${{ github.sha }}
+          path: ${{ runner.temp }}/local-validate
+          retention-days: 14
+
+  install-consumer:
+    name: Installation And Consumer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --version
+          gcc --version | head -n 1
+          echo "preset=linux-gcc-release"
+          echo "commit_sha=${GITHUB_SHA}"
+      - name: Configure
+        shell: bash
+        run: cmake --preset linux-gcc-release
+      - name: Build
+        shell: bash
+        run: cmake --build --preset linux-gcc-release
+      - name: Install
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --install build/linux-gcc-release --prefix "${RUNNER_TEMP}/install-root"
+      - name: Validate consumer package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/install-manifest"
+          python3 scripts/package_consumer_smoke.py \
+            --install-prefix "${RUNNER_TEMP}/install-root" \
+            --manifest-out "${RUNNER_TEMP}/install-manifest/install-manifest.json"
+      - name: Upload install manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-consumer-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/install-manifest
+            ${{ runner.temp }}/install-root
+          retention-days: 14
+
+  ci-required:
+    name: CI Required
+    runs-on: ubuntu-24.04
+    if: always()
+    needs:
+      - workflow-lint
+      - formatting
+      - static-analysis
+      - python-ci
+      - go-ci
+      - linux-gcc-validation
+      - linux-clang-release
+      - windows-msvc-validation
+      - full-validator
+      - install-consumer
+    steps:
+      - name: Enforce required job results
+        shell: bash
+        env:
+          WORKFLOW_LINT: ${{ needs.workflow-lint.result }}
+          FORMATTING: ${{ needs.formatting.result }}
+          STATIC_ANALYSIS: ${{ needs.static-analysis.result }}
+          PYTHON_CI: ${{ needs.python-ci.result }}
+          GO_CI: ${{ needs.go-ci.result }}
+          LINUX_GCC: ${{ needs.linux-gcc-validation.result }}
+          LINUX_CLANG: ${{ needs.linux-clang-release.result }}
+          WINDOWS_MSVC: ${{ needs.windows-msvc-validation.result }}
+          FULL_VALIDATOR: ${{ needs.full-validator.result }}
+          INSTALL_CONSUMER: ${{ needs.install-consumer.result }}
+        run: |
+          set -euo pipefail
+          for status in \
+            "$WORKFLOW_LINT" \
+            "$FORMATTING" \
+            "$STATIC_ANALYSIS" \
+            "$PYTHON_CI" \
+            "$GO_CI" \
+            "$LINUX_GCC" \
+            "$LINUX_CLANG" \
+            "$WINDOWS_MSVC" \
+            "$FULL_VALIDATOR" \
+            "$INSTALL_CONSUMER"; do
+            if [[ "$status" != "success" ]]; then
+              echo "Required CI dependency failed with status: $status"
+              exit 1
+            fi
+          done

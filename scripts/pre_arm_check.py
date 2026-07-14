@@ -18,7 +18,11 @@ class PreArmChecker(BenchChecker):
         timeout_s: float,
         localization_confidence_threshold: float,
     ) -> None:
-        super().__init__(runtime_config_path=runtime_config_path, backend_url=backend_url, timeout_s=timeout_s)
+        super().__init__(
+            runtime_config_path=runtime_config_path,
+            backend_url=backend_url,
+            timeout_s=timeout_s,
+        )
         self.localization_confidence_threshold = localization_confidence_threshold
 
     def run(self) -> int:
@@ -39,7 +43,9 @@ class PreArmChecker(BenchChecker):
         try:
             return self._fetch_backend_payload()
         except Exception as exc:  # noqa: BLE001
-            self._record("backend_payload", False, f"failed to read backend fleet payload: {exc}")
+            self._record(
+                "backend_payload", False, f"failed to read backend fleet payload: {exc}"
+            )
             return None
 
     def _check_real_backend_telemetry(self) -> None:
@@ -50,13 +56,25 @@ class PreArmChecker(BenchChecker):
         stale_drone_count = int(payload.get("stale_drone_count", 0) or 0)
         drones = payload.get("drones", [])
         if real_drone_count <= 0:
-            self._record("real_backend_telemetry", False, "backend is not receiving any real drone telemetry")
+            self._record(
+                "real_backend_telemetry",
+                False,
+                "backend is not receiving any real drone telemetry",
+            )
             return
         if stale_drone_count > 0:
-            self._record("real_backend_telemetry", False, f"backend reports stale telemetry for {stale_drone_count} drone(s)")
+            self._record(
+                "real_backend_telemetry",
+                False,
+                f"backend reports stale telemetry for {stale_drone_count} drone(s)",
+            )
             return
         if not isinstance(drones, list) or not drones:
-            self._record("real_backend_telemetry", False, "fleet payload contains no drone records")
+            self._record(
+                "real_backend_telemetry",
+                False,
+                "fleet payload contains no drone records",
+            )
             return
         fake_sources = []
         for item in drones:
@@ -66,12 +84,24 @@ class PreArmChecker(BenchChecker):
             if source != "real":
                 fake_sources.append(source)
             if bool(item.get("stale", False)):
-                self._record("real_backend_telemetry", False, "fleet payload contains stale drone records")
+                self._record(
+                    "real_backend_telemetry",
+                    False,
+                    "fleet payload contains stale drone records",
+                )
                 return
         if fake_sources:
-            self._record("real_backend_telemetry", False, f"fake or non-real drone sources present: {sorted(set(fake_sources))}")
+            self._record(
+                "real_backend_telemetry",
+                False,
+                f"fake or non-real drone sources present: {sorted(set(fake_sources))}",
+            )
             return
-        self._record("real_backend_telemetry", True, f"backend receiving {real_drone_count} real drone(s) with no stale telemetry")
+        self._record(
+            "real_backend_telemetry",
+            True,
+            f"backend receiving {real_drone_count} real drone(s) with no stale telemetry",
+        )
 
     def _check_no_synthetic_localization(self) -> None:
         payload = self._backend_payload_or_fail()
@@ -79,19 +109,34 @@ class PreArmChecker(BenchChecker):
             return
         drones = payload.get("drones", [])
         if not isinstance(drones, list) or not drones:
-            self._record("localization_data_source", False, "no drone records available to verify localization source")
+            self._record(
+                "localization_data_source",
+                False,
+                "no drone records available to verify localization source",
+            )
             return
         bad_sources: set[str] = set()
         for item in drones:
             if not isinstance(item, dict):
                 continue
-            source = str(item.get("localization_data_source", "unavailable")).strip().lower() or "unavailable"
+            source = (
+                str(item.get("localization_data_source", "unavailable")).strip().lower()
+                or "unavailable"
+            )
             if source != "real":
                 bad_sources.add(source)
         if bad_sources:
-            self._record("localization_data_source", False, f"non-real localization sources active: {sorted(bad_sources)}")
+            self._record(
+                "localization_data_source",
+                False,
+                f"non-real localization sources active: {sorted(bad_sources)}",
+            )
             return
-        self._record("localization_data_source", True, "all reported localization data sources are real")
+        self._record(
+            "localization_data_source",
+            True,
+            "all reported localization data sources are real",
+        )
 
     def _check_localization_confidence(self) -> None:
         payload = self._backend_payload_or_fail()
@@ -99,7 +144,11 @@ class PreArmChecker(BenchChecker):
             return
         drones = payload.get("drones", [])
         if not isinstance(drones, list) or not drones:
-            self._record("localization_confidence", False, "no drone records available to verify localization confidence")
+            self._record(
+                "localization_confidence",
+                False,
+                "no drone records available to verify localization confidence",
+            )
             return
         low_confidence: list[str] = []
         for item in drones:
@@ -134,12 +183,16 @@ class PreArmChecker(BenchChecker):
             return 1
         print()
         print("PRE-ARM VERDICT: PASS")
-        print("Pre-arm gate passed for tethered test prerequisites. This is still not a free-flight readiness claim.")
+        print(
+            "Pre-arm gate passed for tethered test prerequisites. This is still not a free-flight readiness claim."
+        )
         return 0
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Strict tethered-flight pre-arm checks")
+    parser = argparse.ArgumentParser(
+        description="Strict tethered-flight pre-arm checks"
+    )
     parser.add_argument(
         "--runtime-config",
         default="config/runtime.json",
@@ -168,7 +221,9 @@ def main() -> int:
         runtime_config_path=Path(args.runtime_config).resolve(),
         backend_url=args.backend_url,
         timeout_s=max(args.timeout, 0.1),
-        localization_confidence_threshold=max(min(args.loc_confidence_threshold, 1.0), 0.0),
+        localization_confidence_threshold=max(
+            min(args.loc_confidence_threshold, 1.0), 0.0
+        ),
     )
     return checker.run()
 

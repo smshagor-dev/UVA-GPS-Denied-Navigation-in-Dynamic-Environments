@@ -1,0 +1,174 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish a GitHub Release after validation"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  linux-package:
+    name: Linux Release Package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          uname -a
+          gcc --version | head -n 1
+          cmake --version
+          echo "preset=linux-gcc-release-package"
+          echo "commit_sha=${GITHUB_SHA}"
+      - name: Configure
+        shell: bash
+        run: cmake --preset linux-gcc-release-package
+      - name: Build
+        shell: bash
+        run: cmake --build --preset linux-gcc-release-package
+      - name: Test
+        shell: bash
+        run: ctest --preset linux-gcc-release-package --output-on-failure --output-junit "${RUNNER_TEMP}/linux-release-junit.xml"
+      - name: Install
+        shell: bash
+        run: cmake --install build/linux-gcc-release-package --prefix "${RUNNER_TEMP}/linux-install"
+      - name: Package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cpack --config build/linux-gcc-release-package/CPackConfig.cmake --verbose
+          mkdir -p "${RUNNER_TEMP}/release/linux"
+          find build/linux-gcc-release-package -maxdepth 1 \( -name "*.tgz" -o -name "*.zip" \) -exec cp {} "${RUNNER_TEMP}/release/linux/" \;
+      - name: Validate downstream consumer
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 scripts/package_consumer_smoke.py \
+            --install-prefix "${RUNNER_TEMP}/linux-install" \
+            --manifest-out "${RUNNER_TEMP}/release/linux/install-manifest.json"
+      - name: Install syft
+        shell: bash
+        run: |
+          set -euxo pipefail
+          go install github.com/anchore/syft/cmd/syft@v1.22.0
+          echo "${HOME}/go/bin" >> "${GITHUB_PATH}"
+      - name: Generate SBOM and checksums
+        shell: bash
+        run: |
+          set -euxo pipefail
+          syft "dir:${RUNNER_TEMP}/linux-install" -o cyclonedx-json="${RUNNER_TEMP}/release/linux/sbom.cdx.json"
+          (
+            cd "${RUNNER_TEMP}/release/linux"
+            sha256sum * > SHA256SUMS.txt
+          )
+      - name: Upload Linux release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-linux-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/release/linux
+            ${{ runner.temp }}/linux-release-junit.xml
+          retention-days: 30
+
+  windows-package:
+    name: Windows Release Package
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-key-suffix: release-package
+      - name: Print tool versions
+        shell: pwsh
+        run: |
+          cmake --version
+          ctest --version
+          cl
+          Write-Host "preset=windows-msvc-release-package"
+          Write-Host "commit_sha=$env:GITHUB_SHA"
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset windows-msvc-release-package
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset windows-msvc-release-package
+      - name: Test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\release\windows" | Out-Null
+          ctest --preset windows-msvc-release-package --output-on-failure --output-junit "$env:RUNNER_TEMP\release\windows\junit.xml"
+      - name: Install
+        shell: pwsh
+        run: cmake --install build/windows-msvc-release-package --config Release --prefix "$env:RUNNER_TEMP\windows-install"
+      - name: Package
+        shell: pwsh
+        run: |
+          cpack --config build/windows-msvc-release-package\CPackConfig.cmake --verbose
+          Get-ChildItem build\windows-msvc-release-package -Filter *.zip | Copy-Item -Destination "$env:RUNNER_TEMP\release\windows"
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          $artifacts = Get-ChildItem "$env:RUNNER_TEMP\release\windows" -File
+          $lines = foreach ($artifact in $artifacts) {
+            $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $artifact.FullName
+            "$($hash.Hash)  $($artifact.Name)"
+          }
+          $lines | Set-Content -LiteralPath "$env:RUNNER_TEMP\release\windows\SHA256SUMS.txt"
+      - name: Upload Windows release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows-${{ github.sha }}
+          path: ${{ runner.temp }}\release\windows
+          retention-days: 30
+
+  publish-release:
+    name: Publish Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - linux-package
+      - windows-package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/release-bundle
+
+      - name: Publish GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          TAG_NAME="${GITHUB_REF_NAME}"
+          gh release create "${TAG_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${TAG_NAME}" \
+            --notes "Validated software release for research and bench use. See attached packages, SBOM, and checksums." \
+            $(find "${RUNNER_TEMP}/release-bundle" -type f -print)

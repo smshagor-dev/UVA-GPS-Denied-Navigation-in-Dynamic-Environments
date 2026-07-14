@@ -24,6 +24,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include(CompilerWarnings)
+include(Coverage)
 include(Sanitizers)
 include(Dependencies)
 
@@ -36,6 +37,7 @@ option(DRONE_FETCH_GOOGLETEST "Fetch GoogleTest when no package is available" ON
 option(DRONE_WARNINGS_AS_ERRORS "Treat project warnings as errors" OFF)
 option(DRONE_ENABLE_ASAN "Enable AddressSanitizer on supported toolchains" OFF)
 option(DRONE_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer on supported toolchains" OFF)
+option(DRONE_ENABLE_COVERAGE "Enable native coverage instrumentation on supported toolchains" OFF)
 option(DRONE_ENABLE_CPACK "Enable archive packaging via CPack" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -71,26 +73,14 @@ function(drone_append_build_interface_paths out_var)
     set(${out_var} "${_wrapped_paths}" PARENT_SCOPE)
 endfunction()
 
-function(drone_append_install_interface_paths out_var)
-    set(_wrapped_paths "")
-    foreach(path IN LISTS ARGN)
-        list(APPEND _wrapped_paths "$<INSTALL_INTERFACE:${path}>")
-    endforeach()
-    set(${out_var} "${_wrapped_paths}" PARENT_SCOPE)
-endfunction()
-
 drone_resolve_dependencies()
 
 drone_append_build_interface_paths(DRONE_OPENCV_BUILD_INCLUDE_DIRS ${DRONE_OPENCV_INCLUDE_DIRS})
 drone_append_build_interface_paths(DRONE_PCL_BUILD_INCLUDE_DIRS ${DRONE_PCL_INCLUDE_DIRS})
-drone_append_install_interface_paths(DRONE_OPENCV_INSTALL_INCLUDE_DIRS ${DRONE_OPENCV_INCLUDE_DIRS})
-drone_append_install_interface_paths(DRONE_PCL_INSTALL_INCLUDE_DIRS ${DRONE_PCL_INCLUDE_DIRS})
 if(DRONE_HAVE_TENSORRT)
     drone_append_build_interface_paths(DRONE_TENSORRT_BUILD_INCLUDE_DIRS ${DRONE_TENSORRT_INCLUDE_DIR})
-    drone_append_install_interface_paths(DRONE_TENSORRT_INSTALL_INCLUDE_DIRS ${DRONE_TENSORRT_INCLUDE_DIR})
 else()
     set(DRONE_TENSORRT_BUILD_INCLUDE_DIRS "")
-    set(DRONE_TENSORRT_INSTALL_INCLUDE_DIRS "")
 endif()
 
 set(DRONE_CORE_SOURCES
@@ -142,9 +132,6 @@ target_include_directories(sensor_fusion_core
         ${DRONE_OPENCV_BUILD_INCLUDE_DIRS}
         ${DRONE_PCL_BUILD_INCLUDE_DIRS}
         ${DRONE_TENSORRT_BUILD_INCLUDE_DIRS}
-        ${DRONE_OPENCV_INSTALL_INCLUDE_DIRS}
-        ${DRONE_PCL_INSTALL_INCLUDE_DIRS}
-        ${DRONE_TENSORRT_INSTALL_INCLUDE_DIRS}
 )
 target_link_libraries(sensor_fusion_core
     PUBLIC
@@ -169,12 +156,14 @@ target_compile_definitions(sensor_fusion_core
         ${DRONE_PCL_COMPILE_DEFINITIONS}
 )
 drone_apply_project_warnings(sensor_fusion_core)
+drone_enable_coverage(sensor_fusion_core)
 drone_enable_sanitizers(sensor_fusion_core)
 drone_set_target_output_dirs(sensor_fusion_core "bin" "lib" "lib")
 
 add_executable(drone_node src/main.cpp)
 target_link_libraries(drone_node PRIVATE sensor_fusion_core)
 drone_apply_project_warnings(drone_node)
+drone_enable_coverage(drone_node)
 drone_enable_sanitizers(drone_node)
 drone_set_target_output_dirs(drone_node "bin" "lib" "lib")
 
@@ -193,6 +182,7 @@ if(DRONE_ENABLE_PYTHON_BINDINGS AND DRONE_HAVE_PYTHON_BINDINGS)
         $<$<BOOL:${DRONE_HAVE_TENSORRT}>:${DRONE_TENSORRT_LIB}>
     )
     drone_apply_project_warnings(drone_bridge)
+    drone_enable_coverage(drone_bridge)
     drone_enable_sanitizers(drone_bridge)
     drone_set_target_output_dirs(drone_bridge "python" "python" "python")
 endif()

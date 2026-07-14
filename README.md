@@ -7,6 +7,10 @@
 ![Python](https://img.shields.io/badge/Python-PySide6%20Dashboard-3776AB?style=for-the-badge&logo=python)
 ![CMake](https://img.shields.io/badge/CMake-Build%20System-064F8C?style=for-the-badge&logo=cmake)
 
+[![CI](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/ci.yml)
+[![Security](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/security.yml)
+[![Nightly Deep Validation](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/nightly.yml)
+
 ![GPS Denied](https://img.shields.io/badge/GPS--Denied-Autonomy-black?style=flat-square)
 ![UAV Swarm](https://img.shields.io/badge/UAV-Swarm%20Intelligence-blue?style=flat-square)
 ![Edge AI](https://img.shields.io/badge/Edge-AI%20Inference-purple?style=flat-square)
@@ -28,6 +32,9 @@
 
 > **Safety and validation notice**  
 > This repository is an advanced research and production-oriented software platform for GPS-denied UAV autonomy. It is **not flight validated**, **not production-radio validated**, and **not approved for free flight**. Treat the implementation as bench-demo-ready software plus architecture-level research until HIL, tethered, and flight-adjacent evidence exists.
+
+> **CI scope notice**
+> The GitHub Actions badges above represent repository validation for source quality, supported build presets, tests, packaging, and security scanning. They do **not** represent flight certification, hardware-in-the-loop clearance, or operational airworthiness approval.
 
 ---
 
