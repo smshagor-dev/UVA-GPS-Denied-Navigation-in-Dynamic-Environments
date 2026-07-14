@@ -42,7 +42,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: "1.26.5"
           cache: false
 
       - name: Install gitleaks
@@ -104,7 +104,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: "1.26.5"
           cache: false
 
       - name: Install vulnerability scanners
@@ -113,7 +113,7 @@ jobs:
           set -euxo pipefail
           python3 -m pip install --upgrade pip
           python3 -m pip install pip-audit
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
           echo "${HOME}/go/bin" >> "${GITHUB_PATH}"
 
       - name: Print tool versions

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -31,7 +32,7 @@ def iter_source_files() -> list[Path]:
 
 
 def main() -> int:
-    clang_format = shutil.which("clang-format")
+    clang_format = os.environ.get("CLANG_FORMAT_BIN") or shutil.which("clang-format")
     if clang_format is None:
         print("FAIL: clang-format was not found on PATH.")
         return 1

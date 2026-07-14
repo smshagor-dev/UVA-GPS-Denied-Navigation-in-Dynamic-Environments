@@ -78,7 +78,7 @@ jobs:
         run: |
           set -euxo pipefail
           python3 -m pip install --upgrade pip
-          python3 -m pip install black==24.10.0
+          python3 -m pip install black==24.10.0 clang-format==19.1.7
 
       - name: Print tool versions
         shell: bash
