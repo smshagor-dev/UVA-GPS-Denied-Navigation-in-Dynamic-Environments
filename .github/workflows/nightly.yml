@@ -155,7 +155,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - uses: ./.github/actions/setup-linux-deps
       - name: Install coverage tools
         shell: bash
@@ -213,7 +213,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - uses: ./.github/actions/setup-linux-deps
       - name: Configure package preset
         shell: bash

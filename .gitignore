@@ -16,6 +16,7 @@ firmware/*.manifest
 
 # Logs, caches, and crash dumps
 logs/
+artifacts/
 cache/
 *.log
 *.out

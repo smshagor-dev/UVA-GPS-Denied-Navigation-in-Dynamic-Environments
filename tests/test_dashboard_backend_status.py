@@ -5,7 +5,7 @@ from gui.backend_status import (
     compose_operator_status,
     summarize_localization_data_source,
 )
-from gui.dashboard import (
+from gui.dashboard_contract import (
     DashboardSnapshot,
     DroneState,
     mission_start_allowed,

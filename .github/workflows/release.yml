@@ -29,7 +29,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -107,7 +107,12 @@ jobs:
         run: |
           cmake --version
           ctest --version
-          cl
+          $cl = Get-Command cl.exe -ErrorAction SilentlyContinue
+          if ($cl) {
+            cmd /c cl 2>&1 | Select-Object -First 1
+          } else {
+            Write-Host "cl.exe not on PATH before configure; Visual Studio generator will resolve the toolchain during configure."
+          }
           Write-Host "preset=windows-msvc-release-package"
           Write-Host "commit_sha=$env:GITHUB_SHA"
       - name: Configure

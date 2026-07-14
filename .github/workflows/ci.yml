@@ -27,6 +27,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: false
 
       - name: Install actionlint
         shell: bash
@@ -68,6 +69,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: false
 
       - uses: ./.github/actions/setup-linux-deps
 
@@ -422,7 +424,12 @@ jobs:
         run: |
           cmake --version
           ctest --version
-          cl
+          $cl = Get-Command cl.exe -ErrorAction SilentlyContinue
+          if ($cl) {
+            cmd /c cl 2>&1 | Select-Object -First 1
+          } else {
+            Write-Host "cl.exe not on PATH before configure; Visual Studio generator will resolve the toolchain during configure."
+          }
           python --version
           Write-Host "preset=validation-msvc"
           Write-Host "commit_sha=$env:GITHUB_SHA"
@@ -467,7 +474,12 @@ jobs:
         run: |
           cmake --version
           ctest --version
-          cl
+          $cl = Get-Command cl.exe -ErrorAction SilentlyContinue
+          if ($cl) {
+            cmd /c cl 2>&1 | Select-Object -First 1
+          } else {
+            Write-Host "cl.exe not on PATH before configure; Visual Studio generator will resolve the toolchain during configure."
+          }
           Write-Host "preset=windows-msvc-debug"
           Write-Host "commit_sha=$env:GITHUB_SHA"
       - name: Configure
@@ -507,7 +519,12 @@ jobs:
         run: |
           cmake --version
           ctest --version
-          cl
+          $cl = Get-Command cl.exe -ErrorAction SilentlyContinue
+          if ($cl) {
+            cmd /c cl 2>&1 | Select-Object -First 1
+          } else {
+            Write-Host "cl.exe not on PATH before configure; Visual Studio generator will resolve the toolchain during configure."
+          }
           Write-Host "preset=windows-msvc-release"
           Write-Host "commit_sha=$env:GITHUB_SHA"
       - name: Configure
@@ -543,7 +560,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - uses: ./.github/actions/setup-linux-deps
       - name: Install Python dependencies
         shell: bash
