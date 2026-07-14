@@ -27,8 +27,7 @@ struct MotorHealthMeasurement : SensorMeasurement {
 
 class MotorSensor : public SensorBase {
 public:
-    explicit MotorSensor(std::string id = "motor0")
-        : SensorBase(std::move(id), "MotorHealth") {}
+    explicit MotorSensor(std::string id = "motor0") : SensorBase(std::move(id), "MotorHealth") {}
 
     bool initialize() override;
     bool reconfigure(const std::string& config_json) override;
@@ -49,10 +48,9 @@ private:
     DataCallback<MotorHealthMeasurement> data_cb_;
 };
 
-} 
+} // namespace drone::sensors
 
 // namespace drone::sensors
 // System Designer and Developer: Md Shahanur Islam Shagor
 // Project: UVA GPS Denied Navigation in Dynamic Environments
 // Technology: C++, Python, Go, CMake
-

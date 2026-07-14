@@ -27,14 +27,12 @@ uint64_t make_global_keyframe_id(uint32_t drone_id, uint64_t local_id) {
     return (static_cast<uint64_t>(drone_id) << 32) | (local_id & 0xFFFFFFFFull);
 }
 
-template <typename T>
-void append_bytes(std::vector<uint8_t>& out, const T& value) {
+template <typename T> void append_bytes(std::vector<uint8_t>& out, const T& value) {
     const auto* begin = reinterpret_cast<const uint8_t*>(&value);
     out.insert(out.end(), begin, begin + sizeof(T));
 }
 
-template <typename T>
-bool read_bytes(const uint8_t*& ptr, size_t& remaining, T& value) {
+template <typename T> bool read_bytes(const uint8_t*& ptr, size_t& remaining, T& value) {
     if (remaining < sizeof(T)) {
         return false;
     }
@@ -57,12 +55,9 @@ void append_keypoint(std::vector<uint8_t>& out, const cv::KeyPoint& kp) {
 bool read_keypoint(const uint8_t*& ptr, size_t& remaining, cv::KeyPoint& kp) {
     float x = 0.0f;
     float y = 0.0f;
-    if (!read_bytes(ptr, remaining, x) ||
-        !read_bytes(ptr, remaining, y) ||
-        !read_bytes(ptr, remaining, kp.size) ||
-        !read_bytes(ptr, remaining, kp.angle) ||
-        !read_bytes(ptr, remaining, kp.response) ||
-        !read_bytes(ptr, remaining, kp.octave) ||
+    if (!read_bytes(ptr, remaining, x) || !read_bytes(ptr, remaining, y) ||
+        !read_bytes(ptr, remaining, kp.size) || !read_bytes(ptr, remaining, kp.angle) ||
+        !read_bytes(ptr, remaining, kp.response) || !read_bytes(ptr, remaining, kp.octave) ||
         !read_bytes(ptr, remaining, kp.class_id)) {
         return false;
     }
@@ -70,8 +65,7 @@ bool read_keypoint(const uint8_t*& ptr, size_t& remaining, cv::KeyPoint& kp) {
     return true;
 }
 
-size_t descriptor_match_score(const cv::Ptr<cv::BFMatcher>& matcher,
-                              const cv::Mat& lhs,
+size_t descriptor_match_score(const cv::Ptr<cv::BFMatcher>& matcher, const cv::Mat& lhs,
                               const cv::Mat& rhs) {
     if (!matcher || lhs.empty() || rhs.empty()) {
         return 0;
@@ -115,14 +109,10 @@ Eigen::Vector3d keypoint_to_bearing(const cv::KeyPoint& kp, const cv::Size& size
 
 } // namespace
 
-KeyframeManager::KeyframeManager(uint32_t drone_id,
-                                 std::shared_ptr<swarm::V2XMeshNetwork> net,
+KeyframeManager::KeyframeManager(uint32_t drone_id, std::shared_ptr<swarm::V2XMeshNetwork> net,
                                  KeyframeSelectionPolicy policy)
-    : drone_id_(drone_id)
-    , net_(std::move(net))
-    , policy_(std::move(policy))
-    , orb_(cv::ORB::create(512))
-    , matcher_(cv::BFMatcher::create(cv::NORM_HAMMING, false)) {
+    : drone_id_(drone_id), net_(std::move(net)), policy_(std::move(policy)),
+      orb_(cv::ORB::create(512)), matcher_(cv::BFMatcher::create(cv::NORM_HAMMING, false)) {
     logger_ = spdlog::get("SLAM");
     if (!logger_) {
         logger_ = spdlog::stdout_color_mt("SLAM");
@@ -228,8 +218,8 @@ std::optional<uint64_t> KeyframeManager::try_add_frame(const cv::Mat& image,
     last_loop_candidate_count_.store(loop_candidates.size());
     if (!loop_candidates.empty() && logger_) {
         relocalization_count_.fetch_add(1);
-        logger_->info("SLAM keyframe {} has {} loop-closure candidates",
-                      kf.id, loop_candidates.size());
+        logger_->info("SLAM keyframe {} has {} loop-closure candidates", kf.id,
+                      loop_candidates.size());
     }
 
     if (net_) {
@@ -307,7 +297,8 @@ void KeyframeManager::share_latest_keyframe() {
         shared_id = shareable.id;
     }
 
-    if (!net_->broadcast(swarm::SwarmMessage::Type::KEYFRAME_SHARE, std::move(payload)) && logger_) {
+    if (!net_->broadcast(swarm::SwarmMessage::Type::KEYFRAME_SHARE, std::move(payload)) &&
+        logger_) {
         logger_->warn("SLAM failed to broadcast keyframe {}", shared_id);
     }
 }
@@ -332,15 +323,16 @@ void KeyframeManager::on_remote_keyframe(const swarm::SwarmMessage& msg) {
     std::lock_guard lock(map_mutex_);
 
     const auto remote_gid = make_global_keyframe_id(remote.drone_id, remote.id);
-    const auto exists = std::any_of(remote_keyframes_.begin(), remote_keyframes_.end(),
-        [&](const Keyframe& candidate) {
+    const auto exists = std::any_of(
+        remote_keyframes_.begin(), remote_keyframes_.end(), [&](const Keyframe& candidate) {
             return make_global_keyframe_id(candidate.drone_id, candidate.id) == remote_gid;
         });
     if (exists) {
         return;
     }
 
-    for (size_t i = 0; i < remote.bearings.size() && i < static_cast<size_t>(remote.descriptors.rows); ++i) {
+    for (size_t i = 0;
+         i < remote.bearings.size() && i < static_cast<size_t>(remote.descriptors.rows); ++i) {
         const Eigen::Vector3d projected = remote.position + remote.bearings[i].normalized() * 5.0;
         const cv::Mat descriptor_row = remote.descriptors.row(static_cast<int>(i));
 
@@ -388,9 +380,10 @@ void KeyframeManager::on_remote_keyframe(const swarm::SwarmMessage& msg) {
 
     remote_keyframes_.push_back(std::move(remote));
     if (remote_keyframes_.size() > kMaxLocalKeyframes) {
-        remote_keyframes_.erase(remote_keyframes_.begin(),
-                                remote_keyframes_.begin() + static_cast<std::ptrdiff_t>(
-                                    remote_keyframes_.size() - kMaxLocalKeyframes));
+        remote_keyframes_.erase(
+            remote_keyframes_.begin(),
+            remote_keyframes_.begin() +
+                static_cast<std::ptrdiff_t>(remote_keyframes_.size() - kMaxLocalKeyframes));
     }
 }
 
@@ -435,10 +428,9 @@ std::vector<uint64_t> KeyframeManager::find_loop_closure_candidates(const cv::Ma
     return out;
 }
 
-std::optional<KeyframeManager::RelocalizationResult> KeyframeManager::attempt_relocalization(
-        const cv::Mat& image,
-        const Eigen::Vector3d& pose_guess,
-        const Eigen::Quaterniond& orientation_guess) const {
+std::optional<KeyframeManager::RelocalizationResult>
+KeyframeManager::attempt_relocalization(const cv::Mat& image, const Eigen::Vector3d& pose_guess,
+                                        const Eigen::Quaterniond& orientation_guess) const {
     if (image.empty()) {
         return std::nullopt;
     }
@@ -469,7 +461,8 @@ std::optional<KeyframeManager::RelocalizationResult> KeyframeManager::attempt_re
         std::lock_guard lock(map_mutex_);
         auto consider = [&](const auto& frames) {
             for (const auto& frame : frames) {
-                const size_t score = descriptor_match_score(matcher_, descriptors, frame.descriptors);
+                const size_t score =
+                    descriptor_match_score(matcher_, descriptors, frame.descriptors);
                 if (score > best.score) {
                     best.keyframe_id = frame.id;
                     best.drone_id = frame.drone_id;
@@ -526,7 +519,8 @@ bool KeyframeManager::save_map(const std::string& filepath) const {
         const auto encoded = encode_keyframe(kf);
         const uint32_t payload_size = static_cast<uint32_t>(encoded.size());
         out.write(reinterpret_cast<const char*>(&payload_size), sizeof(payload_size));
-        out.write(reinterpret_cast<const char*>(encoded.data()), static_cast<std::streamsize>(encoded.size()));
+        out.write(reinterpret_cast<const char*>(encoded.data()),
+                  static_cast<std::streamsize>(encoded.size()));
     };
 
     for (const auto& kf : keyframes_) {
@@ -550,8 +544,9 @@ bool KeyframeManager::save_map(const std::string& filepath) const {
         out.write(reinterpret_cast<const char*>(&cols), sizeof(cols));
         out.write(reinterpret_cast<const char*>(&type), sizeof(type));
         if (!mp.descriptor.empty()) {
-            out.write(reinterpret_cast<const char*>(mp.descriptor.data),
-                      static_cast<std::streamsize>(mp.descriptor.total() * mp.descriptor.elemSize()));
+            out.write(
+                reinterpret_cast<const char*>(mp.descriptor.data),
+                static_cast<std::streamsize>(mp.descriptor.total() * mp.descriptor.elemSize()));
         }
     }
 
@@ -676,8 +671,7 @@ bool KeyframeManager::load_map(const std::string& filepath) {
 }
 
 bool KeyframeManager::should_create_keyframe(const Eigen::Vector3d& pos,
-                                             const Eigen::Quaterniond& ori,
-                                             double ts,
+                                             const Eigen::Quaterniond& ori, double ts,
                                              size_t tracked_features) const {
     if (tracked_features < policy_.min_tracked_features) {
         return false;
@@ -703,8 +697,9 @@ bool KeyframeManager::should_create_keyframe(const Eigen::Vector3d& pos,
         if (comparable == 0) {
             return true;
         }
-        const double overlap = static_cast<double>(comparable) /
-                               static_cast<double>(std::max(prev.map_point_ids.size(), tracked_features));
+        const double overlap =
+            static_cast<double>(comparable) /
+            static_cast<double>(std::max(prev.map_point_ids.size(), tracked_features));
         if (overlap < policy_.max_point_overlap) {
             return true;
         }
@@ -732,8 +727,10 @@ std::vector<uint64_t> KeyframeManager::extract_and_triangulate(const cv::Mat& im
     kf.bearings.reserve(static_cast<size_t>(kf.descriptors.rows));
 
     for (int row = 0; row < kf.descriptors.rows; ++row) {
-        const auto bearing = (kf.orientation * keypoint_to_bearing(
-            kf.keypoints[static_cast<size_t>(row)], gray.size())).normalized();
+        const auto bearing =
+            (kf.orientation *
+             keypoint_to_bearing(kf.keypoints[static_cast<size_t>(row)], gray.size()))
+                .normalized();
         kf.bearings.push_back(bearing);
 
         MapPoint mp;
@@ -754,11 +751,13 @@ std::vector<uint8_t> KeyframeManager::encode_keyframe(const Keyframe& kf) const 
 
     const int desc_rows = kf.descriptors.empty() ? 0 : kf.descriptors.rows;
     const int desc_cols = kf.descriptors.empty() ? 0 : kf.descriptors.cols;
-    const int bytes_per_row = (desc_rows > 0) ? desc_cols * static_cast<int>(kf.descriptors.elemSize1()) : 0;
+    const int bytes_per_row =
+        (desc_rows > 0) ? desc_cols * static_cast<int>(kf.descriptors.elemSize1()) : 0;
 
     size_t keep_rows = static_cast<size_t>(std::max(desc_rows, 0));
     if (bytes_per_row > 0) {
-        keep_rows = std::min<size_t>(keep_rows, kMaxSharedDescSize / static_cast<size_t>(bytes_per_row));
+        keep_rows =
+            std::min<size_t>(keep_rows, kMaxSharedDescSize / static_cast<size_t>(bytes_per_row));
     }
     keep_rows = std::min(keep_rows, kf.keypoints.size());
     keep_rows = std::min(keep_rows, kf.bearings.size());
@@ -817,20 +816,13 @@ std::optional<Keyframe> KeyframeManager::decode_keyframe(const uint8_t* data, si
     uint32_t row_count = 0;
     int desc_cols = 0;
 
-    if (!read_bytes(ptr, remaining, magic) ||
-        !read_bytes(ptr, remaining, version) ||
-        !read_bytes(ptr, remaining, kf.id) ||
-        !read_bytes(ptr, remaining, kf.drone_id) ||
-        !read_bytes(ptr, remaining, kf.timestamp) ||
-        !read_bytes(ptr, remaining, px) ||
-        !read_bytes(ptr, remaining, py) ||
-        !read_bytes(ptr, remaining, pz) ||
-        !read_bytes(ptr, remaining, qw) ||
-        !read_bytes(ptr, remaining, qx) ||
-        !read_bytes(ptr, remaining, qy) ||
-        !read_bytes(ptr, remaining, qz) ||
-        !read_bytes(ptr, remaining, row_count) ||
-        !read_bytes(ptr, remaining, desc_cols)) {
+    if (!read_bytes(ptr, remaining, magic) || !read_bytes(ptr, remaining, version) ||
+        !read_bytes(ptr, remaining, kf.id) || !read_bytes(ptr, remaining, kf.drone_id) ||
+        !read_bytes(ptr, remaining, kf.timestamp) || !read_bytes(ptr, remaining, px) ||
+        !read_bytes(ptr, remaining, py) || !read_bytes(ptr, remaining, pz) ||
+        !read_bytes(ptr, remaining, qw) || !read_bytes(ptr, remaining, qx) ||
+        !read_bytes(ptr, remaining, qy) || !read_bytes(ptr, remaining, qz) ||
+        !read_bytes(ptr, remaining, row_count) || !read_bytes(ptr, remaining, desc_cols)) {
         return std::nullopt;
     }
 
@@ -853,10 +845,8 @@ std::optional<Keyframe> KeyframeManager::decode_keyframe(const uint8_t* data, si
         double bx = 0.0;
         double by = 0.0;
         double bz = 1.0;
-        if (!read_keypoint(ptr, remaining, kp) ||
-            !read_bytes(ptr, remaining, map_point_id) ||
-            !read_bytes(ptr, remaining, bx) ||
-            !read_bytes(ptr, remaining, by) ||
+        if (!read_keypoint(ptr, remaining, kp) || !read_bytes(ptr, remaining, map_point_id) ||
+            !read_bytes(ptr, remaining, bx) || !read_bytes(ptr, remaining, by) ||
             !read_bytes(ptr, remaining, bz)) {
             return std::nullopt;
         }
@@ -869,7 +859,8 @@ std::optional<Keyframe> KeyframeManager::decode_keyframe(const uint8_t* data, si
             if (remaining < static_cast<size_t>(desc_cols)) {
                 return std::nullopt;
             }
-            std::memcpy(kf.descriptors.ptr(static_cast<int>(i)), ptr, static_cast<size_t>(desc_cols));
+            std::memcpy(kf.descriptors.ptr(static_cast<int>(i)), ptr,
+                        static_cast<size_t>(desc_cols));
             ptr += desc_cols;
             remaining -= static_cast<size_t>(desc_cols);
         }

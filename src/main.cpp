@@ -2,11 +2,10 @@
 // Project: UVA GPS Denied Navigation in Dynamic Environments
 // Technology: C++, Python, Go, CMake
 
- 
-// main.cpp  â€”  Drone Node Entry Point
+// main.cpp - Drone Node Entry Point
 // Boots all subsystems, starts VIO pipeline, swarm networking, and GUI bridge
 // Drone Swarm Sensor Fusion
- 
+
 #include "sensors/IMUSensor.hpp"
 #include "sensors/LidarSensor.hpp"
 #include "sensors/CameraSensor.hpp"
@@ -59,9 +58,8 @@
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
- 
 // Global shutdown flag
- 
+
 static std::atomic<bool> g_shutdown{false};
 
 std::optional<std::string> env_var(std::string_view key) {
@@ -83,11 +81,10 @@ std::optional<std::string> env_var(std::string_view key) {
 }
 
 void signal_handler(int sig) {
-    spdlog::warn("Signal {} received â€” initiating graceful shutdownâ€¦", sig);
+    spdlog::warn("Signal {} received - initiating graceful shutdown...", sig);
     g_shutdown.store(true);
 }
 
- 
 void setup_logging() {
     std::filesystem::create_directories("logs");
 
@@ -98,16 +95,18 @@ void setup_logging() {
         "logs/drone.log", 10 * 1024 * 1024 /* 10MB */, 5 /* keep 5 */);
     file_sink->set_level(spdlog::level::debug);
 
-    auto logger = std::make_shared<spdlog::logger>(
-        "drone", spdlog::sinks_init_list{console_sink, file_sink});
+    auto logger =
+        std::make_shared<spdlog::logger>("drone", spdlog::sinks_init_list{console_sink, file_sink});
 
     spdlog::set_default_logger(logger);
     spdlog::set_level(spdlog::level::debug);
     spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%n] %v");
 
     // Create subsystem loggers sharing same sinks
-    for (const char* name : {"EKF","VIO","SLAM","V2X","HAL_ESP32","I2C","UART","AI","MEMORY","TDOA","SECURITY","CAMERA","LIDAR"}) {
-        auto child = std::make_shared<spdlog::logger>(name, logger->sinks().begin(), logger->sinks().end());
+    for (const char* name : {"EKF", "VIO", "SLAM", "V2X", "HAL_ESP32", "I2C", "UART", "AI",
+                             "MEMORY", "TDOA", "SECURITY", "CAMERA", "LIDAR"}) {
+        auto child =
+            std::make_shared<spdlog::logger>(name, logger->sinks().begin(), logger->sinks().end());
         child->set_level(spdlog::level::debug);
         spdlog::register_logger(child);
     }
@@ -116,21 +115,20 @@ void setup_logging() {
     spdlog::info("Logging initialized. file=logs/drone.log");
 }
 
- 
 // Parse simple CLI args  --id=1  --esp32=192.168.4.1  --lidar=192.168.1.201
- 
+
 struct NodeConfig {
-    uint32_t    drone_id{1};
+    uint32_t drone_id{1};
     std::string esp32_ip{"192.168.4.1"};
     std::string camera_stream_url{};
     std::string imu_device{"/dev/i2c-1"};
-    uint8_t     imu_i2c_addr{0x68};
+    uint8_t imu_i2c_addr{0x68};
     std::string lidar_endpoint{"192.168.1.201:2368"};
     std::string swarm_group{"239.255.0.1"};
-    uint16_t    swarm_port{7400};
+    uint16_t swarm_port{7400};
     std::string yolo_engine{"models/yolov8n.engine"};
     std::string tdoa_measurements_csv{};
-    uint16_t    tdoa_udp_port{0};
+    uint16_t tdoa_udp_port{0};
     std::string tdoa_serial_device{};
     bool enable_imu{true};
     bool enable_camera{true};
@@ -154,7 +152,8 @@ struct NodeConfig {
     drone::security::PacketAuthConfig edge_auth{};
 };
 
-std::optional<std::string> extract_local_json_string(const std::string& content, const std::string& key) {
+std::optional<std::string> extract_local_json_string(const std::string& content,
+                                                     const std::string& key) {
     const std::regex pattern("\"" + key + "\"\\s*:\\s*\"([^\"]+)\"", std::regex::icase);
     std::smatch match;
     if (std::regex_search(content, match, pattern) && match.size() >= 2) {
@@ -168,9 +167,8 @@ std::optional<bool> extract_local_json_bool(const std::string& content, const st
     std::smatch match;
     if (std::regex_search(content, match, pattern) && match.size() >= 2) {
         std::string value = match[1].str();
-        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-            return static_cast<char>(std::tolower(c));
-        });
+        std::transform(value.begin(), value.end(), value.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return value == "true";
     }
     return std::nullopt;
@@ -189,7 +187,8 @@ std::optional<uint64_t> extract_local_json_u64(const std::string& content, const
 }
 
 void apply_edge_protocol_config(NodeConfig& cfg) {
-    if (cfg.edge_protocol_config_path.empty() || !std::filesystem::exists(cfg.edge_protocol_config_path)) {
+    if (cfg.edge_protocol_config_path.empty() ||
+        !std::filesystem::exists(cfg.edge_protocol_config_path)) {
         return;
     }
     std::ifstream in(cfg.edge_protocol_config_path);
@@ -233,9 +232,8 @@ uint16_t parse_port_or_default(const std::string& value, uint16_t fallback) {
 
 bool parse_bool_or_default(const std::string& value, bool fallback) {
     std::string lower = value;
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (lower == "1" || lower == "true" || lower == "yes" || lower == "on") {
         return true;
     }
@@ -332,7 +330,8 @@ void apply_env_overrides(NodeConfig& cfg) {
         cfg.enable_backend_telemetry = parse_bool_or_default(*value, cfg.enable_backend_telemetry);
     }
     if (const auto value = env_var("DRONE_BACKEND_TELEMETRY_INTERVAL_MS")) {
-        cfg.backend_telemetry_interval_ms = parse_port_or_default(*value, cfg.backend_telemetry_interval_ms);
+        cfg.backend_telemetry_interval_ms =
+            parse_port_or_default(*value, cfg.backend_telemetry_interval_ms);
     }
     if (const auto value = env_var("DRONE_SECURITY_PROFILE")) {
         cfg.security_profile = *value;
@@ -383,9 +382,8 @@ void apply_runtime_file_overrides(NodeConfig& cfg) {
 }
 
 std::string normalize_security_profile(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (value == "field") {
         return "field";
     }
@@ -396,8 +394,7 @@ std::string normalize_security_profile(std::string value) {
 }
 
 bool is_placeholder_secret(const std::string& secret) {
-    return secret.empty() ||
-           secret == "replace-with-a-strong-shared-secret" ||
+    return secret.empty() || secret == "replace-with-a-strong-shared-secret" ||
            secret == "replace-with-strong-shared-secret" ||
            secret == "drone-swarm-dev-secret-change-me";
 }
@@ -421,9 +418,8 @@ bool env_enabled(std::string_view key) {
         return false;
     }
     std::string lowered = *value;
-    std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return lowered == "1" || lowered == "true" || lowered == "yes" || lowered == "on";
 }
 
@@ -437,12 +433,12 @@ std::vector<std::string> split_csv_list(std::string_view value) {
     std::stringstream ss{std::string(value)};
     std::string item;
     while (std::getline(ss, item, ',')) {
-        item.erase(item.begin(), std::find_if(item.begin(), item.end(), [](unsigned char c) {
-            return !std::isspace(c);
-        }));
-        item.erase(std::find_if(item.rbegin(), item.rend(), [](unsigned char c) {
-            return !std::isspace(c);
-        }).base(), item.end());
+        item.erase(item.begin(), std::find_if(item.begin(), item.end(),
+                                              [](unsigned char c) { return !std::isspace(c); }));
+        item.erase(std::find_if(item.rbegin(), item.rend(),
+                                [](unsigned char c) { return !std::isspace(c); })
+                       .base(),
+                   item.end());
         if (!item.empty()) {
             out.push_back(item);
         }
@@ -450,10 +446,10 @@ std::vector<std::string> split_csv_list(std::string_view value) {
     return out;
 }
 
-bool validate_backend_transport(const NodeConfig& cfg,
-                                const std::string& backend_url,
+bool validate_backend_transport(const NodeConfig& cfg, const std::string& backend_url,
                                 std::string& error) {
-    const bool hardened_profile = cfg.security_profile == "field" || cfg.security_profile == "production";
+    const bool hardened_profile =
+        cfg.security_profile == "field" || cfg.security_profile == "production";
     if (!hardened_profile) {
         return true;
     }
@@ -503,7 +499,8 @@ void apply_security_failsafe(const drone::security::DroneSecurityAssessment& sec
         if (command.mode != BehaviorMode::EMERGENCY_LAND) {
             command.mode = BehaviorMode::RETURN_HOME;
             command.requires_operator_attention = true;
-            command.desired_velocity = (-pose.velocity * 0.45) + (pose.R_wb() * Eigen::Vector3d{0.0, 1.0, 0.0} * 0.18);
+            command.desired_velocity =
+                (-pose.velocity * 0.45) + (pose.R_wb() * Eigen::Vector3d{0.0, 1.0, 0.0} * 0.18);
             command.desired_yaw_rate_rads = 0.0;
             command.summary = security.summary;
         }
@@ -533,24 +530,40 @@ void apply_cli_overrides(NodeConfig& cfg, int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         auto eq = arg.find('=');
-        if (eq == std::string::npos) continue;
-        auto key = arg.substr(2, eq - 2);  // strip leading "--"
+        if (eq == std::string::npos)
+            continue;
+        auto key = arg.substr(2, eq - 2); // strip leading "--"
         auto val = arg.substr(eq + 1);
-        if      (key == "id")      cfg.drone_id        = std::stoul(val);
-        else if (key == "esp32")   cfg.esp32_ip         = val;
-        else if (key == "lidar")   cfg.lidar_endpoint   = val;
-        else if (key == "group")   cfg.swarm_group      = val;
-        else if (key == "yolo")    cfg.yolo_engine      = val;
-        else if (key == "tdoa-csv")cfg.tdoa_measurements_csv = val;
-        else if (key == "tdoa-udp")cfg.tdoa_udp_port = static_cast<uint16_t>(std::stoul(val));
-        else if (key == "tdoa-serial")cfg.tdoa_serial_device = val;
-        else if (key == "runtime-mode") cfg.runtime_mode = drone::runtime::parse_runtime_mode(val);
-        else if (key == "runtime-config") cfg.runtime_config_path = val;
-        else if (key == "anchor-config") cfg.anchor_config_path = val;
-        else if (key == "lidar-config") cfg.lidar_config_path = val;
-        else if (key == "detector-labels") cfg.detector_labels_path = val;
-        else if (key == "edge-protocol-config") cfg.edge_protocol_config_path = val;
-        else if (key == "edge-serialization") cfg.edge_serialization_mode = val;
+        if (key == "id")
+            cfg.drone_id = std::stoul(val);
+        else if (key == "esp32")
+            cfg.esp32_ip = val;
+        else if (key == "lidar")
+            cfg.lidar_endpoint = val;
+        else if (key == "group")
+            cfg.swarm_group = val;
+        else if (key == "yolo")
+            cfg.yolo_engine = val;
+        else if (key == "tdoa-csv")
+            cfg.tdoa_measurements_csv = val;
+        else if (key == "tdoa-udp")
+            cfg.tdoa_udp_port = static_cast<uint16_t>(std::stoul(val));
+        else if (key == "tdoa-serial")
+            cfg.tdoa_serial_device = val;
+        else if (key == "runtime-mode")
+            cfg.runtime_mode = drone::runtime::parse_runtime_mode(val);
+        else if (key == "runtime-config")
+            cfg.runtime_config_path = val;
+        else if (key == "anchor-config")
+            cfg.anchor_config_path = val;
+        else if (key == "lidar-config")
+            cfg.lidar_config_path = val;
+        else if (key == "detector-labels")
+            cfg.detector_labels_path = val;
+        else if (key == "edge-protocol-config")
+            cfg.edge_protocol_config_path = val;
+        else if (key == "edge-serialization")
+            cfg.edge_serialization_mode = val;
     }
 }
 
@@ -566,38 +579,36 @@ NodeConfig parse_args(int argc, char** argv) {
     cfg.edge_auth.runtime_profile =
         cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION
             ? "simulation"
-            : (cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM ? "edge_swarm" : cfg.security_profile);
-    spdlog::info("CLI config parsed: id={} esp32={} lidar={} group={} yolo={} tdoa_csv={} tdoa_udp={} tdoa_serial={} security_profile={} backend_telemetry={} telemetry_interval_ms={} runtime_mode={} runtime_config={} anchor_config={} lidar_config={} detector_labels={}",
-                 cfg.drone_id, cfg.esp32_ip, cfg.lidar_endpoint, cfg.swarm_group, cfg.yolo_engine,
-                 cfg.tdoa_measurements_csv.empty() ? std::string("<none>") : cfg.tdoa_measurements_csv,
-                 cfg.tdoa_udp_port,
-                 cfg.tdoa_serial_device.empty() ? std::string("<none>") : cfg.tdoa_serial_device,
-                 cfg.security_profile,
-                 cfg.enable_backend_telemetry,
-                 cfg.backend_telemetry_interval_ms,
-                 std::string(drone::runtime::to_string(cfg.runtime_mode)),
-                 cfg.runtime_config_path,
-                 cfg.anchor_config_path.empty() ? std::string("<none>") : cfg.anchor_config_path,
-                 cfg.lidar_config_path.empty() ? std::string("<none>") : cfg.lidar_config_path,
-                 cfg.detector_labels_path.empty() ? std::string("<none>") : cfg.detector_labels_path);
+            : (cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM ? "edge_swarm"
+                                                                           : cfg.security_profile);
+    spdlog::info(
+        "CLI config parsed: id={} esp32={} lidar={} group={} yolo={} tdoa_csv={} tdoa_udp={} "
+        "tdoa_serial={} security_profile={} backend_telemetry={} telemetry_interval_ms={} "
+        "runtime_mode={} runtime_config={} anchor_config={} lidar_config={} detector_labels={}",
+        cfg.drone_id, cfg.esp32_ip, cfg.lidar_endpoint, cfg.swarm_group, cfg.yolo_engine,
+        cfg.tdoa_measurements_csv.empty() ? std::string("<none>") : cfg.tdoa_measurements_csv,
+        cfg.tdoa_udp_port,
+        cfg.tdoa_serial_device.empty() ? std::string("<none>") : cfg.tdoa_serial_device,
+        cfg.security_profile, cfg.enable_backend_telemetry, cfg.backend_telemetry_interval_ms,
+        std::string(drone::runtime::to_string(cfg.runtime_mode)), cfg.runtime_config_path,
+        cfg.anchor_config_path.empty() ? std::string("<none>") : cfg.anchor_config_path,
+        cfg.lidar_config_path.empty() ? std::string("<none>") : cfg.lidar_config_path,
+        cfg.detector_labels_path.empty() ? std::string("<none>") : cfg.detector_labels_path);
     return cfg;
 }
 
 std::vector<drone::localization::TDOALocalizer::Anchor> default_tdoa_anchors() {
     using Anchor = drone::localization::TDOALocalizer::Anchor;
     return {
-        Anchor{1, Eigen::Vector3d{-20.0, -20.0, 6.0}},
-        Anchor{2, Eigen::Vector3d{ 20.0, -20.0, 6.0}},
-        Anchor{3, Eigen::Vector3d{ 20.0,  20.0, 6.0}},
-        Anchor{4, Eigen::Vector3d{-20.0,  20.0, 6.0}},
-        Anchor{5, Eigen::Vector3d{  0.0,   0.0, 24.0}},
+        Anchor{1, Eigen::Vector3d{-20.0, -20.0, 6.0}}, Anchor{2, Eigen::Vector3d{20.0, -20.0, 6.0}},
+        Anchor{3, Eigen::Vector3d{20.0, 20.0, 6.0}},   Anchor{4, Eigen::Vector3d{-20.0, 20.0, 6.0}},
+        Anchor{5, Eigen::Vector3d{0.0, 0.0, 24.0}},
     };
 }
 
-std::vector<drone::localization::TDOALocalizer::Measurement> build_demo_tdoa_measurements(
-        const std::vector<drone::localization::TDOALocalizer::Anchor>& anchors,
-        const Eigen::Vector3d& position,
-        double now_s) {
+std::vector<drone::localization::TDOALocalizer::Measurement>
+build_demo_tdoa_measurements(const std::vector<drone::localization::TDOALocalizer::Anchor>& anchors,
+                             const Eigen::Vector3d& position, double now_s) {
     std::vector<drone::localization::TDOALocalizer::Measurement> measurements;
     measurements.reserve(anchors.size());
     constexpr double kSignalSpeedMps = 299702547.0;
@@ -611,8 +622,8 @@ std::vector<drone::localization::TDOALocalizer::Measurement> build_demo_tdoa_mea
     return measurements;
 }
 
-std::optional<std::vector<drone::localization::TDOALocalizer::Measurement>> load_tdoa_measurements_from_csv(
-        const std::string& csv_path) {
+std::optional<std::vector<drone::localization::TDOALocalizer::Measurement>>
+load_tdoa_measurements_from_csv(const std::string& csv_path) {
     static std::string last_open_warning_path;
     static std::string last_short_warning_path;
     if (csv_path.empty()) {
@@ -666,8 +677,8 @@ std::optional<std::vector<drone::localization::TDOALocalizer::Measurement>> load
     return measurements;
 }
 
-std::vector<drone::localization::TDOALocalizer::Anchor> convert_anchor_definitions(
-        const std::vector<drone::runtime::AnchorDefinition>& anchors) {
+std::vector<drone::localization::TDOALocalizer::Anchor>
+convert_anchor_definitions(const std::vector<drone::runtime::AnchorDefinition>& anchors) {
     std::vector<drone::localization::TDOALocalizer::Anchor> out;
     out.reserve(anchors.size());
     for (const auto& anchor : anchors) {
@@ -710,16 +721,17 @@ std::string replay_file_name(const std::string& path) {
     return std::filesystem::path(path).filename().string();
 }
 
- 
 int main(int argc, char** argv) {
     setup_logging();
-    std::signal(SIGINT,  signal_handler);
+    std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
     const auto cfg = parse_args(argc, argv);
-    spdlog::info("Runtime mode active: {}", std::string(drone::runtime::to_string(cfg.runtime_mode)));
+    spdlog::info("Runtime mode active: {}",
+                 std::string(drone::runtime::to_string(cfg.runtime_mode)));
     if (cfg.runtime_mode != drone::runtime::RuntimeMode::SIMULATION) {
-        spdlog::info("Strict runtime separation enabled: synthetic/demo localization inputs are disabled");
+        spdlog::info(
+            "Strict runtime separation enabled: synthetic/demo localization inputs are disabled");
     }
 
     const auto runtime_validation = drone::runtime::validate_runtime_configuration({
@@ -737,7 +749,8 @@ int main(int argc, char** argv) {
     }
 
     const auto backend_url = env_var("DRONE_BACKEND_URL").value_or("");
-    const bool hardened_profile = cfg.security_profile == "field" || cfg.security_profile == "production";
+    const bool hardened_profile =
+        cfg.security_profile == "field" || cfg.security_profile == "production";
     std::string backend_transport_error;
     if (!validate_backend_transport(cfg, backend_url, backend_transport_error)) {
         spdlog::error("{}", backend_transport_error);
@@ -745,29 +758,27 @@ int main(int argc, char** argv) {
     }
     const auto telemetry_auth_token = env_var("DRONE_SWARM_SECRET").value_or("");
     drone::telemetry::ControlPlaneTelemetryClient telemetry_client(
-        cfg.enable_backend_telemetry ? backend_url : std::string{},
-        telemetry_auth_token,
-        cfg.backend_telemetry_interval_ms,
-        1500);
+        cfg.enable_backend_telemetry ? backend_url : std::string{}, telemetry_auth_token,
+        cfg.backend_telemetry_interval_ms, 1500);
     const auto geofence_radius_env = env_var("DRONE_GEOFENCE_RADIUS_M");
     const auto no_fly_lock_env = env_var("DRONE_NO_FLY_LOCK");
     const double geofence_radius_m = geofence_radius_env.has_value()
-        ? parse_double_or_default(*geofence_radius_env, 60.0)
-        : 60.0;
-    const bool no_fly_lock_configured = no_fly_lock_env.has_value()
-        ? parse_bool_or_default(*no_fly_lock_env, false)
-        : false;
+                                         ? parse_double_or_default(*geofence_radius_env, 60.0)
+                                         : 60.0;
+    const bool no_fly_lock_configured =
+        no_fly_lock_env.has_value() ? parse_bool_or_default(*no_fly_lock_env, false) : false;
     drone::security::FirmwareManifest firmware_manifest =
         drone::security::load_firmware_manifest_file(
-            env_var("DRONE_FIRMWARE_MANIFEST_FILE").value_or(std::string{})).value_or(
-                drone::security::FirmwareManifest{});
+            env_var("DRONE_FIRMWARE_MANIFEST_FILE").value_or(std::string{}))
+            .value_or(drone::security::FirmwareManifest{});
     if (const auto value = env_var("DRONE_FIRMWARE_VERSION")) {
         firmware_manifest.version = *value;
     }
     if (const auto value = env_var("DRONE_FIRMWARE_MEASUREMENT")) {
         firmware_manifest.measurement = *value;
     } else {
-        firmware_manifest.measurement = hardened_profile ? "unsigned-local-build" : "lab-local-build";
+        firmware_manifest.measurement =
+            hardened_profile ? "unsigned-local-build" : "lab-local-build";
     }
     if (const auto value = env_var("DRONE_FIRMWARE_SIGNER")) {
         firmware_manifest.signer = *value;
@@ -776,56 +787,64 @@ int main(int argc, char** argv) {
         firmware_manifest.signature = *value;
     }
     if (const auto value = env_var("DRONE_FIRMWARE_ROLLBACK_COUNTER")) {
-        firmware_manifest.rollback_counter = parse_u64_or_default(*value, firmware_manifest.rollback_counter);
+        firmware_manifest.rollback_counter =
+            parse_u64_or_default(*value, firmware_manifest.rollback_counter);
     }
     if (const auto value = env_var("DRONE_SECURE_BOOT_ATTESTED")) {
-        firmware_manifest.secure_boot_attested = parse_bool_or_default(*value, firmware_manifest.secure_boot_attested);
+        firmware_manifest.secure_boot_attested =
+            parse_bool_or_default(*value, firmware_manifest.secure_boot_attested);
     }
     if (const auto value = env_var("DRONE_BOOTLOADER_LOCKED")) {
-        firmware_manifest.bootloader_locked = parse_bool_or_default(*value, firmware_manifest.bootloader_locked);
+        firmware_manifest.bootloader_locked =
+            parse_bool_or_default(*value, firmware_manifest.bootloader_locked);
     }
     drone::security::FirmwareTrustPolicy firmware_policy;
     firmware_policy.profile = cfg.security_profile;
-    firmware_policy.state_file = env_var("DRONE_FIRMWARE_STATE_FILE").value_or("state/firmware_trust.state");
-    firmware_policy.allowed_signers = split_csv_list(env_var("DRONE_FIRMWARE_ALLOWED_SIGNERS").value_or("release-ca,maint-ca"));
-    firmware_policy.signing_secret = env_var("DRONE_FIRMWARE_SIGNING_SECRET").value_or(std::string{});
+    firmware_policy.state_file =
+        env_var("DRONE_FIRMWARE_STATE_FILE").value_or("state/firmware_trust.state");
+    firmware_policy.allowed_signers =
+        split_csv_list(env_var("DRONE_FIRMWARE_ALLOWED_SIGNERS").value_or("release-ca,maint-ca"));
+    firmware_policy.signing_secret =
+        env_var("DRONE_FIRMWARE_SIGNING_SECRET").value_or(std::string{});
     firmware_policy.maintenance_mode = env_enabled("DRONE_MAINTENANCE_MODE");
-    firmware_policy.maintenance_token = env_var("DRONE_MAINTENANCE_APPROVAL_TOKEN").value_or(std::string{});
-    const auto firmware_trust = drone::security::validate_firmware_trust(firmware_manifest, firmware_policy);
+    firmware_policy.maintenance_token =
+        env_var("DRONE_MAINTENANCE_APPROVAL_TOKEN").value_or(std::string{});
+    const auto firmware_trust =
+        drone::security::validate_firmware_trust(firmware_manifest, firmware_policy);
     if (!firmware_trust.accepted && hardened_profile) {
-        spdlog::error("firmware boot trust failed: {} ({})", firmware_trust.summary, firmware_trust.boot_state);
+        spdlog::error("firmware boot trust failed: {} ({})", firmware_trust.summary,
+                      firmware_trust.boot_state);
         return 1;
     }
     if (!firmware_trust.accepted) {
-        spdlog::warn("firmware boot trust degraded: {} ({})", firmware_trust.summary, firmware_trust.boot_state);
+        spdlog::warn("firmware boot trust degraded: {} ({})", firmware_trust.summary,
+                     firmware_trust.boot_state);
     } else {
         spdlog::info("firmware boot trust accepted: {} version={} rollback_counter={} state={}",
-                     firmware_trust.summary,
-                     firmware_trust.version,
-                     firmware_trust.rollback_counter,
-                     firmware_trust.boot_state);
+                     firmware_trust.summary, firmware_trust.version,
+                     firmware_trust.rollback_counter, firmware_trust.boot_state);
     }
     drone::security::SecurityRuntimeMonitor security_monitor(firmware_trust.measurement);
 
-    spdlog::info("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
-    spdlog::info("â•‘  GPS-Denied Drone Swarm Node v2.0        â•‘");
-    spdlog::info("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
-    spdlog::info("â•‘  Drone ID  : {:5d}                       â•‘", cfg.drone_id);
-    spdlog::info("â•‘  Platform  : {}         â•‘",
-                  std::string(drone::hal::to_string(drone::hal::detect_platform())));
-    spdlog::info("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
+    spdlog::info("+------------------------------------------------------+");
+    spdlog::info("|  GPS-Denied Drone Swarm Node v2.0                   |");
+    spdlog::info("+------------------------------------------------------+");
+    spdlog::info("|  Drone ID  : {:5d}                                  |", cfg.drone_id);
+    spdlog::info("|  Platform  : {}         |",
+                 std::string(drone::hal::to_string(drone::hal::detect_platform())));
+    spdlog::info("+------------------------------------------------------+");
 
-    //1. Sensors â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    auto imu = std::make_shared<drone::sensors::IMUSensor>(
-        "imu0", cfg.imu_device, cfg.imu_i2c_addr);
+    // 1. Sensors
+    auto imu =
+        std::make_shared<drone::sensors::IMUSensor>("imu0", cfg.imu_device, cfg.imu_i2c_addr);
 
     auto cam = std::make_shared<drone::sensors::CameraSensor>(
         "cam0",
-        cfg.camera_stream_url.empty() ? ("rtsp://" + cfg.esp32_ip + ":554/stream") : cfg.camera_stream_url,
+        cfg.camera_stream_url.empty() ? ("rtsp://" + cfg.esp32_ip + ":554/stream")
+                                      : cfg.camera_stream_url,
         drone::sensors::CameraIntrinsics{800, 800, 320, 240, {}, 640, 480});
 
-    auto lidar = std::make_shared<drone::sensors::LidarSensor>(
-        "lidar0", cfg.lidar_endpoint);
+    auto lidar = std::make_shared<drone::sensors::LidarSensor>("lidar0", cfg.lidar_endpoint);
     lidar->set_runtime_mode(cfg.runtime_mode);
     auto barometer = std::make_shared<drone::sensors::BarometerSensor>("baro0");
     auto motor = std::make_shared<drone::sensors::MotorSensor>("motor0");
@@ -840,7 +859,8 @@ int main(int argc, char** argv) {
                 spdlog::error("LiDAR config invalid: {}", error);
             }
             if (cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION) {
-                spdlog::warn("LiDAR config is invalid, continuing without configured LiDAR because runtime mode is simulation");
+                spdlog::warn("LiDAR config is invalid, continuing without configured LiDAR because "
+                             "runtime mode is simulation");
             } else {
                 return 1;
             }
@@ -849,45 +869,44 @@ int main(int argc, char** argv) {
             lidar->configure_parser(lidar_config.model, lidar_config.frame_id);
             lidar->set_range_filter(lidar_config.min_range_m, lidar_config.max_range_m);
             lidar_required = lidar_config.required;
-            spdlog::info("Loaded LiDAR config from {} host={} port={} model={} frame={} range=[{:.1f},{:.1f}] required={}",
-                         cfg.lidar_config_path,
-                         lidar_config.host,
-                         lidar_config.port,
-                         lidar_config.model,
-                         lidar_config.frame_id,
-                         lidar_config.min_range_m,
-                         lidar_config.max_range_m,
-                         lidar_required);
+            spdlog::info("Loaded LiDAR config from {} host={} port={} model={} frame={} "
+                         "range=[{:.1f},{:.1f}] required={}",
+                         cfg.lidar_config_path, lidar_config.host, lidar_config.port,
+                         lidar_config.model, lidar_config.frame_id, lidar_config.min_range_m,
+                         lidar_config.max_range_m, lidar_required);
         }
     } else if (cfg.runtime_mode != drone::runtime::RuntimeMode::SIMULATION && cfg.enable_lidar) {
-        spdlog::warn("No lidar_config_path provided; LiDAR will use legacy endpoint {} without model-specific validation",
+        spdlog::warn("No lidar_config_path provided; LiDAR will use legacy endpoint {} without "
+                     "model-specific validation",
                      cfg.lidar_endpoint);
     }
 
     // Attempt sensor initialization
-    for (auto& [name, enabled, sensor] : std::initializer_list<
-            std::tuple<const char*, bool, drone::sensors::SensorBase*>>{
-            {"IMU", cfg.enable_imu, imu.get()},
-            {"Camera", cfg.enable_camera, cam.get()},
-            {"LiDAR", cfg.enable_lidar, lidar.get()},
-            {"Barometer", cfg.enable_barometer, barometer.get()},
-            {"Motor", cfg.enable_motor, motor.get()},
-            {"OpticalFlow", cfg.enable_optical_flow, optical_flow.get()},
-            {"Rangefinder", cfg.enable_rangefinder, rangefinder.get()}}) {
+    for (auto& [name, enabled, sensor] :
+         std::initializer_list<std::tuple<const char*, bool, drone::sensors::SensorBase*>>{
+             {"IMU", cfg.enable_imu, imu.get()},
+             {"Camera", cfg.enable_camera, cam.get()},
+             {"LiDAR", cfg.enable_lidar, lidar.get()},
+             {"Barometer", cfg.enable_barometer, barometer.get()},
+             {"Motor", cfg.enable_motor, motor.get()},
+             {"OpticalFlow", cfg.enable_optical_flow, optical_flow.get()},
+             {"Rangefinder", cfg.enable_rangefinder, rangefinder.get()}}) {
         if (!enabled) {
             spdlog::warn("{} disabled by environment", name);
             continue;
         }
         if (!sensor->initialize()) {
-            spdlog::error("{} initialization failed â€” running in degraded mode", name);
+            spdlog::error("{} initialization failed - running in degraded mode", name);
             if (std::string_view(name) == "LiDAR" &&
                 drone::runtime::validate_lidar_runtime_configuration({
-                    cfg.runtime_mode,
-                    cfg.enable_lidar,
-                    lidar_required,
-                    false,
-                }).ok == false) {
-                spdlog::error("Required LiDAR is unavailable in {} mode", std::string(drone::runtime::to_string(cfg.runtime_mode)));
+                                                                         cfg.runtime_mode,
+                                                                         cfg.enable_lidar,
+                                                                         lidar_required,
+                                                                         false,
+                                                                     })
+                        .ok == false) {
+                spdlog::error("Required LiDAR is unavailable in {} mode",
+                              std::string(drone::runtime::to_string(cfg.runtime_mode)));
                 return 1;
             }
         }
@@ -910,13 +929,14 @@ int main(int argc, char** argv) {
     // Load YOLOv8n (non-fatal if engine absent)
     if (cfg.enable_camera) {
         if (!cam->load_detector_labels(cfg.detector_labels_path)) {
-            spdlog::warn("Detector label map not loaded from {}. Unknown classes will be labeled as unknown_class_ID",
+            spdlog::warn("Detector label map not loaded from {}. Unknown classes will be labeled "
+                         "as unknown_class_ID",
                          cfg.detector_labels_path);
         }
         cam->load_yolo_model(cfg.yolo_engine, 0.45f, 0.5f);
     }
 
-    //2. VIO Pipeline â”€â”€â”€â”€â”€
+    // 2. VIO Pipeline
     drone::vio::EKFConfig ekf_cfg;
     auto vio = std::make_shared<drone::vio::VIOPipeline>(ekf_cfg);
     vio->set_runtime_mode(cfg.runtime_mode);
@@ -925,15 +945,12 @@ int main(int argc, char** argv) {
     vio->attach_lidar(lidar);
 
     Eigen::Matrix3d K;
-    K << 800, 0, 320,
-         0, 800, 240,
-         0, 0, 1;
+    K << 800, 0, 320, 0, 800, 240, 0, 0, 1;
     vio->set_camera_matrix(K);
 
     vio->set_pose_callback([&](const drone::vio::PoseEstimate& p) {
-        spdlog::debug("Pose: [{:.3f},{:.3f},{:.3f}]  drift={:.4f}m",
-                       p.position.x(), p.position.y(), p.position.z(),
-                       vio->drift_m());
+        spdlog::debug("Pose: [{:.3f},{:.3f},{:.3f}]  drift={:.4f}m", p.position.x(), p.position.y(),
+                      p.position.z(), vio->drift_m());
     });
 
     drone::autonomy::DecisionEngine ai;
@@ -946,11 +963,8 @@ int main(int argc, char** argv) {
     const auto anchor_config = drone::runtime::load_anchor_config_json(cfg.anchor_config_path);
     if (anchor_config.ok) {
         tdoa_anchors = convert_anchor_definitions(anchor_config.anchors);
-        spdlog::info("Loaded {} anchors from {} frame={} units={}",
-                     tdoa_anchors.size(),
-                     cfg.anchor_config_path,
-                     anchor_config.coordinate_frame,
-                     anchor_config.units);
+        spdlog::info("Loaded {} anchors from {} frame={} units={}", tdoa_anchors.size(),
+                     cfg.anchor_config_path, anchor_config.coordinate_frame, anchor_config.units);
         for (const auto& warning : anchor_config.warnings) {
             spdlog::warn("{}", warning);
         }
@@ -959,7 +973,8 @@ int main(int argc, char** argv) {
         for (const auto& error : anchor_config.errors) {
             spdlog::warn("Anchor config not used in simulation mode: {}", error);
         }
-        spdlog::warn("Using built-in simulation anchors because no valid anchor config was provided");
+        spdlog::warn(
+            "Using built-in simulation anchors because no valid anchor config was provided");
     } else {
         for (const auto& error : anchor_config.errors) {
             spdlog::error("Anchor config invalid: {}", error);
@@ -970,13 +985,11 @@ int main(int argc, char** argv) {
     }
     tdoa.set_anchors(tdoa_anchors);
     drone::localization::TDOAIngestor tdoa_ingestor({
-        !cfg.enable_tdoa_ingestor
-            ? drone::localization::TDOAIngestor::Mode::DISABLED
-            : cfg.tdoa_udp_port > 0
-            ? drone::localization::TDOAIngestor::Mode::UDP_TEXT
-            : (!cfg.tdoa_measurements_csv.empty()
-                ? drone::localization::TDOAIngestor::Mode::CSV_FILE
-                : drone::localization::TDOAIngestor::Mode::DISABLED),
+        !cfg.enable_tdoa_ingestor ? drone::localization::TDOAIngestor::Mode::DISABLED
+        : cfg.tdoa_udp_port > 0   ? drone::localization::TDOAIngestor::Mode::UDP_TEXT
+                                  : (!cfg.tdoa_measurements_csv.empty()
+                                         ? drone::localization::TDOAIngestor::Mode::CSV_FILE
+                                         : drone::localization::TDOAIngestor::Mode::DISABLED),
         cfg.tdoa_measurements_csv,
         cfg.tdoa_udp_port,
         32,
@@ -996,17 +1009,19 @@ int main(int argc, char** argv) {
     drone::slam::MapPlanner planner;
     drone::slam::OccupancyGridMap occupancy_map;
 
-    //3. V2X Swarm Network 
-    auto net = std::make_shared<drone::swarm::V2XMeshNetwork>(
-        cfg.drone_id, cfg.swarm_group, cfg.swarm_port);
+    // 3. V2X Swarm Network
+    auto net = std::make_shared<drone::swarm::V2XMeshNetwork>(cfg.drone_id, cfg.swarm_group,
+                                                              cfg.swarm_port);
     const auto requested_edge_serialization =
         drone::swarm::parse_edge_serialization_mode(cfg.edge_serialization_mode)
             .value_or(drone::swarm::EdgeSerializationMode::JSON);
     net->set_edge_serialization_mode(requested_edge_serialization);
     if (requested_edge_serialization == drone::swarm::EdgeSerializationMode::PROTOBUF_PLACEHOLDER) {
-        spdlog::warn("edge_swarm protobuf_placeholder selected; runtime uses JSON compatibility until protobuf is implemented");
+        spdlog::warn("edge_swarm protobuf_placeholder selected; runtime uses JSON compatibility "
+                     "until protobuf is implemented");
     } else {
-        spdlog::info("edge_swarm serialization mode: {}", drone::swarm::to_string(requested_edge_serialization));
+        spdlog::info("edge_swarm serialization mode: {}",
+                     drone::swarm::to_string(requested_edge_serialization));
     }
     drone::swarm::SwarmSecurityConfig security_cfg;
     security_cfg.enabled = false;
@@ -1015,7 +1030,8 @@ int main(int argc, char** argv) {
         security_cfg.swarm_secret = *secret;
         placeholder_swarm_secret = is_placeholder_secret(security_cfg.swarm_secret);
         if (hardened_profile && is_placeholder_secret(security_cfg.swarm_secret)) {
-            spdlog::error("DRONE_SWARM_SECRET is a placeholder value and cannot be used in {} mode", cfg.security_profile);
+            spdlog::error("DRONE_SWARM_SECRET is a placeholder value and cannot be used in {} mode",
+                          cfg.security_profile);
             return 1;
         }
         if (!placeholder_swarm_secret) {
@@ -1029,23 +1045,27 @@ int main(int argc, char** argv) {
         spdlog::warn("DRONE_SWARM_SECRET not set; swarm mesh security is disabled in lab mode");
     }
     if (!security_cfg.enabled && placeholder_swarm_secret) {
-        spdlog::warn("Swarm mesh security remains disabled until a non-placeholder DRONE_SWARM_SECRET is configured");
+        spdlog::warn("Swarm mesh security remains disabled until a non-placeholder "
+                     "DRONE_SWARM_SECRET is configured");
     }
     net->configure_security(std::move(security_cfg));
     auto edge_auth_cfg = cfg.edge_auth;
     edge_auth_cfg.shared_secret = env_var(edge_auth_cfg.shared_secret_env).value_or("");
     if (edge_auth_cfg.mode == drone::security::AuthMode::NONE &&
         edge_auth_cfg.runtime_profile != "simulation") {
-        spdlog::error("edge_swarm auth mode 'none' is not allowed outside explicit simulation/debug");
+        spdlog::error(
+            "edge_swarm auth mode 'none' is not allowed outside explicit simulation/debug");
         return 1;
     }
     if (edge_auth_cfg.mode == drone::security::AuthMode::HMAC_SHA256 &&
         edge_auth_cfg.shared_secret.empty()) {
         if (hardened_profile || cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM) {
-            spdlog::error("{} is required for hmac_sha256 edge packet auth", edge_auth_cfg.shared_secret_env);
+            spdlog::error("{} is required for hmac_sha256 edge packet auth",
+                          edge_auth_cfg.shared_secret_env);
             return 1;
         }
-        spdlog::warn("{} not set; edge packet auth is disabled outside hardened profiles", edge_auth_cfg.shared_secret_env);
+        spdlog::warn("{} not set; edge packet auth is disabled outside hardened profiles",
+                     edge_auth_cfg.shared_secret_env);
         edge_auth_cfg.mode = drone::security::AuthMode::NONE;
     }
     if (edge_auth_cfg.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER) {
@@ -1069,14 +1089,21 @@ int main(int argc, char** argv) {
         }
     });
 
-    //4. Start all subsystems
-    if (cfg.enable_imu) imu->start();
-    if (cfg.enable_camera) cam->start();
-    if (cfg.enable_lidar) lidar->start();
-    if (cfg.enable_barometer) barometer->start();
-    if (cfg.enable_motor) motor->start();
-    if (cfg.enable_optical_flow) optical_flow->start();
-    if (cfg.enable_rangefinder) rangefinder->start();
+    // 4. Start all subsystems
+    if (cfg.enable_imu)
+        imu->start();
+    if (cfg.enable_camera)
+        cam->start();
+    if (cfg.enable_lidar)
+        lidar->start();
+    if (cfg.enable_barometer)
+        barometer->start();
+    if (cfg.enable_motor)
+        motor->start();
+    if (cfg.enable_optical_flow)
+        optical_flow->start();
+    if (cfg.enable_rangefinder)
+        rangefinder->start();
     if (cfg.enable_lidar && lidar_required) {
         const auto lidar_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (std::chrono::steady_clock::now() < lidar_deadline && !lidar->has_recent_scan(1.0)) {
@@ -1100,17 +1127,17 @@ int main(int argc, char** argv) {
     net->start();
     net->trigger_election();
 
-    spdlog::info("All subsystems online. Running until SIGINTâ€¦");
+    spdlog::info("All subsystems online. Running until SIGINT...");
     std::future<void> telemetry_publish_task;
     std::deque<double> replay_confidence_history;
 
-    //5. Main loop â”€â”€â”€â”€â”€â”€â”€â”€
+    // 5. Main loop
     while (!g_shutdown.load()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-        auto stats  = drone::hal::read_system_stats();
-        const auto pose   = vio->current_pose();
-        const auto frame  = cam->latest();
+        auto stats = drone::hal::read_system_stats();
+        const auto pose = vio->current_pose();
+        const auto frame = cam->latest();
         const auto imu_state = imu->latest();
         const auto barometer_state = barometer->latest();
         const auto motor_state = motor->latest();
@@ -1139,22 +1166,23 @@ int main(int argc, char** argv) {
 
         drone::swarm::SwarmHealthMetrics swarm_health;
         swarm_health.battery_pct = stats.battery_pct;
-        swarm_health.motor_health = motor_state.has_value() ? motor_state->average_health : stats.motor_health;
+        swarm_health.motor_health =
+            motor_state.has_value() ? motor_state->average_health : stats.motor_health;
         swarm_health.link_quality = std::clamp((stats.wifi_rssi_dbm + 90.0f) / 45.0f, 0.0f, 1.0f);
         swarm_health.cpu_headroom = std::clamp(1.0f - (stats.cpu_pct / 100.0f), 0.0f, 1.0f);
         swarm_health.thermal_headroom =
             std::clamp(1.0f - std::max(0.0f, (stats.cpu_temp_c - 55.0f) / 35.0f), 0.0f, 1.0f);
-        swarm_health.emergency_fault =
-            (stats.battery_pct < 12.0f) ||
-            (motor_state.has_value() && motor_state->critical_fault) ||
-            (swarm_health.link_quality < 0.12f);
+        swarm_health.emergency_fault = (stats.battery_pct < 12.0f) ||
+                                       (motor_state.has_value() && motor_state->critical_fault) ||
+                                       (swarm_health.link_quality < 0.12f);
         net->set_local_health(swarm_health);
         swarm_peer_count = net->peer_count();
         swarm_follower = (net->local_role() == drone::swarm::DroneRole::FOLLOWER);
 
         const auto serial_tdoa_measurements = uwb_serial.poll();
         const auto ingested_tdoa_measurements = tdoa_ingestor.poll();
-        std::optional<std::vector<drone::localization::TDOALocalizer::Measurement>> selected_tdoa_measurements;
+        std::optional<std::vector<drone::localization::TDOALocalizer::Measurement>>
+            selected_tdoa_measurements;
         bool used_live_external_tdoa = false;
         bool used_csv_playback_tdoa = false;
         bool used_synthetic_tdoa = false;
@@ -1167,7 +1195,8 @@ int main(int argc, char** argv) {
             used_csv_playback_tdoa = cfg.tdoa_udp_port == 0 && !cfg.tdoa_measurements_csv.empty();
             used_live_external_tdoa = !used_csv_playback_tdoa;
         } else if (!tdoa_ingestor.running()) {
-            if (const auto csv_measurements = load_tdoa_measurements_from_csv(cfg.tdoa_measurements_csv)) {
+            if (const auto csv_measurements =
+                    load_tdoa_measurements_from_csv(cfg.tdoa_measurements_csv)) {
                 selected_tdoa_measurements = csv_measurements;
                 used_csv_playback_tdoa = true;
             }
@@ -1175,24 +1204,26 @@ int main(int argc, char** argv) {
 
         if (!selected_tdoa_measurements.has_value() &&
             cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION) {
-            selected_tdoa_measurements = build_demo_tdoa_measurements(tdoa_anchors, pose.position, now_s);
+            selected_tdoa_measurements =
+                build_demo_tdoa_measurements(tdoa_anchors, pose.position, now_s);
             used_synthetic_tdoa = true;
         }
 
-        const bool using_external_tdoa = selected_tdoa_measurements.has_value() && !used_synthetic_tdoa;
-        const std::string localization_data_source = drone::runtime::determine_localization_data_source(
-            cfg.runtime_mode,
-            used_synthetic_tdoa,
-            used_csv_playback_tdoa,
-            used_live_external_tdoa,
-            selected_tdoa_measurements.has_value());
-        const auto tdoa_solution = selected_tdoa_measurements.has_value()
-            ? tdoa.estimate(*selected_tdoa_measurements, pose.position)
-            : std::optional<drone::localization::TDOALocalizer::Solution>{};
+        const bool using_external_tdoa =
+            selected_tdoa_measurements.has_value() && !used_synthetic_tdoa;
+        const std::string localization_data_source =
+            drone::runtime::determine_localization_data_source(
+                cfg.runtime_mode, used_synthetic_tdoa, used_csv_playback_tdoa,
+                used_live_external_tdoa, selected_tdoa_measurements.has_value());
+        const auto tdoa_solution =
+            selected_tdoa_measurements.has_value()
+                ? tdoa.estimate(*selected_tdoa_measurements, pose.position)
+                : std::optional<drone::localization::TDOALocalizer::Solution>{};
         if (selected_tdoa_measurements.has_value() && !selected_tdoa_measurements->empty()) {
             const double ref_time = selected_tdoa_measurements->front().arrival_time_s;
             for (const auto& measurement : *selected_tdoa_measurements) {
-                time_sync.observe_anchor(measurement.anchor_id, measurement.arrival_time_s, ref_time);
+                time_sync.observe_anchor(measurement.anchor_id, measurement.arrival_time_s,
+                                         ref_time);
             }
         }
 
@@ -1202,28 +1233,29 @@ int main(int argc, char** argv) {
         std::vector<drone::swarm::AvoidanceObstacle> lidar_obstacles;
         if (lidar_state.has_value()) {
             lidar_obstacles = drone::swarm::LeaderFollowerController::obstacles_from_lidar(
-                *lidar_state,
-                pose.position,
-                10,
-                0.55f);
+                *lidar_state, pose.position, 10, 0.55f);
         }
         size_t visible_anchor_count = 0;
         if (selected_tdoa_measurements.has_value()) {
             std::vector<uint32_t> visible_anchor_ids;
             visible_anchor_ids.reserve(selected_tdoa_measurements->size());
             for (const auto& measurement : *selected_tdoa_measurements) {
-                if (std::find(visible_anchor_ids.begin(), visible_anchor_ids.end(), measurement.anchor_id) == visible_anchor_ids.end()) {
+                if (std::find(visible_anchor_ids.begin(), visible_anchor_ids.end(),
+                              measurement.anchor_id) == visible_anchor_ids.end()) {
                     visible_anchor_ids.push_back(measurement.anchor_id);
                 }
             }
             visible_anchor_count = visible_anchor_ids.size();
         }
         const double anchor_visibility_ratio = tdoa_anchors.empty()
-            ? 0.0
-            : static_cast<double>(visible_anchor_count) / static_cast<double>(tdoa_anchors.size());
+                                                   ? 0.0
+                                                   : static_cast<double>(visible_anchor_count) /
+                                                         static_cast<double>(tdoa_anchors.size());
         for (const auto& anchor : tdoa_anchors) {
-            const bool visible = selected_tdoa_measurements.has_value() &&
-                std::any_of(selected_tdoa_measurements->begin(), selected_tdoa_measurements->end(),
+            const bool visible =
+                selected_tdoa_measurements.has_value() &&
+                std::any_of(
+                    selected_tdoa_measurements->begin(), selected_tdoa_measurements->end(),
                     [&](const auto& measurement) { return measurement.anchor_id == anchor.id; });
             occupancy_map.mark_anchor(anchor, visible);
         }
@@ -1250,58 +1282,53 @@ int main(int argc, char** argv) {
         }
 
         const bool home_initialized = ai.home_position().norm() > 1e-6;
-        const double home_distance_m = home_initialized ? (pose.position - ai.home_position()).norm() : 0.0;
+        const double home_distance_m =
+            home_initialized ? (pose.position - ai.home_position()).norm() : 0.0;
         const bool geofence_clear = !home_initialized || home_distance_m <= geofence_radius_m;
-        const bool no_fly_lock = no_fly_lock_configured ||
+        const bool no_fly_lock =
+            no_fly_lock_configured ||
             (occupancy_status.occupied_ratio > 0.92 && stats.battery_pct < 20.0);
         const bool swarm_consistency_ok =
             (swarm_peer_count == 0) ||
             (sync_status.confidence >= 0.35 && swarm_health.link_quality >= 0.18f);
         const bool backend_trust_ok = telemetry_client.last_status().rfind("error:", 0) != 0;
-        const double issuer_trust_score =
-            net->security_enabled() ? (placeholder_swarm_secret ? 0.45 : 0.85) : (hardened_profile ? 0.30 : 0.65);
-        const double tamper_score =
-            (placeholder_swarm_secret ? 0.25 : 0.0) +
-            (!geofence_clear ? 0.25 : 0.0) +
-            (no_fly_lock ? 0.15 : 0.0) +
-            (!backend_trust_ok ? 0.15 : 0.0);
+        const double issuer_trust_score = net->security_enabled()
+                                              ? (placeholder_swarm_secret ? 0.45 : 0.85)
+                                              : (hardened_profile ? 0.30 : 0.65);
+        const double tamper_score = (placeholder_swarm_secret ? 0.25 : 0.0) +
+                                    (!geofence_clear ? 0.25 : 0.0) + (no_fly_lock ? 0.15 : 0.0) +
+                                    (!backend_trust_ok ? 0.15 : 0.0);
 
-        const drone::security::DroneSecurityAssessment security = security_monitor.evaluate({
-            cfg.security_profile,
-            net->security_enabled(),
-            hardened_profile,
-            placeholder_swarm_secret,
-            fusion.lost,
-            swarm_health.emergency_fault,
-            geofence_clear,
-            no_fly_lock,
-            swarm_consistency_ok,
-            backend_trust_ok,
-            swarm_health.link_quality >= 0.20f,
-            stats.battery_pct,
-            swarm_health.link_quality,
-            sync_status.confidence,
-            sync_status.peer_clock_offset_ms,
-            fusion.confidence,
-            issuer_trust_score,
-            tamper_score,
-            swarm_peer_count,
-        }, now_s);
+        const drone::security::DroneSecurityAssessment security = security_monitor.evaluate(
+            {
+                cfg.security_profile,
+                net->security_enabled(),
+                hardened_profile,
+                placeholder_swarm_secret,
+                fusion.lost,
+                swarm_health.emergency_fault,
+                geofence_clear,
+                no_fly_lock,
+                swarm_consistency_ok,
+                backend_trust_ok,
+                swarm_health.link_quality >= 0.20f,
+                stats.battery_pct,
+                swarm_health.link_quality,
+                sync_status.confidence,
+                sync_status.peer_clock_offset_ms,
+                fusion.confidence,
+                issuer_trust_score,
+                tamper_score,
+                swarm_peer_count,
+            },
+            now_s);
         replay_confidence_history.push_back(fusion.confidence);
         if (replay_confidence_history.size() > 256) {
             replay_confidence_history.pop_front();
         }
 
-        memory.observe(
-            cfg.drone_id,
-            pose,
-            stats,
-            frame,
-            swarm_peer_count,
-            fusion.confidence,
-            fusion.source,
-            fusion.lost,
-            now_s);
+        memory.observe(cfg.drone_id, pose, stats, frame, swarm_peer_count, fusion.confidence,
+                       fusion.source, fusion.lost, now_s);
         auto prior = memory.summarize(cfg.drone_id);
         auto fused_pose = pose;
         fused_pose.position = fusion.fused_position;
@@ -1313,12 +1340,11 @@ int main(int argc, char** argv) {
             slam->try_add_frame(frame->image, fused_pose.position, fused_pose.orientation, now_s);
             if (fusion.degraded || fusion.lost) {
                 if (const auto relocalized = slam->attempt_relocalization(
-                        frame->image,
-                        fused_pose.position,
-                        fused_pose.orientation)) {
+                        frame->image, fused_pose.position, fused_pose.orientation)) {
                     fused_pose.position = relocalized->corrected_position;
                     fused_pose.orientation = relocalized->corrected_orientation;
-                    fused_pose.localization_confidence = std::max(fused_pose.localization_confidence, relocalized->confidence);
+                    fused_pose.localization_confidence =
+                        std::max(fused_pose.localization_confidence, relocalized->confidence);
                     fused_pose.localization_source = "loop-closure-relocalized";
                     fused_pose.localization_degraded = relocalized->confidence < 0.58;
                     fused_pose.localization_lost = relocalized->confidence < 0.22;
@@ -1341,8 +1367,9 @@ int main(int argc, char** argv) {
         decision_ctx.sync_confidence = sync_status.confidence;
         decision_ctx.visible_anchor_count = visible_anchor_count;
         decision_ctx.relocalization_count = slam_status.relocalization_count;
-        decision_ctx.camera_tracking_nominal = frame.has_value() &&
-            (!frame->detections.empty() || fusion.confidence >= 0.55 || slam_status.loop_candidates > 0);
+        decision_ctx.camera_tracking_nominal =
+            frame.has_value() && (!frame->detections.empty() || fusion.confidence >= 0.55 ||
+                                  slam_status.loop_candidates > 0);
         decision_ctx.swarm_peer_count = swarm_peer_count;
         decision_ctx.swarm_follower = swarm_follower;
         decision_ctx.inference_ready = cam->inference_enabled();
@@ -1350,7 +1377,8 @@ int main(int argc, char** argv) {
         decision_ctx.lidar_obstacle_count = lidar_obstacles.size();
         decision_ctx.nearest_lidar_obstacle_m = -1.0;
         for (const auto& obstacle : lidar_obstacles) {
-            const double distance = (obstacle.position - fused_pose.position).norm() - obstacle.radius_m;
+            const double distance =
+                (obstacle.position - fused_pose.position).norm() - obstacle.radius_m;
             if (decision_ctx.nearest_lidar_obstacle_m < 0.0 ||
                 distance < decision_ctx.nearest_lidar_obstacle_m) {
                 decision_ctx.nearest_lidar_obstacle_m = distance;
@@ -1368,14 +1396,18 @@ int main(int argc, char** argv) {
         local_edge_state.source = localization_data_source;
         local_edge_state.consensus_epoch = net->consensus_epoch() + 1;
         local_edge_state.local_obstacle_count = static_cast<int>(lidar_obstacles.size());
-        local_edge_state.shared_obstacle_count = static_cast<int>(lidar_obstacles.size() + net->peer_count());
-        local_edge_state.mesh_bandwidth_kbps = std::max(24.0, static_cast<double>(net->peer_count()) * 36.0);
+        local_edge_state.shared_obstacle_count =
+            static_cast<int>(lidar_obstacles.size() + net->peer_count());
+        local_edge_state.mesh_bandwidth_kbps =
+            std::max(24.0, static_cast<double>(net->peer_count()) * 36.0);
         local_edge_state.disconnected_operation =
             cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM &&
             (net->safety_eligible_peer_count() == 0 || !telemetry_client.enabled());
         local_edge_state.trust_epoch = security.trust_epoch;
-        local_edge_state.threat_level =
-            decision_ctx.nearest_lidar_obstacle_m >= 0.0 && decision_ctx.nearest_lidar_obstacle_m < 2.5 ? "collision_risk" : "none";
+        local_edge_state.threat_level = decision_ctx.nearest_lidar_obstacle_m >= 0.0 &&
+                                                decision_ctx.nearest_lidar_obstacle_m < 2.5
+                                            ? "collision_risk"
+                                            : "none";
         local_edge_state.threat_summary =
             local_edge_state.threat_level == "none" ? "" : "local obstacle corridor risk";
         local_edge_state.serialization_mode = requested_edge_serialization;
@@ -1383,9 +1415,8 @@ int main(int argc, char** argv) {
 
         drone::safety::SafetyContext safety_ctx;
         safety_ctx.runtime_mode = cfg.runtime_mode;
-        safety_ctx.indoor_mode =
-            cfg.runtime_mode != drone::runtime::RuntimeMode::PRODUCTION &&
-            cfg.runtime_mode != drone::runtime::RuntimeMode::EDGE_SWARM;
+        safety_ctx.indoor_mode = cfg.runtime_mode != drone::runtime::RuntimeMode::PRODUCTION &&
+                                 cfg.runtime_mode != drone::runtime::RuntimeMode::EDGE_SWARM;
         safety_ctx.localization_degraded = fusion.degraded;
         safety_ctx.localization_lost = fusion.lost;
         safety_ctx.localization_confidence = fusion.confidence;
@@ -1393,25 +1424,27 @@ int main(int argc, char** argv) {
         safety_ctx.link_lost = swarm_health.link_quality < 0.12f || sync_status.confidence < 0.25;
         safety_ctx.telemetry_stale = false;
         safety_ctx.lidar_required = lidar_required;
-        safety_ctx.lidar_available = !cfg.enable_lidar ||
-            lidar->state() == drone::sensors::SensorState::RUNNING;
-        safety_ctx.camera_available = !cfg.enable_camera ||
-            cam->state() == drone::sensors::SensorState::RUNNING;
-        safety_ctx.imu_available = !cfg.enable_imu ||
-            imu->state() == drone::sensors::SensorState::RUNNING;
+        safety_ctx.lidar_available =
+            !cfg.enable_lidar || lidar->state() == drone::sensors::SensorState::RUNNING;
+        safety_ctx.camera_available =
+            !cfg.enable_camera || cam->state() == drone::sensors::SensorState::RUNNING;
+        safety_ctx.imu_available =
+            !cfg.enable_imu || imu->state() == drone::sensors::SensorState::RUNNING;
         safety_ctx.sensor_fault =
             (cfg.enable_barometer && barometer->state() == drone::sensors::SensorState::FAILED) ||
-            (cfg.enable_optical_flow && optical_flow->state() == drone::sensors::SensorState::FAILED) ||
+            (cfg.enable_optical_flow &&
+             optical_flow->state() == drone::sensors::SensorState::FAILED) ||
             (cfg.enable_rangefinder && rangefinder->state() == drone::sensors::SensorState::FAILED);
-        safety_ctx.motor_locked = motor_state.has_value() &&
-            (motor_state->critical_fault || motor_state->average_health < 0.15f);
+        safety_ctx.motor_locked = motor_state.has_value() && (motor_state->critical_fault ||
+                                                              motor_state->average_health < 0.15f);
         safety_ctx.security = security;
         const auto safety_status = safety_manager.evaluate(safety_ctx);
-        const auto allowed_plan =
-            safety_status.mission_command_allowed ? plan : std::optional<drone::slam::MapPlanner::Plan>{};
+        const auto allowed_plan = safety_status.mission_command_allowed
+                                      ? plan
+                                      : std::optional<drone::slam::MapPlanner::Plan>{};
         const auto edge_serialization_metrics = net->edge_serialization_metrics();
-        const double edge_bandwidth_savings_pct =
-            std::clamp((1.0 - edge_serialization_metrics.compression_ratio_vs_json) * 100.0, 0.0, 100.0);
+        const double edge_bandwidth_savings_pct = std::clamp(
+            (1.0 - edge_serialization_metrics.compression_ratio_vs_json) * 100.0, 0.0, 100.0);
 
         vio->set_runtime_telemetry({
             fusion.confidence_trend,
@@ -1466,87 +1499,69 @@ int main(int argc, char** argv) {
             security.health_flags,
         });
 
-        spdlog::info("[ HEALTH ] CPU:{:.1f}%  Temp:{:.1f}Â°C  Bat:{:.0f}%  "
-                      "Pos:[{:.2f},{:.2f},{:.2f}]  Drift:{:.3f}m",
-                      stats.cpu_pct, stats.cpu_temp_c, stats.battery_pct,
-                      pose.position.x(), pose.position.y(), pose.position.z(),
-                      vio->drift_m());
-        spdlog::info("[ LOC    ] Source:{}  Data:{}  State:{}  Conf:{:.2f}  Trend:{:.2f}  Degraded:{}  Lost:{}",
-                     fusion.source,
-                     localization_data_source,
-                     fusion.state,
-                     fusion.confidence,
-                     fusion.confidence_trend,
-                     fusion.degraded,
-                     fusion.lost);
+        spdlog::info("[ HEALTH ] CPU:{:.1f}%  Temp:{:.1f}C  Bat:{:.0f}%  "
+                     "Pos:[{:.2f},{:.2f},{:.2f}]  Drift:{:.3f}m",
+                     stats.cpu_pct, stats.cpu_temp_c, stats.battery_pct, pose.position.x(),
+                     pose.position.y(), pose.position.z(), vio->drift_m());
+        spdlog::info("[ LOC    ] Source:{}  Data:{}  State:{}  Conf:{:.2f}  Trend:{:.2f}  "
+                     "Degraded:{}  Lost:{}",
+                     fusion.source, localization_data_source, fusion.state, fusion.confidence,
+                     fusion.confidence_trend, fusion.degraded, fusion.lost);
         spdlog::info("[ SYNC   ] IMU-Cam:{:.2f}ms  Anchor:{:.2f}ms  Peer:{:.2f}ms  Conf:{:.2f}",
-                     sync_status.imu_camera_offset_ms,
-                     sync_status.anchor_clock_offset_ms,
-                     sync_status.peer_clock_offset_ms,
-                     sync_status.confidence);
+                     sync_status.imu_camera_offset_ms, sync_status.anchor_clock_offset_ms,
+                     sync_status.peer_clock_offset_ms, sync_status.confidence);
         spdlog::info("[ MAP    ] Occupied:{:.2f}%  Anchors:{}/{}  Reloc:{}  LoopHints:{}",
-                     occupancy_status.occupied_ratio * 100.0,
-                     visible_anchor_count,
-                     tdoa_anchors.size(),
-                     slam_status.relocalization_count,
+                     occupancy_status.occupied_ratio * 100.0, visible_anchor_count,
+                     tdoa_anchors.size(), slam_status.relocalization_count,
                      slam_status.loop_candidates);
         spdlog::info("[ LIDAR  ] State:{}  Status:{}  Points:{}  Obstacles:{}  Nearest:{:.2f}m",
-                     std::string(drone::sensors::to_string(lidar->state())),
-                     lidar->last_status(),
-                     lidar_state.has_value() ? lidar_state->num_points : 0u,
-                     lidar_obstacles.size(),
+                     std::string(drone::sensors::to_string(lidar->state())), lidar->last_status(),
+                     lidar_state.has_value() ? lidar_state->num_points : 0u, lidar_obstacles.size(),
                      decision_ctx.nearest_lidar_obstacle_m);
-        if (!safety_status.mission_command_allowed && plan.has_value() && !plan->waypoints.empty()) {
+        if (!safety_status.mission_command_allowed && plan.has_value() &&
+            !plan->waypoints.empty()) {
             spdlog::warn("[ PLAN   ] Waypoint mission blocked by safety state {}",
                          std::string(drone::safety::to_string(safety_status.state)));
         } else if (allowed_plan.has_value() && !allowed_plan->waypoints.empty()) {
             const auto& next_waypoint = allowed_plan->waypoints.front();
-            spdlog::info("[ PLAN   ] Waypoints:{} Cost:{:.2f} AnchorGuided:{} Next:[{:.2f},{:.2f},{:.2f}]",
-                         allowed_plan->waypoints.size(),
-                         allowed_plan->total_cost,
-                         allowed_plan->used_anchor_guidance,
-                         next_waypoint.position.x(),
-                         next_waypoint.position.y(),
-                         next_waypoint.position.z());
+            spdlog::info(
+                "[ PLAN   ] Waypoints:{} Cost:{:.2f} AnchorGuided:{} Next:[{:.2f},{:.2f},{:.2f}]",
+                allowed_plan->waypoints.size(), allowed_plan->total_cost,
+                allowed_plan->used_anchor_guidance, next_waypoint.position.x(),
+                next_waypoint.position.y(), next_waypoint.position.z());
         }
 
-        spdlog::info("[ SWARM  ] Peers:{:d}  Role:{}  AvgLatency:{:.1f}ms",
-                      net->peer_count(),
-                      std::string(drone::swarm::to_string(net->local_role())),
-                      net->avg_latency_ms());
+        spdlog::info("[ SWARM  ] Peers:{:d}  Role:{}  AvgLatency:{:.1f}ms", net->peer_count(),
+                     std::string(drone::swarm::to_string(net->local_role())),
+                     net->avg_latency_ms());
         spdlog::info("[ SEC    ] State:{}  Link:{:.2f}  RemoteCmd:{}  Uplink:{}  {}",
                      std::string(drone::security::to_string(security.state)),
-                     security.link_integrity_score,
-                     security.remote_command_allowed,
-                     security.telemetry_uplink_allowed,
-                     security.summary);
-        spdlog::info("[ SAFETY ] State:{}  Arming:{}  Auto:{}  Mission:{}  MaxSpeed:{:.2f}m/s  MaxAccel:{:.2f}m/s^2  {}",
+                     security.link_integrity_score, security.remote_command_allowed,
+                     security.telemetry_uplink_allowed, security.summary);
+        spdlog::info("[ SAFETY ] State:{}  Arming:{}  Auto:{}  Mission:{}  MaxSpeed:{:.2f}m/s  "
+                     "MaxAccel:{:.2f}m/s^2  {}",
                      std::string(drone::safety::to_string(safety_status.state)),
-                     safety_status.arming_allowed,
-                     safety_status.autonomous_flight_allowed,
-                     safety_status.mission_command_allowed,
-                     safety_status.max_speed_mps,
-                     safety_status.max_acceleration_mps2,
-                     safety_status.summary);
+                     safety_status.arming_allowed, safety_status.autonomous_flight_allowed,
+                     safety_status.mission_command_allowed, safety_status.max_speed_mps,
+                     safety_status.max_acceleration_mps2, safety_status.summary);
 
         if (tdoa_solution.has_value()) {
-            spdlog::info("[ TDOA   ] Mode:{}  Data:{}  Pos:[{:.2f},{:.2f},{:.2f}]  RMS:{:.3f}m  Conf:{:.2f}",
-                         using_external_tdoa ? "external" : "none",
-                         localization_data_source,
-                         tdoa_solution->position.x(),
-                         tdoa_solution->position.y(),
-                         tdoa_solution->position.z(),
-                         tdoa_solution->rms_residual_m,
-                         tdoa_solution->confidence);
+            spdlog::info(
+                "[ TDOA   ] Mode:{}  Data:{}  Pos:[{:.2f},{:.2f},{:.2f}]  RMS:{:.3f}m  Conf:{:.2f}",
+                using_external_tdoa ? "external" : "none", localization_data_source,
+                tdoa_solution->position.x(), tdoa_solution->position.y(),
+                tdoa_solution->position.z(), tdoa_solution->rms_residual_m,
+                tdoa_solution->confidence);
         }
 
-        spdlog::info("[ MEMORY ] Risk:{:.2f}  DriftTrend:{:.3f}m/min  BatteryBurn:{:.2f}%/min  LocConf:{:.2f}  Label:{}  LocMode:{}",
-                     prior.risk_score,
-                     prior.drift_trend_m_per_min,
-                     prior.battery_burn_pct_per_min,
+        spdlog::info("[ MEMORY ] Risk:{:.2f}  DriftTrend:{:.3f}m/min  BatteryBurn:{:.2f}%/min  "
+                     "LocConf:{:.2f}  Label:{}  LocMode:{}",
+                     prior.risk_score, prior.drift_trend_m_per_min, prior.battery_burn_pct_per_min,
                      prior.localization_confidence_avg,
                      prior.dominant_label.empty() ? std::string("none") : prior.dominant_label,
-                     prior.dominant_localization_source.empty() ? std::string("none") : prior.dominant_localization_source);
+                     prior.dominant_localization_source.empty()
+                         ? std::string("none")
+                         : prior.dominant_localization_source);
 
         auto decision = ai.update(decision_ctx);
         apply_security_failsafe(security, decision, fused_pose);
@@ -1573,13 +1588,14 @@ int main(int argc, char** argv) {
                 last_remote_command_status =
                     std::string(drone::security::to_string(pending_remote_command->action)) +
                     " from node " + std::to_string(pending_remote_command->src_id) +
-                    (policy.accepted ? " accepted" : " rejected") +
-                    " (" + policy.reason + ")";
+                    (policy.accepted ? " accepted" : " rejected") + " (" + policy.reason + ")";
                 if (!policy.accepted) {
-                    security_monitor.note_remote_command_rejection(policy.reason, policy.critical, now_s);
+                    security_monitor.note_remote_command_rejection(policy.reason, policy.critical,
+                                                                   now_s);
                 }
                 if (policy.accepted) {
-                    drone::security::apply_remote_command(*pending_remote_command, decision, fused_pose);
+                    drone::security::apply_remote_command(*pending_remote_command, decision,
+                                                          fused_pose);
                 }
                 pending_remote_command.reset();
             }
@@ -1587,21 +1603,22 @@ int main(int argc, char** argv) {
         safety_manager.enforce(safety_status, decision, fused_pose);
         spdlog::info("[ REMOTE ] {}", last_remote_command_status);
         if (telemetry_publish_task.valid() &&
-            telemetry_publish_task.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+            telemetry_publish_task.wait_for(std::chrono::milliseconds(0)) ==
+                std::future_status::ready) {
             telemetry_publish_task.get();
         }
         const auto telemetry_now = std::chrono::steady_clock::now();
-        if (telemetry_client.enabled() &&
-            security.telemetry_uplink_allowed &&
-            !telemetry_publish_task.valid() &&
-            telemetry_client.should_publish(telemetry_now)) {
+        if (telemetry_client.enabled() && security.telemetry_uplink_allowed &&
+            !telemetry_publish_task.valid() && telemetry_client.should_publish(telemetry_now)) {
             drone::telemetry::TelemetrySnapshot snapshot;
             std::ostringstream cluster_id;
-            cluster_id << "cluster-" << std::setw(2) << std::setfill('0') << (((cfg.drone_id - 1) / 20) + 1);
+            cluster_id << "cluster-" << std::setw(2) << std::setfill('0')
+                       << (((cfg.drone_id - 1) / 20) + 1);
             const auto imu_stats = imu->telemetry_stats();
             const auto camera_stats = cam->telemetry_stats();
             const auto lidar_stats = lidar->telemetry_stats();
-            const bool replay_active = localization_data_source == "playback" && !cfg.tdoa_measurements_csv.empty();
+            const bool replay_active =
+                localization_data_source == "playback" && !cfg.tdoa_measurements_csv.empty();
             const bool tdoa_simulation = localization_data_source == "simulation";
             const bool tdoa_playback = localization_data_source == "playback";
 
@@ -1637,21 +1654,24 @@ int main(int argc, char** argv) {
             snapshot.peer_count = static_cast<int>(net->peer_count());
             snapshot.stale_peer_count = static_cast<int>(net->stale_peer_count());
             snapshot.mesh_topology_mode =
-                cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM ? "adaptive_mesh" : "hub_assisted";
+                cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM ? "adaptive_mesh"
+                                                                            : "hub_assisted";
             snapshot.local_consensus_state =
-                cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM
-                    ? net->consensus_state()
-                    : "backend_coordinated";
+                cfg.runtime_mode == drone::runtime::RuntimeMode::EDGE_SWARM ? net->consensus_state()
+                                                                            : "backend_coordinated";
             snapshot.local_consensus_epoch = net->consensus_epoch();
             snapshot.peer_latency_ms = net->avg_latency_ms();
             snapshot.mesh_bandwidth_kbps = net->mesh_bandwidth_kbps();
             const auto snapshot_serialization_metrics = net->edge_serialization_metrics();
-            snapshot.edge_serialization_mode = std::string(drone::swarm::to_string(net->edge_serialization_mode()));
+            snapshot.edge_serialization_mode =
+                std::string(drone::swarm::to_string(net->edge_serialization_mode()));
             snapshot.edge_average_packet_size_bytes =
                 static_cast<double>(snapshot_serialization_metrics.encoded_packet_size_bytes);
             snapshot.edge_bandwidth_savings_estimate_pct =
-                std::clamp((1.0 - snapshot_serialization_metrics.compression_ratio_vs_json) * 100.0, 0.0, 100.0);
-            snapshot.edge_packet_encode_latency_us = snapshot_serialization_metrics.serialization_time_us;
+                std::clamp((1.0 - snapshot_serialization_metrics.compression_ratio_vs_json) * 100.0,
+                           0.0, 100.0);
+            snapshot.edge_packet_encode_latency_us =
+                snapshot_serialization_metrics.serialization_time_us;
             snapshot.auth_mode = snapshot_serialization_metrics.auth_mode;
             snapshot.auth_failures = snapshot_serialization_metrics.auth_failures;
             snapshot.unsigned_packets = snapshot_serialization_metrics.unsigned_packets;
@@ -1665,9 +1685,11 @@ int main(int argc, char** argv) {
                     ? (frame.has_value() ? "active" : "sensor_limited")
                     : "backend_assisted";
             snapshot.edge_inference_fps = camera_stats.fps;
-            snapshot.edge_inference_confidence = std::clamp(fusion.confidence * 0.55 + sync_status.confidence * 0.45, 0.0, 1.0);
+            snapshot.edge_inference_confidence =
+                std::clamp(fusion.confidence * 0.55 + sync_status.confidence * 0.45, 0.0, 1.0);
             snapshot.local_obstacle_count = static_cast<int>(lidar_obstacles.size());
-            snapshot.shared_obstacle_count = static_cast<int>(lidar_obstacles.size() + net->peer_count());
+            snapshot.shared_obstacle_count =
+                static_cast<int>(lidar_obstacles.size() + net->peer_count());
             snapshot.security_state = std::string(drone::security::to_string(security.state));
             snapshot.security_summary = security.summary;
             snapshot.security_transition_reason = security.transition_reason;
@@ -1689,27 +1711,30 @@ int main(int argc, char** argv) {
             snapshot.health_flags = security.health_flags;
 
             snapshot.camera.status = sensor_status_tag(
-                camera_stats.stream_active && frame.has_value(),
-                camera_stats.frame_age_ms > 1500.0,
-                cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION && localization_data_source == "simulation",
+                camera_stats.stream_active && frame.has_value(), camera_stats.frame_age_ms > 1500.0,
+                cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION &&
+                    localization_data_source == "simulation",
                 false);
             snapshot.camera.fps = camera_stats.fps;
             snapshot.camera.frame_age_ms = camera_stats.frame_age_ms;
-            snapshot.camera.resolution = camera_stats.width > 0 && camera_stats.height > 0
-                ? std::to_string(camera_stats.width) + "x" + std::to_string(camera_stats.height)
-                : "N/A";
+            snapshot.camera.resolution =
+                camera_stats.width > 0 && camera_stats.height > 0
+                    ? std::to_string(camera_stats.width) + "x" + std::to_string(camera_stats.height)
+                    : "N/A";
             snapshot.camera.dropped_frames = static_cast<int>(camera_stats.dropped_frames);
-            snapshot.camera.source = sensor_source_tag(
-                camera_stats.stream_active && frame.has_value(),
-                cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION && localization_data_source == "simulation",
-                false);
+            snapshot.camera.source =
+                sensor_source_tag(camera_stats.stream_active && frame.has_value(),
+                                  cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION &&
+                                      localization_data_source == "simulation",
+                                  false);
             snapshot.camera.latest_frame_ref = camera_stats.latest_frame_ref;
 
-            snapshot.imu.status = sensor_status_tag(
-                imu_stats.device_active && imu_state.has_value(),
-                imu_stats.last_sample_age_ms > 1500.0,
-                cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION && localization_data_source == "simulation",
-                false);
+            snapshot.imu.status =
+                sensor_status_tag(imu_stats.device_active && imu_state.has_value(),
+                                  imu_stats.last_sample_age_ms > 1500.0,
+                                  cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION &&
+                                      localization_data_source == "simulation",
+                                  false);
             snapshot.imu.sample_rate_hz = imu_stats.sample_rate_hz;
             snapshot.imu.last_sample_age_ms = imu_stats.last_sample_age_ms;
             snapshot.imu.accel = to_sensor_vec3(imu_stats.accel_mps2);
@@ -1717,22 +1742,29 @@ int main(int argc, char** argv) {
             snapshot.imu.health = imu_stats.health;
             snapshot.imu.source = sensor_source_tag(
                 imu_stats.device_active && imu_state.has_value(),
-                imu_stats.simulated || (cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION && localization_data_source == "simulation"),
+                imu_stats.simulated ||
+                    (cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION &&
+                     localization_data_source == "simulation"),
                 false);
 
             snapshot.lidar.status = sensor_status_tag(
                 lidar_stats.scan_active && lidar_state.has_value(),
                 lidar_stats.scan_age_ms > 1500.0,
-                lidar_stats.simulated || (cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION && localization_data_source == "simulation"),
+                lidar_stats.simulated ||
+                    (cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION &&
+                     localization_data_source == "simulation"),
                 false);
             snapshot.lidar.packet_rate_hz = lidar_stats.packet_rate_hz;
             snapshot.lidar.scan_age_ms = lidar_stats.scan_age_ms;
-            snapshot.lidar.point_count = std::min<int>(static_cast<int>(lidar_stats.latest_points.size()), 256);
+            snapshot.lidar.point_count =
+                std::min<int>(static_cast<int>(lidar_stats.latest_points.size()), 256);
             snapshot.lidar.min_range_m = lidar_stats.min_range_m;
             snapshot.lidar.max_range_m = lidar_stats.max_range_m;
             snapshot.lidar.source = sensor_source_tag(
                 lidar_stats.scan_active && lidar_state.has_value(),
-                lidar_stats.simulated || (cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION && localization_data_source == "simulation"),
+                lidar_stats.simulated ||
+                    (cfg.runtime_mode == drone::runtime::RuntimeMode::SIMULATION &&
+                     localization_data_source == "simulation"),
                 false);
             snapshot.lidar.points_2d.reserve(static_cast<size_t>(snapshot.lidar.point_count));
             for (size_t i = 0; i < lidar_stats.latest_points.size() && i < 256; ++i) {
@@ -1744,28 +1776,30 @@ int main(int argc, char** argv) {
                 });
             }
 
-            snapshot.tdoa.status = sensor_status_tag(
-                selected_tdoa_measurements.has_value(),
-                false,
-                tdoa_simulation,
-                tdoa_playback);
+            snapshot.tdoa.status = sensor_status_tag(selected_tdoa_measurements.has_value(), false,
+                                                     tdoa_simulation, tdoa_playback);
             snapshot.tdoa.source = localization_data_source;
             snapshot.tdoa.visible_anchor_count = static_cast<int>(visible_anchor_count);
-            snapshot.tdoa.estimated_position = to_sensor_vec3(tdoa_solution.has_value() ? tdoa_solution->position : fused_pose.position);
+            snapshot.tdoa.estimated_position = to_sensor_vec3(
+                tdoa_solution.has_value() ? tdoa_solution->position : fused_pose.position);
             snapshot.tdoa.calibration_warning =
                 cfg.anchor_config_path.find("example") != std::string::npos
                     ? "example/default anchor geometry configured"
                     : std::string{};
             snapshot.tdoa.anchors.reserve(tdoa_anchors.size());
             for (const auto& anchor : tdoa_anchors) {
-                const bool visible = selected_tdoa_measurements.has_value() &&
-                    std::any_of(selected_tdoa_measurements->begin(), selected_tdoa_measurements->end(),
-                        [&](const auto& measurement) { return measurement.anchor_id == anchor.id; });
+                const bool visible =
+                    selected_tdoa_measurements.has_value() &&
+                    std::any_of(selected_tdoa_measurements->begin(),
+                                selected_tdoa_measurements->end(), [&](const auto& measurement) {
+                                    return measurement.anchor_id == anchor.id;
+                                });
                 double last_seen_ms = 0.0;
                 if (selected_tdoa_measurements.has_value()) {
                     for (const auto& measurement : *selected_tdoa_measurements) {
                         if (measurement.anchor_id == anchor.id) {
-                            last_seen_ms = std::max(0.0, (now_s - measurement.arrival_time_s) * 1000.0);
+                            last_seen_ms =
+                                std::max(0.0, (now_s - measurement.arrival_time_s) * 1000.0);
                         }
                     }
                 }
@@ -1779,27 +1813,26 @@ int main(int argc, char** argv) {
                 });
             }
 
-            snapshot.replay.status = sensor_status_tag(
-                replay_active,
-                false,
-                false,
-                replay_active);
+            snapshot.replay.status = sensor_status_tag(replay_active, false, false, replay_active);
             snapshot.replay.active = replay_active;
             snapshot.replay.file_name = replay_file_name(cfg.tdoa_measurements_csv);
             snapshot.replay.progress = replay_active ? 0.0 : 0.0;
             snapshot.replay.current_time = replay_active ? now_s : 0.0;
             snapshot.replay.source = replay_active ? "playback" : "unavailable";
-            snapshot.replay.confidence_series.assign(replay_confidence_history.begin(), replay_confidence_history.end());
+            snapshot.replay.confidence_series.assign(replay_confidence_history.begin(),
+                                                     replay_confidence_history.end());
 
-            telemetry_publish_task = std::async(std::launch::async, [&telemetry_client, snapshot, telemetry_now]() {
-                const bool ok = telemetry_client.publish(snapshot, telemetry_now);
-                if (!ok) {
-                    spdlog::warn("Backend telemetry publish failed: {}", telemetry_client.last_status());
-                }
-            });
-        }
-        else if (telemetry_publish_task.valid() &&
-                 telemetry_publish_task.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
+            telemetry_publish_task =
+                std::async(std::launch::async, [&telemetry_client, snapshot, telemetry_now]() {
+                    const bool ok = telemetry_client.publish(snapshot, telemetry_now);
+                    if (!ok) {
+                        spdlog::warn("Backend telemetry publish failed: {}",
+                                     telemetry_client.last_status());
+                    }
+                });
+        } else if (telemetry_publish_task.valid() &&
+                   telemetry_publish_task.wait_for(std::chrono::milliseconds(0)) !=
+                       std::future_status::ready) {
             spdlog::debug("Backend telemetry publish still in flight; skipping this interval");
         }
         if (telemetry_client.enabled()) {
@@ -1808,24 +1841,29 @@ int main(int argc, char** argv) {
         }
         spdlog::info("[ AI     ] Mode:{}  Vcmd:[{:.2f},{:.2f},{:.2f}]  Yaw:{:.2f}  {}",
                      std::string(drone::autonomy::to_string(decision.mode)),
-                     decision.desired_velocity.x(),
-                     decision.desired_velocity.y(),
-                     decision.desired_velocity.z(),
-                     decision.desired_yaw_rate_rads,
+                     decision.desired_velocity.x(), decision.desired_velocity.y(),
+                     decision.desired_velocity.z(), decision.desired_yaw_rate_rads,
                      decision.summary);
     }
 
-    //6. Graceful shutdown 
-    spdlog::info("Shutting down subsystemsâ€¦");
+    // 6. Graceful shutdown
+    spdlog::info("Shutting down subsystems...");
     vio->stop();
     net->stop();
-    if (cfg.enable_lidar) lidar->stop();
-    if (cfg.enable_rangefinder) rangefinder->stop();
-    if (cfg.enable_optical_flow) optical_flow->stop();
-    if (cfg.enable_motor) motor->stop();
-    if (cfg.enable_barometer) barometer->stop();
-    if (cfg.enable_camera) cam->stop();
-    if (cfg.enable_imu) imu->stop();
+    if (cfg.enable_lidar)
+        lidar->stop();
+    if (cfg.enable_rangefinder)
+        rangefinder->stop();
+    if (cfg.enable_optical_flow)
+        optical_flow->stop();
+    if (cfg.enable_motor)
+        motor->stop();
+    if (cfg.enable_barometer)
+        barometer->stop();
+    if (cfg.enable_camera)
+        cam->stop();
+    if (cfg.enable_imu)
+        imu->stop();
     tdoa_ingestor.stop();
     uwb_serial.stop();
 

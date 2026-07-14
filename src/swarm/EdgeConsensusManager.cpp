@@ -5,15 +5,15 @@
 namespace drone::swarm {
 
 EdgeConsensusManager::EdgeConsensusManager(uint32_t local_id, int default_quorum)
-    : local_id_(local_id),
-      default_quorum_(std::max(default_quorum, 1)) {}
+    : local_id_(local_id), default_quorum_(std::max(default_quorum, 1)) {}
 
 void EdgeConsensusManager::set_local_safety_override(bool enabled) {
     std::lock_guard lock(mutex_);
     state_.local_safety_override = enabled;
 }
 
-void EdgeConsensusManager::propose(ConsensusProposalType proposal_type, uint64_t epoch, int quorum_count) {
+void EdgeConsensusManager::propose(ConsensusProposalType proposal_type, uint64_t epoch,
+                                   int quorum_count) {
     std::lock_guard lock(mutex_);
     state_.proposal_type = proposal_type;
     state_.consensus_epoch = epoch;
@@ -25,8 +25,10 @@ void EdgeConsensusManager::propose(ConsensusProposalType proposal_type, uint64_t
     state_.state = state_.quorum_met ? "quorum_met" : "quorum_pending";
 }
 
-void EdgeConsensusManager::observe_packet(const EdgePeerPacket& packet, const SwarmStateCache& cache) {
-    if (packet.packet_type != EdgePacketType::CONSENSUS_STATE || !packet.consensus_state.has_value()) {
+void EdgeConsensusManager::observe_packet(const EdgePeerPacket& packet,
+                                          const SwarmStateCache& cache) {
+    if (packet.packet_type != EdgePacketType::CONSENSUS_STATE ||
+        !packet.consensus_state.has_value()) {
         return;
     }
     const auto peer = cache.peer_state(packet.sender_id);
@@ -48,7 +50,8 @@ void EdgeConsensusManager::observe_packet(const EdgePeerPacket& packet, const Sw
         supporters_.insert(packet.sender_id);
     }
     state_.supporting_peer_count = supporters_.size();
-    state_.quorum_met = supporters_.size() >= static_cast<size_t>(std::max(state_.quorum_count, default_quorum_));
+    state_.quorum_met =
+        supporters_.size() >= static_cast<size_t>(std::max(state_.quorum_count, default_quorum_));
     if (!state_.quorum_met && cache.split_swarm_isolated()) {
         state_.state = "split_swarm_recovery";
     } else if (state_.quorum_met) {
@@ -62,9 +65,8 @@ void EdgeConsensusManager::expire(const SwarmStateCache& cache) {
     std::lock_guard lock(mutex_);
     const auto states = cache.snapshot();
     for (auto it = supporters_.begin(); it != supporters_.end();) {
-        const auto peer = std::find_if(states.begin(), states.end(), [&](const auto& item) {
-            return item.peer_id == *it;
-        });
+        const auto peer = std::find_if(states.begin(), states.end(),
+                                       [&](const auto& item) { return item.peer_id == *it; });
         if (*it != local_id_ && (peer == states.end() || peer->stale)) {
             it = supporters_.erase(it);
             continue;
@@ -72,7 +74,8 @@ void EdgeConsensusManager::expire(const SwarmStateCache& cache) {
         ++it;
     }
     state_.supporting_peer_count = supporters_.size();
-    state_.quorum_met = supporters_.size() >= static_cast<size_t>(std::max(state_.quorum_count, default_quorum_));
+    state_.quorum_met =
+        supporters_.size() >= static_cast<size_t>(std::max(state_.quorum_count, default_quorum_));
     if (cache.split_swarm_isolated()) {
         state_.state = "split_swarm_recovery";
     } else if (cache.safety_eligible_peer_count() == 0) {
@@ -86,8 +89,7 @@ void EdgeConsensusManager::expire(const SwarmStateCache& cache) {
 
 bool EdgeConsensusManager::should_apply_collective_action() const {
     std::lock_guard lock(mutex_);
-    return !state_.local_safety_override &&
-           state_.proposal_type != ConsensusProposalType::NONE &&
+    return !state_.local_safety_override && state_.proposal_type != ConsensusProposalType::NONE &&
            state_.quorum_met;
 }
 

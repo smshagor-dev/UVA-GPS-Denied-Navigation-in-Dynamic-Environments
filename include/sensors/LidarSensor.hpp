@@ -3,10 +3,10 @@
 // Technology: C++, Python, Go, CMake
 
 #pragma once
- 
+
 // LidarSensor.hpp    LiDAR interface (Velodyne VLP-16 / RPLIDAR A3)
 // Drone Swarm Sensor Fusion  |  Phase 2
- 
+
 #include "sensors/SensorBase.hpp"
 #include "runtime/RuntimeMode.hpp"
 #include <pcl/point_cloud.h>
@@ -20,7 +20,7 @@
 
 namespace drone::sensors {
 
-using PointCloud    = pcl::PointCloud<pcl::PointXYZI>;
+using PointCloud = pcl::PointCloud<pcl::PointXYZI>;
 using PointCloudPtr = PointCloud::Ptr;
 
 struct RawLidarPacket {
@@ -52,34 +52,28 @@ public:
     [[nodiscard]] virtual std::optional<LidarScan> parse(const RawLidarPacket& packet) const = 0;
 };
 
-[[nodiscard]] std::optional<RawLidarPacket> receive_lidar_udp_packet(
-    int socket_fd,
-    size_t max_bytes,
-    int timeout_ms);
+[[nodiscard]] std::optional<RawLidarPacket>
+receive_lidar_udp_packet(int socket_fd, size_t max_bytes, int timeout_ms);
 
-[[nodiscard]] std::unique_ptr<ILidarParser> create_lidar_parser(
-    std::string_view model,
-    const std::string& frame_id,
-    bool allow_placeholder_parser);
+[[nodiscard]] std::unique_ptr<ILidarParser> create_lidar_parser(std::string_view model,
+                                                                const std::string& frame_id,
+                                                                bool allow_placeholder_parser);
 
-[[nodiscard]] PointCloudPtr point_cloud_from_scan(
-    const LidarScan& scan,
-    float min_range_m,
-    float max_range_m);
+[[nodiscard]] PointCloudPtr point_cloud_from_scan(const LidarScan& scan, float min_range_m,
+                                                  float max_range_m);
 
-//  LiDAR Measurement 
+//  LiDAR Measurement
 struct LidarMeasurement : SensorMeasurement {
-    PointCloudPtr cloud;           // raw scan
+    PointCloudPtr cloud; // raw scan
     std::vector<LidarPoint> points;
-    uint32_t      num_points{0};
-    float         range_min_m{0.1f};
-    float         range_max_m{100.0f};
-    float         angular_res_deg{0.1f};
-    std::string   frame_id{"lidar"};
-    bool          simulated{false};
+    uint32_t num_points{0};
+    float range_min_m{0.1f};
+    float range_max_m{100.0f};
+    float angular_res_deg{0.1f};
+    std::string frame_id{"lidar"};
+    bool simulated{false};
 };
 
- 
 class LidarSensor : public SensorBase {
 public:
     struct TelemetryStats {
@@ -95,8 +89,7 @@ public:
     };
 
     explicit LidarSensor(std::string id, std::string endpoint = "192.168.1.201:2368")
-        : SensorBase(std::move(id), "LiDAR")
-        , endpoint_(std::move(endpoint)) {}
+        : SensorBase(std::move(id), "LiDAR"), endpoint_(std::move(endpoint)) {}
 
     bool initialize() override;
     bool reconfigure(const std::string& config_json) override;
@@ -113,13 +106,17 @@ public:
         data_cb_ = std::move(cb);
     }
 
-    //  Filtering 
-    void set_voxel_leaf_size(float leaf) { voxel_leaf_ = leaf; }
+    //  Filtering
+    void set_voxel_leaf_size(float leaf) {
+        voxel_leaf_ = leaf;
+    }
     void set_range_filter(float min_m, float max_m) {
         range_min_ = min_m;
         range_max_ = max_m;
     }
-    void set_runtime_mode(drone::runtime::RuntimeMode mode) { runtime_mode_ = mode; }
+    void set_runtime_mode(drone::runtime::RuntimeMode mode) {
+        runtime_mode_ = mode;
+    }
     void configure_socket(std::string host, uint16_t port) {
         bind_host_ = std::move(host);
         udp_port_ = port;
@@ -146,25 +143,25 @@ private:
         last_status_ = std::move(value);
     }
 
-    std::string                   endpoint_;
-    std::string                   bind_host_{"0.0.0.0"};
-    uint16_t                      udp_port_{2368};
-    int                           udp_sock_{-1};
-    int                           udp_timeout_ms_{75};
-    std::string                   model_{"generic_udp_cartesian_v1"};
-    std::string                   frame_id_{"lidar"};
-    drone::runtime::RuntimeMode   runtime_mode_{drone::runtime::RuntimeMode::SIMULATION};
+    std::string endpoint_;
+    std::string bind_host_{"0.0.0.0"};
+    uint16_t udp_port_{2368};
+    int udp_sock_{-1};
+    int udp_timeout_ms_{75};
+    std::string model_{"generic_udp_cartesian_v1"};
+    std::string frame_id_{"lidar"};
+    drone::runtime::RuntimeMode runtime_mode_{drone::runtime::RuntimeMode::SIMULATION};
     std::unique_ptr<ILidarParser> parser_{};
 
     std::optional<LidarMeasurement> latest_;
-    DataCallback<LidarMeasurement>  data_cb_;
-    mutable std::mutex              status_mutex_;
-    std::string                     last_status_{"not initialized"};
-    Timestamp                       last_packet_timestamp_{0.0};
-    double                          packet_rate_estimate_hz_{0.0};
-    double                          previous_packet_timestamp_{0.0};
+    DataCallback<LidarMeasurement> data_cb_;
+    mutable std::mutex status_mutex_;
+    std::string last_status_{"not initialized"};
+    Timestamp last_packet_timestamp_{0.0};
+    double packet_rate_estimate_hz_{0.0};
+    double previous_packet_timestamp_{0.0};
 
-    float voxel_leaf_{0.05f};   // 5 cm voxel grid
+    float voxel_leaf_{0.05f}; // 5 cm voxel grid
     float range_min_{0.3f};
     float range_max_{80.0f};
 };

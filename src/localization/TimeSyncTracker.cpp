@@ -5,11 +5,9 @@
 
 namespace drone::localization {
 
-TimeSyncTracker::TimeSyncTracker()
-    : TimeSyncTracker(Config{}) {}
+TimeSyncTracker::TimeSyncTracker() : TimeSyncTracker(Config{}) {}
 
-TimeSyncTracker::TimeSyncTracker(Config cfg)
-    : cfg_(cfg) {}
+TimeSyncTracker::TimeSyncTracker(Config cfg) : cfg_(cfg) {}
 
 void TimeSyncTracker::observe_imu(double timestamp_s) {
     last_imu_ts_ = timestamp_s;
@@ -29,7 +27,8 @@ void TimeSyncTracker::observe_anchor(uint32_t, double arrival_time_s, double ref
     push_sample(anchor_offsets_ms_, (arrival_time_s - reference_time_s) * 1000.0);
 }
 
-void TimeSyncTracker::observe_peer(uint32_t, double remote_timestamp_s, double local_receive_time_s) {
+void TimeSyncTracker::observe_peer(uint32_t, double remote_timestamp_s,
+                                   double local_receive_time_s) {
     push_sample(peer_offsets_ms_, (local_receive_time_s - remote_timestamp_s) * 1000.0);
 }
 
@@ -44,15 +43,14 @@ TimeSyncStatus TimeSyncTracker::status() const {
     const double peer_jitter = mean_abs_deviation(peer_offsets_ms_, out.peer_clock_offset_ms);
     out.jitter_ms = std::max({imu_jitter, anchor_jitter, peer_jitter, 0.0});
 
-    const double worst_offset = std::max({
-        std::abs(out.imu_camera_offset_ms),
-        std::abs(out.anchor_clock_offset_ms),
-        std::abs(out.peer_clock_offset_ms),
-        0.0
-    });
+    const double worst_offset =
+        std::max({std::abs(out.imu_camera_offset_ms), std::abs(out.anchor_clock_offset_ms),
+                  std::abs(out.peer_clock_offset_ms), 0.0});
 
-    out.confidence = std::clamp(1.0 - (worst_offset / std::max(cfg_.degraded_threshold_ms, 1.0)), 0.0, 1.0);
-    out.synchronized = worst_offset <= cfg_.synchronized_threshold_ms && out.jitter_ms <= cfg_.synchronized_threshold_ms;
+    out.confidence =
+        std::clamp(1.0 - (worst_offset / std::max(cfg_.degraded_threshold_ms, 1.0)), 0.0, 1.0);
+    out.synchronized = worst_offset <= cfg_.synchronized_threshold_ms &&
+                       out.jitter_ms <= cfg_.synchronized_threshold_ms;
 
     if (std::abs(out.anchor_clock_offset_ms) >= std::abs(out.imu_camera_offset_ms) &&
         std::abs(out.anchor_clock_offset_ms) >= std::abs(out.peer_clock_offset_ms)) {

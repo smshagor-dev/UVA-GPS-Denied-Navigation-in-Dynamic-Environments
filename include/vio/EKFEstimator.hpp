@@ -3,11 +3,11 @@
 // Technology: C++, Python, Go, CMake
 
 #pragma once
- 
+
 // EKFEstimator.hpp    Extended Kalman Filter for Visual-Inertial Odometry
 // State: [pos(3), vel(3), quat(4), ba(3), bg(3)] = 16-dim
 // Drone Swarm Sensor Fusion  |  Phase 2  VIO Pipeline
- 
+
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 #include <chrono>
@@ -20,36 +20,34 @@
 
 namespace drone::vio {
 
- 
 // State vector layout  (16-dim)
 //   [0:2]  position      p  (m, world frame)
 //   [3:5]  velocity      v  (m/s, world frame)
 //   [6:9]  quaternion    q  (w,x,y,z   world body)
 //   [10:12] accel bias   ba (m/sÂ²)
 //   [13:15] gyro bias    bg (rad/s)
- 
-constexpr int kStateDim    = 16;
-constexpr int kErrorDim    = 15;  // error-state (quaternion  3-param)
-constexpr int kImuNoiseDim = 12;  // na, ng, nba, nbg (3 each)
 
-using StateVec     = Eigen::Matrix<double, kStateDim,    1>;
-using ErrorVec     = Eigen::Matrix<double, kErrorDim,    1>;
-using CovMat       = Eigen::Matrix<double, kErrorDim, kErrorDim>;
-using FMat         = Eigen::Matrix<double, kErrorDim, kErrorDim>;
-using GMat         = Eigen::Matrix<double, kErrorDim, kImuNoiseDim>;
-using QNoiseMat    = Eigen::Matrix<double, kImuNoiseDim, kImuNoiseDim>;
+constexpr int kStateDim = 16;
+constexpr int kErrorDim = 15;    // error-state (quaternion  3-param)
+constexpr int kImuNoiseDim = 12; // na, ng, nba, nbg (3 each)
 
- 
+using StateVec = Eigen::Matrix<double, kStateDim, 1>;
+using ErrorVec = Eigen::Matrix<double, kErrorDim, 1>;
+using CovMat = Eigen::Matrix<double, kErrorDim, kErrorDim>;
+using FMat = Eigen::Matrix<double, kErrorDim, kErrorDim>;
+using GMat = Eigen::Matrix<double, kErrorDim, kImuNoiseDim>;
+using QNoiseMat = Eigen::Matrix<double, kImuNoiseDim, kImuNoiseDim>;
+
 struct EKFConfig {
     // IMU noise parameters
-    double sigma_na{0.02};     // accel noise  (m/sÂ²)
-    double sigma_ng{0.005};    // gyro  noise  (rad/s)
-    double sigma_nba{1.0e-4};  // accel bias walk
-    double sigma_nbg{1.0e-5};  // gyro  bias walk
+    double sigma_na{0.02};    // accel noise  (m/sÂ²)
+    double sigma_ng{0.005};   // gyro  noise  (rad/s)
+    double sigma_nba{1.0e-4}; // accel bias walk
+    double sigma_nbg{1.0e-5}; // gyro  bias walk
 
     // Vision noise
-    double sigma_px{1.5};      // pixel reprojection noise
-    double sigma_pz{0.05};     // depth measurement noise (if available)
+    double sigma_px{1.5};  // pixel reprojection noise
+    double sigma_pz{0.05}; // depth measurement noise (if available)
 
     // Initial covariance
     double init_pos_std{0.1};
@@ -62,58 +60,56 @@ struct EKFConfig {
     double mahal_gate{7.815};
 };
 
- 
 // Pose output
- 
+
 struct PoseEstimate {
-    double           timestamp{0.0};
-    Eigen::Vector3d  position{Eigen::Vector3d::Zero()};
-    Eigen::Vector3d  velocity{Eigen::Vector3d::Zero()};
+    double timestamp{0.0};
+    Eigen::Vector3d position{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d velocity{Eigen::Vector3d::Zero()};
     Eigen::Quaterniond orientation{Eigen::Quaterniond::Identity()};
-    Eigen::Vector3d  accel_bias{Eigen::Vector3d::Zero()};
-    Eigen::Vector3d  gyro_bias{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d accel_bias{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d gyro_bias{Eigen::Vector3d::Zero()};
 
     // Uncertainty (diagonal of position block)
     Eigen::Vector3d pos_std{Eigen::Vector3d::Ones() * 0.1};
-    double          drift_m{0.0};
-    double          localization_confidence{1.0};
-    std::string     localization_source{"imu-dead-reckoning"};
-    bool            localization_degraded{false};
-    bool            localization_lost{false};
+    double drift_m{0.0};
+    double localization_confidence{1.0};
+    std::string localization_source{"imu-dead-reckoning"};
+    bool localization_degraded{false};
+    bool localization_lost{false};
 
     // Derived
-    [[nodiscard]] Eigen::Matrix3d R_wb() const { return orientation.toRotationMatrix(); }
+    [[nodiscard]] Eigen::Matrix3d R_wb() const {
+        return orientation.toRotationMatrix();
+    }
     [[nodiscard]] Eigen::Vector3d euler_zyx_deg() const {
-        return orientation.toRotationMatrix().eulerAngles(2,1,0) *
+        return orientation.toRotationMatrix().eulerAngles(2, 1, 0) *
                (180.0 / std::numbers::pi_v<double>);
     }
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
- 
 class EKFEstimator {
 public:
     explicit EKFEstimator(EKFConfig cfg = EKFConfig{});
 
-    //  Initialize with known pose 
-    void reset(const Eigen::Vector3d& p0       = Eigen::Vector3d::Zero(),
-               const Eigen::Quaterniond& q0    = Eigen::Quaterniond::Identity(),
-               const Eigen::Vector3d& v0       = Eigen::Vector3d::Zero());
+    //  Initialize with known pose
+    void reset(const Eigen::Vector3d& p0 = Eigen::Vector3d::Zero(),
+               const Eigen::Quaterniond& q0 = Eigen::Quaterniond::Identity(),
+               const Eigen::Vector3d& v0 = Eigen::Vector3d::Zero());
 
-    //  IMU propagation 
+    //  IMU propagation
     //   Call at IMU rate (~400 Hz).  dt in seconds.
-    void propagate_imu(const Eigen::Vector3d& accel_mps2,
-                       const Eigen::Vector3d& gyro_rads,
+    void propagate_imu(const Eigen::Vector3d& accel_mps2, const Eigen::Vector3d& gyro_rads,
                        double dt);
 
-    //  Camera update (feature-based) 
+    //  Camera update (feature-based)
     //   z_pixels: Nx2 observed pixel coordinates
     //   p_world:  Nx3 corresponding 3-D map points
     //   K:        3x3 camera intrinsic matrix
     void update_vision(const std::vector<Eigen::Vector2d>& z_pixels,
-                       const std::vector<Eigen::Vector3d>& p_world,
-                       const Eigen::Matrix3d& K);
+                       const std::vector<Eigen::Vector3d>& p_world, const Eigen::Matrix3d& K);
 
     //  Depth update (from LiDAR plane fit) â”€
     void update_depth(double z_depth_m, double sigma_m = 0.05);
@@ -121,41 +117,41 @@ public:
     //  Visual pose correction from frame-to-frame frontend
     void update_visual_pose(const Eigen::Vector3d& observed_position,
                             const Eigen::Vector3d& observed_velocity,
-                            double sigma_position_m = 0.35,
-                            double sigma_velocity_mps = 0.45);
+                            double sigma_position_m = 0.35, double sigma_velocity_mps = 0.45);
 
-    //  Zero velocity update (on ground detection) 
+    //  Zero velocity update (on ground detection)
     void update_zupt();
 
     //  Query â”€
     [[nodiscard]] PoseEstimate state() const;
-    [[nodiscard]] double       total_drift_m() const { return total_drift_; }
-    [[nodiscard]] bool         is_initialized() const { return initialized_; }
+    [[nodiscard]] double total_drift_m() const {
+        return total_drift_;
+    }
+    [[nodiscard]] bool is_initialized() const {
+        return initialized_;
+    }
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
-    //  Core EKF math 
-    FMat compute_F(const Eigen::Vector3d& accel_body,
-                   const Eigen::Matrix3d& R_wb,
-                   double dt) const;
+    //  Core EKF math
+    FMat compute_F(const Eigen::Vector3d& accel_body, const Eigen::Matrix3d& R_wb, double dt) const;
 
     GMat compute_G(const Eigen::Matrix3d& R_wb) const;
 
     // Quaternion kinematics
     static Eigen::Quaterniond propagate_quat(const Eigen::Quaterniond& q,
-                                              const Eigen::Vector3d& omega,
-                                              double dt);
+                                             const Eigen::Vector3d& omega, double dt);
     // Box-plus / box-minus for error-state
     static Eigen::Vector3d quat_to_rotvec(const Eigen::Quaterniond& q);
     static Eigen::Quaterniond rotvec_to_quat(const Eigen::Vector3d& rv);
 
     // Nominal state
-    Eigen::Vector3d    pos_{Eigen::Vector3d::Zero()};
-    Eigen::Vector3d    vel_{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d pos_{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d vel_{Eigen::Vector3d::Zero()};
     Eigen::Quaterniond q_{Eigen::Quaterniond::Identity()};
-    Eigen::Vector3d    ba_{Eigen::Vector3d::Zero()};
-    Eigen::Vector3d    bg_{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d ba_{Eigen::Vector3d::Zero()};
+    Eigen::Vector3d bg_{Eigen::Vector3d::Zero()};
 
     // Error-state covariance
     CovMat P_{CovMat::Identity() * 0.01};
@@ -165,7 +161,7 @@ private:
 
     double timestamp_{0.0};
     double total_drift_{0.0};
-    bool   initialized_{false};
+    bool initialized_{false};
     double last_vision_update_ts_{-1.0};
     double last_depth_update_ts_{-1.0};
 

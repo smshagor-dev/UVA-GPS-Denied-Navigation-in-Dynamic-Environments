@@ -13,8 +13,7 @@ struct RangefinderMeasurement : SensorMeasurement {
 
 class RangefinderSensor : public SensorBase {
 public:
-    explicit RangefinderSensor(std::string id)
-        : SensorBase(std::move(id), "Rangefinder") {}
+    explicit RangefinderSensor(std::string id) : SensorBase(std::move(id), "Rangefinder") {}
 
     bool initialize() override;
     bool reconfigure(const std::string& config_json) override;

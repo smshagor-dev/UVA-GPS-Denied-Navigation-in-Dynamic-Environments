@@ -71,13 +71,13 @@ public:
     explicit SafetyManager(SafetyConfig cfg = SafetyConfig{});
 
     [[nodiscard]] SafetyDecision evaluate(const SafetyContext& ctx) const;
-    void enforce(const SafetyDecision& safety,
-                 autonomy::DecisionCommand& command,
+    void enforce(const SafetyDecision& safety, autonomy::DecisionCommand& command,
                  const vio::PoseEstimate& pose) const;
 
 private:
     [[nodiscard]] static bool uses_visual_localization(std::string_view source);
-    [[nodiscard]] static Eigen::Vector3d clamp_speed(Eigen::Vector3d velocity, double max_speed_mps);
+    [[nodiscard]] static Eigen::Vector3d clamp_speed(Eigen::Vector3d velocity,
+                                                     double max_speed_mps);
 
     SafetyConfig cfg_;
 };

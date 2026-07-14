@@ -18,37 +18,35 @@ constexpr double kMinDistanceM = 1.0e-3;
 
 } // namespace
 
-TDOALocalizer::TDOALocalizer()
-    : TDOALocalizer(Config{}) {}
+TDOALocalizer::TDOALocalizer() : TDOALocalizer(Config{}) {}
 
-TDOALocalizer::TDOALocalizer(Config cfg)
-    : cfg_(cfg) {
+TDOALocalizer::TDOALocalizer(Config cfg) : cfg_(cfg) {
     drone::utils::get_or_create_logger("TDOA")->info(
-        "TDOALocalizer initialized iterations={} damping={} eps={}",
-        cfg_.max_iterations, cfg_.damping, cfg_.convergence_eps_m);
+        "TDOALocalizer initialized iterations={} damping={} eps={}", cfg_.max_iterations,
+        cfg_.damping, cfg_.convergence_eps_m);
 }
 
 void TDOALocalizer::set_anchors(std::vector<Anchor> anchors) {
     anchors_ = std::move(anchors);
-    drone::utils::get_or_create_logger("TDOA")->info("TDOALocalizer anchors set count={}", anchors_.size());
+    drone::utils::get_or_create_logger("TDOA")->info("TDOALocalizer anchors set count={}",
+                                                     anchors_.size());
 }
 
-std::optional<TDOALocalizer::Solution> TDOALocalizer::estimate(
-        const std::vector<Measurement>& measurements,
-        std::optional<Eigen::Vector3d> seed) const {
+std::optional<TDOALocalizer::Solution>
+TDOALocalizer::estimate(const std::vector<Measurement>& measurements,
+                        std::optional<Eigen::Vector3d> seed) const {
     auto logger = drone::utils::get_or_create_logger("TDOA");
-    logger->debug("TDOALocalizer estimate anchors={} measurements={} seeded={}",
-                  anchors_.size(), measurements.size(), seed.has_value());
+    logger->debug("TDOALocalizer estimate anchors={} measurements={} seeded={}", anchors_.size(),
+                  measurements.size(), seed.has_value());
     if (anchors_.size() < 4 || measurements.size() < 4) {
         logger->warn("TDOALocalizer estimate rejected due to insufficient anchors/measurements");
         return std::nullopt;
     }
 
-    const auto ref_it = std::min_element(
-        measurements.begin(), measurements.end(),
-        [](const Measurement& lhs, const Measurement& rhs) {
-            return lhs.arrival_time_s < rhs.arrival_time_s;
-        });
+    const auto ref_it = std::min_element(measurements.begin(), measurements.end(),
+                                         [](const Measurement& lhs, const Measurement& rhs) {
+                                             return lhs.arrival_time_s < rhs.arrival_time_s;
+                                         });
     if (ref_it == measurements.end()) {
         logger->warn("TDOALocalizer failed to choose reference measurement");
         return std::nullopt;
@@ -100,8 +98,7 @@ std::optional<TDOALocalizer::Solution> TDOALocalizer::estimate(
             ++row;
         }
 
-        Eigen::Matrix3d hessian =
-            J.transpose() * J + (cfg_.damping * Eigen::Matrix3d::Identity());
+        Eigen::Matrix3d hessian = J.transpose() * J + (cfg_.damping * Eigen::Matrix3d::Identity());
         const Eigen::Vector3d step = hessian.ldlt().solve(J.transpose() * r);
         x += step;
 
@@ -117,11 +114,10 @@ std::optional<TDOALocalizer::Solution> TDOALocalizer::estimate(
         solution.rms_residual_m = std::max(solution.rms_residual_m, 5.0);
     }
     solution.confidence = std::clamp(1.0 - (solution.rms_residual_m / 6.0), 0.0, 1.0);
-    logger->info("TDOALocalizer solution converged={} rms={:.3f} conf={:.3f} pos=[{:.2f},{:.2f},{:.2f}]",
-                 solution.converged,
-                 solution.rms_residual_m,
-                 solution.confidence,
-                 solution.position.x(), solution.position.y(), solution.position.z());
+    logger->info(
+        "TDOALocalizer solution converged={} rms={:.3f} conf={:.3f} pos=[{:.2f},{:.2f},{:.2f}]",
+        solution.converged, solution.rms_residual_m, solution.confidence, solution.position.x(),
+        solution.position.y(), solution.position.z());
     return solution;
 }
 

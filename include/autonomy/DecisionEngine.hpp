@@ -33,16 +33,26 @@ enum class BehaviorMode : uint8_t {
 
 inline std::string_view to_string(BehaviorMode mode) {
     switch (mode) {
-    case BehaviorMode::HOLD_POSITION: return "HOLD_POSITION";
-    case BehaviorMode::SEARCH:        return "SEARCH";
-    case BehaviorMode::TRACK_TARGET:  return "TRACK_TARGET";
-    case BehaviorMode::AVOID_OBSTACLE:return "AVOID_OBSTACLE";
-    case BehaviorMode::RETURN_HOME:   return "RETURN_HOME";
-    case BehaviorMode::EMERGENCY_LAND:return "EMERGENCY_LAND";
-    case BehaviorMode::HOVER_AND_SCAN:return "HOVER_AND_SCAN";
-    case BehaviorMode::SAFE_RETURN_BY_ANCHOR:return "SAFE_RETURN_BY_ANCHOR";
-    case BehaviorMode::LOCALIZATION_DEGRADED:return "LOCALIZATION_DEGRADED";
-    case BehaviorMode::LOCALIZATION_LOST:return "LOCALIZATION_LOST";
+    case BehaviorMode::HOLD_POSITION:
+        return "HOLD_POSITION";
+    case BehaviorMode::SEARCH:
+        return "SEARCH";
+    case BehaviorMode::TRACK_TARGET:
+        return "TRACK_TARGET";
+    case BehaviorMode::AVOID_OBSTACLE:
+        return "AVOID_OBSTACLE";
+    case BehaviorMode::RETURN_HOME:
+        return "RETURN_HOME";
+    case BehaviorMode::EMERGENCY_LAND:
+        return "EMERGENCY_LAND";
+    case BehaviorMode::HOVER_AND_SCAN:
+        return "HOVER_AND_SCAN";
+    case BehaviorMode::SAFE_RETURN_BY_ANCHOR:
+        return "SAFE_RETURN_BY_ANCHOR";
+    case BehaviorMode::LOCALIZATION_DEGRADED:
+        return "LOCALIZATION_DEGRADED";
+    case BehaviorMode::LOCALIZATION_LOST:
+        return "LOCALIZATION_LOST";
     }
     return "UNKNOWN";
 }
@@ -116,14 +126,18 @@ public:
     [[nodiscard]] DecisionCommand update(const DecisionContext& ctx);
     void reset();
 
-    [[nodiscard]] BehaviorMode current_mode() const { return mode_; }
-    [[nodiscard]] Eigen::Vector3d home_position() const { return home_position_; }
+    [[nodiscard]] BehaviorMode current_mode() const {
+        return mode_;
+    }
+    [[nodiscard]] Eigen::Vector3d home_position() const {
+        return home_position_;
+    }
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 private:
-    [[nodiscard]] std::optional<PerceptionFocus> select_primary_detection(
-        const sensors::CameraFrame& frame) const;
+    [[nodiscard]] std::optional<PerceptionFocus>
+    select_primary_detection(const sensors::CameraFrame& frame) const;
 
     [[nodiscard]] DecisionCommand build_emergency_land(const DecisionContext& ctx) const;
     [[nodiscard]] DecisionCommand build_return_home(const DecisionContext& ctx) const;
@@ -143,10 +157,10 @@ private:
     [[nodiscard]] static bool is_target_label(std::string_view label);
     [[nodiscard]] static bool is_unknown_label(std::string_view label);
     DecisionConfig cfg_;
-    BehaviorMode   mode_{BehaviorMode::HOLD_POSITION};
+    BehaviorMode mode_{BehaviorMode::HOLD_POSITION};
     Eigen::Vector3d home_position_{Eigen::Vector3d::Zero()};
-    bool            home_initialized_{false};
-    uint32_t        target_miss_count_{0};
+    bool home_initialized_{false};
+    uint32_t target_miss_count_{0};
 };
 
 } // namespace drone::autonomy

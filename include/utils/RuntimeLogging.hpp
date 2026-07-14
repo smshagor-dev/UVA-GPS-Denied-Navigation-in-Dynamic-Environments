@@ -21,10 +21,8 @@ inline std::shared_ptr<spdlog::logger> get_or_create_logger(const std::string& n
         return spdlog::default_logger();
     }
 
-    auto logger = std::make_shared<spdlog::logger>(
-        name,
-        base->sinks().begin(),
-        base->sinks().end());
+    auto logger =
+        std::make_shared<spdlog::logger>(name, base->sinks().begin(), base->sinks().end());
     logger->set_level(base->level());
     spdlog::register_logger(logger);
     return logger;

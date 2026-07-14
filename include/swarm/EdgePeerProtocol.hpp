@@ -150,25 +150,24 @@ struct EdgePacketParseResult {
 [[nodiscard]] std::string_view to_string(EdgePacketType type);
 [[nodiscard]] std::optional<EdgePacketType> parse_edge_packet_type(std::string_view value);
 [[nodiscard]] std::string_view to_string(ConsensusProposalType type);
-[[nodiscard]] std::optional<ConsensusProposalType> parse_consensus_proposal_type(std::string_view value);
+[[nodiscard]] std::optional<ConsensusProposalType>
+parse_consensus_proposal_type(std::string_view value);
 [[nodiscard]] std::string_view to_string(EdgeSerializationMode mode);
-[[nodiscard]] std::optional<EdgeSerializationMode> parse_edge_serialization_mode(std::string_view value);
+[[nodiscard]] std::optional<EdgeSerializationMode>
+parse_edge_serialization_mode(std::string_view value);
 [[nodiscard]] std::string normalize_edge_source_tag(std::string_view value);
 [[nodiscard]] bool packet_is_expired(const EdgePeerPacket& packet, uint64_t now_ms);
 [[nodiscard]] std::string serialize_edge_packet_json(const EdgePeerPacket& packet);
 [[nodiscard]] EdgePacketParseResult parse_edge_packet_json(std::string_view wire);
 [[nodiscard]] std::vector<uint8_t> serialize_edge_packet_cbor(const EdgePeerPacket& packet);
 [[nodiscard]] EdgePacketParseResult parse_edge_packet_cbor(std::span<const uint8_t> wire);
-[[nodiscard]] std::vector<uint8_t> serialize_edge_packet(
-    const EdgePeerPacket& packet,
-    EdgeSerializationMode mode,
-    EdgeSerializationMetrics* metrics = nullptr);
-[[nodiscard]] EdgePacketParseResult parse_edge_packet(
-    std::span<const uint8_t> wire,
-    EdgeSerializationMode mode,
-    EdgeSerializationMetrics* metrics = nullptr);
-[[nodiscard]] EdgePacketValidationResult validate_edge_packet(
-    const EdgePeerPacket& packet,
-    const EdgePacketValidationOptions& options);
+[[nodiscard]] std::vector<uint8_t>
+serialize_edge_packet(const EdgePeerPacket& packet, EdgeSerializationMode mode,
+                      EdgeSerializationMetrics* metrics = nullptr);
+[[nodiscard]] EdgePacketParseResult parse_edge_packet(std::span<const uint8_t> wire,
+                                                      EdgeSerializationMode mode,
+                                                      EdgeSerializationMetrics* metrics = nullptr);
+[[nodiscard]] EdgePacketValidationResult
+validate_edge_packet(const EdgePeerPacket& packet, const EdgePacketValidationOptions& options);
 
 } // namespace drone::swarm

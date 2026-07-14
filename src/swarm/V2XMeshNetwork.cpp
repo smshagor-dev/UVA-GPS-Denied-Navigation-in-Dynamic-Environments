@@ -2,10 +2,9 @@
 // Project: UVA GPS Denied Navigation in Dynamic Environments
 // Technology: C++, Python, Go, CMake
 
- 
 // V2XMeshNetwork.cpp    Swarm comms, leader election, formation control
 // Drone Swarm Sensor Fusion  |  Phase 3
- 
+
 #include "swarm/V2XMeshNetwork.hpp"
 #include "swarm/EdgePeerProtocol.hpp"
 #include "swarm/SwarmSecurity.hpp"
@@ -42,8 +41,8 @@ constexpr size_t kHeartbeatPayloadSize = 1 + (sizeof(float) * 6) + 1;
 
 Eigen::Vector3d deterministic_separation_axis(uint32_t local_id, uint32_t peer_id) {
     const uint32_t mixed = (local_id * 2654435761u) ^ (peer_id * 2246822519u);
-    const double angle = static_cast<double>(mixed)
-        * (kTwoPi / static_cast<double>(std::numeric_limits<uint32_t>::max()));
+    const double angle = static_cast<double>(mixed) *
+                         (kTwoPi / static_cast<double>(std::numeric_limits<uint32_t>::max()));
     return {std::cos(angle), std::sin(angle), 0.15};
 }
 
@@ -64,26 +63,25 @@ double closing_speed_along(const Eigen::Vector3d& relative_position,
 
 } // namespace
 
-//  Wire format header (little-endian) 
+//  Wire format header (little-endian)
 // [4B magic][4B src_id][4B dst_id][4B seq][8B timestamp][1B type][1B hop]
 // [1B ttl][1B pad][2B payload_len][payload...]
 static constexpr uint32_t kMagic = 0x56325831; // "V2X1"
-static constexpr size_t   kHdrSize = 30;
+static constexpr size_t kHdrSize = 30;
 
- 
 std::vector<uint8_t> SwarmMessage::serialize() const {
     std::vector<uint8_t> out;
     out.reserve(kHdrSize + payload.size());
 
     auto push32 = [&](uint32_t v) {
         out.push_back(v & 0xFF);
-        out.push_back((v >> 8)  & 0xFF);
+        out.push_back((v >> 8) & 0xFF);
         out.push_back((v >> 16) & 0xFF);
         out.push_back((v >> 24) & 0xFF);
     };
     auto push64 = [&](uint64_t v) {
         for (int i = 0; i < 8; ++i)
-            out.push_back((v >> (8*i)) & 0xFF);
+            out.push_back((v >> (8 * i)) & 0xFF);
     };
     auto push16 = [&](uint16_t v) {
         out.push_back(v & 0xFF);
@@ -101,7 +99,7 @@ std::vector<uint8_t> SwarmMessage::serialize() const {
     out.push_back(static_cast<uint8_t>(type));
     out.push_back(hop_count);
     out.push_back(ttl);
-    out.push_back(0x00);  // pad
+    out.push_back(0x00); // pad
 
     push16(static_cast<uint16_t>(payload.size()));
     out.insert(out.end(), payload.begin(), payload.end());
@@ -110,71 +108,70 @@ std::vector<uint8_t> SwarmMessage::serialize() const {
 }
 
 std::optional<SwarmMessage> SwarmMessage::deserialize(const uint8_t* data, size_t len) {
-    if (!data || len < kHdrSize) return std::nullopt;
+    if (!data || len < kHdrSize)
+        return std::nullopt;
 
     auto r32 = [&](size_t off) -> uint32_t {
-        return static_cast<uint32_t>(data[off])
-             | (static_cast<uint32_t>(data[off+1]) << 8)
-             | (static_cast<uint32_t>(data[off+2]) << 16)
-             | (static_cast<uint32_t>(data[off+3]) << 24);
+        return static_cast<uint32_t>(data[off]) | (static_cast<uint32_t>(data[off + 1]) << 8) |
+               (static_cast<uint32_t>(data[off + 2]) << 16) |
+               (static_cast<uint32_t>(data[off + 3]) << 24);
     };
     auto r64 = [&](size_t off) -> uint64_t {
         uint64_t v = 0;
         for (int i = 0; i < 8; ++i)
-            v |= static_cast<uint64_t>(data[off+i]) << (8*i);
+            v |= static_cast<uint64_t>(data[off + i]) << (8 * i);
         return v;
     };
     auto r16 = [&](size_t off) -> uint16_t {
-        return static_cast<uint16_t>(data[off]) | (static_cast<uint16_t>(data[off+1]) << 8);
+        return static_cast<uint16_t>(data[off]) | (static_cast<uint16_t>(data[off + 1]) << 8);
     };
 
-    if (r32(0) != kMagic) return std::nullopt;
+    if (r32(0) != kMagic)
+        return std::nullopt;
 
     SwarmMessage msg;
-    msg.src_id      = r32(4);
-    msg.dst_id      = r32(8);
-    msg.seq_num     = r32(12);
-    msg.timestamp   = static_cast<double>(r64(16)) * 1e-9;
-    msg.type        = static_cast<Type>(data[24]);
-    msg.hop_count   = data[25];
-    msg.ttl         = data[26];
+    msg.src_id = r32(4);
+    msg.dst_id = r32(8);
+    msg.seq_num = r32(12);
+    msg.timestamp = static_cast<double>(r64(16)) * 1e-9;
+    msg.type = static_cast<Type>(data[24]);
+    msg.hop_count = data[25];
+    msg.ttl = data[26];
     // data[27] = pad
     msg.payload_len = r16(28);
 
-    if (kHdrSize + msg.payload_len > len) return std::nullopt;
+    if (kHdrSize + msg.payload_len > len)
+        return std::nullopt;
 
     msg.payload.assign(data + kHdrSize, data + kHdrSize + msg.payload_len);
     return msg;
 }
 
- 
 // PeerInfo
- 
+
 bool PeerInfo::is_stale(double timeout_s) const {
-    const double now = std::chrono::duration<double>(
-        std::chrono::steady_clock::now().time_since_epoch()).count();
+    const double now =
+        std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     return (now - last_seen_ts) > timeout_s;
 }
 
- 
 // V2XMeshNetwork
- 
-V2XMeshNetwork::V2XMeshNetwork(uint32_t local_id,
-                                 std::string multicast_group,
-                                 uint16_t port)
-    : local_id_(local_id)
-    , multicast_group_(std::move(multicast_group))
-    , port_(port)
-    , edge_state_cache_({})
-    , edge_consensus_(local_id) {
+
+V2XMeshNetwork::V2XMeshNetwork(uint32_t local_id, std::string multicast_group, uint16_t port)
+    : local_id_(local_id), multicast_group_(std::move(multicast_group)), port_(port),
+      edge_state_cache_({}), edge_consensus_(local_id) {
     logger_ = spdlog::get("V2X");
-    if (!logger_) logger_ = spdlog::stdout_color_mt("V2X");
+    if (!logger_)
+        logger_ = spdlog::stdout_color_mt("V2X");
 }
 
-V2XMeshNetwork::~V2XMeshNetwork() { stop(); }
+V2XMeshNetwork::~V2XMeshNetwork() {
+    stop();
+}
 
 bool V2XMeshNetwork::start() {
-    if (running_.exchange(true)) return true;
+    if (running_.exchange(true))
+        return true;
 
 #ifdef _WIN32
     WSADATA wsa_data;
@@ -219,8 +216,8 @@ bool V2XMeshNetwork::start() {
 
     // Bind
     sockaddr_in addr{};
-    addr.sin_family      = AF_INET;
-    addr.sin_port        = htons(port_);
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port_);
     addr.sin_addr.s_addr = INADDR_ANY;
     if (::bind(sock_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
         logger_->error("V2X bind failed on port {}", port_);
@@ -237,72 +234,72 @@ bool V2XMeshNetwork::start() {
     ::setsockopt(sock_, IPPROTO_IP, IP_MULTICAST_TTL, &ttl, sizeof(ttl));
 #endif
 
-    recv_thread_      = std::thread([this] { recv_loop(); });
+    recv_thread_ = std::thread([this] { recv_loop(); });
     heartbeat_thread_ = std::thread([this] { heartbeat_loop(); });
 
-    logger_->info("V2X mesh started. ID={} group={} port={}",
-                  local_id_, multicast_group_, port_);
+    logger_->info("V2X mesh started. ID={} group={} port={}", local_id_, multicast_group_, port_);
     return true;
 }
 
 void V2XMeshNetwork::stop() {
-    if (!running_.exchange(false)) return;
+    if (!running_.exchange(false))
+        return;
 
     if (sock_ >= 0) {
         broadcast_edge_packet(build_edge_goodbye_packet());
     }
 
 #ifdef _WIN32
-    if (sock_ >= 0) { ::closesocket(static_cast<SOCKET>(sock_)); sock_ = -1; }
+    if (sock_ >= 0) {
+        ::closesocket(static_cast<SOCKET>(sock_));
+        sock_ = -1;
+    }
     WSACleanup();
 #elif defined(__linux__)
-    if (sock_ >= 0) { ::close(sock_); sock_ = -1; }
+    if (sock_ >= 0) {
+        ::close(sock_);
+        sock_ = -1;
+    }
 #endif
 
-    if (recv_thread_.joinable())      recv_thread_.join();
-    if (heartbeat_thread_.joinable()) heartbeat_thread_.join();
+    if (recv_thread_.joinable())
+        recv_thread_.join();
+    if (heartbeat_thread_.joinable())
+        heartbeat_thread_.join();
 
-    logger_->info("V2X mesh stopped. TX={} RX={} loss={:.1f}%",
-                  tx_count_, rx_count_, packet_loss_pct_);
+    logger_->info("V2X mesh stopped. TX={} RX={} loss={:.1f}%", tx_count_, rx_count_,
+                  packet_loss_pct_);
 }
 
- 
-bool V2XMeshNetwork::broadcast(SwarmMessage::Type type,
-                                std::vector<uint8_t> payload) {
+bool V2XMeshNetwork::broadcast(SwarmMessage::Type type, std::vector<uint8_t> payload) {
     SwarmMessage msg;
-    msg.src_id      = local_id_;
-    msg.dst_id      = 0xFFFFFFFF;
-    msg.seq_num     = ++seq_counter_;
-    msg.timestamp   = std::chrono::duration<double>(
-        std::chrono::steady_clock::now().time_since_epoch()).count();
-    msg.type        = type;
-    msg.ttl         = 8;
-    msg.payload     = std::move(payload);
+    msg.src_id = local_id_;
+    msg.dst_id = 0xFFFFFFFF;
+    msg.seq_num = ++seq_counter_;
+    msg.timestamp =
+        std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    msg.type = type;
+    msg.ttl = 8;
+    msg.payload = std::move(payload);
     msg.payload_len = static_cast<uint16_t>(msg.payload.size());
 
-    const auto bytes = (security_ && security_->enabled())
-        ? security_->seal(msg)
-        : msg.serialize();
-    if (bytes.size() > kMaxPayload) return false;
+    const auto bytes = (security_ && security_->enabled()) ? security_->seal(msg) : msg.serialize();
+    if (bytes.size() > kMaxPayload)
+        return false;
 
 #if defined(_WIN32) || defined(__linux__)
     sockaddr_in dest{};
-    dest.sin_family      = AF_INET;
-    dest.sin_port        = htons(port_);
+    dest.sin_family = AF_INET;
+    dest.sin_port = htons(port_);
     dest.sin_addr.s_addr = ::inet_addr(multicast_group_.c_str());
 
 #ifdef _WIN32
     const int sent = ::sendto(
-        static_cast<SOCKET>(sock_),
-        reinterpret_cast<const char*>(bytes.data()),
-        static_cast<int>(bytes.size()),
-        0,
-        reinterpret_cast<const sockaddr*>(&dest),
-        sizeof(dest));
+        static_cast<SOCKET>(sock_), reinterpret_cast<const char*>(bytes.data()),
+        static_cast<int>(bytes.size()), 0, reinterpret_cast<const sockaddr*>(&dest), sizeof(dest));
 #else
-    const ssize_t sent = ::sendto(
-        sock_, bytes.data(), bytes.size(), 0,
-        reinterpret_cast<sockaddr*>(&dest), sizeof(dest));
+    const ssize_t sent = ::sendto(sock_, bytes.data(), bytes.size(), 0,
+                                  reinterpret_cast<sockaddr*>(&dest), sizeof(dest));
 #endif
 
     if (sent < 0) {
@@ -318,43 +315,35 @@ bool V2XMeshNetwork::broadcast(SwarmMessage::Type type,
     return true;
 }
 
-bool V2XMeshNetwork::unicast(uint32_t dst,
-                             SwarmMessage::Type type,
-                             std::vector<uint8_t> payload) {
+bool V2XMeshNetwork::unicast(uint32_t dst, SwarmMessage::Type type, std::vector<uint8_t> payload) {
     SwarmMessage msg;
-    msg.src_id      = local_id_;
-    msg.dst_id      = dst;
-    msg.seq_num     = ++seq_counter_;
-    msg.timestamp   = std::chrono::duration<double>(
-        std::chrono::steady_clock::now().time_since_epoch()).count();
-    msg.type        = type;
-    msg.ttl         = 8;
-    msg.payload     = std::move(payload);
+    msg.src_id = local_id_;
+    msg.dst_id = dst;
+    msg.seq_num = ++seq_counter_;
+    msg.timestamp =
+        std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    msg.type = type;
+    msg.ttl = 8;
+    msg.payload = std::move(payload);
     msg.payload_len = static_cast<uint16_t>(msg.payload.size());
 
-    const auto bytes = (security_ && security_->enabled())
-        ? security_->seal(msg)
-        : msg.serialize();
-    if (bytes.size() > kMaxPayload) return false;
+    const auto bytes = (security_ && security_->enabled()) ? security_->seal(msg) : msg.serialize();
+    if (bytes.size() > kMaxPayload)
+        return false;
 
 #if defined(_WIN32) || defined(__linux__)
     sockaddr_in dest{};
-    dest.sin_family      = AF_INET;
-    dest.sin_port        = htons(port_);
+    dest.sin_family = AF_INET;
+    dest.sin_port = htons(port_);
     dest.sin_addr.s_addr = ::inet_addr(multicast_group_.c_str());
 
 #ifdef _WIN32
     const int sent = ::sendto(
-        static_cast<SOCKET>(sock_),
-        reinterpret_cast<const char*>(bytes.data()),
-        static_cast<int>(bytes.size()),
-        0,
-        reinterpret_cast<const sockaddr*>(&dest),
-        sizeof(dest));
+        static_cast<SOCKET>(sock_), reinterpret_cast<const char*>(bytes.data()),
+        static_cast<int>(bytes.size()), 0, reinterpret_cast<const sockaddr*>(&dest), sizeof(dest));
 #else
-    const ssize_t sent = ::sendto(
-        sock_, bytes.data(), bytes.size(), 0,
-        reinterpret_cast<sockaddr*>(&dest), sizeof(dest));
+    const ssize_t sent = ::sendto(sock_, bytes.data(), bytes.size(), 0,
+                                  reinterpret_cast<sockaddr*>(&dest), sizeof(dest));
 #endif
 
     if (sent < 0) {
@@ -372,12 +361,12 @@ bool V2XMeshNetwork::unicast(uint32_t dst,
 
 bool V2XMeshNetwork::send_formation(const FormationCommand& cmd) {
     if (role_.load() != DroneRole::LEADER) {
-        logger_->warn("V2X: node {} rejected formation broadcast because it is not leader", local_id_);
+        logger_->warn("V2X: node {} rejected formation broadcast because it is not leader",
+                      local_id_);
         return false;
     }
 
-    std::vector<uint8_t> payload(
-        sizeof(uint8_t) + sizeof(float) * 3 + sizeof(double) * 3);
+    std::vector<uint8_t> payload(sizeof(uint8_t) + sizeof(float) * 3 + sizeof(double) * 3);
     size_t offset = 0;
 
     payload[offset++] = static_cast<uint8_t>(cmd.shape);
@@ -395,7 +384,6 @@ bool V2XMeshNetwork::send_formation(const FormationCommand& cmd) {
     return broadcast(SwarmMessage::Type::FORMATION_CMD, std::move(payload));
 }
 
- 
 void V2XMeshNetwork::recv_loop() {
     std::vector<uint8_t> buf(kMaxPayload);
 
@@ -405,17 +393,16 @@ void V2XMeshNetwork::recv_loop() {
 #ifdef _WIN32
         int sender_len = sizeof(sender);
 #else
-        socklen_t   sender_len = sizeof(sender);
+        socklen_t sender_len = sizeof(sender);
 #endif
 
 #ifdef _WIN32
-        const int n = ::recvfrom(
-            static_cast<SOCKET>(sock_), reinterpret_cast<char*>(buf.data()), static_cast<int>(buf.size()), 0,
-            reinterpret_cast<sockaddr*>(&sender), &sender_len);
+        const int n = ::recvfrom(static_cast<SOCKET>(sock_), reinterpret_cast<char*>(buf.data()),
+                                 static_cast<int>(buf.size()), 0,
+                                 reinterpret_cast<sockaddr*>(&sender), &sender_len);
 #else
-        const ssize_t n = ::recvfrom(
-            sock_, buf.data(), buf.size(), MSG_DONTWAIT,
-            reinterpret_cast<sockaddr*>(&sender), &sender_len);
+        const ssize_t n = ::recvfrom(sock_, buf.data(), buf.size(), MSG_DONTWAIT,
+                                     reinterpret_cast<sockaddr*>(&sender), &sender_len);
 #endif
 
         if (n <= 0) {
@@ -433,12 +420,13 @@ void V2XMeshNetwork::recv_loop() {
         } else {
             msg = SwarmMessage::deserialize(buf.data(), static_cast<size_t>(n));
         }
-        if (msg && msg->src_id != local_id_) {  // ignore own broadcasts
+        if (msg && msg->src_id != local_id_) { // ignore own broadcasts
             if (msg->type == SwarmMessage::Type::EDGE_PACKET) {
                 edge_rx_bytes_.fetch_add(static_cast<uint64_t>(n));
             }
             handle_message(*msg);
-            if (msg_cb_) msg_cb_(*msg);
+            if (msg_cb_)
+                msg_cb_(*msg);
         }
 #else
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -446,7 +434,6 @@ void V2XMeshNetwork::recv_loop() {
     }
 }
 
- 
 void V2XMeshNetwork::heartbeat_loop() {
     uint32_t loop_count = 0;
     while (running_.load()) {
@@ -471,23 +458,21 @@ void V2XMeshNetwork::heartbeat_loop() {
             broadcast_edge_packet(build_edge_emergency_packet());
         }
         expire_stale_peers();
-        std::this_thread::sleep_for(
-            std::chrono::duration<double>(kHeartbeatInterval_s));
+        std::this_thread::sleep_for(std::chrono::duration<double>(kHeartbeatInterval_s));
         ++loop_count;
     }
 }
 
- 
 void V2XMeshNetwork::handle_heartbeat(const SwarmMessage& msg) {
     std::optional<PeerInfo> updated_peer;
     bool force_re_election = false;
     {
         std::lock_guard lock(peers_mutex_);
-        auto& peer         = peers_[msg.src_id];
-        peer.id            = msg.src_id;
-        peer.last_seen_ts  = msg.timestamp;
-        peer.seq_last      = msg.seq_num;
-        peer.reachable     = true;
+        auto& peer = peers_[msg.src_id];
+        peer.id = msg.src_id;
+        peer.last_seen_ts = msg.timestamp;
+        peer.seq_last = msg.seq_num;
+        peer.reachable = true;
 
         if (msg.payload.size() >= kHeartbeatPayloadSize) {
             peer.role = static_cast<DroneRole>(msg.payload[0]);
@@ -529,20 +514,30 @@ void V2XMeshNetwork::handle_heartbeat(const SwarmMessage& msg) {
 
 void V2XMeshNetwork::handle_message(const SwarmMessage& msg) {
     switch (msg.type) {
-    case SwarmMessage::Type::HEARTBEAT:    handle_heartbeat(msg);    break;
-    case SwarmMessage::Type::LEADER_ELECT: handle_election(msg);     break;
-    case SwarmMessage::Type::POSE_UPDATE:  handle_pose_update(msg);  break;
-    case SwarmMessage::Type::EDGE_PACKET:  handle_edge_packet(msg);  break;
-    case SwarmMessage::Type::FORMATION_CMD: break;
-    default: break;
+    case SwarmMessage::Type::HEARTBEAT:
+        handle_heartbeat(msg);
+        break;
+    case SwarmMessage::Type::LEADER_ELECT:
+        handle_election(msg);
+        break;
+    case SwarmMessage::Type::POSE_UPDATE:
+        handle_pose_update(msg);
+        break;
+    case SwarmMessage::Type::EDGE_PACKET:
+        handle_edge_packet(msg);
+        break;
+    case SwarmMessage::Type::FORMATION_CMD:
+        break;
+    default:
+        break;
     }
 }
 
- 
 // MCSS-style leader election
- 
+
 void V2XMeshNetwork::trigger_election() {
-    if (election_ongoing_.exchange(true)) return;
+    if (election_ongoing_.exchange(true))
+        return;
     logger_->info("V2X election triggered by node {}", local_id_);
 
     auto health = local_health();
@@ -562,14 +557,16 @@ void V2XMeshNetwork::trigger_election() {
     {
         std::lock_guard lock(peers_mutex_);
         for (const auto& [id, peer] : peers_) {
-            if (!peer.reachable) continue;
+            if (!peer.reachable)
+                continue;
 
             const bool better_score = peer.health.leadership_score > best_score;
-            const bool better_battery = std::abs(peer.health.leadership_score - best_score) < 1e-4f
-                && peer.health.battery_pct > best_battery;
-            const bool tie_break = std::abs(peer.health.leadership_score - best_score) < 1e-4f
-                && std::abs(peer.health.battery_pct - best_battery) < 1e-4f
-                && id > best_id;
+            const bool better_battery =
+                std::abs(peer.health.leadership_score - best_score) < 1e-4f &&
+                peer.health.battery_pct > best_battery;
+            const bool tie_break = std::abs(peer.health.leadership_score - best_score) < 1e-4f &&
+                                   std::abs(peer.health.battery_pct - best_battery) < 1e-4f &&
+                                   id > best_id;
             if (better_score || better_battery || tie_break) {
                 best_id = id;
                 best_score = peer.health.leadership_score;
@@ -585,14 +582,15 @@ void V2XMeshNetwork::trigger_election() {
     } else {
         role_.store(DroneRole::FOLLOWER);
         leader_id_.store(best_id);
-        logger_->info("V2X: node {} is FOLLOWER (leader={} score {:.3f})",
-                      local_id_, best_id, best_score);
+        logger_->info("V2X: node {} is FOLLOWER (leader={} score {:.3f})", local_id_, best_id,
+                      best_score);
     }
     election_ongoing_.store(false);
 }
 
 void V2XMeshNetwork::handle_election(const SwarmMessage& msg) {
-    if (msg.payload.size() < sizeof(uint32_t)) return;
+    if (msg.payload.size() < sizeof(uint32_t))
+        return;
     uint32_t candidate_id;
     std::memcpy(&candidate_id, msg.payload.data(), sizeof(uint32_t));
 
@@ -611,25 +609,26 @@ void V2XMeshNetwork::handle_election(const SwarmMessage& msg) {
     }
 
     const auto local = local_health();
-    const bool remote_wins = (candidate_score > local.leadership_score)
-        || (std::abs(candidate_score - local.leadership_score) < 1e-4f
-            && candidate_id > local_id_);
+    const bool remote_wins =
+        (candidate_score > local.leadership_score) ||
+        (std::abs(candidate_score - local.leadership_score) < 1e-4f && candidate_id > local_id_);
     if (remote_wins && role_.load() == DroneRole::LEADER) {
         role_.store(DroneRole::FOLLOWER);
         leader_id_.store(candidate_id);
-        logger_->info("V2X: stepping down, new leader={} score={:.3f}",
-                      candidate_id, candidate_score);
+        logger_->info("V2X: stepping down, new leader={} score={:.3f}", candidate_id,
+                      candidate_score);
     }
 }
 
 void V2XMeshNetwork::handle_pose_update(const SwarmMessage& msg) {
-    if (msg.payload.size() < 24) return;
+    if (msg.payload.size() < 24)
+        return;
     Eigen::Vector3d pos;
     std::memcpy(pos.data(), msg.payload.data(), 24);
 
     std::lock_guard lock(peers_mutex_);
-    auto& peer    = peers_[msg.src_id];
-    peer.id       = msg.src_id;
+    auto& peer = peers_[msg.src_id];
+    peer.id = msg.src_id;
     peer.position = pos;
     if (msg.payload.size() >= 48) {
         std::memcpy(peer.velocity.data(), msg.payload.data() + 24, 24);
@@ -653,10 +652,8 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
     }
     if (parsed.packet.sender_id != msg.src_id) {
         if (logger_) {
-            logger_->warn(
-                "V2X edge packet rejected from {}: envelope sender mismatch ({})",
-                msg.src_id,
-                parsed.packet.sender_id);
+            logger_->warn("V2X edge packet rejected from {}: envelope sender mismatch ({})",
+                          msg.src_id, parsed.packet.sender_id);
         }
         return;
     }
@@ -664,24 +661,31 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
     {
         std::lock_guard lock(edge_serialization_metrics_mutex_);
         edge_serialization_metrics_.mode = mode;
-        edge_serialization_metrics_.encoded_packet_size_bytes = parse_metrics.encoded_packet_size_bytes;
-        edge_serialization_metrics_.json_equivalent_size_bytes = parse_metrics.json_equivalent_size_bytes;
+        edge_serialization_metrics_.encoded_packet_size_bytes =
+            parse_metrics.encoded_packet_size_bytes;
+        edge_serialization_metrics_.json_equivalent_size_bytes =
+            parse_metrics.json_equivalent_size_bytes;
         edge_serialization_metrics_.deserialization_time_us = parse_metrics.deserialization_time_us;
-        edge_serialization_metrics_.compression_ratio_vs_json = parse_metrics.compression_ratio_vs_json;
+        edge_serialization_metrics_.compression_ratio_vs_json =
+            parse_metrics.compression_ratio_vs_json;
         edge_serialization_metrics_.estimated = false;
     }
     edge_rx_bytes_.fetch_add(msg.payload.size(), std::memory_order_relaxed);
 
-    const auto now_ms = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    const auto now_ms =
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count());
 
     const auto last_sequence = edge_state_cache_.last_sequence_number(parsed.packet.sender_id);
-    const auto auth = drone::security::verifyPacket(parsed.packet, packet_auth_config_, now_ms, last_sequence);
+    const auto auth =
+        drone::security::verifyPacket(parsed.packet, packet_auth_config_, now_ms, last_sequence);
     {
         std::lock_guard lock(edge_serialization_metrics_mutex_);
-        edge_serialization_metrics_.auth_mode = std::string(drone::security::to_string(packet_auth_config_.mode));
-        edge_serialization_metrics_.last_auth_result = std::string(drone::security::to_string(auth.result));
+        edge_serialization_metrics_.auth_mode =
+            std::string(drone::security::to_string(packet_auth_config_.mode));
+        edge_serialization_metrics_.last_auth_result =
+            std::string(drone::security::to_string(auth.result));
         edge_serialization_metrics_.pqc_ready_status =
             packet_auth_config_.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER
                 ? "roadmap_only"
@@ -700,10 +704,8 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
             edge_serialization_metrics_.auth_failures = failures;
         }
         if (logger_) {
-            logger_->warn("V2X edge packet auth rejected from {}: {} ({})",
-                          msg.src_id,
-                          drone::security::to_string(auth.result),
-                          auth.reason);
+            logger_->warn("V2X edge packet auth rejected from {}: {} ({})", msg.src_id,
+                          drone::security::to_string(auth.result), auth.reason);
         }
         return;
     }
@@ -719,7 +721,8 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
     edge_consensus_.observe_packet(parsed.packet, edge_state_cache_);
 
     std::optional<PeerInfo> updated_peer;
-    if (const auto cached = edge_state_cache_.peer_state(parsed.packet.sender_id); cached.has_value()) {
+    if (const auto cached = edge_state_cache_.peer_state(parsed.packet.sender_id);
+        cached.has_value()) {
         std::lock_guard lock(peers_mutex_);
         auto& peer = peers_[parsed.packet.sender_id];
         peer.id = parsed.packet.sender_id;
@@ -734,7 +737,8 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
             peer.health.motor_health = static_cast<float>(parsed.packet.heartbeat->motor_health);
             peer.health.link_quality = static_cast<float>(parsed.packet.heartbeat->link_quality);
         }
-        peer.health.link_quality = static_cast<float>(std::clamp(cached->mesh_bandwidth_kbps / 256.0, 0.0, 1.0));
+        peer.health.link_quality =
+            static_cast<float>(std::clamp(cached->mesh_bandwidth_kbps / 256.0, 0.0, 1.0));
         peer.health.emergency_fault = cached->emergency_fault;
         updated_peer = peer;
     }
@@ -746,9 +750,10 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
 // peer liveness and leader-loss detection
 void V2XMeshNetwork::expire_stale_peers() {
     bool leader_lost = false;
-    const auto now_ms = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    const auto now_ms =
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count());
     edge_state_cache_.expire(now_ms);
     edge_consensus_.expire(edge_state_cache_);
     {
@@ -756,10 +761,11 @@ void V2XMeshNetwork::expire_stale_peers() {
         for (auto& [id, peer] : peers_) {
             if (peer.is_stale(kPeerTimeout_s)) {
                 peer.reachable = false;
-                logger_->warn("V2X: peer {} marked unreachable (last seen {:.1f}s ago)",
-                              id, std::chrono::duration<double>(
-                                  std::chrono::steady_clock::now().time_since_epoch()).count()
-                              - peer.last_seen_ts);
+                logger_->warn("V2X: peer {} marked unreachable (last seen {:.1f}s ago)", id,
+                              std::chrono::duration<double>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                      .count() -
+                                  peer.last_seen_ts);
                 if (leader_id_.load() == id) {
                     leader_lost = true;
                 }
@@ -781,7 +787,8 @@ std::vector<PeerInfo> V2XMeshNetwork::active_peers() const {
     std::vector<PeerInfo> out;
     out.reserve(peers_.size());
     for (const auto& [id, p] : peers_)
-        if (p.reachable) out.push_back(p);
+        if (p.reachable)
+            out.push_back(p);
     return out;
 }
 
@@ -817,9 +824,8 @@ std::string V2XMeshNetwork::autonomy_state() const {
 
 float V2XMeshNetwork::mesh_bandwidth_kbps() const {
     std::lock_guard lock(local_edge_state_mutex_);
-    return static_cast<float>(
-        local_edge_state_.mesh_bandwidth_kbps +
-        ((edge_tx_bytes_.load() + edge_rx_bytes_.load()) / 128.0));
+    return static_cast<float>(local_edge_state_.mesh_bandwidth_kbps +
+                              ((edge_tx_bytes_.load() + edge_rx_bytes_.load()) / 128.0));
 }
 
 bool V2XMeshNetwork::disconnected_operation() const {
@@ -871,8 +877,10 @@ bool V2XMeshNetwork::broadcast_edge_packet(const EdgePeerPacket& packet) {
     const auto auth = drone::security::signPacket(signed_packet, packet_auth_config_);
     {
         std::lock_guard lock(edge_serialization_metrics_mutex_);
-        edge_serialization_metrics_.auth_mode = std::string(drone::security::to_string(packet_auth_config_.mode));
-        edge_serialization_metrics_.last_auth_result = std::string(drone::security::to_string(auth.result));
+        edge_serialization_metrics_.auth_mode =
+            std::string(drone::security::to_string(packet_auth_config_.mode));
+        edge_serialization_metrics_.last_auth_result =
+            std::string(drone::security::to_string(auth.result));
         edge_serialization_metrics_.pqc_ready_status =
             packet_auth_config_.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER
                 ? "roadmap_only"
@@ -884,8 +892,7 @@ bool V2XMeshNetwork::broadcast_edge_packet(const EdgePeerPacket& packet) {
     if (!auth.accepted()) {
         if (logger_) {
             logger_->warn("V2X edge packet signing skipped: {} ({})",
-                          drone::security::to_string(auth.result),
-                          auth.reason);
+                          drone::security::to_string(auth.result), auth.reason);
         }
         return false;
     }
@@ -898,8 +905,10 @@ bool V2XMeshNetwork::broadcast_edge_packet(const EdgePeerPacket& packet) {
         edge_serialization_metrics_.json_equivalent_size_bytes = metrics.json_equivalent_size_bytes;
         edge_serialization_metrics_.serialization_time_us = metrics.serialization_time_us;
         edge_serialization_metrics_.compression_ratio_vs_json = metrics.compression_ratio_vs_json;
-        edge_serialization_metrics_.auth_mode = std::string(drone::security::to_string(packet_auth_config_.mode));
-        edge_serialization_metrics_.last_auth_result = std::string(drone::security::to_string(auth.result));
+        edge_serialization_metrics_.auth_mode =
+            std::string(drone::security::to_string(packet_auth_config_.mode));
+        edge_serialization_metrics_.last_auth_result =
+            std::string(drone::security::to_string(auth.result));
         edge_serialization_metrics_.auth_failures = edge_auth_failures_.load();
         edge_serialization_metrics_.unsigned_packets = edge_unsigned_packets_.load();
         edge_serialization_metrics_.pqc_ready_status =
@@ -922,9 +931,10 @@ EdgePeerPacket V2XMeshNetwork::build_edge_heartbeat_packet() const {
     EdgePeerPacket packet;
     packet.packet_type = EdgePacketType::HEARTBEAT;
     packet.sender_id = local_id_;
-    packet.timestamp_ms = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.timestamp_ms =
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = edge_state.trust_epoch;
     packet.source = edge_state.source;
@@ -948,9 +958,10 @@ EdgePeerPacket V2XMeshNetwork::build_edge_pose_packet() const {
     EdgePeerPacket packet;
     packet.packet_type = EdgePacketType::POSE_STATE;
     packet.sender_id = local_id_;
-    packet.timestamp_ms = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.timestamp_ms =
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
     packet.source = local_edge_state_.source;
@@ -969,9 +980,10 @@ EdgePeerPacket V2XMeshNetwork::build_edge_health_packet() const {
     EdgePeerPacket packet;
     packet.packet_type = EdgePacketType::EDGE_HEALTH;
     packet.sender_id = local_id_;
-    packet.timestamp_ms = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.timestamp_ms =
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
     packet.source = local_edge_state_.source;
@@ -992,9 +1004,10 @@ EdgePeerPacket V2XMeshNetwork::build_edge_obstacle_packet() const {
     EdgePeerPacket packet;
     packet.packet_type = EdgePacketType::OBSTACLE_DIGEST;
     packet.sender_id = local_id_;
-    packet.timestamp_ms = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.timestamp_ms =
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
     packet.source = local_edge_state_.source;
@@ -1014,9 +1027,10 @@ EdgePeerPacket V2XMeshNetwork::build_edge_threat_packet() const {
     EdgePeerPacket packet;
     packet.packet_type = EdgePacketType::THREAT_DIGEST;
     packet.sender_id = local_id_;
-    packet.timestamp_ms = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.timestamp_ms =
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
     packet.source = local_edge_state_.source;
@@ -1036,9 +1050,10 @@ EdgePeerPacket V2XMeshNetwork::build_edge_consensus_packet() const {
     EdgePeerPacket packet;
     packet.packet_type = EdgePacketType::CONSENSUS_STATE;
     packet.sender_id = local_id_;
-    packet.timestamp_ms = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.timestamp_ms =
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
     packet.source = local_edge_state_.source;
@@ -1048,7 +1063,9 @@ EdgePeerPacket V2XMeshNetwork::build_edge_consensus_packet() const {
         consensus.proposal_type,
         consensus.state,
         std::max(consensus.consensus_epoch, local_edge_state_.consensus_epoch),
-        std::max(consensus.quorum_count, static_cast<int>(safety_eligible_peer_count() > 0 ? safety_eligible_peer_count() : 1)),
+        std::max(
+            consensus.quorum_count,
+            static_cast<int>(safety_eligible_peer_count() > 0 ? safety_eligible_peer_count() : 1)),
         consensus.local_safety_override,
     };
     return packet;
@@ -1059,9 +1076,10 @@ EdgePeerPacket V2XMeshNetwork::build_edge_emergency_packet() const {
     EdgePeerPacket packet;
     packet.packet_type = EdgePacketType::EMERGENCY_CORRIDOR;
     packet.sender_id = local_id_;
-    packet.timestamp_ms = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.timestamp_ms =
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
     packet.source = local_edge_state_.source;
@@ -1085,9 +1103,10 @@ EdgePeerPacket V2XMeshNetwork::build_edge_goodbye_packet() const {
     EdgePeerPacket packet;
     packet.packet_type = EdgePacketType::PEER_GOODBYE;
     packet.sender_id = local_id_;
-    packet.timestamp_ms = static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count());
+    packet.timestamp_ms =
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = edge_state.trust_epoch;
     packet.source = edge_state.source;
@@ -1104,7 +1123,8 @@ void V2XMeshNetwork::configure_packet_auth(drone::security::PacketAuthConfig cfg
     packet_auth_config_ = std::move(cfg);
     {
         std::lock_guard lock(edge_serialization_metrics_mutex_);
-        edge_serialization_metrics_.auth_mode = std::string(drone::security::to_string(packet_auth_config_.mode));
+        edge_serialization_metrics_.auth_mode =
+            std::string(drone::security::to_string(packet_auth_config_.mode));
         edge_serialization_metrics_.pqc_ready_status =
             packet_auth_config_.mode == drone::security::AuthMode::PQC_HYBRID_PLACEHOLDER
                 ? "roadmap_only"
@@ -1124,7 +1144,8 @@ void V2XMeshNetwork::configure_packet_auth(drone::security::PacketAuthConfig cfg
 void V2XMeshNetwork::set_edge_serialization_mode(EdgeSerializationMode mode) {
     if (mode == EdgeSerializationMode::PROTOBUF_PLACEHOLDER) {
         if (logger_) {
-            logger_->warn("V2X: protobuf_placeholder requested; falling back to JSON until protobuf transport is implemented");
+            logger_->warn("V2X: protobuf_placeholder requested; falling back to JSON until "
+                          "protobuf transport is implemented");
         }
         mode = EdgeSerializationMode::JSON;
     }
@@ -1165,28 +1186,24 @@ float V2XMeshNetwork::compute_leadership_score(const SwarmHealthMetrics& health)
         return 0.0f;
     }
     const float battery_norm = std::clamp(health.battery_pct / 100.0f, 0.0f, 1.0f);
-    const float score =
-        (0.32f * battery_norm) +
-        (0.28f * std::clamp(health.motor_health, 0.0f, 1.0f)) +
-        (0.18f * std::clamp(health.link_quality, 0.0f, 1.0f)) +
-        (0.12f * std::clamp(health.cpu_headroom, 0.0f, 1.0f)) +
-        (0.10f * std::clamp(health.thermal_headroom, 0.0f, 1.0f));
+    const float score = (0.32f * battery_norm) +
+                        (0.28f * std::clamp(health.motor_health, 0.0f, 1.0f)) +
+                        (0.18f * std::clamp(health.link_quality, 0.0f, 1.0f)) +
+                        (0.12f * std::clamp(health.cpu_headroom, 0.0f, 1.0f)) +
+                        (0.10f * std::clamp(health.thermal_headroom, 0.0f, 1.0f));
     return std::clamp(score, 0.0f, 1.0f);
 }
 bool V2XMeshNetwork::should_force_re_election(const PeerInfo& peer) const {
-    return peer.health.emergency_fault
-        || peer.health.motor_health < 0.35f
-        || peer.health.link_quality < 0.25f
-        || peer.health.battery_pct < 18.0f
-        || peer.health.leadership_score < 0.40f;
+    return peer.health.emergency_fault || peer.health.motor_health < 0.35f ||
+           peer.health.link_quality < 0.25f || peer.health.battery_pct < 18.0f ||
+           peer.health.leadership_score < 0.40f;
 }
 // -----------------------------------------------------------------------------
 // LeaderFollowerController
- 
-Eigen::Vector3d LeaderFollowerController::compute_target(
-        const Eigen::Vector3d& leader_pos,
-        const FormationCommand& cmd,
-        uint32_t follower_index) const {
+
+Eigen::Vector3d LeaderFollowerController::compute_target(const Eigen::Vector3d& leader_pos,
+                                                         const FormationCommand& cmd,
+                                                         uint32_t follower_index) const {
 
     const float s = cmd.spacing_m;
     Eigen::Vector3d offset;
@@ -1195,10 +1212,10 @@ Eigen::Vector3d LeaderFollowerController::compute_target(
     case FormationCommand::Formation::DIAMOND: {
         // 4-drone diamond: [right, left, back-right, back-left]
         static const std::array<Eigen::Vector3f, 4> diamond = {{
-            { s,  0,    0},
-            {-s,  0,    0},
-            { s*0.7f, -s, 0},
-            {-s*0.7f, -s, 0},
+            {s, 0, 0},
+            {-s, 0, 0},
+            {s * 0.7f, -s, 0},
+            {-s * 0.7f, -s, 0},
         }};
         const auto& o = diamond[follower_index % 4];
         offset = Eigen::Vector3d(o.x(), o.y(), o.z());
@@ -1206,12 +1223,9 @@ Eigen::Vector3d LeaderFollowerController::compute_target(
     }
     case FormationCommand::Formation::VEE: {
         const float angle = static_cast<float>(30.0 * kDegToRad);
-        const int   side  = (follower_index % 2 == 0) ? 1 : -1;
-        const float row   = static_cast<float>((follower_index / 2) + 1);
-        offset = Eigen::Vector3d(
-            side * row * s * std::sin(angle),
-            -row * s * std::cos(angle),
-            0.0);
+        const int side = (follower_index % 2 == 0) ? 1 : -1;
+        const float row = static_cast<float>((follower_index / 2) + 1);
+        offset = Eigen::Vector3d(side * row * s * std::sin(angle), -row * s * std::cos(angle), 0.0);
         break;
     }
     case FormationCommand::Formation::LINE: {
@@ -1225,28 +1239,25 @@ Eigen::Vector3d LeaderFollowerController::compute_target(
     return leader_pos + offset;
 }
 
-Eigen::Vector3d LeaderFollowerController::velocity_command(
-        const Eigen::Vector3d& current_pos,
-        const Eigen::Vector3d& current_velocity,
-        const Eigen::Vector3d& target_pos,
-        float kp, float max_speed_mps) const {
+Eigen::Vector3d LeaderFollowerController::velocity_command(const Eigen::Vector3d& current_pos,
+                                                           const Eigen::Vector3d& current_velocity,
+                                                           const Eigen::Vector3d& target_pos,
+                                                           float kp, float max_speed_mps) const {
     const auto peers = net_ ? net_->active_peers() : std::vector<PeerInfo>{};
-    return velocity_command(current_pos, current_velocity, target_pos, peers, {}, kp, max_speed_mps);
+    return velocity_command(current_pos, current_velocity, target_pos, peers, {}, kp,
+                            max_speed_mps);
 }
 
 Eigen::Vector3d LeaderFollowerController::velocity_command(
-        const Eigen::Vector3d& current_pos,
-        const Eigen::Vector3d& current_velocity,
-        const Eigen::Vector3d& target_pos,
-        const std::vector<PeerInfo>& peers,
-        const std::vector<AvoidanceObstacle>& obstacles,
-        float kp, float max_speed_mps) const {
+    const Eigen::Vector3d& current_pos, const Eigen::Vector3d& current_velocity,
+    const Eigen::Vector3d& target_pos, const std::vector<PeerInfo>& peers,
+    const std::vector<AvoidanceObstacle>& obstacles, float kp, float max_speed_mps) const {
     Eigen::Vector3d error = target_pos - current_pos;
     Eigen::Vector3d preferred_vel = kp * error;
 
     // Blend goal tracking with VO-aware peer/static obstacle avoidance.
-    Eigen::Vector3d vel = preferred_vel
-        + compute_avoidance_velocity(current_pos, current_velocity, peers, obstacles);
+    Eigen::Vector3d vel =
+        preferred_vel + compute_avoidance_velocity(current_pos, current_velocity, peers, obstacles);
 
     // Escape local minima by injecting a small tangential move when the
     // desired tracking velocity and avoidance field nearly cancel out.
@@ -1263,14 +1274,10 @@ Eigen::Vector3d LeaderFollowerController::velocity_command(
 }
 
 Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
-        const Eigen::Vector3d& current_pos,
-        const Eigen::Vector3d& current_velocity,
-        const std::vector<PeerInfo>& peers,
-        const std::vector<AvoidanceObstacle>& obstacles,
-        float min_separation_m,
-        float influence_radius_m,
-        float max_avoid_speed_mps,
-        float prediction_horizon_s) const {
+    const Eigen::Vector3d& current_pos, const Eigen::Vector3d& current_velocity,
+    const std::vector<PeerInfo>& peers, const std::vector<AvoidanceObstacle>& obstacles,
+    float min_separation_m, float influence_radius_m, float max_avoid_speed_mps,
+    float prediction_horizon_s) const {
     if (peers.empty() && obstacles.empty()) {
         return Eigen::Vector3d::Zero();
     }
@@ -1280,9 +1287,8 @@ Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
 
     Eigen::Vector3d repulsion = Eigen::Vector3d::Zero();
     double strongest_hazard = 0.0;
-    const double separation_band = std::max(
-        static_cast<double>(influence_radius_m - min_separation_m),
-        kAvoidanceEps);
+    const double separation_band =
+        std::max(static_cast<double>(influence_radius_m - min_separation_m), kAvoidanceEps);
 
     for (const auto& peer : peers) {
         if (!peer.reachable || peer.id == id_) {
@@ -1307,13 +1313,12 @@ Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
         }
 
         const double normalized_gap = std::clamp(
-            (static_cast<double>(influence_radius_m) - distance) / separation_band,
-            0.0, 1.0);
+            (static_cast<double>(influence_radius_m) - distance) / separation_band, 0.0, 1.0);
 
         double weight = normalized_gap * normalized_gap;
         if (distance < min_separation_m) {
-            weight += 1.0 + ((static_cast<double>(min_separation_m) - distance)
-                / std::max(static_cast<double>(min_separation_m), kAvoidanceEps));
+            weight += 1.0 + ((static_cast<double>(min_separation_m) - distance) /
+                             std::max(static_cast<double>(min_separation_m), kAvoidanceEps));
         }
 
         const Eigen::Vector3d relative_velocity = peer.velocity - current_velocity;
@@ -1321,7 +1326,8 @@ Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
         if (closing_speed > 0.0) {
             const double time_to_collision = distance / std::max(closing_speed, kAvoidanceEps);
             if (time_to_collision < prediction_horizon_s) {
-                weight += (prediction_horizon_s - time_to_collision) / std::max(prediction_horizon_s, 0.1f);
+                weight += (prediction_horizon_s - time_to_collision) /
+                          std::max(prediction_horizon_s, 0.1f);
             }
         }
 
@@ -1337,7 +1343,8 @@ Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
         }
 
         if (distance < kAvoidanceEps) {
-            delta = deterministic_separation_axis(id_, static_cast<uint32_t>(obstacle.radius_m * 1000.0f + 1.0f));
+            delta = deterministic_separation_axis(
+                id_, static_cast<uint32_t>(obstacle.radius_m * 1000.0f + 1.0f));
             distance = delta.norm();
         }
 
@@ -1348,22 +1355,22 @@ Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
         }
 
         const double normalized_gap = std::clamp(
-            (static_cast<double>(influence_radius_m) - distance) / separation_band,
-            0.0, 1.0);
+            (static_cast<double>(influence_radius_m) - distance) / separation_band, 0.0, 1.0);
 
         double weight = 0.8 * normalized_gap * normalized_gap;
         if (distance < min_separation_m) {
-            weight += 1.1 + ((static_cast<double>(min_separation_m) - distance)
-                / std::max(static_cast<double>(min_separation_m), kAvoidanceEps));
+            weight += 1.1 + ((static_cast<double>(min_separation_m) - distance) /
+                             std::max(static_cast<double>(min_separation_m), kAvoidanceEps));
         }
 
         const Eigen::Vector3d relative_velocity = obstacle.velocity - current_velocity;
         const double closing_speed = closing_speed_along(delta, relative_velocity);
         if (obstacle.dynamic && closing_speed > 0.0) {
-            const double time_to_collision = std::max(distance, 0.0) / std::max(closing_speed, kAvoidanceEps);
+            const double time_to_collision =
+                std::max(distance, 0.0) / std::max(closing_speed, kAvoidanceEps);
             if (time_to_collision < prediction_horizon_s) {
-                weight += 0.75 * (prediction_horizon_s - time_to_collision)
-                    / std::max(prediction_horizon_s, 0.1f);
+                weight += 0.75 * (prediction_horizon_s - time_to_collision) /
+                          std::max(prediction_horizon_s, 0.1f);
             }
         }
 
@@ -1380,11 +1387,10 @@ Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
     return repulsion;
 }
 
-std::vector<AvoidanceObstacle> LeaderFollowerController::obstacles_from_lidar(
-        const sensors::LidarMeasurement& scan,
-        const Eigen::Vector3d& drone_position,
-        size_t stride,
-        float obstacle_radius_m) {
+std::vector<AvoidanceObstacle>
+LeaderFollowerController::obstacles_from_lidar(const sensors::LidarMeasurement& scan,
+                                               const Eigen::Vector3d& drone_position, size_t stride,
+                                               float obstacle_radius_m) {
     std::vector<AvoidanceObstacle> out;
     if (!scan.cloud || scan.cloud->empty()) {
         return out;
@@ -1406,7 +1412,6 @@ std::vector<AvoidanceObstacle> LeaderFollowerController::obstacles_from_lidar(
 }
 
 } // namespace drone::swarm
-
 
 // System Designer and Developer: Md Shahanur Islam Shagor
 // Project: UVA GPS Denied Navigation in Dynamic Environments

@@ -17,9 +17,8 @@ namespace {
 
 std::string lowercase(std::string_view value) {
     std::string out(value.begin(), value.end());
-    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return out;
 }
 
@@ -33,7 +32,8 @@ std::optional<std::string> extract_json_string(const std::string& content, const
 }
 
 std::optional<double> extract_json_number(const std::string& content, const std::string& key) {
-    const std::regex pattern("\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)", std::regex::icase);
+    const std::regex pattern("\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)",
+                             std::regex::icase);
     std::smatch match;
     if (!(std::regex_search(content, match, pattern) && match.size() >= 2)) {
         return std::nullopt;
@@ -51,16 +51,15 @@ bool finite_coord(double value) {
 
 std::optional<uint32_t> parse_anchor_numeric_id(std::string_view id_text) {
     std::string trimmed(id_text.begin(), id_text.end());
-    trimmed.erase(std::remove_if(trimmed.begin(), trimmed.end(), [](unsigned char c) {
-        return std::isspace(c);
-    }), trimmed.end());
+    trimmed.erase(std::remove_if(trimmed.begin(), trimmed.end(),
+                                 [](unsigned char c) { return std::isspace(c); }),
+                  trimmed.end());
     if (trimmed.empty()) {
         return std::nullopt;
     }
 
-    bool all_digits = std::all_of(trimmed.begin(), trimmed.end(), [](unsigned char c) {
-        return std::isdigit(c);
-    });
+    bool all_digits = std::all_of(trimmed.begin(), trimmed.end(),
+                                  [](unsigned char c) { return std::isdigit(c); });
     try {
         if (all_digits) {
             return static_cast<uint32_t>(std::stoul(trimmed));
@@ -70,7 +69,8 @@ std::optional<uint32_t> parse_anchor_numeric_id(std::string_view id_text) {
             return std::nullopt;
         }
         const std::string numeric = trimmed.substr(digit_start);
-        if (!std::all_of(numeric.begin(), numeric.end(), [](unsigned char c) { return std::isdigit(c); })) {
+        if (!std::all_of(numeric.begin(), numeric.end(),
+                         [](unsigned char c) { return std::isdigit(c); })) {
             return std::nullopt;
         }
         return static_cast<uint32_t>(std::stoul(numeric));
@@ -88,11 +88,13 @@ void assess_anchor_geometry(const std::vector<AnchorDefinition>& anchors,
     double min_distance = std::numeric_limits<double>::max();
     for (size_t i = 0; i < anchors.size(); ++i) {
         for (size_t j = i + 1; j < anchors.size(); ++j) {
-            min_distance = std::min(min_distance, (anchors[i].position - anchors[j].position).norm());
+            min_distance =
+                std::min(min_distance, (anchors[i].position - anchors[j].position).norm());
         }
     }
     if (min_distance < 1.0) {
-        warnings.push_back("anchor geometry quality warning: at least two anchors are closer than 1 meter");
+        warnings.push_back(
+            "anchor geometry quality warning: at least two anchors are closer than 1 meter");
     }
 
     bool found_non_collinear = false;
@@ -131,10 +133,14 @@ void assess_anchor_geometry(const std::vector<AnchorDefinition>& anchors,
 
 std::string_view to_string(RuntimeMode mode) {
     switch (mode) {
-    case RuntimeMode::SIMULATION: return "simulation";
-    case RuntimeMode::BENCH: return "bench";
-    case RuntimeMode::PRODUCTION: return "production";
-    case RuntimeMode::EDGE_SWARM: return "edge_swarm";
+    case RuntimeMode::SIMULATION:
+        return "simulation";
+    case RuntimeMode::BENCH:
+        return "bench";
+    case RuntimeMode::PRODUCTION:
+        return "production";
+    case RuntimeMode::EDGE_SWARM:
+        return "edge_swarm";
     }
     return "simulation";
 }
@@ -186,7 +192,8 @@ RuntimeFileConfig load_runtime_file(const std::string& path) {
 
 RuntimeValidationResult validate_runtime_configuration(const RuntimeValidationInputs& input) {
     RuntimeValidationResult result;
-    const bool has_any_external_source = input.has_csv_source || input.has_udp_source || input.has_serial_source;
+    const bool has_any_external_source =
+        input.has_csv_source || input.has_udp_source || input.has_serial_source;
     const bool has_anchor_config = !input.anchor_config_path.empty();
 
     if (input.runtime_mode == RuntimeMode::SIMULATION) {
@@ -203,14 +210,16 @@ RuntimeValidationResult validate_runtime_configuration(const RuntimeValidationIn
         result.errors.push_back("an external TDOA source is required outside simulation mode");
     }
 
-    if (input.runtime_mode == RuntimeMode::PRODUCTION || input.runtime_mode == RuntimeMode::EDGE_SWARM) {
+    if (input.runtime_mode == RuntimeMode::PRODUCTION ||
+        input.runtime_mode == RuntimeMode::EDGE_SWARM) {
         if (input.has_csv_source) {
             result.ok = false;
             result.errors.push_back("CSV playback is not allowed in production or edge_swarm mode");
         }
         if (!input.has_udp_source && !input.has_serial_source) {
             result.ok = false;
-            result.errors.push_back("production and edge_swarm modes require live UDP or serial TDOA input");
+            result.errors.push_back(
+                "production and edge_swarm modes require live UDP or serial TDOA input");
         }
     }
 
@@ -240,7 +249,11 @@ AnchorConfigLoadResult load_anchor_config_json(const std::string& path) {
     result.coordinate_frame = extract_json_string(content, "coordinate_frame").value_or("unknown");
     result.units = extract_json_string(content, "units").value_or("unknown");
 
-    const std::regex anchor_pattern("\\{[^\\{\\}]*\"id\"\\s*:\\s*\"([^\"]+)\"[^\\{\\}]*\"x\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\\s*,?[^\\{\\}]*\"y\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)\\s*,?[^\\{\\}]*\"z\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)", std::regex::icase);
+    const std::regex anchor_pattern(
+        "\\{[^\\{\\}]*\"id\"\\s*:\\s*\"([^\"]+)\"[^\\{\\}]*\"x\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:"
+        "[eE][+-]?[0-9]+)?)\\s*,?[^\\{\\}]*\"y\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)"
+        "?)\\s*,?[^\\{\\}]*\"z\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)",
+        std::regex::icase);
     std::sregex_iterator it(content.begin(), content.end(), anchor_pattern);
     std::sregex_iterator end;
 
@@ -255,7 +268,8 @@ AnchorConfigLoadResult load_anchor_config_json(const std::string& path) {
         const std::string source_id = match[1].str();
         const auto numeric_id = parse_anchor_numeric_id(source_id);
         if (!numeric_id.has_value()) {
-            result.errors.push_back("anchor id \"" + source_id + "\" is invalid; expected digits or a string ending in digits");
+            result.errors.push_back("anchor id \"" + source_id +
+                                    "\" is invalid; expected digits or a string ending in digits");
             continue;
         }
 
@@ -272,7 +286,8 @@ AnchorConfigLoadResult load_anchor_config_json(const std::string& path) {
         }
 
         if (!finite_coord(x) || !finite_coord(y) || !finite_coord(z)) {
-            result.errors.push_back("anchor \"" + source_id + "\" contains non-finite or out-of-range coordinates");
+            result.errors.push_back("anchor \"" + source_id +
+                                    "\" contains non-finite or out-of-range coordinates");
             continue;
         }
         if (!seen_source_ids.insert(source_id).second) {
@@ -280,7 +295,8 @@ AnchorConfigLoadResult load_anchor_config_json(const std::string& path) {
             continue;
         }
         if (!seen_numeric_ids.insert(*numeric_id).second) {
-            result.errors.push_back("duplicate numeric anchor id derived from \"" + source_id + "\"");
+            result.errors.push_back("duplicate numeric anchor id derived from \"" + source_id +
+                                    "\"");
             continue;
         }
 
@@ -363,23 +379,22 @@ LidarConfigLoadResult load_lidar_config_json(const std::string& path) {
     return result;
 }
 
-RuntimeValidationResult validate_lidar_runtime_configuration(const LidarRuntimeValidationInputs& input) {
+RuntimeValidationResult
+validate_lidar_runtime_configuration(const LidarRuntimeValidationInputs& input) {
     RuntimeValidationResult result;
     if (!input.lidar_enabled || !input.lidar_required) {
         return result;
     }
     if (!input.lidar_initialized) {
         result.ok = false;
-        result.errors.push_back(
-            "required LiDAR is unavailable; bench/production/edge_swarm mode cannot continue without live LiDAR initialization");
+        result.errors.push_back("required LiDAR is unavailable; bench/production/edge_swarm mode "
+                                "cannot continue without live LiDAR initialization");
     }
     return result;
 }
 
-std::string determine_localization_data_source(RuntimeMode mode,
-                                               bool used_synthetic,
-                                               bool used_csv_playback,
-                                               bool used_live_external,
+std::string determine_localization_data_source(RuntimeMode mode, bool used_synthetic,
+                                               bool used_csv_playback, bool used_live_external,
                                                bool has_measurements) {
     if (used_synthetic) {
         return "simulation";

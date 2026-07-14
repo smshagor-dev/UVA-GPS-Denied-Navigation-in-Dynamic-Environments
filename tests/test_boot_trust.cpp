@@ -51,7 +51,8 @@ TEST(FirmwareTrust, RejectsRollbackRegression) {
         policy.state_file = stateFile.string();
         policy.allowed_signers = {"release-ca"};
         policy.signing_secret = "phase4-test-secret";
-        manifest.signature = drone::security::sign_firmware_manifest(manifest, policy.signing_secret);
+        manifest.signature =
+            drone::security::sign_firmware_manifest(manifest, policy.signing_secret);
         const auto accepted = drone::security::validate_firmware_trust(manifest, policy);
         ASSERT_TRUE(accepted.accepted);
     }
@@ -64,7 +65,8 @@ TEST(FirmwareTrust, RejectsRollbackRegression) {
     policy.state_file = stateFile.string();
     policy.allowed_signers = {"release-ca"};
     policy.signing_secret = "phase4-test-secret";
-    rollbackManifest.signature = drone::security::sign_firmware_manifest(rollbackManifest, policy.signing_secret);
+    rollbackManifest.signature =
+        drone::security::sign_firmware_manifest(rollbackManifest, policy.signing_secret);
 
     const auto report = drone::security::validate_firmware_trust(rollbackManifest, policy);
 

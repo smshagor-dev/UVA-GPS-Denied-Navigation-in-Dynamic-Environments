@@ -20,11 +20,9 @@ cv::Mat make_feature_rich_image(int seed = 0) {
     for (int i = 0; i < 80; ++i) {
         const cv::Point center(rng.uniform(20, 620), rng.uniform(20, 460));
         cv::circle(image, center, rng.uniform(4, 14), cv::Scalar(rng.uniform(120, 255)), -1);
-        cv::line(image,
+        cv::line(image, cv::Point(rng.uniform(0, 639), rng.uniform(0, 479)),
                  cv::Point(rng.uniform(0, 639), rng.uniform(0, 479)),
-                 cv::Point(rng.uniform(0, 639), rng.uniform(0, 479)),
-                 cv::Scalar(rng.uniform(80, 220)),
-                 rng.uniform(1, 3));
+                 cv::Scalar(rng.uniform(80, 220)), rng.uniform(1, 3));
     }
     return image;
 }
@@ -33,11 +31,8 @@ cv::Mat make_feature_rich_image(int seed = 0) {
 
 TEST(KeyframeManager, CreatesKeyframeAndMapPoints) {
     KeyframeManager manager(1, nullptr);
-    const auto maybe_id = manager.try_add_frame(
-        make_feature_rich_image(),
-        Eigen::Vector3d::Zero(),
-        Eigen::Quaterniond::Identity(),
-        1.0);
+    const auto maybe_id = manager.try_add_frame(make_feature_rich_image(), Eigen::Vector3d::Zero(),
+                                                Eigen::Quaterniond::Identity(), 1.0);
 
     ASSERT_TRUE(maybe_id.has_value());
     EXPECT_EQ(manager.keyframe_count(), 1u);
@@ -51,17 +46,14 @@ TEST(KeyframeManager, EnforcesSelectionPolicyOnNearlyIdenticalFrames) {
     policy.min_rotation_deg = 10.0f;
 
     KeyframeManager manager(1, nullptr, policy);
-    ASSERT_TRUE(manager.try_add_frame(
-        make_feature_rich_image(1),
-        Eigen::Vector3d::Zero(),
-        Eigen::Quaterniond::Identity(),
-        1.0).has_value());
+    ASSERT_TRUE(manager
+                    .try_add_frame(make_feature_rich_image(1), Eigen::Vector3d::Zero(),
+                                   Eigen::Quaterniond::Identity(), 1.0)
+                    .has_value());
 
-    const auto second = manager.try_add_frame(
-        make_feature_rich_image(1),
-        Eigen::Vector3d(0.05, 0.0, 0.0),
-        Eigen::Quaterniond::Identity(),
-        1.2);
+    const auto second =
+        manager.try_add_frame(make_feature_rich_image(1), Eigen::Vector3d(0.05, 0.0, 0.0),
+                              Eigen::Quaterniond::Identity(), 1.2);
 
     EXPECT_FALSE(second.has_value());
     EXPECT_EQ(manager.keyframe_count(), 1u);
@@ -76,17 +68,15 @@ TEST(KeyframeManager, FindsLoopClosureCandidatesFromRepeatedView) {
     KeyframeManager manager(1, nullptr, policy);
     const cv::Mat repeated = make_feature_rich_image(7);
 
-    ASSERT_TRUE(manager.try_add_frame(
-        repeated,
-        Eigen::Vector3d::Zero(),
-        Eigen::Quaterniond::Identity(),
-        1.0).has_value());
+    ASSERT_TRUE(
+        manager
+            .try_add_frame(repeated, Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity(), 1.0)
+            .has_value());
 
-    ASSERT_TRUE(manager.try_add_frame(
-        repeated,
-        Eigen::Vector3d(1.0, 0.0, 0.0),
-        Eigen::Quaterniond::Identity(),
-        2.0).has_value());
+    ASSERT_TRUE(manager
+                    .try_add_frame(repeated, Eigen::Vector3d(1.0, 0.0, 0.0),
+                                   Eigen::Quaterniond::Identity(), 2.0)
+                    .has_value());
 
     auto keyframes = manager.get_recent_keyframes(1);
     ASSERT_EQ(keyframes.size(), 1u);
@@ -101,16 +91,14 @@ TEST(KeyframeManager, SavesAndLoadsMapState) {
     policy.min_translation_m = 0.1f;
 
     KeyframeManager manager(1, nullptr, policy);
-    ASSERT_TRUE(manager.try_add_frame(
-        make_feature_rich_image(3),
-        Eigen::Vector3d::Zero(),
-        Eigen::Quaterniond::Identity(),
-        1.0).has_value());
-    ASSERT_TRUE(manager.try_add_frame(
-        make_feature_rich_image(4),
-        Eigen::Vector3d(0.8, 0.0, 0.0),
-        Eigen::Quaterniond::Identity(),
-        2.0).has_value());
+    ASSERT_TRUE(manager
+                    .try_add_frame(make_feature_rich_image(3), Eigen::Vector3d::Zero(),
+                                   Eigen::Quaterniond::Identity(), 1.0)
+                    .has_value());
+    ASSERT_TRUE(manager
+                    .try_add_frame(make_feature_rich_image(4), Eigen::Vector3d(0.8, 0.0, 0.0),
+                                   Eigen::Quaterniond::Identity(), 2.0)
+                    .has_value());
 
     const auto path = std::filesystem::temp_directory_path() / "drone_swarm_slam_map.bin";
     ASSERT_TRUE(manager.save_map(path.string()));

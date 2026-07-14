@@ -41,15 +41,10 @@ public:
     ExperienceMemory();
     explicit ExperienceMemory(Config cfg);
 
-    void observe(uint32_t drone_id,
-                 const vio::PoseEstimate& pose,
-                 const hal::SystemStats& system,
-                 const std::optional<sensors::CameraFrame>& frame,
-                 size_t swarm_peer_count,
-                 double localization_confidence,
-                 std::string_view localization_source,
-                 bool localization_lost,
-                 double now_s);
+    void observe(uint32_t drone_id, const vio::PoseEstimate& pose, const hal::SystemStats& system,
+                 const std::optional<sensors::CameraFrame>& frame, size_t swarm_peer_count,
+                 double localization_confidence, std::string_view localization_source,
+                 bool localization_lost, double now_s);
 
     [[nodiscard]] MemoryPrior summarize(uint32_t drone_id) const;
     [[nodiscard]] MemoryPrior summarize_fleet() const;

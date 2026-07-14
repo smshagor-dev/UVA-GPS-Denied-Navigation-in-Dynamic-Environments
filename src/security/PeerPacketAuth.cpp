@@ -25,9 +25,8 @@ namespace {
 
 std::string lowercase(std::string_view value) {
     std::string out(value.begin(), value.end());
-    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return out;
 }
 
@@ -47,9 +46,12 @@ std::optional<std::vector<uint8_t>> hex_decode(std::string_view value) {
     std::vector<uint8_t> out;
     out.reserve(value.size() / 2u);
     auto hex_value = [](char c) -> int {
-        if (c >= '0' && c <= '9') return c - '0';
-        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        if (c >= '0' && c <= '9')
+            return c - '0';
+        if (c >= 'a' && c <= 'f')
+            return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F')
+            return c - 'A' + 10;
         return -1;
     };
     for (size_t i = 0; i < value.size(); i += 2) {
@@ -115,7 +117,8 @@ std::array<uint8_t, 32> bcrypt_sha256(const uint8_t* data, size_t len) {
     if (BCryptCreateHash(alg, &hash, hash_object.data(), obj_len, nullptr, 0, 0) < 0 ||
         BCryptHashData(hash, const_cast<PUCHAR>(data), static_cast<ULONG>(len), 0) < 0 ||
         BCryptFinishHash(hash, out.data(), static_cast<ULONG>(out.size()), 0) < 0) {
-        if (hash) BCryptDestroyHash(hash);
+        if (hash)
+            BCryptDestroyHash(hash);
         BCryptCloseAlgorithmProvider(alg, 0);
         throw std::runtime_error("BCrypt SHA256 failed");
     }
@@ -145,7 +148,8 @@ std::array<uint8_t, 32> bcrypt_hmac_sha256(std::string_view key, const uint8_t* 
                          static_cast<ULONG>(key.size()), 0) < 0 ||
         BCryptHashData(hash, const_cast<PUCHAR>(data), static_cast<ULONG>(len), 0) < 0 ||
         BCryptFinishHash(hash, out.data(), static_cast<ULONG>(out.size()), 0) < 0) {
-        if (hash) BCryptDestroyHash(hash);
+        if (hash)
+            BCryptDestroyHash(hash);
         BCryptCloseAlgorithmProvider(alg, 0);
         throw std::runtime_error("BCrypt HMAC failed");
     }
@@ -160,17 +164,18 @@ uint32_t rotr(uint32_t value, uint32_t bits) {
 
 std::array<uint8_t, 32> portable_sha256(const uint8_t* data, size_t len) {
     static constexpr std::array<uint32_t, 64> k{
-        0x428a2f98u, 0x71374491u, 0xb5c0fbcfu, 0xe9b5dba5u, 0x3956c25bu, 0x59f111f1u, 0x923f82a4u, 0xab1c5ed5u,
-        0xd807aa98u, 0x12835b01u, 0x243185beu, 0x550c7dc3u, 0x72be5d74u, 0x80deb1feu, 0x9bdc06a7u, 0xc19bf174u,
-        0xe49b69c1u, 0xefbe4786u, 0x0fc19dc6u, 0x240ca1ccu, 0x2de92c6fu, 0x4a7484aau, 0x5cb0a9dcu, 0x76f988dau,
-        0x983e5152u, 0xa831c66du, 0xb00327c8u, 0xbf597fc7u, 0xc6e00bf3u, 0xd5a79147u, 0x06ca6351u, 0x14292967u,
-        0x27b70a85u, 0x2e1b2138u, 0x4d2c6dfcu, 0x53380d13u, 0x650a7354u, 0x766a0abbu, 0x81c2c92eu, 0x92722c85u,
-        0xa2bfe8a1u, 0xa81a664bu, 0xc24b8b70u, 0xc76c51a3u, 0xd192e819u, 0xd6990624u, 0xf40e3585u, 0x106aa070u,
-        0x19a4c116u, 0x1e376c08u, 0x2748774cu, 0x34b0bcb5u, 0x391c0cb3u, 0x4ed8aa4au, 0x5b9cca4fu, 0x682e6ff3u,
-        0x748f82eeu, 0x78a5636fu, 0x84c87814u, 0x8cc70208u, 0x90befffau, 0xa4506cebu, 0xbef9a3f7u, 0xc67178f2u};
-    std::array<uint32_t, 8> h{
-        0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
-        0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u};
+        0x428a2f98u, 0x71374491u, 0xb5c0fbcfu, 0xe9b5dba5u, 0x3956c25bu, 0x59f111f1u, 0x923f82a4u,
+        0xab1c5ed5u, 0xd807aa98u, 0x12835b01u, 0x243185beu, 0x550c7dc3u, 0x72be5d74u, 0x80deb1feu,
+        0x9bdc06a7u, 0xc19bf174u, 0xe49b69c1u, 0xefbe4786u, 0x0fc19dc6u, 0x240ca1ccu, 0x2de92c6fu,
+        0x4a7484aau, 0x5cb0a9dcu, 0x76f988dau, 0x983e5152u, 0xa831c66du, 0xb00327c8u, 0xbf597fc7u,
+        0xc6e00bf3u, 0xd5a79147u, 0x06ca6351u, 0x14292967u, 0x27b70a85u, 0x2e1b2138u, 0x4d2c6dfcu,
+        0x53380d13u, 0x650a7354u, 0x766a0abbu, 0x81c2c92eu, 0x92722c85u, 0xa2bfe8a1u, 0xa81a664bu,
+        0xc24b8b70u, 0xc76c51a3u, 0xd192e819u, 0xd6990624u, 0xf40e3585u, 0x106aa070u, 0x19a4c116u,
+        0x1e376c08u, 0x2748774cu, 0x34b0bcb5u, 0x391c0cb3u, 0x4ed8aa4au, 0x5b9cca4fu, 0x682e6ff3u,
+        0x748f82eeu, 0x78a5636fu, 0x84c87814u, 0x8cc70208u, 0x90befffau, 0xa4506cebu, 0xbef9a3f7u,
+        0xc67178f2u};
+    std::array<uint32_t, 8> h{0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
+                              0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u};
     std::vector<uint8_t> msg(data, data + len);
     const uint64_t bit_len = static_cast<uint64_t>(len) * 8u;
     msg.push_back(0x80u);
@@ -186,8 +191,7 @@ std::array<uint8_t, 32> portable_sha256(const uint8_t* data, size_t len) {
             const size_t j = offset + (i * 4u);
             w[i] = (static_cast<uint32_t>(msg[j]) << 24u) |
                    (static_cast<uint32_t>(msg[j + 1]) << 16u) |
-                   (static_cast<uint32_t>(msg[j + 2]) << 8u) |
-                   static_cast<uint32_t>(msg[j + 3]);
+                   (static_cast<uint32_t>(msg[j + 2]) << 8u) | static_cast<uint32_t>(msg[j + 3]);
         }
         for (size_t i = 16; i < 64; ++i) {
             const uint32_t s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3u);
@@ -211,8 +215,14 @@ std::array<uint8_t, 32> portable_sha256(const uint8_t* data, size_t len) {
             b = a;
             a = temp1 + temp2;
         }
-        h[0] += a; h[1] += b; h[2] += c; h[3] += d;
-        h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+        h[0] += a;
+        h[1] += b;
+        h[2] += c;
+        h[3] += d;
+        h[4] += e;
+        h[5] += f;
+        h[6] += g;
+        h[7] += hh;
     }
     std::array<uint8_t, 32> out{};
     for (size_t i = 0; i < h.size(); ++i) {
@@ -233,7 +243,8 @@ std::array<uint8_t, 32> sha256_bytes(const std::vector<uint8_t>& data) {
 #endif
 }
 
-std::array<uint8_t, 32> hmac_sha256_bytes(std::string_view secret, const std::vector<uint8_t>& data) {
+std::array<uint8_t, 32> hmac_sha256_bytes(std::string_view secret,
+                                          const std::vector<uint8_t>& data) {
 #ifdef _WIN32
     return bcrypt_hmac_sha256(secret, data.data(), data.size());
 #else
@@ -283,32 +294,47 @@ PacketAuthOutcome outcome(PacketAuthResult result, std::string reason) {
 
 std::string_view to_string(AuthMode mode) {
     switch (mode) {
-    case AuthMode::NONE: return "none";
-    case AuthMode::HMAC_SHA256: return "hmac_sha256";
-    case AuthMode::ED25519_PLACEHOLDER: return "ed25519_placeholder";
-    case AuthMode::PQC_HYBRID_PLACEHOLDER: return "pqc_hybrid_placeholder";
+    case AuthMode::NONE:
+        return "none";
+    case AuthMode::HMAC_SHA256:
+        return "hmac_sha256";
+    case AuthMode::ED25519_PLACEHOLDER:
+        return "ed25519_placeholder";
+    case AuthMode::PQC_HYBRID_PLACEHOLDER:
+        return "pqc_hybrid_placeholder";
     }
     return "unknown";
 }
 
 std::optional<AuthMode> parse_auth_mode(std::string_view value) {
     const auto lower = lowercase(value);
-    if (lower == "none") return AuthMode::NONE;
-    if (lower == "hmac_sha256") return AuthMode::HMAC_SHA256;
-    if (lower == "ed25519_placeholder") return AuthMode::ED25519_PLACEHOLDER;
-    if (lower == "pqc_hybrid_placeholder") return AuthMode::PQC_HYBRID_PLACEHOLDER;
+    if (lower == "none")
+        return AuthMode::NONE;
+    if (lower == "hmac_sha256")
+        return AuthMode::HMAC_SHA256;
+    if (lower == "ed25519_placeholder")
+        return AuthMode::ED25519_PLACEHOLDER;
+    if (lower == "pqc_hybrid_placeholder")
+        return AuthMode::PQC_HYBRID_PLACEHOLDER;
     return std::nullopt;
 }
 
 std::string_view to_string(PacketAuthResult result) {
     switch (result) {
-    case PacketAuthResult::ACCEPTED: return "accepted";
-    case PacketAuthResult::REJECTED: return "rejected";
-    case PacketAuthResult::UNSUPPORTED: return "unsupported";
-    case PacketAuthResult::MISSING_SIGNATURE: return "missing_signature";
-    case PacketAuthResult::INVALID_SIGNATURE: return "invalid_signature";
-    case PacketAuthResult::STALE_EPOCH: return "stale_epoch";
-    case PacketAuthResult::REPLAY_DETECTED: return "replay_detected";
+    case PacketAuthResult::ACCEPTED:
+        return "accepted";
+    case PacketAuthResult::REJECTED:
+        return "rejected";
+    case PacketAuthResult::UNSUPPORTED:
+        return "unsupported";
+    case PacketAuthResult::MISSING_SIGNATURE:
+        return "missing_signature";
+    case PacketAuthResult::INVALID_SIGNATURE:
+        return "invalid_signature";
+    case PacketAuthResult::STALE_EPOCH:
+        return "stale_epoch";
+    case PacketAuthResult::REPLAY_DETECTED:
+        return "replay_detected";
     }
     return "unknown";
 }
@@ -333,17 +359,18 @@ PacketAuthOutcome validateNonceOrSequence(const drone::swarm::EdgePeerPacket& pa
     return outcome(PacketAuthResult::ACCEPTED, "sequence accepted");
 }
 
-PacketAuthOutcome signPacket(drone::swarm::EdgePeerPacket& packet,
-                             const PacketAuthConfig& config) {
+PacketAuthOutcome signPacket(drone::swarm::EdgePeerPacket& packet, const PacketAuthConfig& config) {
     if (config.mode == AuthMode::NONE) {
         packet.auth_hook = "unsigned";
         return outcome(PacketAuthResult::ACCEPTED, "unsigned packet emitted");
     }
     if (config.mode == AuthMode::PQC_HYBRID_PLACEHOLDER) {
-        return outcome(PacketAuthResult::UNSUPPORTED, "PQC hybrid auth is roadmap-only in this build.");
+        return outcome(PacketAuthResult::UNSUPPORTED,
+                       "PQC hybrid auth is roadmap-only in this build.");
     }
     if (config.mode == AuthMode::ED25519_PLACEHOLDER) {
-        return outcome(PacketAuthResult::UNSUPPORTED, "Ed25519 auth is placeholder-only in this build.");
+        return outcome(PacketAuthResult::UNSUPPORTED,
+                       "Ed25519 auth is placeholder-only in this build.");
     }
     const auto secret = effective_secret(config);
     if (secret.empty()) {
@@ -355,16 +382,18 @@ PacketAuthOutcome signPacket(drone::swarm::EdgePeerPacket& packet,
 }
 
 PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
-                               const PacketAuthConfig& config,
-                               uint64_t now_ms,
+                               const PacketAuthConfig& config, uint64_t now_ms,
                                std::optional<uint32_t> last_sequence_number) {
     if (config.mode == AuthMode::PQC_HYBRID_PLACEHOLDER) {
-        return outcome(PacketAuthResult::UNSUPPORTED, "PQC hybrid auth is roadmap-only in this build.");
+        return outcome(PacketAuthResult::UNSUPPORTED,
+                       "PQC hybrid auth is roadmap-only in this build.");
     }
     if (config.mode == AuthMode::ED25519_PLACEHOLDER) {
-        return outcome(PacketAuthResult::UNSUPPORTED, "Ed25519 auth is placeholder-only in this build.");
+        return outcome(PacketAuthResult::UNSUPPORTED,
+                       "Ed25519 auth is placeholder-only in this build.");
     }
-    const auto age = now_ms > packet.timestamp_ms ? now_ms - packet.timestamp_ms : packet.timestamp_ms - now_ms;
+    const auto age =
+        now_ms > packet.timestamp_ms ? now_ms - packet.timestamp_ms : packet.timestamp_ms - now_ms;
     if (config.max_clock_skew_ms > 0 && age > config.max_clock_skew_ms + packet.ttl_ms) {
         return outcome(PacketAuthResult::REJECTED, "packet timestamp outside auth clock skew");
     }
@@ -376,9 +405,11 @@ PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
     }
     if (config.mode == AuthMode::NONE) {
         if (unsigned_allowed_for_profile(packet, config)) {
-            return outcome(PacketAuthResult::ACCEPTED, "unsigned packet accepted for simulation/debug");
+            return outcome(PacketAuthResult::ACCEPTED,
+                           "unsigned packet accepted for simulation/debug");
         }
-        return outcome(PacketAuthResult::MISSING_SIGNATURE, "unsigned peer packets are not allowed in this runtime profile");
+        return outcome(PacketAuthResult::MISSING_SIGNATURE,
+                       "unsigned peer packets are not allowed in this runtime profile");
     }
     if (packet.auth_hook.empty() || packet.auth_hook == "unsigned") {
         return outcome(PacketAuthResult::MISSING_SIGNATURE, "missing packet signature");

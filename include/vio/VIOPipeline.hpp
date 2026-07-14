@@ -3,11 +3,11 @@
 // Technology: C++, Python, Go, CMake
 
 #pragma once
- 
+
 // VIOPipeline.hpp    Visual-Inertial Odometry orchestrator
 // Manages the EKF, feature tracking, and multi-sensor data flow
 // Drone Swarm Sensor Fusion  |  Phase 2
- 
+
 #include "vio/EKFEstimator.hpp"
 #include "sensors/IMUSensor.hpp"
 #include "sensors/CameraSensor.hpp"
@@ -26,12 +26,9 @@
 
 namespace drone::vio {
 
-//  Variant message for sensor event queue 
-using SensorEvent = std::variant<
-    sensors::ImuMeasurement,
-    sensors::CameraFrame,
-    sensors::LidarMeasurement
->;
+//  Variant message for sensor event queue
+using SensorEvent =
+    std::variant<sensors::ImuMeasurement, sensors::CameraFrame, sensors::LidarMeasurement>;
 
 struct RuntimeTelemetry {
     double localization_confidence_trend{0.0};
@@ -112,52 +109,56 @@ struct VisualFrontendResult {
 
 [[nodiscard]] bool visual_placeholder_allowed(drone::runtime::RuntimeMode mode);
 [[nodiscard]] double compute_visual_update_confidence(const VisualFrontendMetrics& metrics);
-[[nodiscard]] VisualFrontendResult run_visual_frontend(
-    const cv::Mat& previous_gray,
-    const cv::Mat& current_gray,
-    const Eigen::Matrix3d& K,
-    const PoseEstimate& previous_pose,
-    const PoseEstimate& current_predicted_pose,
-    double dt_s);
-[[nodiscard]] VisualFrontendResult build_placeholder_visual_frontend_result(
-    const sensors::CameraFrame& frame,
-    const PoseEstimate& pose,
-    const Eigen::Matrix3d& K);
+[[nodiscard]] VisualFrontendResult
+run_visual_frontend(const cv::Mat& previous_gray, const cv::Mat& current_gray,
+                    const Eigen::Matrix3d& K, const PoseEstimate& previous_pose,
+                    const PoseEstimate& current_predicted_pose, double dt_s);
+[[nodiscard]] VisualFrontendResult
+build_placeholder_visual_frontend_result(const sensors::CameraFrame& frame,
+                                         const PoseEstimate& pose, const Eigen::Matrix3d& K);
 
- 
 class VIOPipeline {
 public:
     using PoseCallback = std::function<void(const PoseEstimate&)>;
 
-    explicit VIOPipeline(EKFConfig cfg = EKFConfig{})
-        : ekf_(cfg) {}
+    explicit VIOPipeline(EKFConfig cfg = EKFConfig{}) : ekf_(cfg) {}
 
-    ~VIOPipeline() { stop(); }
+    ~VIOPipeline() {
+        stop();
+    }
 
-    //  Sensor registration 
-    void attach_imu   (std::shared_ptr<sensors::IMUSensor>    imu);
+    //  Sensor registration
+    void attach_imu(std::shared_ptr<sensors::IMUSensor> imu);
     void attach_camera(std::shared_ptr<sensors::CameraSensor> cam);
-    void attach_lidar (std::shared_ptr<sensors::LidarSensor>  lidar);
+    void attach_lidar(std::shared_ptr<sensors::LidarSensor> lidar);
 
-    //  Pipeline control 
+    //  Pipeline control
     bool start();
     void stop();
     void reset();
-    void set_runtime_mode(drone::runtime::RuntimeMode mode) { runtime_mode_ = mode; }
+    void set_runtime_mode(drone::runtime::RuntimeMode mode) {
+        runtime_mode_ = mode;
+    }
 
     //  State query â”€
-    [[nodiscard]] PoseEstimate  current_pose() const;
-    [[nodiscard]] double        drift_m()      const { return ekf_.total_drift_m(); }
+    [[nodiscard]] PoseEstimate current_pose() const;
+    [[nodiscard]] double drift_m() const {
+        return ekf_.total_drift_m();
+    }
     [[nodiscard]] RuntimeTelemetry runtime_telemetry() const {
         std::lock_guard lock(runtime_mutex_);
         return runtime_telemetry_;
     }
 
-    //  Output callback 
-    void set_pose_callback(PoseCallback cb) { pose_cb_ = std::move(cb); }
+    //  Output callback
+    void set_pose_callback(PoseCallback cb) {
+        pose_cb_ = std::move(cb);
+    }
 
-    //  Configuration 
-    void set_camera_matrix(const Eigen::Matrix3d& K) { K_ = K; }
+    //  Configuration
+    void set_camera_matrix(const Eigen::Matrix3d& K) {
+        K_ = K;
+    }
     void set_runtime_telemetry(RuntimeTelemetry telemetry) {
         std::lock_guard lock(runtime_mutex_);
         telemetry.tracked_feature_count = runtime_telemetry_.tracked_feature_count;
@@ -182,24 +183,24 @@ private:
 
     EKFEstimator ekf_;
 
-    std::shared_ptr<sensors::IMUSensor>    imu_;
+    std::shared_ptr<sensors::IMUSensor> imu_;
     std::shared_ptr<sensors::CameraSensor> cam_;
-    std::shared_ptr<sensors::LidarSensor>  lidar_;
+    std::shared_ptr<sensors::LidarSensor> lidar_;
 
     // Thread-safe event queue
-    std::queue<SensorEvent>  event_queue_;
-    mutable std::mutex       queue_mutex_;
-    std::condition_variable  queue_cv_;
-    std::thread              proc_thread_;
-    std::atomic<bool>        running_{false};
+    std::queue<SensorEvent> event_queue_;
+    mutable std::mutex queue_mutex_;
+    std::condition_variable queue_cv_;
+    std::thread proc_thread_;
+    std::atomic<bool> running_{false};
 
-    Eigen::Matrix3d  K_{Eigen::Matrix3d::Identity()};
-    PoseCallback     pose_cb_;
-    double           last_imu_ts_{-1.0};
-    double           last_camera_ts_{-1.0};
-    cv::Mat          previous_gray_frame_;
-    PoseEstimate     previous_camera_pose_{};
-    bool             previous_camera_pose_valid_{false};
+    Eigen::Matrix3d K_{Eigen::Matrix3d::Identity()};
+    PoseCallback pose_cb_;
+    double last_imu_ts_{-1.0};
+    double last_camera_ts_{-1.0};
+    cv::Mat previous_gray_frame_;
+    PoseEstimate previous_camera_pose_{};
+    bool previous_camera_pose_valid_{false};
     drone::runtime::RuntimeMode runtime_mode_{drone::runtime::RuntimeMode::SIMULATION};
     mutable std::mutex visual_metrics_mutex_;
     VisualFrontendMetrics last_visual_metrics_{};

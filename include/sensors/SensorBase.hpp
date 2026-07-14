@@ -3,10 +3,10 @@
 // Technology: C++, Python, Go, CMake
 
 #pragma once
- 
+
 // SensorBase.hpp    Abstract base for all drone sensors
 // Drone Swarm Sensor Fusion  |  Phase 2: Core C++ Sensor Engine
- 
+
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -21,13 +21,12 @@
 
 namespace drone::sensors {
 
-//  Timestamp alias 
+//  Timestamp alias
 using TimePoint = std::chrono::time_point<std::chrono::steady_clock>;
 using Timestamp = double; // seconds since epoch
 
 inline Timestamp now_sec() {
-    return std::chrono::duration<double>(
-               std::chrono::steady_clock::now().time_since_epoch())
+    return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch())
         .count();
 }
 
@@ -36,74 +35,89 @@ enum class SensorState : uint8_t {
     UNINITIALIZED = 0,
     INITIALIZING,
     RUNNING,
-    DEGRADED,   // partial data quality
+    DEGRADED, // partial data quality
     FAILED,
     DISCONNECTED
 };
 
 inline std::string_view to_string(SensorState s) {
     switch (s) {
-    case SensorState::UNINITIALIZED:  return "UNINITIALIZED";
-    case SensorState::INITIALIZING:   return "INITIALIZING";
-    case SensorState::RUNNING:        return "RUNNING";
-    case SensorState::DEGRADED:       return "DEGRADED";
-    case SensorState::FAILED:         return "FAILED";
-    case SensorState::DISCONNECTED:   return "DISCONNECTED";
+    case SensorState::UNINITIALIZED:
+        return "UNINITIALIZED";
+    case SensorState::INITIALIZING:
+        return "INITIALIZING";
+    case SensorState::RUNNING:
+        return "RUNNING";
+    case SensorState::DEGRADED:
+        return "DEGRADED";
+    case SensorState::FAILED:
+        return "FAILED";
+    case SensorState::DISCONNECTED:
+        return "DISCONNECTED";
     }
     return "UNKNOWN";
 }
 
-//  Generic sensor measurement 
+//  Generic sensor measurement
 struct SensorMeasurement {
-    Timestamp   timestamp{0.0};
+    Timestamp timestamp{0.0};
     SensorState quality{SensorState::RUNNING};
-    float       confidence{1.0f};  // 0.0 â€“ 1.0
+    float confidence{1.0f}; // 0.0 â€“ 1.0
     std::string source_id;
 };
 
 //  Callback types â”€
-template <typename T>
-using DataCallback = std::function<void(const T&)>;
+template <typename T> using DataCallback = std::function<void(const T&)>;
 using ErrorCallback = std::function<void(const std::string&)>;
 
- 
 // SensorBase    CRTP-free abstract interface
- 
+
 class SensorBase {
 public:
     explicit SensorBase(std::string sensor_id, std::string sensor_type)
-        : id_(std::move(sensor_id))
-        , type_(std::move(sensor_type))
-        , state_(SensorState::UNINITIALIZED) {
+        : id_(std::move(sensor_id)), type_(std::move(sensor_type)),
+          state_(SensorState::UNINITIALIZED) {
         logger_ = spdlog::get(id_);
         if (!logger_) {
             logger_ = spdlog::stdout_color_mt(id_);
         }
     }
 
-    virtual ~SensorBase() { stop(); }
+    virtual ~SensorBase() {
+        stop();
+    }
 
     // Non-copyable, movable
-    SensorBase(const SensorBase&)            = delete;
+    SensorBase(const SensorBase&) = delete;
     SensorBase& operator=(const SensorBase&) = delete;
-    SensorBase(SensorBase&&)                 = delete;
-    SensorBase& operator=(SensorBase&&)      = delete;
+    SensorBase(SensorBase&&) = delete;
+    SensorBase& operator=(SensorBase&&) = delete;
 
-    //  Lifecycle 
-    virtual bool initialize()                = 0;
+    //  Lifecycle
+    virtual bool initialize() = 0;
     virtual bool start();
     virtual void stop();
     virtual bool reconfigure(const std::string& config_json) = 0;
 
-    //  Data access (non-blocking, returns std::optional) 
-    virtual void poll() = 0;  // called periodically by sensor thread
+    //  Data access (non-blocking, returns std::optional)
+    virtual void poll() = 0; // called periodically by sensor thread
 
-    //  Status 
-    [[nodiscard]] SensorState   state()        const noexcept { return state_.load(); }
-    [[nodiscard]] std::string_view sensor_id() const noexcept { return id_; }
-    [[nodiscard]] std::string_view sensor_type() const noexcept { return type_; }
-    [[nodiscard]] float         dropout_rate() const noexcept { return dropout_rate_; }
-    [[nodiscard]] uint64_t      sample_count() const noexcept { return sample_count_; }
+    //  Status
+    [[nodiscard]] SensorState state() const noexcept {
+        return state_.load();
+    }
+    [[nodiscard]] std::string_view sensor_id() const noexcept {
+        return id_;
+    }
+    [[nodiscard]] std::string_view sensor_type() const noexcept {
+        return type_;
+    }
+    [[nodiscard]] float dropout_rate() const noexcept {
+        return dropout_rate_;
+    }
+    [[nodiscard]] uint64_t sample_count() const noexcept {
+        return sample_count_;
+    }
 
     //  Error callback â”€
     void set_error_callback(ErrorCallback cb) {
@@ -120,7 +134,8 @@ protected:
     void report_error(const std::string& msg) {
         logger_->error("[{}] {}", id_, msg);
         std::lock_guard lock(cb_mutex_);
-        if (error_cb_) error_cb_(msg);
+        if (error_cb_)
+            error_cb_(msg);
     }
 
     void increment_samples() {
@@ -128,26 +143,27 @@ protected:
     }
 
     std::shared_ptr<spdlog::logger> logger_;
-    std::string                     id_;
-    std::string                     type_;
-    std::atomic<SensorState>        state_;
+    std::string id_;
+    std::string type_;
+    std::atomic<SensorState> state_;
 
     // Acquisition thread
-    std::thread                     acq_thread_;
-    std::atomic<bool>               running_{false};
+    std::thread acq_thread_;
+    std::atomic<bool> running_{false};
 
-    mutable std::mutex              data_mutex_;
-    mutable std::mutex              cb_mutex_;
-    ErrorCallback                   error_cb_;
+    mutable std::mutex data_mutex_;
+    mutable std::mutex cb_mutex_;
+    ErrorCallback error_cb_;
 
-    float     dropout_rate_{0.0f};
-    uint64_t  sample_count_{0};
-    uint32_t  poll_rate_hz_{100};
+    float dropout_rate_{0.0f};
+    uint64_t sample_count_{0};
+    uint32_t poll_rate_hz_{100};
 };
 
-//  Inline implementations 
+//  Inline implementations
 inline bool SensorBase::start() {
-    if (running_.exchange(true)) return true; // already running
+    if (running_.exchange(true))
+        return true; // already running
     set_state(SensorState::RUNNING);
     acq_thread_ = std::thread([this] {
         const auto interval = std::chrono::microseconds(1'000'000 / poll_rate_hz_);
@@ -168,8 +184,10 @@ inline bool SensorBase::start() {
 }
 
 inline void SensorBase::stop() {
-    if (!running_.exchange(false)) return;
-    if (acq_thread_.joinable()) acq_thread_.join();
+    if (!running_.exchange(false))
+        return;
+    if (acq_thread_.joinable())
+        acq_thread_.join();
     set_state(SensorState::DISCONNECTED);
     logger_->info("[{}] stopped. {} samples collected", id_, sample_count_);
 }

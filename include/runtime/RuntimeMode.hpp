@@ -76,15 +76,15 @@ struct LidarRuntimeValidationInputs {
 [[nodiscard]] std::string_view to_string(RuntimeMode mode);
 [[nodiscard]] RuntimeMode parse_runtime_mode(std::string_view value);
 [[nodiscard]] RuntimeFileConfig load_runtime_file(const std::string& path);
-[[nodiscard]] RuntimeValidationResult validate_runtime_configuration(const RuntimeValidationInputs& input);
+[[nodiscard]] RuntimeValidationResult
+validate_runtime_configuration(const RuntimeValidationInputs& input);
 [[nodiscard]] AnchorConfigLoadResult load_anchor_config_json(const std::string& path);
 [[nodiscard]] LidarConfigLoadResult load_lidar_config_json(const std::string& path);
-[[nodiscard]] RuntimeValidationResult validate_lidar_runtime_configuration(const LidarRuntimeValidationInputs& input);
-[[nodiscard]] std::string determine_localization_data_source(
-    RuntimeMode mode,
-    bool used_synthetic,
-    bool used_csv_playback,
-    bool used_live_external,
-    bool has_measurements);
+[[nodiscard]] RuntimeValidationResult
+validate_lidar_runtime_configuration(const LidarRuntimeValidationInputs& input);
+[[nodiscard]] std::string determine_localization_data_source(RuntimeMode mode, bool used_synthetic,
+                                                             bool used_csv_playback,
+                                                             bool used_live_external,
+                                                             bool has_measurements);
 
 } // namespace drone::runtime

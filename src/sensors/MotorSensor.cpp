@@ -37,7 +37,8 @@ void MotorSensor::poll() {
         const float temp_penalty = std::clamp((motor.temperature_c - 55.0f) / 35.0f, 0.0f, 0.5f);
         const float vibration_penalty = std::clamp((motor.vibration_g - 0.25f) * 1.5f, 0.0f, 0.4f);
         const float current_penalty = std::clamp((motor.current_a - 6.0f) * 0.15f, 0.0f, 0.2f);
-        motor.health = std::clamp(1.0f - temp_penalty - vibration_penalty - current_penalty, 0.0f, 1.0f);
+        motor.health =
+            std::clamp(1.0f - temp_penalty - vibration_penalty - current_penalty, 0.0f, 1.0f);
         summed_health += motor.health;
     }
 

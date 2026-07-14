@@ -73,9 +73,8 @@ inline std::string trim_copy(std::string value) {
 }
 
 inline std::string lower_copy(std::string value) {
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return value;
 }
 
@@ -144,18 +143,17 @@ inline std::string sha3_hex(std::string_view payload) {
     return out;
 }
 
-inline std::string sign_firmware_manifest(const FirmwareManifest& manifest, std::string_view secret) {
-    return sha3_hex(
-        trim_copy(std::string(secret)) + "\n" +
-        manifest.version + "\n" +
-        manifest.measurement + "\n" +
-        manifest.signer + "\n" +
-        (manifest.secure_boot_attested ? "1" : "0") + "\n" +
-        (manifest.bootloader_locked ? "1" : "0") + "\n" +
-        std::to_string(manifest.rollback_counter));
+inline std::string sign_firmware_manifest(const FirmwareManifest& manifest,
+                                          std::string_view secret) {
+    return sha3_hex(trim_copy(std::string(secret)) + "\n" + manifest.version + "\n" +
+                    manifest.measurement + "\n" + manifest.signer + "\n" +
+                    (manifest.secure_boot_attested ? "1" : "0") + "\n" +
+                    (manifest.bootloader_locked ? "1" : "0") + "\n" +
+                    std::to_string(manifest.rollback_counter));
 }
 
-inline std::optional<FirmwareManifest> load_firmware_manifest_file(const std::filesystem::path& path) {
+inline std::optional<FirmwareManifest>
+load_firmware_manifest_file(const std::filesystem::path& path) {
     if (path.empty()) {
         return std::nullopt;
     }
@@ -255,12 +253,16 @@ inline FirmwareTrustReport validate_firmware_trust(const FirmwareManifest& manif
     const bool production = profile == "production";
 
     const auto stored = load_firmware_trust_record(policy.state_file);
-    const bool signer_allowed = policy.allowed_signers.empty()
-        || std::find_if(policy.allowed_signers.begin(), policy.allowed_signers.end(),
-            [&](const std::string& item) { return trim_copy(item) == trim_copy(manifest.signer); }) != policy.allowed_signers.end();
+    const bool signer_allowed =
+        policy.allowed_signers.empty() ||
+        std::find_if(policy.allowed_signers.begin(), policy.allowed_signers.end(),
+                     [&](const std::string& item) {
+                         return trim_copy(item) == trim_copy(manifest.signer);
+                     }) != policy.allowed_signers.end();
     const bool signature_matches = !policy.signing_secret.empty()
-        ? lower_copy(manifest.signature) == sign_firmware_manifest(manifest, policy.signing_secret)
-        : !trim_copy(manifest.signature).empty();
+                                       ? lower_copy(manifest.signature) ==
+                                             sign_firmware_manifest(manifest, policy.signing_secret)
+                                       : !trim_copy(manifest.signature).empty();
 
     report.signed_firmware_valid = signer_allowed && signature_matches;
 
@@ -278,8 +280,8 @@ inline FirmwareTrustReport validate_firmware_trust(const FirmwareManifest& manif
     if (!hardened) {
         report.boot_state = policy.maintenance_mode ? "LAB_MAINTENANCE" : "LAB_BOOT";
         report.summary = policy.maintenance_mode
-            ? "Lab maintenance mode active with software boot trust checks"
-            : "Lab boot trust bypassed";
+                             ? "Lab maintenance mode active with software boot trust checks"
+                             : "Lab boot trust bypassed";
         report.accepted = true;
         return report;
     }
@@ -287,12 +289,12 @@ inline FirmwareTrustReport validate_firmware_trust(const FirmwareManifest& manif
     if (!manifest.secure_boot_attested || !manifest.bootloader_locked) {
         report.accepted = false;
         report.boot_state = "SECURE_BOOT_FAILED";
-        report.summary = production
-            ? "Production secure boot attestation failed"
-            : "Hardened bootloader lock or secure boot attestation missing";
+        report.summary = production ? "Production secure boot attestation failed"
+                                    : "Hardened bootloader lock or secure boot attestation missing";
         return report;
     }
-    if (compare_versions(manifest.version, stored.version) < 0 || manifest.rollback_counter < stored.rollback_counter) {
+    if (compare_versions(manifest.version, stored.version) < 0 ||
+        manifest.rollback_counter < stored.rollback_counter) {
         report.accepted = false;
         report.boot_state = "ROLLBACK_REJECTED";
         report.summary = "Firmware rollback counter or version regressed";
@@ -321,8 +323,8 @@ inline FirmwareTrustReport validate_firmware_trust(const FirmwareManifest& manif
 
     report.boot_state = policy.maintenance_mode ? "MAINTENANCE_TRUSTED" : "SECURE_BOOT_TRUSTED";
     report.summary = policy.maintenance_mode
-        ? "Secure boot trusted and maintenance workflow authorized"
-        : "Secure boot trusted and firmware signature verified";
+                         ? "Secure boot trusted and maintenance workflow authorized"
+                         : "Secure boot trusted and firmware signature verified";
     persist_firmware_trust_record(policy.state_file, report);
     return report;
 }

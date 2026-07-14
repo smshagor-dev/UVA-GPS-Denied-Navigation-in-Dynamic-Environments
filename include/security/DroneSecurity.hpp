@@ -28,15 +28,24 @@ enum class DroneSecurityState : uint8_t {
 
 inline std::string_view to_string(DroneSecurityState state) {
     switch (state) {
-    case DroneSecurityState::TRUSTED: return "TRUSTED";
-    case DroneSecurityState::DEGRADED_LINK: return "DEGRADED_LINK";
-    case DroneSecurityState::AUTH_SUSPECT: return "AUTH_SUSPECT";
-    case DroneSecurityState::PEER_SPOOF_SUSPECT: return "PEER_SPOOF_SUSPECT";
-    case DroneSecurityState::COMMAND_REPLAY_SUSPECT: return "COMMAND_REPLAY_SUSPECT";
-    case DroneSecurityState::CONTROL_PLANE_UNTRUSTED: return "CONTROL_PLANE_UNTRUSTED";
-    case DroneSecurityState::ISOLATED_AUTONOMY: return "ISOLATED_AUTONOMY";
-    case DroneSecurityState::SAFE_RETURN: return "SAFE_RETURN";
-    case DroneSecurityState::LAND_IMMEDIATELY: return "LAND_IMMEDIATELY";
+    case DroneSecurityState::TRUSTED:
+        return "TRUSTED";
+    case DroneSecurityState::DEGRADED_LINK:
+        return "DEGRADED_LINK";
+    case DroneSecurityState::AUTH_SUSPECT:
+        return "AUTH_SUSPECT";
+    case DroneSecurityState::PEER_SPOOF_SUSPECT:
+        return "PEER_SPOOF_SUSPECT";
+    case DroneSecurityState::COMMAND_REPLAY_SUSPECT:
+        return "COMMAND_REPLAY_SUSPECT";
+    case DroneSecurityState::CONTROL_PLANE_UNTRUSTED:
+        return "CONTROL_PLANE_UNTRUSTED";
+    case DroneSecurityState::ISOLATED_AUTONOMY:
+        return "ISOLATED_AUTONOMY";
+    case DroneSecurityState::SAFE_RETURN:
+        return "SAFE_RETURN";
+    case DroneSecurityState::LAND_IMMEDIATELY:
+        return "LAND_IMMEDIATELY";
     }
     return "UNKNOWN";
 }
@@ -115,7 +124,8 @@ public:
             last_replay_failure_at_s_ = now_s;
             return;
         }
-        if (contains(normalized, "issuer trust") || contains(normalized, "authorization") || contains(normalized, "blocked")) {
+        if (contains(normalized, "issuer trust") || contains(normalized, "authorization") ||
+            contains(normalized, "blocked")) {
             auth_failures_ += critical ? 2u : 1u;
             last_auth_failure_at_s_ = now_s;
         }
@@ -132,7 +142,8 @@ public:
         }
         ++control_plane_failures_;
         last_control_plane_failure_at_s_ = now_s;
-        if (contains(normalized, "certificate") || contains(normalized, "policy rejected backend")) {
+        if (contains(normalized, "certificate") ||
+            contains(normalized, "policy rejected backend")) {
             backend_identity_failed_ = true;
         }
     }
@@ -141,22 +152,16 @@ public:
         decay_failures(now_s);
 
         DroneSecurityAssessment out;
-        out.tamper_score = std::clamp(
-            in.tamper_score +
-                (replay_failures_ > 0 ? 0.20 : 0.0) +
-                (peer_spoof_events_ > 0 ? 0.25 : 0.0) +
-                (control_plane_failures_ > 0 ? 0.12 : 0.0) +
-                (auth_failures_ > 0 ? 0.10 : 0.0),
-            0.0,
-            1.0);
-        out.link_integrity_score = std::clamp(
-            (in.link_quality * 0.35) +
-                (in.sync_confidence * 0.25) +
-                (in.localization_confidence * 0.15) +
-                (in.issuer_trust_score * 0.15) +
-                ((in.peer_count > 0 ? 1.0 : 0.65) * 0.10),
-            0.0,
-            1.0);
+        out.tamper_score = std::clamp(in.tamper_score + (replay_failures_ > 0 ? 0.20 : 0.0) +
+                                          (peer_spoof_events_ > 0 ? 0.25 : 0.0) +
+                                          (control_plane_failures_ > 0 ? 0.12 : 0.0) +
+                                          (auth_failures_ > 0 ? 0.10 : 0.0),
+                                      0.0, 1.0);
+        out.link_integrity_score =
+            std::clamp((in.link_quality * 0.35) + (in.sync_confidence * 0.25) +
+                           (in.localization_confidence * 0.15) + (in.issuer_trust_score * 0.15) +
+                           ((in.peer_count > 0 ? 1.0 : 0.65) * 0.10),
+                       0.0, 1.0);
         out.firmware_measurement = firmware_measurement_;
         out.last_auth_failure_at_s = last_auth_failure_at_s_;
 
@@ -172,21 +177,25 @@ public:
             out.state = DroneSecurityState::ISOLATED_AUTONOMY;
             out.remote_command_allowed = false;
             out.telemetry_uplink_allowed = true;
-            out.summary = "Hardened profile lost secure command trust, isolating into onboard autonomy";
+            out.summary =
+                "Hardened profile lost secure command trust, isolating into onboard autonomy";
             out.health_flags = {"security-isolated", "remote-command-blocked"};
             reason = "secure-command-trust-lost";
         } else if (in.no_fly_lock || !in.geofence_clear || !in.swarm_consistency_ok ||
-                   (in.localization_lost && (in.sync_confidence < 0.35 || in.link_quality < 0.18))) {
+                   (in.localization_lost &&
+                    (in.sync_confidence < 0.35 || in.link_quality < 0.18))) {
             out.state = DroneSecurityState::SAFE_RETURN;
             out.remote_command_allowed = false;
             out.telemetry_uplink_allowed = true;
-            out.summary = in.no_fly_lock
-                ? "Mission lock engaged, safe return autonomy enforced"
-                : (!in.geofence_clear
-                    ? "Geofence trust violated, safe return autonomy enforced"
-                    : (!in.swarm_consistency_ok
-                        ? "Swarm consistency degraded, holding safe autonomous return"
-                        : "Navigation trust degraded with unstable link, returning via safe autonomy"));
+            out.summary =
+                in.no_fly_lock
+                    ? "Mission lock engaged, safe return autonomy enforced"
+                    : (!in.geofence_clear
+                           ? "Geofence trust violated, safe return autonomy enforced"
+                           : (!in.swarm_consistency_ok
+                                  ? "Swarm consistency degraded, holding safe autonomous return"
+                                  : "Navigation trust degraded with unstable link, returning via "
+                                    "safe autonomy"));
             out.health_flags = {"security-safe-return", "remote-command-blocked"};
             if (in.no_fly_lock) {
                 out.health_flags.push_back("mission-lock");
@@ -197,7 +206,9 @@ public:
             if (!in.swarm_consistency_ok) {
                 out.health_flags.push_back("swarm-inconsistent");
             }
-            reason = in.no_fly_lock ? "mission-lock" : (!in.geofence_clear ? "geofence-breach" : "safety-consistency-failed");
+            reason = in.no_fly_lock
+                         ? "mission-lock"
+                         : (!in.geofence_clear ? "geofence-breach" : "safety-consistency-failed");
         } else if (replay_failures_ >= 2u || (in.hardened_profile && !in.command_channel_fresh)) {
             out.state = DroneSecurityState::COMMAND_REPLAY_SUSPECT;
             out.remote_command_allowed = false;
@@ -228,7 +239,8 @@ public:
             out.summary = "Repeated authorization failures raised onboard auth suspicion";
             out.health_flags = {"auth-suspect", "remote-command-blocked"};
             reason = "authorization-failures";
-        } else if (in.link_quality < 0.18 || in.sync_confidence < 0.45 || in.localization_confidence < 0.35) {
+        } else if (in.link_quality < 0.18 || in.sync_confidence < 0.45 ||
+                   in.localization_confidence < 0.35) {
             out.state = DroneSecurityState::DEGRADED_LINK;
             out.remote_command_allowed = !in.hardened_profile;
             out.telemetry_uplink_allowed = true;
@@ -246,7 +258,8 @@ public:
         if (out.tamper_score >= 0.60) {
             out.health_flags.push_back("tamper-suspect");
         }
-        if (!out.remote_command_allowed && !flag_present(out.health_flags, "remote-command-blocked")) {
+        if (!out.remote_command_allowed &&
+            !flag_present(out.health_flags, "remote-command-blocked")) {
             out.health_flags.push_back("remote-command-blocked");
         }
 
@@ -255,7 +268,8 @@ public:
             current_state_ = out.state;
             out.transition_reason = reason;
         } else {
-            out.transition_reason = last_transition_reason_.empty() ? reason : last_transition_reason_;
+            out.transition_reason =
+                last_transition_reason_.empty() ? reason : last_transition_reason_;
         }
         last_transition_reason_ = reason;
         out.trust_epoch = trust_epoch_;
@@ -274,16 +288,14 @@ private:
 
     static std::string normalize_text(std::string_view value) {
         std::string out(value);
-        std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
-            return static_cast<char>(std::tolower(c));
-        });
+        std::transform(out.begin(), out.end(), out.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return out;
     }
 
     static bool flag_present(const std::vector<std::string>& flags, std::string_view needle) {
-        return std::any_of(flags.begin(), flags.end(), [&](const std::string& item) {
-            return item == needle;
-        });
+        return std::any_of(flags.begin(), flags.end(),
+                           [&](const std::string& item) { return item == needle; });
     }
 
     void decay_failures(double now_s) {

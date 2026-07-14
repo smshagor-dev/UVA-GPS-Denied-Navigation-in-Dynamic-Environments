@@ -42,6 +42,8 @@ def main() -> int:
             [clang_format, "--dry-run", "--Werror", str(path)],
             cwd=REPO_ROOT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
         )
         if completed.returncode != 0:

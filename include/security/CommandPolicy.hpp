@@ -25,11 +25,16 @@ enum class RemoteCommandAction : uint8_t {
 
 inline std::string_view to_string(RemoteCommandAction action) {
     switch (action) {
-    case RemoteCommandAction::NONE: return "NONE";
-    case RemoteCommandAction::HOLD_POSITION: return "HOLD_POSITION";
-    case RemoteCommandAction::RETURN_HOME: return "RETURN_HOME";
-    case RemoteCommandAction::EMERGENCY_LAND: return "EMERGENCY_LAND";
-    case RemoteCommandAction::FORMATION_HOLD: return "FORMATION_HOLD";
+    case RemoteCommandAction::NONE:
+        return "NONE";
+    case RemoteCommandAction::HOLD_POSITION:
+        return "HOLD_POSITION";
+    case RemoteCommandAction::RETURN_HOME:
+        return "RETURN_HOME";
+    case RemoteCommandAction::EMERGENCY_LAND:
+        return "EMERGENCY_LAND";
+    case RemoteCommandAction::FORMATION_HOLD:
+        return "FORMATION_HOLD";
     }
     return "UNKNOWN";
 }
@@ -68,7 +73,8 @@ inline CommandPolicyDecision evaluate_remote_command(const DroneSecurityAssessme
                                                      const RemoteCommandSafetyInputs& safety,
                                                      const RemoteCommandEnvelope& command);
 
-inline std::optional<RemoteCommandEnvelope> command_from_swarm_message(const swarm::SwarmMessage& msg) {
+inline std::optional<RemoteCommandEnvelope>
+command_from_swarm_message(const swarm::SwarmMessage& msg) {
     RemoteCommandEnvelope out;
     out.src_id = msg.src_id;
     out.seq_num = msg.seq_num;
@@ -133,7 +139,7 @@ inline CommandPolicyDecision evaluate_remote_command(const DroneSecurityAssessme
 
     if (safety.no_fly_lock) {
         const bool safe_action = command.action == RemoteCommandAction::RETURN_HOME ||
-            command.action == RemoteCommandAction::HOLD_POSITION;
+                                 command.action == RemoteCommandAction::HOLD_POSITION;
         if (!safe_action) {
             out.accepted = false;
             out.reason = "Remote command rejected: mission no-fly lock is active";
@@ -143,7 +149,7 @@ inline CommandPolicyDecision evaluate_remote_command(const DroneSecurityAssessme
 
     if (!safety.geofence_clear) {
         const bool safe_action = command.action == RemoteCommandAction::RETURN_HOME ||
-            command.action == RemoteCommandAction::HOLD_POSITION;
+                                 command.action == RemoteCommandAction::HOLD_POSITION;
         if (!safe_action) {
             out.accepted = false;
             out.reason = "Remote command rejected: geofence policy blocks external maneuver";
@@ -162,7 +168,8 @@ inline CommandPolicyDecision evaluate_remote_command(const DroneSecurityAssessme
          safety.battery_pct < safety.minimum_battery_pct) &&
         command.action == RemoteCommandAction::FORMATION_HOLD) {
         out.accepted = false;
-        out.reason = "Remote command rejected: onboard safety margin is below formation-control threshold";
+        out.reason =
+            "Remote command rejected: onboard safety margin is below formation-control threshold";
         return out;
     }
 
@@ -212,7 +219,8 @@ inline void apply_remote_command(const RemoteCommandEnvelope& command,
     case RemoteCommandAction::RETURN_HOME:
         decision.mode = BehaviorMode::RETURN_HOME;
         decision.requires_operator_attention = true;
-        decision.desired_velocity = (-pose.velocity * 0.35) + (pose.R_wb() * Eigen::Vector3d{0.0, 1.0, 0.0} * 0.12);
+        decision.desired_velocity =
+            (-pose.velocity * 0.35) + (pose.R_wb() * Eigen::Vector3d{0.0, 1.0, 0.0} * 0.12);
         decision.desired_yaw_rate_rads = 0.0;
         decision.summary = command.summary;
         return;

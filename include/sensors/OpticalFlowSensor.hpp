@@ -16,8 +16,7 @@ struct OpticalFlowMeasurement : SensorMeasurement {
 
 class OpticalFlowSensor : public SensorBase {
 public:
-    explicit OpticalFlowSensor(std::string id)
-        : SensorBase(std::move(id), "OpticalFlow") {}
+    explicit OpticalFlowSensor(std::string id) : SensorBase(std::move(id), "OpticalFlow") {}
 
     bool initialize() override;
     bool reconfigure(const std::string& config_json) override;

@@ -23,26 +23,30 @@ namespace drone::localization {
 namespace {
 
 std::string normalize_key(std::string key) {
-    key.erase(std::remove_if(key.begin(), key.end(), [](unsigned char c) {
-        return std::isspace(c) || c == '"' || c == '\'' || c == '{' || c == '}' || c == '[' || c == ']';
-    }), key.end());
-    std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    key.erase(std::remove_if(key.begin(), key.end(),
+                             [](unsigned char c) {
+                                 return std::isspace(c) || c == '"' || c == '\'' || c == '{' ||
+                                        c == '}' || c == '[' || c == ']';
+                             }),
+              key.end());
+    std::transform(key.begin(), key.end(), key.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return key;
 }
 
 std::string trim_token(std::string value) {
-    value.erase(std::remove_if(value.begin(), value.end(), [](unsigned char c) {
-        return c == '"' || c == '\'' || c == '{' || c == '}' || c == '[' || c == ']';
-    }), value.end());
+    value.erase(std::remove_if(value.begin(), value.end(),
+                               [](unsigned char c) {
+                                   return c == '"' || c == '\'' || c == '{' || c == '}' ||
+                                          c == '[' || c == ']';
+                               }),
+                value.end());
 
-    const auto first = std::find_if_not(value.begin(), value.end(), [](unsigned char c) {
-        return std::isspace(c);
-    });
+    const auto first = std::find_if_not(value.begin(), value.end(),
+                                        [](unsigned char c) { return std::isspace(c); });
     const auto last = std::find_if_not(value.rbegin(), value.rend(), [](unsigned char c) {
-        return std::isspace(c);
-    }).base();
+                          return std::isspace(c);
+                      }).base();
     if (first >= last) {
         return {};
     }
@@ -85,9 +89,9 @@ std::optional<TDOALocalizer::Measurement> parse_key_value_measurement(std::strin
         const auto value = trim_token(token.substr(eq + 1));
         if (key == "anchor" || key == "anchorid" || key == "anchor_id" || key == "id") {
             anchor_id = parse_uint_token(value);
-        } else if (key == "time" || key == "timestamp" || key == "toa" ||
-                   key == "rx" || key == "rx_time" || key == "arrival" ||
-                   key == "arrivaltime" || key == "arrival_time" || key == "arrival_time_s") {
+        } else if (key == "time" || key == "timestamp" || key == "toa" || key == "rx" ||
+                   key == "rx_time" || key == "arrival" || key == "arrivaltime" ||
+                   key == "arrival_time" || key == "arrival_time_s") {
             arrival_time_s = parse_double_token(value);
         }
     }
@@ -126,8 +130,7 @@ std::optional<TDOALocalizer::Measurement> parse_measurement_line(std::string lin
         return std::nullopt;
     }
 
-    if (line.find('=') != std::string::npos ||
-        line.find('{') != std::string::npos ||
+    if (line.find('=') != std::string::npos || line.find('{') != std::string::npos ||
         line.find(':') != std::string::npos) {
         if (auto parsed = parse_key_value_measurement(line)) {
             return parsed;
@@ -139,11 +142,9 @@ std::optional<TDOALocalizer::Measurement> parse_measurement_line(std::string lin
 
 } // namespace
 
-TDOAIngestor::TDOAIngestor()
-    : TDOAIngestor(Config{}) {}
+TDOAIngestor::TDOAIngestor() : TDOAIngestor(Config{}) {}
 
-TDOAIngestor::TDOAIngestor(Config cfg)
-    : cfg_(std::move(cfg)) {}
+TDOAIngestor::TDOAIngestor(Config cfg) : cfg_(std::move(cfg)) {}
 
 TDOAIngestor::~TDOAIngestor() {
     stop();

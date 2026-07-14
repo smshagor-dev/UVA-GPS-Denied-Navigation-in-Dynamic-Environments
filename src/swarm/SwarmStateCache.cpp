@@ -4,22 +4,21 @@
 
 namespace drone::swarm {
 
-SwarmStateCache::SwarmStateCache(SwarmStateCacheConfig config)
-    : config_(std::move(config)) {}
+SwarmStateCache::SwarmStateCache(SwarmStateCacheConfig config) : config_(std::move(config)) {}
 
-SwarmStateCacheObservation SwarmStateCache::observe_packet(const EdgePeerPacket& packet, uint64_t now_ms) {
+SwarmStateCacheObservation SwarmStateCache::observe_packet(const EdgePeerPacket& packet,
+                                                           uint64_t now_ms) {
     SwarmStateCacheObservation result;
     std::lock_guard lock(mutex_);
 
     const auto existing = peers_.find(packet.sender_id);
     const auto validation = validate_edge_packet(
-        packet,
-        {
-            now_ms,
-            existing != peers_.end() ? existing->second.last_sequence_number : 0u,
-            existing != peers_.end(),
-            1400u,
-        });
+        packet, {
+                    now_ms,
+                    existing != peers_.end() ? existing->second.last_sequence_number : 0u,
+                    existing != peers_.end(),
+                    1400u,
+                });
     if (!validation.ok) {
         result.reason = validation.error;
         return result;
@@ -85,8 +84,8 @@ void SwarmStateCache::expire(uint64_t now_ms) {
     std::lock_guard lock(mutex_);
     for (auto it = peers_.begin(); it != peers_.end();) {
         const auto age_ms = now_ms > it->second.last_packet_timestamp_ms
-            ? (now_ms - it->second.last_packet_timestamp_ms)
-            : 0u;
+                                ? (now_ms - it->second.last_packet_timestamp_ms)
+                                : 0u;
         if (age_ms > config_.entry_expiry_ms) {
             it = peers_.erase(it);
             continue;
@@ -109,28 +108,23 @@ size_t SwarmStateCache::peer_count() const {
 
 size_t SwarmStateCache::stale_peer_count() const {
     std::lock_guard lock(mutex_);
-    return std::count_if(peers_.begin(), peers_.end(), [](const auto& item) {
-        return item.second.stale;
-    });
+    return std::count_if(peers_.begin(), peers_.end(),
+                         [](const auto& item) { return item.second.stale; });
 }
 
 size_t SwarmStateCache::safety_eligible_peer_count() const {
     std::lock_guard lock(mutex_);
     return std::count_if(peers_.begin(), peers_.end(), [](const auto& item) {
-        return !item.second.stale &&
-               !item.second.disconnected_operation &&
-               item.second.edge_health_status != "fault" &&
-               item.second.trust_epoch > 0;
+        return !item.second.stale && !item.second.disconnected_operation &&
+               item.second.edge_health_status != "fault" && item.second.trust_epoch > 0;
     });
 }
 
 bool SwarmStateCache::disconnected_operation() const {
     std::lock_guard lock(mutex_);
     const auto eligible = std::count_if(peers_.begin(), peers_.end(), [](const auto& item) {
-        return !item.second.stale &&
-               !item.second.disconnected_operation &&
-               item.second.edge_health_status != "fault" &&
-               item.second.trust_epoch > 0;
+        return !item.second.stale && !item.second.disconnected_operation &&
+               item.second.edge_health_status != "fault" && item.second.trust_epoch > 0;
     });
     return peers_.empty() || eligible == 0;
 }
@@ -168,9 +162,8 @@ std::vector<CachedPeerState> SwarmStateCache::snapshot() const {
         (void)peer_id;
         out.push_back(state);
     }
-    std::sort(out.begin(), out.end(), [](const auto& lhs, const auto& rhs) {
-        return lhs.peer_id < rhs.peer_id;
-    });
+    std::sort(out.begin(), out.end(),
+              [](const auto& lhs, const auto& rhs) { return lhs.peer_id < rhs.peer_id; });
     return out;
 }
 

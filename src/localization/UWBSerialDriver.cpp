@@ -35,14 +35,14 @@ std::optional<TDOALocalizer::Measurement> parse_serial_measurement(std::string l
         auto value = token.substr(eq + 1);
         key.erase(std::remove_if(key.begin(), key.end(), ::isspace), key.end());
         value.erase(std::remove_if(value.begin(), value.end(), ::isspace), value.end());
-        std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) {
-            return static_cast<char>(std::tolower(c));
-        });
+        std::transform(key.begin(), key.end(), key.begin(),
+                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
         try {
             if (key == "anchor" || key == "anchor_id" || key == "anchorid" || key == "id") {
                 anchor_id = static_cast<uint32_t>(std::stoul(value));
-            } else if (key == "arrival_time_s" || key == "toa" || key == "timestamp" || key == "rx_time") {
+            } else if (key == "arrival_time_s" || key == "toa" || key == "timestamp" ||
+                       key == "rx_time") {
                 arrival_time_s = std::stod(value);
             }
         } catch (...) {
@@ -58,11 +58,9 @@ std::optional<TDOALocalizer::Measurement> parse_serial_measurement(std::string l
 
 } // namespace
 
-UWBSerialDriver::UWBSerialDriver()
-    : UWBSerialDriver(Config{}) {}
+UWBSerialDriver::UWBSerialDriver() : UWBSerialDriver(Config{}) {}
 
-UWBSerialDriver::UWBSerialDriver(Config cfg)
-    : cfg_(std::move(cfg)) {}
+UWBSerialDriver::UWBSerialDriver(Config cfg) : cfg_(std::move(cfg)) {}
 
 UWBSerialDriver::~UWBSerialDriver() {
     stop();
@@ -75,14 +73,8 @@ bool UWBSerialDriver::start() {
 
 #ifdef _WIN32
     const auto wide_path = std::wstring(cfg_.device_path.begin(), cfg_.device_path.end());
-    HANDLE handle = CreateFileW(
-        wide_path.c_str(),
-        GENERIC_READ | GENERIC_WRITE,
-        0,
-        nullptr,
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL,
-        nullptr);
+    HANDLE handle = CreateFileW(wide_path.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (handle == INVALID_HANDLE_VALUE) {
         return false;
     }
@@ -154,7 +146,8 @@ std::optional<std::vector<TDOALocalizer::Measurement>> UWBSerialDriver::poll() {
     int bytes_read = 0;
 #ifdef _WIN32
     DWORD win_read = 0;
-    if (!ReadFile(reinterpret_cast<HANDLE>(static_cast<intptr_t>(handle_)), buffer, sizeof(buffer) - 1, &win_read, nullptr)) {
+    if (!ReadFile(reinterpret_cast<HANDLE>(static_cast<intptr_t>(handle_)), buffer,
+                  sizeof(buffer) - 1, &win_read, nullptr)) {
         return std::nullopt;
     }
     bytes_read = static_cast<int>(win_read);

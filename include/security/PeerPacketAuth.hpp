@@ -42,23 +42,26 @@ struct PacketAuthOutcome {
     PacketAuthResult result{PacketAuthResult::REJECTED};
     std::string reason{};
 
-    [[nodiscard]] bool accepted() const { return result == PacketAuthResult::ACCEPTED; }
+    [[nodiscard]] bool accepted() const {
+        return result == PacketAuthResult::ACCEPTED;
+    }
 };
 
 [[nodiscard]] std::string_view to_string(AuthMode mode);
 [[nodiscard]] std::optional<AuthMode> parse_auth_mode(std::string_view value);
 [[nodiscard]] std::string_view to_string(PacketAuthResult result);
 
-[[nodiscard]] std::array<uint8_t, 32> canonicalPayloadHash(const drone::swarm::EdgePeerPacket& packet);
+[[nodiscard]] std::array<uint8_t, 32>
+canonicalPayloadHash(const drone::swarm::EdgePeerPacket& packet);
 [[nodiscard]] PacketAuthOutcome validateTrustEpoch(const drone::swarm::EdgePeerPacket& packet,
                                                    const PacketAuthConfig& config);
-[[nodiscard]] PacketAuthOutcome validateNonceOrSequence(const drone::swarm::EdgePeerPacket& packet,
-                                                        std::optional<uint32_t> last_sequence_number);
+[[nodiscard]] PacketAuthOutcome
+validateNonceOrSequence(const drone::swarm::EdgePeerPacket& packet,
+                        std::optional<uint32_t> last_sequence_number);
 [[nodiscard]] PacketAuthOutcome signPacket(drone::swarm::EdgePeerPacket& packet,
                                            const PacketAuthConfig& config);
-[[nodiscard]] PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
-                                             const PacketAuthConfig& config,
-                                             uint64_t now_ms,
-                                             std::optional<uint32_t> last_sequence_number = std::nullopt);
+[[nodiscard]] PacketAuthOutcome
+verifyPacket(const drone::swarm::EdgePeerPacket& packet, const PacketAuthConfig& config,
+             uint64_t now_ms, std::optional<uint32_t> last_sequence_number = std::nullopt);
 
 } // namespace drone::security

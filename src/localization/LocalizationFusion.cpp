@@ -15,10 +15,11 @@ LocalizationFusionOutput LocalizationFusion::update(const LocalizationFusionInpu
         const double tdoa_conf = input.tdoa_solution->confidence;
         const double drift_bias = std::clamp(input.vio_pose.drift_m / 2.0, 0.0, 1.0);
         tdoa_weight = std::clamp((tdoa_conf * 0.55) + (drift_bias * 0.45), 0.0, 0.85);
-        out.fused_position =
-            (input.vio_pose.position * (1.0 - tdoa_weight)) +
-            (input.tdoa_solution->position * tdoa_weight);
-        confidence = std::max(confidence, (input.vio_pose.localization_confidence * (1.0 - tdoa_weight)) + (tdoa_conf * tdoa_weight));
+        out.fused_position = (input.vio_pose.position * (1.0 - tdoa_weight)) +
+                             (input.tdoa_solution->position * tdoa_weight);
+        confidence =
+            std::max(confidence, (input.vio_pose.localization_confidence * (1.0 - tdoa_weight)) +
+                                     (tdoa_conf * tdoa_weight));
     }
 
     if (!input.camera_available) {
@@ -31,11 +32,11 @@ LocalizationFusionOutput LocalizationFusion::update(const LocalizationFusionInpu
         confidence *= std::clamp(input.time_sync.confidence, 0.35, 1.0);
     }
     confidence *= std::clamp(0.65 + input.anchor_visibility_ratio * 0.35, 0.65, 1.0);
-    if (input.tdoa_solution.has_value() && input.time_sync.confidence >= 0.8 && input.anchor_visibility_ratio >= 0.5) {
-        const double tdoa_floor =
-            (input.tdoa_solution->confidence * 0.55) +
-            (std::clamp(input.anchor_visibility_ratio, 0.0, 1.0) * 0.25) +
-            (std::clamp(input.time_sync.confidence, 0.0, 1.0) * 0.20);
+    if (input.tdoa_solution.has_value() && input.time_sync.confidence >= 0.8 &&
+        input.anchor_visibility_ratio >= 0.5) {
+        const double tdoa_floor = (input.tdoa_solution->confidence * 0.55) +
+                                  (std::clamp(input.anchor_visibility_ratio, 0.0, 1.0) * 0.25) +
+                                  (std::clamp(input.time_sync.confidence, 0.0, 1.0) * 0.20);
         confidence = std::max(confidence, tdoa_floor);
     }
 

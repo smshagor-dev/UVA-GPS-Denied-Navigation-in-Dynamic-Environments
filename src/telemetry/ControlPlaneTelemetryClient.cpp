@@ -45,7 +45,8 @@ std::wstring widen(std::string_view value) {
     if (value.empty()) {
         return {};
     }
-    const int size = MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
+    const int size =
+        MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
     if (size <= 0) {
         return {};
     }
@@ -60,17 +61,32 @@ std::string json_escape(std::string_view value) {
     out.reserve(value.size() + 8);
     for (const unsigned char c : value) {
         switch (c) {
-        case '\\': out += "\\\\"; break;
-        case '"': out += "\\\""; break;
-        case '\b': out += "\\b"; break;
-        case '\f': out += "\\f"; break;
-        case '\n': out += "\\n"; break;
-        case '\r': out += "\\r"; break;
-        case '\t': out += "\\t"; break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '"':
+            out += "\\\"";
+            break;
+        case '\b':
+            out += "\\b";
+            break;
+        case '\f':
+            out += "\\f";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
         default:
             if (c < 0x20) {
                 std::ostringstream hex;
-                hex << "\\u" << std::hex << std::setw(4) << std::setfill('0') << static_cast<int>(c);
+                hex << "\\u" << std::hex << std::setw(4) << std::setfill('0')
+                    << static_cast<int>(c);
                 out += hex.str();
             } else {
                 out.push_back(static_cast<char>(c));
@@ -123,9 +139,8 @@ std::string read_env(const char* key) {
 
 bool parse_bool_env(const char* key, bool fallback) {
     std::string value = read_env(key);
-    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     if (value == "1" || value == "true" || value == "yes" || value == "on") {
         return true;
     }
@@ -135,9 +150,9 @@ bool parse_bool_env(const char* key, bool fallback) {
     return fallback;
 }
 
-template <typename Vector3>
-std::string json_vec3(const Vector3& value) {
-    return "[" + format_double(value.x()) + "," + format_double(value.y()) + "," + format_double(value.z()) + "]";
+template <typename Vector3> std::string json_vec3(const Vector3& value) {
+    return "[" + format_double(value.x()) + "," + format_double(value.y()) + "," +
+           format_double(value.z()) + "]";
 }
 
 std::string json_string_array(const std::vector<std::string>& values) {
@@ -193,8 +208,10 @@ using unique_chain_context = std::unique_ptr<const CERT_CHAIN_CONTEXT, ChainCont
 
 std::string win32_error_message(DWORD code) {
     LPSTR buffer = nullptr;
-    const DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
-    const DWORD size = FormatMessageA(flags, nullptr, code, 0, reinterpret_cast<LPSTR>(&buffer), 0, nullptr);
+    const DWORD flags =
+        FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+    const DWORD size =
+        FormatMessageA(flags, nullptr, code, 0, reinterpret_cast<LPSTR>(&buffer), 0, nullptr);
     if (size == 0 || buffer == nullptr) {
         return "error code " + std::to_string(code);
     }
@@ -214,14 +231,8 @@ unique_cert_context load_client_certificate_from_pfx(const std::string& pfx_path
         return {};
     }
 
-    HANDLE file = CreateFileW(
-        widen(pfx_path).c_str(),
-        GENERIC_READ,
-        FILE_SHARE_READ,
-        nullptr,
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL,
-        nullptr);
+    HANDLE file = CreateFileW(widen(pfx_path).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) {
         error = "failed to open client PFX: " + win32_error_message(GetLastError());
         return {};
@@ -236,7 +247,8 @@ unique_cert_context load_client_certificate_from_pfx(const std::string& pfx_path
 
     std::vector<std::byte> buffer(static_cast<size_t>(file_size.QuadPart));
     DWORD bytes_read = 0;
-    const BOOL read_ok = ReadFile(file, buffer.data(), static_cast<DWORD>(buffer.size()), &bytes_read, nullptr);
+    const BOOL read_ok =
+        ReadFile(file, buffer.data(), static_cast<DWORD>(buffer.size()), &bytes_read, nullptr);
     CloseHandle(file);
     if (!read_ok || bytes_read != buffer.size()) {
         error = "failed to read client PFX contents";
@@ -247,26 +259,23 @@ unique_cert_context load_client_certificate_from_pfx(const std::string& pfx_path
     blob.pbData = reinterpret_cast<BYTE*>(buffer.data());
     blob.cbData = bytes_read;
 
-    unique_cert_store store(
-        PFXImportCertStore(&blob, widen(password).c_str(), CRYPT_USER_KEYSET | PKCS12_ALLOW_OVERWRITE_KEY),
-        CertStoreCloser{});
+    unique_cert_store store(PFXImportCertStore(&blob, widen(password).c_str(),
+                                               CRYPT_USER_KEYSET | PKCS12_ALLOW_OVERWRITE_KEY),
+                            CertStoreCloser{});
     if (!store) {
         error = "failed to import client PFX: " + win32_error_message(GetLastError());
         return {};
     }
 
     PCCERT_CONTEXT found = nullptr;
-    while ((found = CertFindCertificateInStore(
-                static_cast<HCERTSTORE>(store.get()),
-                X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-                0,
-                CERT_FIND_ANY,
-                nullptr,
-                found)) != nullptr) {
+    while ((found = CertFindCertificateInStore(static_cast<HCERTSTORE>(store.get()),
+                                               X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0,
+                                               CERT_FIND_ANY, nullptr, found)) != nullptr) {
         DWORD key_spec = 0;
         BOOL must_free = FALSE;
         HCRYPTPROV_OR_NCRYPT_KEY_HANDLE key_handle = 0;
-        if (CryptAcquireCertificatePrivateKey(found, CRYPT_ACQUIRE_SILENT_FLAG, nullptr, &key_handle, &key_spec, &must_free)) {
+        if (CryptAcquireCertificatePrivateKey(found, CRYPT_ACQUIRE_SILENT_FLAG, nullptr,
+                                              &key_handle, &key_spec, &must_free)) {
             if (must_free) {
                 if (key_spec == CERT_NCRYPT_KEY_SPEC) {
                     NCryptFreeObject(key_handle);
@@ -293,18 +302,10 @@ unique_cert_store load_ca_store_from_file(const std::string& ca_file, std::strin
     DWORD encoding = 0;
     DWORD content_type = 0;
     DWORD format_type = 0;
-    if (!CryptQueryObject(
-            CERT_QUERY_OBJECT_FILE,
-            widen(ca_file).c_str(),
-            CERT_QUERY_CONTENT_FLAG_CERT,
-            CERT_QUERY_FORMAT_FLAG_ALL,
-            0,
-            &encoding,
-            &content_type,
-            &format_type,
-            &store,
-            nullptr,
-            reinterpret_cast<const void**>(&cert_context))) {
+    if (!CryptQueryObject(CERT_QUERY_OBJECT_FILE, widen(ca_file).c_str(),
+                          CERT_QUERY_CONTENT_FLAG_CERT, CERT_QUERY_FORMAT_FLAG_ALL, 0, &encoding,
+                          &content_type, &format_type, &store, nullptr,
+                          reinterpret_cast<const void**>(&cert_context))) {
         error = "failed to parse DRONE_TLS_CA_FILE: " + win32_error_message(GetLastError());
         return unique_cert_store(nullptr, CertStoreCloser{});
     }
@@ -314,10 +315,10 @@ unique_cert_store load_ca_store_from_file(const std::string& ca_file, std::strin
     return unique_cert_store(store, CertStoreCloser{});
 }
 
-bool validate_server_certificate(HINTERNET request,
-                                 const std::string& host,
-                                 const drone::telemetry::ControlPlaneTelemetryClient::TLSRuntimeConfig& tls,
-                                 std::string& error) {
+bool validate_server_certificate(
+    HINTERNET request, const std::string& host,
+    const drone::telemetry::ControlPlaneTelemetryClient::TLSRuntimeConfig& tls,
+    std::string& error) {
     if (tls.skip_verify) {
         return true;
     }
@@ -330,7 +331,8 @@ bool validate_server_certificate(HINTERNET request,
     }
 
     std::vector<std::byte> cert_buffer(size);
-    if (!WinHttpQueryOption(request, WINHTTP_OPTION_SERVER_CERT_CONTEXT, cert_buffer.data(), &size)) {
+    if (!WinHttpQueryOption(request, WINHTTP_OPTION_SERVER_CERT_CONTEXT, cert_buffer.data(),
+                            &size)) {
         error = "failed to query server certificate: " + win32_error_message(GetLastError());
         return false;
     }
@@ -362,15 +364,9 @@ bool validate_server_certificate(HINTERNET request,
     CERT_CHAIN_PARA chain_para{};
     chain_para.cbSize = sizeof(chain_para);
     PCCERT_CHAIN_CONTEXT raw_chain = nullptr;
-    if (!CertGetCertificateChain(
-            static_cast<HCERTCHAINENGINE>(chain_engine.get()),
-            server_cert.get(),
-            nullptr,
-            server_cert->hCertStore,
-            &chain_para,
-            0,
-            nullptr,
-            &raw_chain)) {
+    if (!CertGetCertificateChain(static_cast<HCERTCHAINENGINE>(chain_engine.get()),
+                                 server_cert.get(), nullptr, server_cert->hCertStore, &chain_para,
+                                 0, nullptr, &raw_chain)) {
         error = "failed to build server certificate chain: " + win32_error_message(GetLastError());
         return false;
     }
@@ -388,12 +384,15 @@ bool validate_server_certificate(HINTERNET request,
 
     CERT_CHAIN_POLICY_STATUS policy_status{};
     policy_status.cbSize = sizeof(policy_status);
-    if (!CertVerifyCertificateChainPolicy(CERT_CHAIN_POLICY_SSL, chain.get(), &policy_para, &policy_status)) {
-        error = "failed to verify server certificate policy: " + win32_error_message(GetLastError());
+    if (!CertVerifyCertificateChainPolicy(CERT_CHAIN_POLICY_SSL, chain.get(), &policy_para,
+                                          &policy_status)) {
+        error =
+            "failed to verify server certificate policy: " + win32_error_message(GetLastError());
         return false;
     }
     if (policy_status.dwError != 0) {
-        error = "server certificate policy rejected backend: " + win32_error_message(policy_status.dwError);
+        error = "server certificate policy rejected backend: " +
+                win32_error_message(policy_status.dwError);
         return false;
     }
     return true;
@@ -414,10 +413,8 @@ std::string json_double_array(const std::vector<double>& values) {
 }
 
 std::string json_sensor_vec3(const SensorVector3& value) {
-    return std::string("{") +
-        "\"x\":" + format_double(value.x) + "," +
-        "\"y\":" + format_double(value.y) + "," +
-        "\"z\":" + format_double(value.z) + "}";
+    return std::string("{") + "\"x\":" + format_double(value.x) + "," +
+           "\"y\":" + format_double(value.y) + "," + "\"z\":" + format_double(value.z) + "}";
 }
 
 std::string json_camera_payload(const CameraTelemetryPayload& camera) {
@@ -460,8 +457,7 @@ std::string json_lidar_payload(const LidarTelemetryPayload& lidar) {
         points << "{"
                << "\"x\":" << format_double(point.x) << ","
                << "\"y\":" << format_double(point.y) << ","
-               << "\"intensity\":" << format_double(point.intensity)
-               << "}";
+               << "\"intensity\":" << format_double(point.intensity) << "}";
     }
     points << "]";
     std::ostringstream oss;
@@ -492,8 +488,7 @@ std::string json_tdoa_payload(const TDOATelemetryPayload& tdoa) {
                 << "\"y\":" << format_double(anchor.y) << ","
                 << "\"z\":" << format_double(anchor.z) << ","
                 << "\"visible\":" << (anchor.visible ? "true" : "false") << ","
-                << "\"last_seen_ms\":" << format_double(anchor.last_seen_ms)
-                << "}";
+                << "\"last_seen_ms\":" << format_double(anchor.last_seen_ms) << "}";
     }
     anchors << "]";
     std::ostringstream oss;
@@ -548,20 +543,14 @@ bool wait_for_socket(int fd, bool write_ready, int timeout_ms) {
     timeval timeout{};
     timeout.tv_sec = timeout_ms / 1000;
     timeout.tv_usec = (timeout_ms % 1000) * 1000;
-    const int ready = select(
-        fd + 1,
-        write_ready ? nullptr : &fds,
-        write_ready ? &fds : nullptr,
-        nullptr,
-        &timeout);
+    const int ready = select(fd + 1, write_ready ? nullptr : &fds, write_ready ? &fds : nullptr,
+                             nullptr, &timeout);
     return ready > 0;
 }
 
-ControlPlaneTelemetryClient::HttpResponse send_http_posix(
-    const ControlPlaneTelemetryClient::ParsedEndpoint& endpoint,
-    std::string_view body,
-    const ControlPlaneTelemetryClient::HeaderList& headers,
-    int timeout_ms) {
+ControlPlaneTelemetryClient::HttpResponse
+send_http_posix(const ControlPlaneTelemetryClient::ParsedEndpoint& endpoint, std::string_view body,
+                const ControlPlaneTelemetryClient::HeaderList& headers, int timeout_ms) {
     if (endpoint.https) {
         return {false, 0, "https unsupported in minimal posix telemetry client"};
     }
@@ -598,7 +587,8 @@ ControlPlaneTelemetryClient::HttpResponse send_http_posix(
         }
 
         set_nonblocking(socket_guard.fd, true);
-        const int connect_result = connect(socket_guard.fd, ai->ai_addr, static_cast<socklen_t>(ai->ai_addrlen));
+        const int connect_result =
+            connect(socket_guard.fd, ai->ai_addr, static_cast<socklen_t>(ai->ai_addrlen));
         if (connect_result != 0 && errno != EINPROGRESS) {
             response.status_text = "connect failed";
             continue;
@@ -610,7 +600,9 @@ ControlPlaneTelemetryClient::HttpResponse send_http_posix(
 
         int socket_error = 0;
         socklen_t socket_error_size = sizeof(socket_error);
-        if (getsockopt(socket_guard.fd, SOL_SOCKET, SO_ERROR, &socket_error, &socket_error_size) != 0 || socket_error != 0) {
+        if (getsockopt(socket_guard.fd, SOL_SOCKET, SO_ERROR, &socket_error, &socket_error_size) !=
+                0 ||
+            socket_error != 0) {
             response.status_text = "connect error";
             continue;
         }
@@ -624,7 +616,8 @@ ControlPlaneTelemetryClient::HttpResponse send_http_posix(
 
         size_t sent = 0;
         while (sent < request.size()) {
-            const ssize_t wrote = send(socket_guard.fd, request.data() + sent, request.size() - sent, 0);
+            const ssize_t wrote =
+                send(socket_guard.fd, request.data() + sent, request.size() - sent, 0);
             if (wrote <= 0) {
                 response.status_text = "send failed";
                 break;
@@ -674,23 +667,22 @@ ControlPlaneTelemetryClient::HttpResponse send_http_posix(
 } // namespace
 
 ControlPlaneTelemetryClient::ControlPlaneTelemetryClient(std::string backend_url,
-                                                         std::string auth_token,
-                                                         int interval_ms,
-                                                         int timeout_ms,
-                                                         TransportFn transport)
-    : endpoint_(parse_backend_url(backend_url)),
-      tls_(load_tls_runtime_config()),
+                                                         std::string auth_token, int interval_ms,
+                                                         int timeout_ms, TransportFn transport)
+    : endpoint_(parse_backend_url(backend_url)), tls_(load_tls_runtime_config()),
       interval_(std::chrono::milliseconds(std::max(interval_ms, 200))),
       timeout_(std::chrono::milliseconds(std::max(timeout_ms, 200))),
       auth_token_(std::move(auth_token)),
-      transport_(transport ? std::move(transport) : &ControlPlaneTelemetryClient::default_transport) {
+      transport_(transport ? std::move(transport)
+                           : &ControlPlaneTelemetryClient::default_transport) {
     enabled_ = !backend_url.empty();
     if (enabled_) {
         last_status_ = "ready";
     }
 }
 
-ControlPlaneTelemetryClient::TLSRuntimeConfig ControlPlaneTelemetryClient::load_tls_runtime_config() {
+ControlPlaneTelemetryClient::TLSRuntimeConfig
+ControlPlaneTelemetryClient::load_tls_runtime_config() {
     TLSRuntimeConfig out;
     out.skip_verify = parse_bool_env("DRONE_TLS_SKIP_VERIFY", false);
     out.ca_file = read_env("DRONE_TLS_CA_FILE");
@@ -732,14 +724,15 @@ bool ControlPlaneTelemetryClient::publish(const TelemetrySnapshot& snapshot,
     const std::string body = serialize_payload(snapshot);
     const auto headers = build_headers(auth_token_, snapshot.drone_id);
     const auto response = transport_(endpoint_, body, headers, static_cast<int>(timeout_.count()));
-    const bool ok = response.transport_ok && response.status_code >= 200 && response.status_code < 300;
-    mark_result(
-        ok,
-        ok ? ("telemetry accepted status=" + std::to_string(response.status_code))
-           : (response.status_code > 0
-                ? ("telemetry rejected status=" + std::to_string(response.status_code) + " " + response.status_text)
-                : ("telemetry transport failed: " + response.status_text)),
-        now);
+    const bool ok =
+        response.transport_ok && response.status_code >= 200 && response.status_code < 300;
+    mark_result(ok,
+                ok ? ("telemetry accepted status=" + std::to_string(response.status_code))
+                   : (response.status_code > 0
+                          ? ("telemetry rejected status=" + std::to_string(response.status_code) +
+                             " " + response.status_text)
+                          : ("telemetry transport failed: " + response.status_text)),
+                now);
     return ok;
 }
 
@@ -753,7 +746,8 @@ int ControlPlaneTelemetryClient::consecutive_failures() const {
     return consecutive_failures_;
 }
 
-ControlPlaneTelemetryClient::ParsedEndpoint ControlPlaneTelemetryClient::parse_backend_url(const std::string& backend_url) {
+ControlPlaneTelemetryClient::ParsedEndpoint
+ControlPlaneTelemetryClient::parse_backend_url(const std::string& backend_url) {
     ParsedEndpoint endpoint;
     if (backend_url.empty()) {
         return endpoint;
@@ -787,8 +781,8 @@ ControlPlaneTelemetryClient::ParsedEndpoint ControlPlaneTelemetryClient::parse_b
     return endpoint;
 }
 
-ControlPlaneTelemetryClient::HeaderList ControlPlaneTelemetryClient::build_headers(std::string_view auth_token,
-                                                                                   uint32_t drone_id) {
+ControlPlaneTelemetryClient::HeaderList
+ControlPlaneTelemetryClient::build_headers(std::string_view auth_token, uint32_t drone_id) {
     HeaderList headers;
     headers.emplace_back("Content-Type", "application/json");
     headers.emplace_back("X-Drone-Id", std::to_string(drone_id));
@@ -821,7 +815,8 @@ std::string ControlPlaneTelemetryClient::serialize_payload(const TelemetrySnapsh
         << "\"gpu_load_pct\":" << format_double(snapshot.gpu_load_pct) << ","
         << "\"mission_state\":\"" << json_escape(snapshot.mission_state) << "\","
         << "\"localization_source\":\"" << json_escape(snapshot.localization_source) << "\","
-        << "\"localization_data_source\":\"" << json_escape(snapshot.localization_data_source) << "\","
+        << "\"localization_data_source\":\"" << json_escape(snapshot.localization_data_source)
+        << "\","
         << "\"localization_state\":\"" << json_escape(snapshot.localization_state) << "\","
         << "\"localization_confidence\":" << format_double(snapshot.localization_confidence) << ","
         << "\"tdoa_confidence\":" << format_double(snapshot.tdoa_confidence) << ","
@@ -838,28 +833,37 @@ std::string ControlPlaneTelemetryClient::serialize_payload(const TelemetrySnapsh
         << "\"local_consensus_epoch\":" << snapshot.local_consensus_epoch << ","
         << "\"peer_latency_ms\":" << format_double(snapshot.peer_latency_ms) << ","
         << "\"mesh_bandwidth_kbps\":" << format_double(snapshot.mesh_bandwidth_kbps) << ","
-        << "\"edge_serialization_mode\":\"" << json_escape(snapshot.edge_serialization_mode) << "\","
-        << "\"edge_average_packet_size_bytes\":" << format_double(snapshot.edge_average_packet_size_bytes) << ","
-        << "\"edge_bandwidth_savings_estimate_pct\":" << format_double(snapshot.edge_bandwidth_savings_estimate_pct) << ","
-        << "\"edge_packet_encode_latency_us\":" << format_double(snapshot.edge_packet_encode_latency_us) << ","
+        << "\"edge_serialization_mode\":\"" << json_escape(snapshot.edge_serialization_mode)
+        << "\","
+        << "\"edge_average_packet_size_bytes\":"
+        << format_double(snapshot.edge_average_packet_size_bytes) << ","
+        << "\"edge_bandwidth_savings_estimate_pct\":"
+        << format_double(snapshot.edge_bandwidth_savings_estimate_pct) << ","
+        << "\"edge_packet_encode_latency_us\":"
+        << format_double(snapshot.edge_packet_encode_latency_us) << ","
         << "\"auth_mode\":\"" << json_escape(snapshot.auth_mode) << "\","
         << "\"auth_failures\":" << snapshot.auth_failures << ","
         << "\"unsigned_packets\":" << snapshot.unsigned_packets << ","
         << "\"last_auth_result\":\"" << json_escape(snapshot.last_auth_result) << "\","
         << "\"pqc_ready_status\":\"" << json_escape(snapshot.pqc_ready_status) << "\","
-        << "\"disconnected_operation\":" << (snapshot.disconnected_operation ? "true" : "false") << ","
+        << "\"disconnected_operation\":" << (snapshot.disconnected_operation ? "true" : "false")
+        << ","
         << "\"edge_health_status\":\"" << json_escape(snapshot.edge_health_status) << "\","
         << "\"edge_autonomy_state\":\"" << json_escape(snapshot.edge_autonomy_state) << "\","
         << "\"edge_inference_status\":\"" << json_escape(snapshot.edge_inference_status) << "\","
         << "\"edge_inference_fps\":" << format_double(snapshot.edge_inference_fps) << ","
-        << "\"edge_inference_confidence\":" << format_double(snapshot.edge_inference_confidence) << ","
+        << "\"edge_inference_confidence\":" << format_double(snapshot.edge_inference_confidence)
+        << ","
         << "\"local_obstacle_count\":" << snapshot.local_obstacle_count << ","
         << "\"shared_obstacle_count\":" << snapshot.shared_obstacle_count << ","
         << "\"security_state\":\"" << json_escape(snapshot.security_state) << "\","
         << "\"security_summary\":\"" << json_escape(snapshot.security_summary) << "\","
-        << "\"security_transition_reason\":\"" << json_escape(snapshot.security_transition_reason) << "\","
-        << "\"remote_command_allowed\":" << (snapshot.remote_command_allowed ? "true" : "false") << ","
-        << "\"telemetry_uplink_allowed\":" << (snapshot.telemetry_uplink_allowed ? "true" : "false") << ","
+        << "\"security_transition_reason\":\"" << json_escape(snapshot.security_transition_reason)
+        << "\","
+        << "\"remote_command_allowed\":" << (snapshot.remote_command_allowed ? "true" : "false")
+        << ","
+        << "\"telemetry_uplink_allowed\":" << (snapshot.telemetry_uplink_allowed ? "true" : "false")
+        << ","
         << "\"link_integrity_score\":" << format_double(snapshot.link_integrity_score) << ","
         << "\"trust_epoch\":" << snapshot.trust_epoch << ","
         << "\"last_auth_failure_at_s\":" << format_double(snapshot.last_auth_failure_at_s) << ","
@@ -884,19 +888,16 @@ std::string ControlPlaneTelemetryClient::serialize_payload(const TelemetrySnapsh
     return oss.str();
 }
 
-ControlPlaneTelemetryClient::HttpResponse ControlPlaneTelemetryClient::default_transport(
-    const ParsedEndpoint& endpoint,
-    std::string_view body,
-    const HeaderList& headers,
-    int timeout_ms) {
+ControlPlaneTelemetryClient::HttpResponse
+ControlPlaneTelemetryClient::default_transport(const ParsedEndpoint& endpoint,
+                                               std::string_view body, const HeaderList& headers,
+                                               int timeout_ms) {
 #ifdef _WIN32
     auto host = widen(endpoint.host);
     auto path = widen(endpoint.path);
-    HINTERNET session = WinHttpOpen(L"drone_swarm/telemetry-client",
-                                    WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                                    WINHTTP_NO_PROXY_NAME,
-                                    WINHTTP_NO_PROXY_BYPASS,
-                                    0);
+    HINTERNET session =
+        WinHttpOpen(L"drone_swarm/telemetry-client", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!session) {
         return {false, 0, "WinHttpOpen failed"};
     }
@@ -908,13 +909,8 @@ ControlPlaneTelemetryClient::HttpResponse ControlPlaneTelemetryClient::default_t
     }
 
     DWORD flags = endpoint.https ? WINHTTP_FLAG_SECURE : 0;
-    HINTERNET request = WinHttpOpenRequest(connect,
-                                           L"POST",
-                                           path.c_str(),
-                                           nullptr,
-                                           WINHTTP_NO_REFERER,
-                                           WINHTTP_DEFAULT_ACCEPT_TYPES,
-                                           flags);
+    HINTERNET request = WinHttpOpenRequest(connect, L"POST", path.c_str(), nullptr,
+                                           WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
     if (!request) {
         WinHttpCloseHandle(connect);
         WinHttpCloseHandle(session);
@@ -929,13 +925,10 @@ ControlPlaneTelemetryClient::HttpResponse ControlPlaneTelemetryClient::default_t
     DWORD timeout = static_cast<DWORD>(std::max(timeout_ms, 200));
     WinHttpSetTimeouts(session, timeout, timeout, timeout, timeout);
 
-    const BOOL sent = WinHttpSendRequest(request,
-                                         header_block.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : header_block.c_str(),
-                                         static_cast<DWORD>(header_block.size()),
-                                         const_cast<char*>(body.data()),
-                                         static_cast<DWORD>(body.size()),
-                                         static_cast<DWORD>(body.size()),
-                                         0);
+    const BOOL sent = WinHttpSendRequest(
+        request, header_block.empty() ? WINHTTP_NO_ADDITIONAL_HEADERS : header_block.c_str(),
+        static_cast<DWORD>(header_block.size()), const_cast<char*>(body.data()),
+        static_cast<DWORD>(body.size()), static_cast<DWORD>(body.size()), 0);
     if (!sent || !WinHttpReceiveResponse(request, nullptr)) {
         WinHttpCloseHandle(request);
         WinHttpCloseHandle(connect);
@@ -945,12 +938,9 @@ ControlPlaneTelemetryClient::HttpResponse ControlPlaneTelemetryClient::default_t
 
     DWORD status_code = 0;
     DWORD size = sizeof(status_code);
-    const BOOL queried = WinHttpQueryHeaders(request,
-                                             WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-                                             WINHTTP_HEADER_NAME_BY_INDEX,
-                                             &status_code,
-                                             &size,
-                                             WINHTTP_NO_HEADER_INDEX);
+    const BOOL queried = WinHttpQueryHeaders(
+        request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+        WINHTTP_HEADER_NAME_BY_INDEX, &status_code, &size, WINHTTP_NO_HEADER_INDEX);
 
     WinHttpCloseHandle(request);
     WinHttpCloseHandle(connect);
@@ -971,8 +961,7 @@ std::chrono::milliseconds ControlPlaneTelemetryClient::current_backoff() const {
     return base * (1 << exponent);
 }
 
-void ControlPlaneTelemetryClient::mark_result(bool ok,
-                                              std::string status,
+void ControlPlaneTelemetryClient::mark_result(bool ok, std::string status,
                                               std::chrono::steady_clock::time_point now) {
     std::lock_guard lock(state_mutex_);
     last_attempt_ = now;
@@ -985,8 +974,10 @@ void ControlPlaneTelemetryClient::mark_result(bool ok,
 
     ++consecutive_failures_;
     next_retry_not_before_ = now + current_backoff();
-    last_status_ = "error: " + status + " retry_in_ms=" +
-        std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(current_backoff()).count());
+    last_status_ =
+        "error: " + status + " retry_in_ms=" +
+        std::to_string(
+            std::chrono::duration_cast<std::chrono::milliseconds>(current_backoff()).count());
 }
 
 } // namespace drone::telemetry
