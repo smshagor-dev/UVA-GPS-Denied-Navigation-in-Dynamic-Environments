@@ -148,6 +148,9 @@ The Python/PySide6 dashboard exposes:
 - runtime mode banners
 - backend simulation/production truthfulness
 - command and mission workflows
+- role-aware operator console workflows for `operator`, `commander`, and `maintenance`
+- live runtime settings for operator role and UI/dialog FPS limits
+- backend/TLS security profile awareness for lab vs. field/production operation
 
 ### Local safety priority
 
@@ -798,6 +801,19 @@ Capabilities include:
 - sensor telemetry panels for camera, IMU, LiDAR, TDOA, and replay state
 - edge serialization visibility for JSON/CBOR mode, packet size, estimated savings, and encode latency
 - safety-state and security-state visibility for operator review
+- operator top bar health summaries for telemetry quality, link quality, backend reachability, and fleet counts
+- dedicated operator-console panels for map, vehicle table, battery trend, signal trend, mission progress, CPU temperature, and system messages
+- lazy-loaded auxiliary workspaces for operations, sensors, analytics, settings, safety/security, system health, and bench validation
+
+The current dashboard entry window is the operator console view backed by `gui/operator_console.py`, while `gui/dashboard.py` owns the application lifecycle, telemetry polling, command dispatch, dialogs, persistence, and backend integration.
+
+Dashboard runtime behavior also includes:
+
+- local mode without a backend URL for demo/local state inspection
+- fleet mode via `--backend-url` or `DRONE_BACKEND_URL`
+- operator-role normalization for `operator`, `commander`, and `maintenance`
+- signed-command enforcement when the security profile is `production` or `field`
+- HTTPS and mTLS validation for non-lab backend sessions
 
 The dashboard is an operations and research visualization tool. It is not a flight certification interface.
 
@@ -1128,6 +1144,27 @@ Local dashboard mode:
 python gui/dashboard.py
 ```
 
+Supported dashboard launch inputs:
+
+- `--ids` or `DRONE_DASHBOARD_IDS` for comma-separated drone IDs
+- `--poll-hz` or `DRONE_DASHBOARD_POLL_HZ` for telemetry polling rate
+- `--backend-url` or `DRONE_BACKEND_URL` for Go control-plane connectivity
+
+Operator and security-related environment variables:
+
+- `DRONE_OPERATOR_ROLE` selects `operator`, `commander`, or `maintenance`
+- `DRONE_OPERATOR_ID` and `DRONE_OPERATOR_SECRET` enable signed dashboard command envelopes when required by policy
+- `DRONE_SECURITY_PROFILE` selects `lab`, `production`, or `field`
+- `DRONE_TLS_CA_FILE`, `DRONE_TLS_CLIENT_CERT_FILE`, and `DRONE_TLS_CLIENT_KEY_FILE` are required for `production`/`field` HTTPS control-plane sessions
+- `DRONE_TLS_SKIP_VERIFY` is available for controlled lab-only troubleshooting and should not be used as a production default
+
+The main dashboard window now boots directly into the operator-console layout and exposes additional dialogs for:
+
+- command console
+- operations overview, selected-drone detail, mission, localization, safety, modes, and edge swarm
+- sensor status, camera, LiDAR, IMU, TDOA/UWB, and replay inspection
+- analytics, runtime settings, security workspace, system health, and bench validation
+
 ### Configuration source of truth
 
 Active default runtime configuration is loaded from:
@@ -1205,6 +1242,7 @@ Supported values:
 cmd/control-plane/              Go backend entrypoint
 internal/controlplane/          Go fleet state, server, security, API tests
 gui/dashboard.py                PySide6 operational dashboard
+gui/operator_console.py         Operator console layout, charts, tables, and top-bar UX
 gui/backend_status.py           Backend/runtime status helpers
 include/                        C++ public headers
 src/                            C++ implementation
@@ -1245,7 +1283,7 @@ drone_swarm/
 │   ├── swarm/                   Edge peer protocol, V2X mesh, consensus, cache
 │   ├── telemetry/               Telemetry snapshot/client interface
 │   └── vio/                     EKF and VIO pipeline interfaces
-├── gui/                         Python/PySide6 dashboard and backend-status helpers
+├── gui/                         Python/PySide6 dashboard, operator console, and backend-status helpers
 ├── internal/controlplane/       Go control-plane backend types, handlers, telemetry state
 ├── tests/                       C++, Go, and Python validation entry points
 ├── config/                      Runtime, detector, LiDAR, anchor, and swarm protocol examples
@@ -1266,7 +1304,7 @@ drone_swarm/
 | Safety | `src/safety/`, `include/safety/` | Local safety authority and failsafe behavior |
 | Security | `src/swarm/SwarmSecurity.cpp`, `include/security/` | Command policy, trust state, replay/stale rejection hooks |
 | Backend | `internal/controlplane/` | Go telemetry/control plane |
-| Dashboard | `gui/` | PySide6 operator visualization, replay, topology, mission pages |
+| Dashboard | `gui/` | PySide6 operator console, dialogs, replay, topology, mission, and runtime settings pages |
 | Tests | `tests/` | CTest, Go tests, Python dashboard/backend tests |
 
 ---
