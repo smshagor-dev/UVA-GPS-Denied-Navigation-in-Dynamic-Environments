@@ -13,7 +13,7 @@ runs:
       shell: pwsh
       run: |
         $baseline = python -c "import json, pathlib; print(json.loads(pathlib.Path('vcpkg.json').read_text(encoding='utf-8'))['builtin-baseline'])"
-        "baseline=$baseline" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "baseline=$baseline"
 
     - name: Cache vcpkg binary archives
       uses: actions/cache@v4
@@ -36,6 +36,6 @@ runs:
     - name: Export vcpkg environment
       shell: pwsh
       run: |
-        "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        "VCPKG_DEFAULT_BINARY_CACHE=$env:GITHUB_WORKSPACE\vcpkg-cache" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        "VCPKG_BINARY_SOURCES=clear;files,$env:GITHUB_WORKSPACE\vcpkg-cache,readwrite" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg"
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_BINARY_CACHE=$env:GITHUB_WORKSPACE\vcpkg-cache"
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_BINARY_SOURCES=clear;files,$env:GITHUB_WORKSPACE\vcpkg-cache,readwrite"

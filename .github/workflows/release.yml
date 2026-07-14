@@ -79,7 +79,7 @@ jobs:
           syft "dir:${RUNNER_TEMP}/linux-install" -o cyclonedx-json="${RUNNER_TEMP}/release/linux/sbom.cdx.json"
           (
             cd "${RUNNER_TEMP}/release/linux"
-            sha256sum * > SHA256SUMS.txt
+            sha256sum ./* > SHA256SUMS.txt
           )
       - name: Upload Linux release artifacts
         uses: actions/upload-artifact@v4
@@ -172,8 +172,9 @@ jobs:
         run: |
           set -euxo pipefail
           TAG_NAME="${GITHUB_REF_NAME}"
+          mapfile -t release_files < <(find "${RUNNER_TEMP}/release-bundle" -type f -print)
           gh release create "${TAG_NAME}" \
             --repo "${GITHUB_REPOSITORY}" \
             --title "${TAG_NAME}" \
             --notes "Validated software release for research and bench use. See attached packages, SBOM, and checksums." \
-            $(find "${RUNNER_TEMP}/release-bundle" -type f -print)
+            "${release_files[@]}"

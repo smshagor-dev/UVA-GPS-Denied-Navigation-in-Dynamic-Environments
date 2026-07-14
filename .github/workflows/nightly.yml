@@ -254,7 +254,7 @@ jobs:
           syft "dir:${RUNNER_TEMP}/package-install" -o cyclonedx-json="${RUNNER_TEMP}/packages/sbom.cdx.json"
           (
             cd "${RUNNER_TEMP}/packages"
-            sha256sum * > SHA256SUMS.txt
+            sha256sum ./* > SHA256SUMS.txt
           )
       - name: Upload package validation artifacts
         if: always()
