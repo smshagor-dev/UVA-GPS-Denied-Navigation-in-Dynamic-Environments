@@ -117,7 +117,7 @@ jobs:
           Write-Host "commit_sha=$env:GITHUB_SHA"
       - name: Configure
         shell: pwsh
-        run: cmake --preset windows-msvc-release-package
+        run: cmake --preset windows-msvc-release-package -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
       - name: Build
         shell: pwsh
         run: cmake --build --preset windows-msvc-release-package

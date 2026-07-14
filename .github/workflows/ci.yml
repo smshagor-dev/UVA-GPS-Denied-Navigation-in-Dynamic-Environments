@@ -24,17 +24,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false
-
       - name: Install actionlint
         shell: bash
         run: |
           set -euxo pipefail
-          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-          echo "${HOME}/go/bin" >> "${GITHUB_PATH}"
+          version=v1.7.7
+          archive="actionlint_${version#v}_linux_amd64.tar.gz"
+          curl -fsSLo "${RUNNER_TEMP}/${archive}" \
+            "https://github.com/rhysd/actionlint/releases/download/${version}/${archive}"
+          tar -xzf "${RUNNER_TEMP}/${archive}" -C "${RUNNER_TEMP}" actionlint
+          install "${RUNNER_TEMP}/actionlint" /usr/local/bin/actionlint
 
       - name: Print tool versions
         shell: bash
@@ -436,7 +435,7 @@ jobs:
 
       - name: Configure
         shell: pwsh
-        run: cmake --preset validation-msvc
+        run: cmake --preset validation-msvc -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
 
       - name: Build
         shell: pwsh
@@ -484,7 +483,7 @@ jobs:
           Write-Host "commit_sha=$env:GITHUB_SHA"
       - name: Configure
         shell: pwsh
-        run: cmake --preset windows-msvc-debug
+        run: cmake --preset windows-msvc-debug -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
       - name: Build
         shell: pwsh
         run: cmake --build --preset windows-msvc-debug
@@ -529,7 +528,7 @@ jobs:
           Write-Host "commit_sha=$env:GITHUB_SHA"
       - name: Configure
         shell: pwsh
-        run: cmake --preset windows-msvc-release
+        run: cmake --preset windows-msvc-release -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
       - name: Build
         shell: pwsh
         run: cmake --build --preset windows-msvc-release
