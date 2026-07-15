@@ -30,10 +30,10 @@
 ![Flight Validation](https://img.shields.io/badge/Flight%20Validation-Not%20Validated-red?style=flat-square)
 ![Flight Readiness](https://img.shields.io/badge/Status-NOT%20FLIGHT%20READY-red?style=flat-square)
 
-> **Copyright and usage notice**
-> Copyright (c) 2026 Md Shahanur Islam Shagor. All rights reserved. No
-> permission is granted to use, copy, modify, distribute, or present this
-> work as your own without prior written permission. See [LICENSE](LICENSE).
+> **Open-source license notice**
+> Copyright (c) 2026 Md Shahanur Islam Shagor. This repository is released
+> under the GNU GPL v3.0. Use, modification, and redistribution are allowed
+> only if the GPL conditions are preserved. See [LICENSE](LICENSE).
 
 > **Safety and validation notice**  
 > This repository is an advanced research and production-oriented software platform for GPS-denied UAV autonomy. It is **not flight validated**, **not production-radio validated**, and **not approved for free flight**. Treat the implementation as bench-demo-ready software plus architecture-level research until HIL, tethered, and flight-adjacent evidence exists.
