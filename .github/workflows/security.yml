@@ -21,26 +21,35 @@ concurrency:
 jobs:
   dependency-review:
     name: Dependency Review
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Skip dependency review outside pull requests
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Dependency Review only applies to pull_request events; marking push run successful."
+
+      - uses: actions/checkout@v6
+        if: github.event_name == 'pull_request'
+
       - uses: actions/dependency-review-action@v5
+        if: github.event_name == 'pull_request'
 
   secret-scanning:
     name: Secret Scanning
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26.5"
           cache: false
@@ -83,7 +92,7 @@ jobs:
 
       - name: Upload gitleaks reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: gitleaks-${{ github.sha }}
           path: ${{ runner.temp }}/gitleaks
@@ -94,15 +103,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements.txt
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26.5"
           cache: false
@@ -140,7 +149,7 @@ jobs:
 
       - name: Upload dependency-security reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: dependency-security-${{ github.sha }}
           path: ${{ runner.temp }}/dependency-security
@@ -164,9 +173,9 @@ jobs:
           - language: go
             build-mode: manual
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         if: matrix.language == 'go'
         with:
           go-version-file: go.mod

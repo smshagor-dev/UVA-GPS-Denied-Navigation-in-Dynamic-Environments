@@ -16,7 +16,7 @@ runs:
         Add-Content -Path $env:GITHUB_OUTPUT -Value "baseline=$baseline"
 
     - name: Cache vcpkg binary archives
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           ${{ github.workspace }}\vcpkg-cache
