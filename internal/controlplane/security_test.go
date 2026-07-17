@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -197,6 +198,7 @@ func TestSecurityConfigNormalizedIsSafeUnderConcurrency(t *testing.T) {
 	const goroutines = 32
 	const iterations = 200
 	var wg sync.WaitGroup
+	errCh := make(chan string, goroutines*iterations)
 	wg.Add(goroutines)
 	for i := 0; i < goroutines; i++ {
 		go func() {
@@ -204,16 +206,23 @@ func TestSecurityConfigNormalizedIsSafeUnderConcurrency(t *testing.T) {
 			for j := 0; j < iterations; j++ {
 				normalized := cfg.normalized()
 				if normalized.Profile != "production" {
-					t.Fatalf("expected production profile, got %q", normalized.Profile)
+					errCh <- fmt.Sprintf("expected production profile, got %q", normalized.Profile)
+					return
 				}
 				if _, ok := normalized.Devices["operator-console-1"]; !ok {
-					t.Fatal("expected normalized device registry to include operator-derived identity")
+					errCh <- "expected normalized device registry to include operator-derived identity"
+					return
 				}
 				if _, ok := normalized.Operators["operator-console-1"]; !ok {
-					t.Fatal("expected normalized operators to include primary operator")
+					errCh <- "expected normalized operators to include primary operator"
+					return
 				}
 			}
 		}()
 	}
 	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatal(err)
+	}
 }

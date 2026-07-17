@@ -165,7 +165,8 @@ void apply_edge_protocol_config(NodeConfig& cfg) {
     std::ostringstream buffer;
     buffer << in.rdbuf();
     const std::string content = buffer.str();
-    if (const auto mode = drone::utils::simple_json::extract_string(content, "serialization_mode")) {
+    if (const auto mode =
+            drone::utils::simple_json::extract_string(content, "serialization_mode")) {
         cfg.edge_serialization_mode = *mode;
     }
     if (const auto mode = drone::utils::simple_json::extract_string(content, "mode")) {

@@ -11,15 +11,14 @@ namespace drone::utils::simple_json {
 namespace detail {
 
 inline size_t skip_ws(std::string_view content, size_t pos) {
-    while (pos < content.size() &&
-           std::isspace(static_cast<unsigned char>(content[pos])) != 0) {
+    while (pos < content.size() && std::isspace(static_cast<unsigned char>(content[pos])) != 0) {
         ++pos;
     }
     return pos;
 }
 
-inline std::optional<std::pair<std::string, size_t>>
-read_quoted_string(std::string_view content, size_t pos) {
+inline std::optional<std::pair<std::string, size_t>> read_quoted_string(std::string_view content,
+                                                                        size_t pos) {
     if (pos >= content.size() || content[pos] != '"') {
         return std::nullopt;
     }
