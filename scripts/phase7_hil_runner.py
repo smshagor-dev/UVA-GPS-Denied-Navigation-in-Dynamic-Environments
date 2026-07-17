@@ -40,7 +40,9 @@ def build_scenarios() -> list[ScenarioSpec]:
             description="Software HIL navigation loop with GPS denied and VIO/TDOA fallback.",
             steps=8,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8101, cluster_id="phase7-hil", role="LEADER", vx=0.2, vy=0.05),
+            vehicle=VehicleState(
+                drone_id=8101, cluster_id="phase7-hil", role="LEADER", vx=0.2, vy=0.05
+            ),
             faults=[
                 ScheduledFault(2, "gps_denied", gps_denied_fault()),
                 ScheduledFault(5, "recovery", recovery_action()),
@@ -51,7 +53,9 @@ def build_scenarios() -> list[ScenarioSpec]:
             description="Software HIL sensor dropout with degraded localization and recovery.",
             steps=8,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8102, cluster_id="phase7-hil", role="FOLLOWER", vx=0.1),
+            vehicle=VehicleState(
+                drone_id=8102, cluster_id="phase7-hil", role="FOLLOWER", vx=0.1
+            ),
             faults=[
                 ScheduledFault(2, "camera_dropout", sensor_dropout_fault("camera")),
                 ScheduledFault(5, "recovery", recovery_action()),
@@ -62,7 +66,9 @@ def build_scenarios() -> list[ScenarioSpec]:
             description="Software HIL delayed telemetry link with recovery to nominal backend state.",
             steps=8,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8103, cluster_id="phase7-hil", role="FOLLOWER"),
+            vehicle=VehicleState(
+                drone_id=8103, cluster_id="phase7-hil", role="FOLLOWER"
+            ),
             faults=[
                 ScheduledFault(2, "telemetry_delay", telemetry_delay_fault(450.0)),
                 ScheduledFault(5, "recovery", recovery_action()),
@@ -73,7 +79,9 @@ def build_scenarios() -> list[ScenarioSpec]:
             description="Software HIL packet loss forcing degraded then recovered communication state.",
             steps=8,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8104, cluster_id="phase7-hil", role="FOLLOWER"),
+            vehicle=VehicleState(
+                drone_id=8104, cluster_id="phase7-hil", role="FOLLOWER"
+            ),
             faults=[
                 ScheduledFault(2, "packet_loss", packet_loss_fault(45.0)),
                 ScheduledFault(5, "recovery", recovery_action()),
@@ -84,9 +92,13 @@ def build_scenarios() -> list[ScenarioSpec]:
             description="Software HIL estimator degradation with emergency fallback and recovery.",
             steps=8,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8105, cluster_id="phase7-hil", role="LEADER", vx=0.08, vy=-0.04),
+            vehicle=VehicleState(
+                drone_id=8105, cluster_id="phase7-hil", role="LEADER", vx=0.08, vy=-0.04
+            ),
             faults=[
-                ScheduledFault(2, "estimator_degradation", estimator_degradation_fault(0.18)),
+                ScheduledFault(
+                    2, "estimator_degradation", estimator_degradation_fault(0.18)
+                ),
                 ScheduledFault(6, "recovery", recovery_action()),
             ],
         ),

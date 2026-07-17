@@ -141,7 +141,11 @@ def main() -> int:
             "recovery_rate": recoveries / len(decisions),
             "decision_timing_ms": summarize_latency(latencies),
         },
-        "status": "PASS" if successes == len(decisions) and recoveries == len(decisions) else "FAIL",
+        "status": (
+            "PASS"
+            if successes == len(decisions) and recoveries == len(decisions)
+            else "FAIL"
+        ),
     }
     write_json(OUTPUT_JSON, payload)
     OUTPUT_MD.write_text(
@@ -178,4 +182,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

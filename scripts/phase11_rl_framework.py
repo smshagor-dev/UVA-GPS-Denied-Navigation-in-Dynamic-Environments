@@ -22,8 +22,24 @@ OUTPUT_MD = DOC_ROOT / "RL_FRAMEWORK_REPORT.md"
 
 def build_scenarios() -> list[RLTrainingScenario]:
     return [
-        RLTrainingScenario("swarm_route_selection", "coordination-aware route selection", 24, 6, 0.72, 0.84, 0.38),
-        RLTrainingScenario("fault_recovery_policy", "adaptive recovery under estimator degradation", 28, 5, 0.64, 0.91, 0.47),
+        RLTrainingScenario(
+            "swarm_route_selection",
+            "coordination-aware route selection",
+            24,
+            6,
+            0.72,
+            0.84,
+            0.38,
+        ),
+        RLTrainingScenario(
+            "fault_recovery_policy",
+            "adaptive recovery under estimator degradation",
+            28,
+            5,
+            0.64,
+            0.91,
+            0.47,
+        ),
     ]
 
 

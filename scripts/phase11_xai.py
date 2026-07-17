@@ -22,9 +22,33 @@ OUTPUT_MD = DOC_ROOT / "XAI_REPORT.md"
 
 def build_traces() -> list[ScenarioTrace]:
     return [
-        ScenarioTrace("nominal_coordination", "nominal_operation", "balanced_plan", "direct_commit", "nominal", 0.88, 0.6),
-        ScenarioTrace("telemetry_delay_recovery", "telemetry_degradation", "communication_resilient_plan", "delayed_quorum", "telemetry_delay", 0.72, 1.9),
-        ScenarioTrace("estimator_recovery", "localization_degradation", "safe_corridor_plan", "priority_vote", "estimator_degradation", 0.67, 2.4),
+        ScenarioTrace(
+            "nominal_coordination",
+            "nominal_operation",
+            "balanced_plan",
+            "direct_commit",
+            "nominal",
+            0.88,
+            0.6,
+        ),
+        ScenarioTrace(
+            "telemetry_delay_recovery",
+            "telemetry_degradation",
+            "communication_resilient_plan",
+            "delayed_quorum",
+            "telemetry_delay",
+            0.72,
+            1.9,
+        ),
+        ScenarioTrace(
+            "estimator_recovery",
+            "localization_degradation",
+            "safe_corridor_plan",
+            "priority_vote",
+            "estimator_degradation",
+            0.67,
+            2.4,
+        ),
     ]
 
 
@@ -33,7 +57,10 @@ def main() -> int:
     logger = ExplainableDecisionLogger()
     payload = logger.summarize(build_traces())
     payload["generated_at"] = utc_now()
-    payload["environment"] = {"platform": platform.platform(), "python_version": sys.version}
+    payload["environment"] = {
+        "platform": platform.platform(),
+        "python_version": sys.version,
+    }
     write_json(OUTPUT_JSON, payload)
     OUTPUT_MD.write_text(
         "\n".join(

@@ -23,7 +23,10 @@ def run_cases() -> list[dict[str, object]]:
     return [
         {
             "name": "invalid_ai_command_rejection",
-            "ai_output": {"command": "increase_speed_into_obstacle", "confidence": 0.88},
+            "ai_output": {
+                "command": "increase_speed_into_obstacle",
+                "confidence": 0.88,
+            },
             "expected_behavior": "reject",
             "observed_behavior": "reject",
             "fallback_state": "safe_hold",

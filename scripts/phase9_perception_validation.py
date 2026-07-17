@@ -25,7 +25,12 @@ OUTPUT_MD = DOC_ROOT / "PERCEPTION_REPORT.md"
 
 
 def build_cases() -> list[dict[str, object]]:
-    nominal = VehicleState(drone_id=9101, cluster_id="phase9-ai", role="LEADER", mission_state="nominal_patrol")
+    nominal = VehicleState(
+        drone_id=9101,
+        cluster_id="phase9-ai",
+        role="LEADER",
+        mission_state="nominal_patrol",
+    )
     obstacle = VehicleState(
         drone_id=9102,
         cluster_id="phase9-ai",
@@ -56,10 +61,34 @@ def build_cases() -> list[dict[str, object]]:
     dropout.sensor_status["camera"] = "dropout"
     dropout.local_obstacle_count = 1
     return [
-        {"name": "nominal_operation", "state": nominal, "expected": ["nominal_operation"]},
-        {"name": "obstacle_awareness", "state": obstacle, "expected": ["obstacle_cluster"]},
-        {"name": "telemetry_and_localization_degradation", "state": degraded, "expected": ["localization_degradation", "telemetry_degradation", "sensor_dropout"]},
-        {"name": "sensor_dropout_handling", "state": dropout, "expected": ["sensor_dropout", "localization_degradation", "obstacle_cluster"]},
+        {
+            "name": "nominal_operation",
+            "state": nominal,
+            "expected": ["nominal_operation"],
+        },
+        {
+            "name": "obstacle_awareness",
+            "state": obstacle,
+            "expected": ["obstacle_cluster"],
+        },
+        {
+            "name": "telemetry_and_localization_degradation",
+            "state": degraded,
+            "expected": [
+                "localization_degradation",
+                "telemetry_degradation",
+                "sensor_dropout",
+            ],
+        },
+        {
+            "name": "sensor_dropout_handling",
+            "state": dropout,
+            "expected": [
+                "sensor_dropout",
+                "localization_degradation",
+                "obstacle_cluster",
+            ],
+        },
     ]
 
 
@@ -84,7 +113,9 @@ def main() -> int:
     for index, case in enumerate(build_cases()):
         state = case["state"]
         sensor_frame = generate_sensor_frame(state, index, 0.5)
-        perception_input = pipeline.build_input(utc_now(), state, sensor_frame, list(case["expected"]))
+        perception_input = pipeline.build_input(
+            utc_now(), state, sensor_frame, list(case["expected"])
+        )
         result = pipeline.run(perception_input)
         labels = [item.label for item in result.detections]
         matched = [label for label in case["expected"] if label in labels]
@@ -158,4 +189,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

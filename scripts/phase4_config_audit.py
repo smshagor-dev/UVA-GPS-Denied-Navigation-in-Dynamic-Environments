@@ -203,7 +203,9 @@ def validate_detector_labels(path: Path, data: dict[str, Any]) -> ConfigResult:
         result.errors.append("labels must be a non-empty object")
         return result
 
-    non_string_values = [key for key, value in labels.items() if not isinstance(value, str)]
+    non_string_values = [
+        key for key, value in labels.items() if not isinstance(value, str)
+    ]
     if non_string_values:
         result.ok = False
         result.errors.append(
@@ -250,10 +252,14 @@ def validate_file(path_text: str) -> ConfigResult:
     try:
         data = load_json(path)
     except Exception as exc:  # noqa: BLE001
-        return ConfigResult(path_text, ok=False, errors=[f"failed to parse JSON: {exc}"])
+        return ConfigResult(
+            path_text, ok=False, errors=[f"failed to parse JSON: {exc}"]
+        )
 
     if not isinstance(data, dict):
-        return ConfigResult(path_text, ok=False, errors=["top-level JSON value must be an object"])
+        return ConfigResult(
+            path_text, ok=False, errors=["top-level JSON value must be an object"]
+        )
 
     if path.name.startswith("runtime"):
         return validate_runtime_config(path, data)

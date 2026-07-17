@@ -39,57 +39,93 @@ def build_failure_specs() -> list[ScenarioSpec]:
             description="Delayed telemetry packets trigger degraded then recovered state.",
             steps=7,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8201, cluster_id="phase7-failure", role="LEADER"),
-            faults=[ScheduledFault(2, "delay", telemetry_delay_fault(500.0)), ScheduledFault(5, "recovery", recovery_action())],
+            vehicle=VehicleState(
+                drone_id=8201, cluster_id="phase7-failure", role="LEADER"
+            ),
+            faults=[
+                ScheduledFault(2, "delay", telemetry_delay_fault(500.0)),
+                ScheduledFault(5, "recovery", recovery_action()),
+            ],
         ),
         ScenarioSpec(
             name="missing_telemetry",
             description="Packet loss triggers stale communication behavior.",
             steps=7,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8202, cluster_id="phase7-failure", role="FOLLOWER"),
-            faults=[ScheduledFault(2, "packet_loss", packet_loss_fault(55.0)), ScheduledFault(5, "recovery", recovery_action())],
+            vehicle=VehicleState(
+                drone_id=8202, cluster_id="phase7-failure", role="FOLLOWER"
+            ),
+            faults=[
+                ScheduledFault(2, "packet_loss", packet_loss_fault(55.0)),
+                ScheduledFault(5, "recovery", recovery_action()),
+            ],
         ),
         ScenarioSpec(
             name="stale_sensor_data",
             description="LiDAR dropout creates degraded localization and sensor fault visibility.",
             steps=7,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8203, cluster_id="phase7-failure", role="FOLLOWER"),
-            faults=[ScheduledFault(2, "lidar_dropout", sensor_dropout_fault("lidar")), ScheduledFault(5, "recovery", recovery_action())],
+            vehicle=VehicleState(
+                drone_id=8203, cluster_id="phase7-failure", role="FOLLOWER"
+            ),
+            faults=[
+                ScheduledFault(2, "lidar_dropout", sensor_dropout_fault("lidar")),
+                ScheduledFault(5, "recovery", recovery_action()),
+            ],
         ),
         ScenarioSpec(
             name="invalid_localization",
             description="Invalid localization is rejected and escalates to emergency fallback.",
             steps=7,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8204, cluster_id="phase7-failure", role="LEADER"),
-            faults=[ScheduledFault(2, "invalid_localization", invalid_localization_fault()), ScheduledFault(5, "recovery", recovery_action())],
+            vehicle=VehicleState(
+                drone_id=8204, cluster_id="phase7-failure", role="LEADER"
+            ),
+            faults=[
+                ScheduledFault(2, "invalid_localization", invalid_localization_fault()),
+                ScheduledFault(5, "recovery", recovery_action()),
+            ],
         ),
         ScenarioSpec(
             name="degraded_estimator_confidence",
             description="Low estimator confidence produces emergency fallback visibility.",
             steps=7,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8205, cluster_id="phase7-failure", role="LEADER"),
-            faults=[ScheduledFault(2, "estimator_drop", estimator_degradation_fault(0.19)), ScheduledFault(5, "recovery", recovery_action())],
+            vehicle=VehicleState(
+                drone_id=8205, cluster_id="phase7-failure", role="LEADER"
+            ),
+            faults=[
+                ScheduledFault(2, "estimator_drop", estimator_degradation_fault(0.19)),
+                ScheduledFault(5, "recovery", recovery_action()),
+            ],
         ),
         ScenarioSpec(
             name="command_rejection",
             description="Command rejection is surfaced through policy state and command channel visibility.",
             steps=7,
             dt_s=0.5,
-            vehicle=VehicleState(drone_id=8206, cluster_id="phase7-failure", role="FOLLOWER"),
-            faults=[ScheduledFault(2, "command_rejection", command_rejection_fault()), ScheduledFault(5, "recovery", recovery_action())],
+            vehicle=VehicleState(
+                drone_id=8206, cluster_id="phase7-failure", role="FOLLOWER"
+            ),
+            faults=[
+                ScheduledFault(2, "command_rejection", command_rejection_fault()),
+                ScheduledFault(5, "recovery", recovery_action()),
+            ],
         ),
     ]
 
 
 def summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
     return {
-        "detection_time_s_max": max(result.get("detection_time_s", 0.0) for result in results),
-        "recovery_time_s_max": max(result.get("recovery_time_s", 0.0) for result in results),
-        "final_states": {result["name"]: result.get("final_state", {}) for result in results},
+        "detection_time_s_max": max(
+            result.get("detection_time_s", 0.0) for result in results
+        ),
+        "recovery_time_s_max": max(
+            result.get("recovery_time_s", 0.0) for result in results
+        ),
+        "final_states": {
+            result["name"]: result.get("final_state", {}) for result in results
+        },
     }
 
 

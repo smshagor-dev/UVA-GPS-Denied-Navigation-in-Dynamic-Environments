@@ -30,7 +30,14 @@ BENCHMARK_MD = DOC_ROOT / "BENCHMARK_RESULTS.md"
 
 def benchmark_perception(iterations: int) -> dict[str, object]:
     model = MockPyTorchAdapter(
-        ModelMetadata("phase9-perception-mock", "1.0.0", "pytorch-mock", "telemetry_perception", "phase9/perception_input_v1", "phase9/perception_output_v1")
+        ModelMetadata(
+            "phase9-perception-mock",
+            "1.0.0",
+            "pytorch-mock",
+            "telemetry_perception",
+            "phase9/perception_input_v1",
+            "phase9/perception_output_v1",
+        )
     )
     pipeline = TelemetryPerceptionPipeline(model)
     latencies: list[float] = []
@@ -49,8 +56,18 @@ def benchmark_perception(iterations: int) -> dict[str, object]:
             state.telemetry_delay_ms = 230.0
             state.sensor_status["gps"] = "denied"
         sensor_frame = generate_sensor_frame(state, index, 0.5)
-        expected = ["localization_degradation"] if index % 5 == 0 else ["nominal_operation", "obstacle_cluster"] if state.local_obstacle_count else ["nominal_operation"]
-        result = pipeline.run(pipeline.build_input(utc_now(), state, sensor_frame, expected))
+        expected = (
+            ["localization_degradation"]
+            if index % 5 == 0
+            else (
+                ["nominal_operation", "obstacle_cluster"]
+                if state.local_obstacle_count
+                else ["nominal_operation"]
+            )
+        )
+        result = pipeline.run(
+            pipeline.build_input(utc_now(), state, sensor_frame, expected)
+        )
         labels = [item.label for item in result.detections]
         if any(label in labels for label in expected):
             correct += 1
@@ -67,7 +84,14 @@ def benchmark_perception(iterations: int) -> dict[str, object]:
 def benchmark_planning(iterations: int) -> dict[str, object]:
     planner = AIMissionPlanner(
         MockOnnxAdapter(
-            ModelMetadata("phase9-planner-mock", "1.0.0", "onnx-mock", "mission_planning", "phase9/planner_input_v1", "phase9/planner_output_v1")
+            ModelMetadata(
+                "phase9-planner-mock",
+                "1.0.0",
+                "onnx-mock",
+                "mission_planning",
+                "phase9/planner_input_v1",
+                "phase9/planner_output_v1",
+            )
         )
     )
     latencies: list[float] = []
@@ -79,12 +103,29 @@ def benchmark_planning(iterations: int) -> dict[str, object]:
             objective="benchmark planning",
             routes=[
                 RouteOption("safe", 180.0, 0.25 + ((index % 4) * 0.03), 0.28, 0.15),
-                RouteOption("fast", 150.0, 0.52, 0.58 if index % 3 == 0 else 0.47, 0.42),
+                RouteOption(
+                    "fast", 150.0, 0.52, 0.58 if index % 3 == 0 else 0.47, 0.42
+                ),
             ],
             available_drones=[
-                {"drone_id": 9501, "battery_pct": 89.0, "role": "LEADER", "load_score": 0.2},
-                {"drone_id": 9502, "battery_pct": 82.0, "role": "FOLLOWER", "load_score": 0.24},
-                {"drone_id": 9503, "battery_pct": 77.0, "role": "FOLLOWER", "load_score": 0.18},
+                {
+                    "drone_id": 9501,
+                    "battery_pct": 89.0,
+                    "role": "LEADER",
+                    "load_score": 0.2,
+                },
+                {
+                    "drone_id": 9502,
+                    "battery_pct": 82.0,
+                    "role": "FOLLOWER",
+                    "load_score": 0.24,
+                },
+                {
+                    "drone_id": 9503,
+                    "battery_pct": 77.0,
+                    "role": "FOLLOWER",
+                    "load_score": 0.18,
+                },
             ],
             mission_pressure=0.35 + ((index % 5) * 0.05),
             link_quality=0.44 if index % 4 == 0 else 0.82,

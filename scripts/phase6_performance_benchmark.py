@@ -20,7 +20,9 @@ def benchmark_metrics_get(base_url: str, iterations: int) -> suite.Metric:
     samples_ms: list[float] = []
     for _ in range(iterations):
         started = time.perf_counter()
-        request = urllib.request.Request(f"{base_url}/metrics", headers={"Accept": "text/plain"}, method="GET")
+        request = urllib.request.Request(
+            f"{base_url}/metrics", headers={"Accept": "text/plain"}, method="GET"
+        )
         with urllib.request.urlopen(request, timeout=10) as response:
             body = response.read().decode("utf-8", errors="replace")
             status = response.status
@@ -28,7 +30,9 @@ def benchmark_metrics_get(base_url: str, iterations: int) -> suite.Metric:
         if status != 200 or "drone_swarm_controlplane_ready" not in body:
             raise RuntimeError(f"metrics GET failed: status={status} body={body}")
         samples_ms.append(elapsed_ms)
-    return suite.summarize("backend_metrics_get", "http", samples_ms, {"url": f"{base_url}/metrics"})
+    return suite.summarize(
+        "backend_metrics_get", "http", samples_ms, {"url": f"{base_url}/metrics"}
+    )
 
 
 def benchmark_command_posts(base_url: str, iterations: int) -> suite.Metric:
@@ -44,7 +48,9 @@ def benchmark_command_posts(base_url: str, iterations: int) -> suite.Metric:
             },
         }
         started = time.perf_counter()
-        status, body = suite.request_json("POST", f"{base_url}/api/v1/commands", payload)
+        status, body = suite.request_json(
+            "POST", f"{base_url}/api/v1/commands", payload
+        )
         elapsed_ms = (time.perf_counter() - started) * 1000.0
         if status != 202:
             raise RuntimeError(f"command POST failed: status={status} payload={body}")
@@ -55,7 +61,11 @@ def benchmark_command_posts(base_url: str, iterations: int) -> suite.Metric:
         "backend_command_post",
         "http",
         samples_ms,
-        {"url": f"{base_url}/api/v1/commands", "accepted": accepted, "throughput_hz": throughput_hz},
+        {
+            "url": f"{base_url}/api/v1/commands",
+            "accepted": accepted,
+            "throughput_hz": throughput_hz,
+        },
     )
 
 
@@ -63,9 +73,15 @@ def main() -> int:
     suite.DOC_ROOT.mkdir(parents=True, exist_ok=True)
     metrics: list[suite.Metric] = []
 
-    metrics.append(suite.benchmark_config_load(suite.REPO_ROOT / "config" / "runtime.json", 20))
-    metrics.append(suite.benchmark_config_load(suite.REPO_ROOT / "config" / "anchors.json", 20))
-    metrics.append(suite.benchmark_config_load(suite.REPO_ROOT / "config" / "lidar.json", 20))
+    metrics.append(
+        suite.benchmark_config_load(suite.REPO_ROOT / "config" / "runtime.json", 20)
+    )
+    metrics.append(
+        suite.benchmark_config_load(suite.REPO_ROOT / "config" / "anchors.json", 20)
+    )
+    metrics.append(
+        suite.benchmark_config_load(suite.REPO_ROOT / "config" / "lidar.json", 20)
+    )
     metrics.append(
         suite.benchmark_native_test(
             "ekf_update_path",
@@ -112,7 +128,11 @@ def main() -> int:
     benchmark_process, startup_ms = suite.start_backend(production_port, production_log)
     try:
         base_url = f"http://127.0.0.1:{production_port}"
-        metrics.append(suite.summarize("backend_startup", "process", [startup_ms], {"mode": "production"}))
+        metrics.append(
+            suite.summarize(
+                "backend_startup", "process", [startup_ms], {"mode": "production"}
+            )
+        )
         metrics.append(suite.benchmark_backend_reads(base_url, 30))
         metrics.append(suite.benchmark_telemetry_posts(base_url, 30))
         metrics.append(benchmark_metrics_get(base_url, 30))

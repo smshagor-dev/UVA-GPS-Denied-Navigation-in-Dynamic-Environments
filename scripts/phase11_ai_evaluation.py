@@ -52,20 +52,36 @@ def main() -> int:
         "generated_at": utc_now(),
         "environment": {"platform": platform.platform(), "python_version": sys.version},
         "scores": {
-            "planning_quality": rounded(float(multi_summary["consensus_score_avg"]) * 0.52 + 0.38),
-            "coordination_quality": rounded(float(multi_summary["cooperation_score_avg"])),
+            "planning_quality": rounded(
+                float(multi_summary["consensus_score_avg"]) * 0.52 + 0.38
+            ),
+            "coordination_quality": rounded(
+                float(multi_summary["cooperation_score_avg"])
+            ),
             "decision_latency_ms": summarize_latency(eval_latency),
-            "mission_completion": rounded(float(twin_summary["swarm_consistency_avg"]) * 0.55 + 0.4),
+            "mission_completion": rounded(
+                float(twin_summary["swarm_consistency_avg"]) * 0.55 + 0.4
+            ),
             "adaptation_score": rounded(float(xai_summary["confidence_avg"]) * 0.8),
-            "recovery_score": rounded(0.7 + (float(xai_summary["recovery_case_count"]) * 0.05)),
+            "recovery_score": rounded(
+                0.7 + (float(xai_summary["recovery_case_count"]) * 0.05)
+            ),
             "safety_score": rounded(
-                (float(rl["scenarios"][0]["policies"][0]["metrics"]["safety_alignment"]) + float(xai_summary["confidence_avg"])) / 2.0
+                (
+                    float(
+                        rl["scenarios"][0]["policies"][0]["metrics"]["safety_alignment"]
+                    )
+                    + float(xai_summary["confidence_avg"])
+                )
+                / 2.0
             ),
         },
         "benchmark": bench,
         "resource_usage": {
-            "cpu_seconds_delta": stats_after["cpu_seconds"] - stats_before["cpu_seconds"],
-            "working_set_mb_delta": stats_after["working_set_mb"] - stats_before["working_set_mb"],
+            "cpu_seconds_delta": stats_after["cpu_seconds"]
+            - stats_before["cpu_seconds"],
+            "working_set_mb_delta": stats_after["working_set_mb"]
+            - stats_before["working_set_mb"],
         },
         "status": "PASS",
     }

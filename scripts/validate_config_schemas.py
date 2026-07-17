@@ -38,7 +38,9 @@ def main() -> int:
         config_data = load_json(config_path)
         schema_data = load_json(schema_path)
         validator = Draft202012Validator(schema_data)
-        errors = sorted(validator.iter_errors(config_data), key=lambda err: list(err.path))
+        errors = sorted(
+            validator.iter_errors(config_data), key=lambda err: list(err.path)
+        )
         if errors:
             failures.append(
                 f"{config_rel} failed {schema_rel}: "
@@ -59,4 +61,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -47,7 +47,9 @@ def percentile(values: list[float], ratio: float) -> float:
     return ordered[index]
 
 
-def summarize(name: str, kind: str, samples_ms: list[float], extra: dict[str, Any]) -> Metric:
+def summarize(
+    name: str, kind: str, samples_ms: list[float], extra: dict[str, Any]
+) -> Metric:
     return Metric(
         name=name,
         kind=kind,
@@ -60,7 +62,9 @@ def summarize(name: str, kind: str, samples_ms: list[float], extra: dict[str, An
     )
 
 
-def request_json(method: str, url: str, payload: dict[str, Any] | None = None) -> tuple[int, dict[str, Any]]:
+def request_json(
+    method: str, url: str, payload: dict[str, Any] | None = None
+) -> tuple[int, dict[str, Any]]:
     data = None
     headers = {"Accept": "application/json"}
     if payload is not None:
@@ -80,7 +84,9 @@ def request_json(method: str, url: str, payload: dict[str, Any] | None = None) -
         return exc.code, parsed
 
 
-def benchmark_native_test(name: str, executable: Path, args: list[str], repeat: int) -> Metric:
+def benchmark_native_test(
+    name: str, executable: Path, args: list[str], repeat: int
+) -> Metric:
     if not executable.exists():
         raise FileNotFoundError(f"missing benchmark executable: {executable}")
     samples_ms: list[float] = []
@@ -128,7 +134,7 @@ def benchmark_config_load(path: Path, repeat: int) -> Metric:
         f"config_load::{path.relative_to(REPO_ROOT)}",
         "python-json",
         samples_ms,
-        {"peak_kib": peak_kib, "bytes": len(raw_text.encode('utf-8'))},
+        {"peak_kib": peak_kib, "bytes": len(raw_text.encode("utf-8"))},
     )
 
 
@@ -235,10 +241,38 @@ def production_payload(drone_id: int) -> dict[str, Any]:
             "source": "real",
             "visible_anchor_count": 4,
             "anchors": [
-                {"id": "A0", "x": 0.0, "y": 0.0, "z": 2.5, "visible": True, "last_seen_ms": 6.0},
-                {"id": "A1", "x": 8.0, "y": 0.0, "z": 2.5, "visible": True, "last_seen_ms": 7.0},
-                {"id": "A2", "x": 0.0, "y": 8.0, "z": 2.5, "visible": True, "last_seen_ms": 8.0},
-                {"id": "A3", "x": 8.0, "y": 8.0, "z": 2.5, "visible": True, "last_seen_ms": 9.0},
+                {
+                    "id": "A0",
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 2.5,
+                    "visible": True,
+                    "last_seen_ms": 6.0,
+                },
+                {
+                    "id": "A1",
+                    "x": 8.0,
+                    "y": 0.0,
+                    "z": 2.5,
+                    "visible": True,
+                    "last_seen_ms": 7.0,
+                },
+                {
+                    "id": "A2",
+                    "x": 0.0,
+                    "y": 8.0,
+                    "z": 2.5,
+                    "visible": True,
+                    "last_seen_ms": 8.0,
+                },
+                {
+                    "id": "A3",
+                    "x": 8.0,
+                    "y": 8.0,
+                    "z": 2.5,
+                    "visible": True,
+                    "last_seen_ms": 9.0,
+                },
             ],
             "estimated_position": {"x": 1.0, "y": 2.0, "z": 3.0},
         },
@@ -281,7 +315,9 @@ def start_backend(port: int) -> tuple[subprocess.Popen[str], float]:
             pass
         time.sleep(0.1)
     process.terminate()
-    raise TimeoutError(f"backend did not become healthy within {deadline_s:.0f} seconds")
+    raise TimeoutError(
+        f"backend did not become healthy within {deadline_s:.0f} seconds"
+    )
 
 
 def stop_backend(process: subprocess.Popen[str]) -> None:
@@ -311,7 +347,9 @@ def benchmark_backend_reads(base_url: str, iterations: int) -> Metric:
         if status != 200:
             raise RuntimeError(f"fleet GET failed: status={status} payload={payload}")
         samples_ms.append(elapsed_ms)
-    return summarize("backend_fleet_get", "http", samples_ms, {"url": f"{base_url}/api/v1/fleet"})
+    return summarize(
+        "backend_fleet_get", "http", samples_ms, {"url": f"{base_url}/api/v1/fleet"}
+    )
 
 
 def benchmark_telemetry_posts(base_url: str, iterations: int) -> Metric:
@@ -426,7 +464,9 @@ def main() -> int:
         run_smoke_in_isolated_backend("scripts/telemetry_smoke_test.py", 18081)
     )
     smoke_results.append(
-        run_smoke_in_isolated_backend("scripts/production_telemetry_smoke_test.py", 18082)
+        run_smoke_in_isolated_backend(
+            "scripts/production_telemetry_smoke_test.py", 18082
+        )
     )
 
     report = {

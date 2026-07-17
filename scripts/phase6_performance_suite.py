@@ -27,6 +27,8 @@ OUTPUT_PATH = DOC_ROOT / "performance_results.json"
 LOG_PATH = DOC_ROOT / "performance_suite.log"
 BUILD_ROOT = REPO_ROOT / "build" / "validation-msvc"
 TEST_ROOT = BUILD_ROOT / "tests" / "Release"
+
+
 @dataclass
 class Metric:
     name: str
@@ -61,7 +63,9 @@ def percentile(values: list[float], ratio: float) -> float:
     return ordered[index]
 
 
-def summarize(name: str, kind: str, samples_ms: list[float], extra: dict[str, Any]) -> Metric:
+def summarize(
+    name: str, kind: str, samples_ms: list[float], extra: dict[str, Any]
+) -> Metric:
     return Metric(
         name=name,
         kind=kind,
@@ -77,7 +81,9 @@ def summarize(name: str, kind: str, samples_ms: list[float], extra: dict[str, An
     )
 
 
-def request_json(method: str, url: str, payload: dict[str, Any] | None = None) -> tuple[int, dict[str, Any]]:
+def request_json(
+    method: str, url: str, payload: dict[str, Any] | None = None
+) -> tuple[int, dict[str, Any]]:
     data = None
     headers = {"Accept": "application/json"}
     if payload is not None:
@@ -97,7 +103,9 @@ def request_json(method: str, url: str, payload: dict[str, Any] | None = None) -
         return exc.code, parsed
 
 
-def benchmark_native_test(name: str, executable: Path, args: list[str], repeat: int) -> Metric:
+def benchmark_native_test(
+    name: str, executable: Path, args: list[str], repeat: int
+) -> Metric:
     if not executable.exists():
         raise FileNotFoundError(f"missing benchmark executable: {executable}")
     samples_ms: list[float] = []
@@ -135,7 +143,7 @@ def benchmark_config_load(path: Path, repeat: int) -> Metric:
         f"config_load::{path.relative_to(REPO_ROOT)}",
         "python-json",
         samples_ms,
-        {"bytes": len(raw_text.encode('utf-8'))},
+        {"bytes": len(raw_text.encode("utf-8"))},
     )
 
 
@@ -242,10 +250,38 @@ def production_payload(drone_id: int) -> dict[str, Any]:
             "source": "real",
             "visible_anchor_count": 4,
             "anchors": [
-                {"id": "A0", "x": 0.0, "y": 0.0, "z": 2.5, "visible": True, "last_seen_ms": 6.0},
-                {"id": "A1", "x": 8.0, "y": 0.0, "z": 2.5, "visible": True, "last_seen_ms": 7.0},
-                {"id": "A2", "x": 0.0, "y": 8.0, "z": 2.5, "visible": True, "last_seen_ms": 8.0},
-                {"id": "A3", "x": 8.0, "y": 8.0, "z": 2.5, "visible": True, "last_seen_ms": 9.0},
+                {
+                    "id": "A0",
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 2.5,
+                    "visible": True,
+                    "last_seen_ms": 6.0,
+                },
+                {
+                    "id": "A1",
+                    "x": 8.0,
+                    "y": 0.0,
+                    "z": 2.5,
+                    "visible": True,
+                    "last_seen_ms": 7.0,
+                },
+                {
+                    "id": "A2",
+                    "x": 0.0,
+                    "y": 8.0,
+                    "z": 2.5,
+                    "visible": True,
+                    "last_seen_ms": 8.0,
+                },
+                {
+                    "id": "A3",
+                    "x": 8.0,
+                    "y": 8.0,
+                    "z": 2.5,
+                    "visible": True,
+                    "last_seen_ms": 9.0,
+                },
             ],
             "estimated_position": {"x": 1.0, "y": 2.0, "z": 3.0},
         },
@@ -301,7 +337,9 @@ def start_backend(
             pass
         time.sleep(0.1)
     process.terminate()
-    raise TimeoutError(f"backend did not become healthy within {deadline_s:.0f} seconds")
+    raise TimeoutError(
+        f"backend did not become healthy within {deadline_s:.0f} seconds"
+    )
 
 
 def stop_backend(process: subprocess.Popen[str]) -> None:
@@ -323,7 +361,9 @@ def benchmark_backend_reads(base_url: str, iterations: int) -> Metric:
         if status != 200:
             raise RuntimeError(f"fleet GET failed: status={status} payload={payload}")
         samples_ms.append(elapsed_ms)
-    return summarize("backend_fleet_get", "http", samples_ms, {"url": f"{base_url}/api/v1/fleet"})
+    return summarize(
+        "backend_fleet_get", "http", samples_ms, {"url": f"{base_url}/api/v1/fleet"}
+    )
 
 
 def benchmark_telemetry_posts(base_url: str, iterations: int) -> Metric:
@@ -343,7 +383,11 @@ def benchmark_telemetry_posts(base_url: str, iterations: int) -> Metric:
         "backend_telemetry_post",
         "http",
         samples_ms,
-        {"url": f"{base_url}/api/v1/telemetry", "accepted": accepted, "throughput_hz": throughput_hz},
+        {
+            "url": f"{base_url}/api/v1/telemetry",
+            "accepted": accepted,
+            "throughput_hz": throughput_hz,
+        },
     )
 
 
@@ -380,8 +424,10 @@ def sample_process_stats(pid: int) -> dict[str, float]:
             uptime_seconds = max(0.0, (datetime.now(tzinfo) - started).total_seconds())
     return {
         "cpu_seconds": float(payload.get("CPU", 0.0) or 0.0),
-        "working_set_mb": float(payload.get("WorkingSet64", 0) or 0) / (1024.0 * 1024.0),
-        "private_memory_mb": float(payload.get("PrivateMemorySize64", 0) or 0) / (1024.0 * 1024.0),
+        "working_set_mb": float(payload.get("WorkingSet64", 0) or 0)
+        / (1024.0 * 1024.0),
+        "private_memory_mb": float(payload.get("PrivateMemorySize64", 0) or 0)
+        / (1024.0 * 1024.0),
         "handles": float(payload.get("Handles", 0) or 0),
         "thread_count": float(len(threads)),
         "open_file_descriptors": float(payload.get("Handles", 0) or 0),
@@ -414,27 +460,43 @@ def run_stress_test(base_url: str, total_requests: int, workers: int) -> dict[st
         "requests": total_requests,
         "workers": workers,
         "wall_elapsed_ms": wall_elapsed_ms,
-        "throughput_hz": total_requests / (wall_elapsed_ms / 1000.0) if wall_elapsed_ms else 0.0,
-        "latency": asdict(summarize("stress_post_latency", "http-stress", latencies_ms, {})),
+        "throughput_hz": (
+            total_requests / (wall_elapsed_ms / 1000.0) if wall_elapsed_ms else 0.0
+        ),
+        "latency": asdict(
+            summarize("stress_post_latency", "http-stress", latencies_ms, {})
+        ),
         "failures": failures,
     }
 
 
-def run_stress_test_with_stats(base_url: str, pid: int, total_requests: int, workers: int) -> dict[str, Any]:
+def run_stress_test_with_stats(
+    base_url: str, pid: int, total_requests: int, workers: int
+) -> dict[str, Any]:
     stats_before = sample_process_stats(pid)
     result = run_stress_test(base_url, total_requests=total_requests, workers=workers)
     stats_after = sample_process_stats(pid)
     result["resource_before"] = stats_before
     result["resource_after"] = stats_after
-    result["cpu_seconds_delta"] = stats_after["cpu_seconds"] - stats_before["cpu_seconds"]
-    result["working_set_mb_delta"] = stats_after["working_set_mb"] - stats_before["working_set_mb"]
-    result["private_memory_mb_delta"] = stats_after["private_memory_mb"] - stats_before["private_memory_mb"]
-    result["thread_count_delta"] = stats_after["thread_count"] - stats_before["thread_count"]
+    result["cpu_seconds_delta"] = (
+        stats_after["cpu_seconds"] - stats_before["cpu_seconds"]
+    )
+    result["working_set_mb_delta"] = (
+        stats_after["working_set_mb"] - stats_before["working_set_mb"]
+    )
+    result["private_memory_mb_delta"] = (
+        stats_after["private_memory_mb"] - stats_before["private_memory_mb"]
+    )
+    result["thread_count_delta"] = (
+        stats_after["thread_count"] - stats_before["thread_count"]
+    )
     result["handle_delta"] = stats_after["handles"] - stats_before["handles"]
     return result
 
 
-def run_soak_test(base_url: str, pid: int, duration_s: int, interval_s: float) -> dict[str, Any]:
+def run_soak_test(
+    base_url: str, pid: int, duration_s: int, interval_s: float
+) -> dict[str, Any]:
     samples: list[dict[str, Any]] = []
     latencies_ms: list[float] = []
     requests = 0
@@ -445,7 +507,9 @@ def run_soak_test(base_url: str, pid: int, duration_s: int, interval_s: float) -
         status, body = request_json("POST", f"{base_url}/api/v1/telemetry", payload)
         latency_ms = (time.perf_counter() - sample_started) * 1000.0
         if status != 202:
-            raise RuntimeError(f"soak telemetry POST failed: status={status} payload={body}")
+            raise RuntimeError(
+                f"soak telemetry POST failed: status={status} payload={body}"
+            )
         stats = sample_process_stats(pid)
         stats["elapsed_s"] = time.perf_counter() - started
         stats["latency_ms"] = latency_ms
@@ -463,7 +527,9 @@ def run_soak_test(base_url: str, pid: int, duration_s: int, interval_s: float) -
         "duration_s": duration_s,
         "interval_s": interval_s,
         "requests": requests,
-        "latency": asdict(summarize("soak_post_latency", "http-soak", latencies_ms, {})),
+        "latency": asdict(
+            summarize("soak_post_latency", "http-soak", latencies_ms, {})
+        ),
         "working_set_mb_start": working_sets[0] if working_sets else 0.0,
         "working_set_mb_end": working_sets[-1] if working_sets else 0.0,
         "working_set_mb_peak": max(working_sets) if working_sets else 0.0,
@@ -481,7 +547,9 @@ def run_soak_test(base_url: str, pid: int, duration_s: int, interval_s: float) -
         "open_file_descriptors_start": fd_samples[0] if fd_samples else 0.0,
         "open_file_descriptors_end": fd_samples[-1] if fd_samples else 0.0,
         "open_file_descriptors_peak": max(fd_samples) if fd_samples else 0.0,
-        "latency_drift_ms": (latencies_ms[-1] - latencies_ms[0]) if len(latencies_ms) >= 2 else 0.0,
+        "latency_drift_ms": (
+            (latencies_ms[-1] - latencies_ms[0]) if len(latencies_ms) >= 2 else 0.0
+        ),
         "queue_depth_peak": 0.0,
         "samples": samples,
     }
@@ -553,7 +621,11 @@ def main() -> int:
     benchmark_process, startup_ms = start_backend(benchmark_port, benchmark_log)
     try:
         base_url = f"http://127.0.0.1:{benchmark_port}"
-        metrics.append(summarize("backend_startup", "process", [startup_ms], {"mode": "production"}))
+        metrics.append(
+            summarize(
+                "backend_startup", "process", [startup_ms], {"mode": "production"}
+            )
+        )
         metrics.append(benchmark_backend_reads(base_url, 30))
         metrics.append(benchmark_telemetry_posts(base_url, 30))
     finally:
@@ -561,7 +633,9 @@ def main() -> int:
 
     stress_process, _stress_startup = start_backend(stress_port, stress_log)
     try:
-        stress_result = run_stress_test(f"http://127.0.0.1:{stress_port}", total_requests=400, workers=16)
+        stress_result = run_stress_test(
+            f"http://127.0.0.1:{stress_port}", total_requests=400, workers=16
+        )
     finally:
         stop_backend(stress_process)
 

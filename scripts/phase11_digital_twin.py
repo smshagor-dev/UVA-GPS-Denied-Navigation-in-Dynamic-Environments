@@ -40,10 +40,46 @@ REPRO_MD = DOC_ROOT / "REPRODUCIBILITY_REPORT.md"
 
 def base_vehicles() -> list[VehicleState]:
     return [
-        VehicleState(drone_id=1131, cluster_id="phase11-a", role="LEADER", x=0.0, y=0.0, vx=0.14, vy=0.02, local_obstacle_count=1),
-        VehicleState(drone_id=1132, cluster_id="phase11-a", role="FOLLOWER", x=1.0, y=0.4, vx=0.1, vy=0.03, local_obstacle_count=2),
-        VehicleState(drone_id=1133, cluster_id="phase11-b", role="FOLLOWER", x=-0.7, y=0.6, vx=0.08, vy=0.01, shared_obstacle_count=2),
-        VehicleState(drone_id=1134, cluster_id="phase11-b", role="FOLLOWER", x=0.2, y=-1.1, vx=0.09, vy=0.0, telemetry_delay_ms=45.0),
+        VehicleState(
+            drone_id=1131,
+            cluster_id="phase11-a",
+            role="LEADER",
+            x=0.0,
+            y=0.0,
+            vx=0.14,
+            vy=0.02,
+            local_obstacle_count=1,
+        ),
+        VehicleState(
+            drone_id=1132,
+            cluster_id="phase11-a",
+            role="FOLLOWER",
+            x=1.0,
+            y=0.4,
+            vx=0.1,
+            vy=0.03,
+            local_obstacle_count=2,
+        ),
+        VehicleState(
+            drone_id=1133,
+            cluster_id="phase11-b",
+            role="FOLLOWER",
+            x=-0.7,
+            y=0.6,
+            vx=0.08,
+            vy=0.01,
+            shared_obstacle_count=2,
+        ),
+        VehicleState(
+            drone_id=1134,
+            cluster_id="phase11-b",
+            role="FOLLOWER",
+            x=0.2,
+            y=-1.1,
+            vx=0.09,
+            vy=0.0,
+            telemetry_delay_ms=45.0,
+        ),
     ]
 
 
@@ -77,7 +113,9 @@ def main() -> int:
     }
     write_json(TWIN_JSON, twin_payload)
 
-    world_snapshot = build_world_model(vehicles, mission.mission_name, environment.label)
+    world_snapshot = build_world_model(
+        vehicles, mission.mission_name, environment.label
+    )
     world_payload = {
         "generated_at": utc_now(),
         "world_model": world_snapshot,
@@ -128,7 +166,9 @@ def main() -> int:
         ),
         encoding="utf-8",
     )
-    hashes = manifest_hash([config_path, metadata_path, results_path, TWIN_JSON, WORLD_JSON, BENCH_JSON])
+    hashes = manifest_hash(
+        [config_path, metadata_path, results_path, TWIN_JSON, WORLD_JSON, BENCH_JSON]
+    )
 
     TWIN_MD.write_text(
         "\n".join(

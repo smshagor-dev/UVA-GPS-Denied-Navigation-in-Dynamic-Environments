@@ -47,7 +47,9 @@ def hash_file(path: Path) -> dict[str, Any]:
         "exists": True,
         "sha256": digest,
         "bytes": path.stat().st_size,
-        "modified_at": datetime.fromtimestamp(path.stat().st_mtime, tz=UTC).isoformat().replace("+00:00", "Z"),
+        "modified_at": datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
+        .isoformat()
+        .replace("+00:00", "Z"),
     }
 
 
@@ -79,12 +81,18 @@ def git_revision() -> str:
 
 def request_metrics(base_url: str) -> dict[str, Any]:
     started = time.perf_counter()
-    request = suite.urllib.request.Request(f"{base_url}/metrics", headers={"Accept": "text/plain"}, method="GET")
+    request = suite.urllib.request.Request(
+        f"{base_url}/metrics", headers={"Accept": "text/plain"}, method="GET"
+    )
     with suite.urllib.request.urlopen(request, timeout=10) as response:
         body = response.read().decode("utf-8", errors="replace")
         status = response.status
     elapsed_ms = (time.perf_counter() - started) * 1000.0
-    return {"status": status, "latency_ms": elapsed_ms, "body_size_bytes": len(body.encode("utf-8"))}
+    return {
+        "status": status,
+        "latency_ms": elapsed_ms,
+        "body_size_bytes": len(body.encode("utf-8")),
+    }
 
 
 def scenario_payload(
@@ -184,7 +192,9 @@ def expect(condition: bool, message: str) -> None:
 
 def find_drone(fleet: dict[str, Any], drone_id: int) -> dict[str, Any]:
     drones = fleet.get("drones", [])
-    target = next((drone for drone in drones if drone.get("drone_id") == drone_id), None)
+    target = next(
+        (drone for drone in drones if drone.get("drone_id") == drone_id), None
+    )
     if target is None:
         raise AssertionError(f"drone {drone_id} not found in fleet snapshot")
     return target
@@ -206,23 +216,54 @@ def formation_scenario(base_url: str, experiment_id: str) -> dict[str, Any]:
             stale_peer_count=0,
             source="simulation",
             localization_data_source="simulation",
-            health_flags=[f"experiment:{experiment_id}", "scenario:formation", "coordination:stable"],
+            health_flags=[
+                f"experiment:{experiment_id}",
+                "scenario:formation",
+                "coordination:stable",
+            ],
         )
         result = post_telemetry(base_url, payload)
-        expect(result["status"] == 202, f"formation telemetry rejected for drone {drone_id}")
+        expect(
+            result["status"] == 202,
+            f"formation telemetry rejected for drone {drone_id}",
+        )
         post_samples.append(float(result["latency_ms"]))
-        timeline.append({"event": "telemetry_posted", "drone_id": drone_id, "latency_ms": result["latency_ms"]})
+        timeline.append(
+            {
+                "event": "telemetry_posted",
+                "drone_id": drone_id,
+                "latency_ms": result["latency_ms"],
+            }
+        )
     fleet = get_fleet(base_url)
-    cluster = next((item for item in fleet.get("clusters", []) if item.get("cluster_id") == cluster_id), None)
+    cluster = next(
+        (
+            item
+            for item in fleet.get("clusters", [])
+            if item.get("cluster_id") == cluster_id
+        ),
+        None,
+    )
     expect(cluster is not None, "formation cluster was not created")
-    expect(cluster.get("drone_count") == 3, f"expected 3 drones in formation cluster, got {cluster}")
-    expect(cluster.get("leader_id") == drone_ids[0], f"unexpected leader in formation cluster: {cluster}")
-    expect(fleet.get("leader_id") == drone_ids[0], f"unexpected fleet leader: {fleet.get('leader_id')}")
+    expect(
+        cluster.get("drone_count") == 3,
+        f"expected 3 drones in formation cluster, got {cluster}",
+    )
+    expect(
+        cluster.get("leader_id") == drone_ids[0],
+        f"unexpected leader in formation cluster: {cluster}",
+    )
+    expect(
+        fleet.get("leader_id") == drone_ids[0],
+        f"unexpected fleet leader: {fleet.get('leader_id')}",
+    )
     health = get_health(base_url)
     return {
         "name": "formation_maintenance",
         "pass": True,
-        "latency_ms": summarize_latency(post_samples + [fleet["_latency_ms"], health["_latency_ms"]]),
+        "latency_ms": summarize_latency(
+            post_samples + [fleet["_latency_ms"], health["_latency_ms"]]
+        ),
         "timeline": timeline,
         "observations": {
             "cluster_id": cluster_id,
@@ -251,24 +292,54 @@ def gps_denied_scenario(base_url: str, experiment_id: str) -> dict[str, Any]:
         peer_count=1,
         local_obstacle_count=2,
         shared_obstacle_count=3,
-        health_flags=[f"experiment:{experiment_id}", "scenario:gps_denied", "fusion:active"],
+        health_flags=[
+            f"experiment:{experiment_id}",
+            "scenario:gps_denied",
+            "fusion:active",
+        ],
     )
     post_result = post_telemetry(base_url, payload)
     expect(post_result["status"] == 202, "gps-denied telemetry rejected")
     fleet = get_fleet(base_url)
     target = find_drone(fleet, drone_id)
-    expect(target.get("source") == "real", f"expected source=real for gps-denied scenario, got {target.get('source')}")
-    expect(target.get("localization_source") == "vio-tdoa-fused", "gps-denied localization source mismatch")
-    expect(target.get("localization_state") == "nominal", "gps-denied localization state mismatch")
-    expect(float(target.get("localization_confidence", 0.0)) >= 0.9, "gps-denied confidence below target")
-    expect(int(target.get("visible_anchor_count", 0)) >= 4, "gps-denied anchor visibility not preserved")
+    expect(
+        target.get("source") == "real",
+        f"expected source=real for gps-denied scenario, got {target.get('source')}",
+    )
+    expect(
+        target.get("localization_source") == "vio-tdoa-fused",
+        "gps-denied localization source mismatch",
+    )
+    expect(
+        target.get("localization_state") == "nominal",
+        "gps-denied localization state mismatch",
+    )
+    expect(
+        float(target.get("localization_confidence", 0.0)) >= 0.9,
+        "gps-denied confidence below target",
+    )
+    expect(
+        int(target.get("visible_anchor_count", 0)) >= 4,
+        "gps-denied anchor visibility not preserved",
+    )
     metrics = request_metrics(base_url)
-    expect(metrics["status"] == 200, "metrics endpoint unavailable during gps-denied scenario")
+    expect(
+        metrics["status"] == 200,
+        "metrics endpoint unavailable during gps-denied scenario",
+    )
     return {
         "name": "gps_denied_navigation",
         "pass": True,
-        "latency_ms": summarize_latency([post_result["latency_ms"], fleet["_latency_ms"], metrics["latency_ms"]]),
-        "timeline": [{"event": "telemetry_posted", "drone_id": drone_id, "latency_ms": post_result["latency_ms"]}],
+        "latency_ms": summarize_latency(
+            [post_result["latency_ms"], fleet["_latency_ms"], metrics["latency_ms"]]
+        ),
+        "timeline": [
+            {
+                "event": "telemetry_posted",
+                "drone_id": drone_id,
+                "latency_ms": post_result["latency_ms"],
+            }
+        ],
         "observations": {
             "drone_id": drone_id,
             "localization_source": target.get("localization_source"),
@@ -294,15 +365,25 @@ def communication_loss_scenario(base_url: str, experiment_id: str) -> dict[str, 
             peer_count=0,
             stale_peer_count=0,
             safety_state="NORMAL",
-            health_flags=[f"experiment:{experiment_id}", "scenario:comm_loss", "link:healthy"],
+            health_flags=[
+                f"experiment:{experiment_id}",
+                "scenario:comm_loss",
+                "link:healthy",
+            ],
         ),
     )
     expect(first["status"] == 202, "communication-loss seed telemetry rejected")
     time.sleep(3.2)
     stale_fleet = get_fleet(base_url)
     stale_target = find_drone(stale_fleet, drone_id)
-    expect(bool(stale_target.get("stale")), f"expected stale drone after timeout, got {stale_target}")
-    expect(int(stale_fleet.get("stale_drone_count", 0)) >= 1, "stale fleet count did not increase")
+    expect(
+        bool(stale_target.get("stale")),
+        f"expected stale drone after timeout, got {stale_target}",
+    )
+    expect(
+        int(stale_fleet.get("stale_drone_count", 0)) >= 1,
+        "stale fleet count did not increase",
+    )
     recovered = post_telemetry(
         base_url,
         scenario_payload(
@@ -316,24 +397,45 @@ def communication_loss_scenario(base_url: str, experiment_id: str) -> dict[str, 
             stale_peer_count=0,
             safety_state="LINK_LOST",
             safety_summary="Link timeout observed and recovery signal injected",
-            health_flags=[f"experiment:{experiment_id}", "scenario:comm_loss", "link:recovered"],
+            health_flags=[
+                f"experiment:{experiment_id}",
+                "scenario:comm_loss",
+                "link:recovered",
+            ],
         ),
     )
     expect(recovered["status"] == 202, "communication-loss recovery telemetry rejected")
     recovered_fleet = get_fleet(base_url)
     recovered_target = find_drone(recovered_fleet, drone_id)
-    expect(not bool(recovered_target.get("stale")), f"expected stale flag to clear after recovery, got {recovered_target}")
+    expect(
+        not bool(recovered_target.get("stale")),
+        f"expected stale flag to clear after recovery, got {recovered_target}",
+    )
     readiness = get_readiness(base_url)
     return {
         "name": "communication_loss_recovery",
         "pass": True,
         "latency_ms": summarize_latency(
-            [first["latency_ms"], stale_fleet["_latency_ms"], recovered["latency_ms"], recovered_fleet["_latency_ms"], readiness["_latency_ms"]]
+            [
+                first["latency_ms"],
+                stale_fleet["_latency_ms"],
+                recovered["latency_ms"],
+                recovered_fleet["_latency_ms"],
+                readiness["_latency_ms"],
+            ]
         ),
         "timeline": [
-            {"event": "telemetry_posted", "stage": "initial", "latency_ms": first["latency_ms"]},
+            {
+                "event": "telemetry_posted",
+                "stage": "initial",
+                "latency_ms": first["latency_ms"],
+            },
             {"event": "stale_detected", "latency_ms": stale_fleet["_latency_ms"]},
-            {"event": "telemetry_posted", "stage": "recovery", "latency_ms": recovered["latency_ms"]},
+            {
+                "event": "telemetry_posted",
+                "stage": "recovery",
+                "latency_ms": recovered["latency_ms"],
+            },
         ],
         "observations": {
             "stale_detected": True,
@@ -366,21 +468,42 @@ def obstacle_degradation_scenario(base_url: str, experiment_id: str) -> dict[str
         safety_summary="Obstacle density increased while localization confidence dropped",
         security_state="TRUSTED",
         remote_command_allowed=True,
-        health_flags=[f"experiment:{experiment_id}", "scenario:obstacle", "localization:degraded"],
+        health_flags=[
+            f"experiment:{experiment_id}",
+            "scenario:obstacle",
+            "localization:degraded",
+        ],
     )
     post_result = post_telemetry(base_url, payload)
     expect(post_result["status"] == 202, "obstacle degradation telemetry rejected")
     fleet = get_fleet(base_url)
     target = find_drone(fleet, drone_id)
-    expect(target.get("safety_state") == "DEGRADED_LOCALIZATION", "degraded safety state not preserved")
-    expect(float(target.get("localization_confidence", 1.0)) < 0.5, "expected degraded localization confidence")
-    expect(int(target.get("local_obstacle_count", 0)) >= 8, "expected dense local obstacle count")
+    expect(
+        target.get("safety_state") == "DEGRADED_LOCALIZATION",
+        "degraded safety state not preserved",
+    )
+    expect(
+        float(target.get("localization_confidence", 1.0)) < 0.5,
+        "expected degraded localization confidence",
+    )
+    expect(
+        int(target.get("local_obstacle_count", 0)) >= 8,
+        "expected dense local obstacle count",
+    )
     health = get_health(base_url)
     return {
         "name": "obstacle_avoidance_degradation",
         "pass": True,
-        "latency_ms": summarize_latency([post_result["latency_ms"], fleet["_latency_ms"], health["_latency_ms"]]),
-        "timeline": [{"event": "telemetry_posted", "drone_id": drone_id, "latency_ms": post_result["latency_ms"]}],
+        "latency_ms": summarize_latency(
+            [post_result["latency_ms"], fleet["_latency_ms"], health["_latency_ms"]]
+        ),
+        "timeline": [
+            {
+                "event": "telemetry_posted",
+                "drone_id": drone_id,
+                "latency_ms": post_result["latency_ms"],
+            }
+        ],
         "observations": {
             "safety_state": target.get("safety_state"),
             "localization_confidence": target.get("localization_confidence"),
@@ -413,14 +536,23 @@ def emergency_landing_scenario(base_url: str, experiment_id: str) -> dict[str, A
         security_state="LAND_IMMEDIATELY",
         remote_command_allowed=False,
         telemetry_uplink_allowed=True,
-        health_flags=[f"experiment:{experiment_id}", "scenario:emergency", "failsafe:active"],
+        health_flags=[
+            f"experiment:{experiment_id}",
+            "scenario:emergency",
+            "failsafe:active",
+        ],
     )
     post_result = post_telemetry(base_url, payload)
     expect(post_result["status"] == 202, "emergency landing telemetry rejected")
     fleet = get_fleet(base_url)
     target = find_drone(fleet, drone_id)
-    expect(target.get("safety_state") == "EMERGENCY_LAND", "emergency state not preserved")
-    expect(target.get("security_state") == "LAND_IMMEDIATELY", "emergency security state mismatch")
+    expect(
+        target.get("safety_state") == "EMERGENCY_LAND", "emergency state not preserved"
+    )
+    expect(
+        target.get("security_state") == "LAND_IMMEDIATELY",
+        "emergency security state mismatch",
+    )
     readiness = get_readiness(base_url)
     remote_gate_observed = target.get("remote_command_allowed")
     expect(
@@ -430,8 +562,16 @@ def emergency_landing_scenario(base_url: str, experiment_id: str) -> dict[str, A
     return {
         "name": "emergency_landing_behavior",
         "pass": True,
-        "latency_ms": summarize_latency([post_result["latency_ms"], fleet["_latency_ms"], readiness["_latency_ms"]]),
-        "timeline": [{"event": "telemetry_posted", "drone_id": drone_id, "latency_ms": post_result["latency_ms"]}],
+        "latency_ms": summarize_latency(
+            [post_result["latency_ms"], fleet["_latency_ms"], readiness["_latency_ms"]]
+        ),
+        "timeline": [
+            {
+                "event": "telemetry_posted",
+                "drone_id": drone_id,
+                "latency_ms": post_result["latency_ms"],
+            }
+        ],
         "observations": {
             "safety_state": target.get("safety_state"),
             "security_state": target.get("security_state"),
@@ -484,7 +624,9 @@ def main() -> int:
     failures: list[dict[str, Any]] = []
     try:
         base_url = f"http://127.0.0.1:{backend_port}"
-        log(f"started backend on {base_url} pid={process.pid} startup_ms={startup_ms:.3f}")
+        log(
+            f"started backend on {base_url} pid={process.pid} startup_ms={startup_ms:.3f}"
+        )
         process_before = sample_metrics_process(process.pid)
         for fn in scenario_fns:
             scenario_started = time.perf_counter()
@@ -493,9 +635,13 @@ def main() -> int:
             try:
                 result = fn(base_url, experiment_id)
                 result["started_at"] = utc_now()
-                result["duration_ms"] = (time.perf_counter() - scenario_started) * 1000.0
+                result["duration_ms"] = (
+                    time.perf_counter() - scenario_started
+                ) * 1000.0
                 scenario_results.append(result)
-                log(f"scenario {result['name']} PASS duration_ms={result['duration_ms']:.3f}")
+                log(
+                    f"scenario {result['name']} PASS duration_ms={result['duration_ms']:.3f}"
+                )
             except Exception as exc:  # noqa: BLE001
                 duration_ms = (time.perf_counter() - scenario_started) * 1000.0
                 failure = {
@@ -589,7 +735,9 @@ def main() -> int:
         "status": report["status"],
         "config_snapshots": report["config_snapshots"],
     }
-    (EXPERIMENT_ROOT / f"{run_id}.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    (EXPERIMENT_ROOT / f"{run_id}.json").write_text(
+        json.dumps(metadata, indent=2), encoding="utf-8"
+    )
     return 0 if not failures else 1
 
 

@@ -13,7 +13,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 import phase6_performance_suite as suite
-from simulation.fault_injector import ScheduledFault, estimator_degradation_fault, packet_loss_fault, recovery_action, telemetry_delay_fault
+from simulation.fault_injector import (
+    ScheduledFault,
+    estimator_degradation_fault,
+    packet_loss_fault,
+    recovery_action,
+    telemetry_delay_fault,
+)
 from simulation.mission_executor import ScenarioSpec, run_backend_scenario, utc_now
 from simulation.vehicle_state import VehicleState
 
@@ -116,9 +122,23 @@ def build_specs() -> list[ScenarioSpec]:
 
 
 def summarize(results: list[dict[str, object]]) -> dict[str, object]:
-    reliability = sum(1 for result in results if result.get("pass")) / len(results) if results else 0.0
-    avg_detection = sum(float(result.get("detection_time_s", 0.0)) for result in results) / len(results) if results else 0.0
-    avg_recovery = sum(float(result.get("recovery_time_s", 0.0)) for result in results) / len(results) if results else 0.0
+    reliability = (
+        sum(1 for result in results if result.get("pass")) / len(results)
+        if results
+        else 0.0
+    )
+    avg_detection = (
+        sum(float(result.get("detection_time_s", 0.0)) for result in results)
+        / len(results)
+        if results
+        else 0.0
+    )
+    avg_recovery = (
+        sum(float(result.get("recovery_time_s", 0.0)) for result in results)
+        / len(results)
+        if results
+        else 0.0
+    )
     return {
         "scenario_reliability": reliability,
         "average_detection_time_s": avg_detection,
