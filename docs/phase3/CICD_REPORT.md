@@ -23,16 +23,18 @@ That means the CI/CD evidence relevant to Phase 3 must cover:
 
 ## Documented Workflow Sources
 
-This report is based on the workflows already tracked in the repository:
+This report is based on the workflows already tracked in the repository. As of July 17, 2026, the repository contains six workflow files:
 
 - [.github/workflows/ci.yml](../../.github/workflows/ci.yml)
 - [.github/workflows/nightly.yml](../../.github/workflows/nightly.yml)
+- [.github/workflows/phase10-enterprise-validation.yml](../../.github/workflows/phase10-enterprise-validation.yml)
+- [.github/workflows/release-validation.yml](../../.github/workflows/release-validation.yml)
 - [.github/workflows/release.yml](../../.github/workflows/release.yml)
 - [.github/workflows/security.yml](../../.github/workflows/security.yml)
 
 ## Pipeline Overview
 
-The repository CI/CD layout is organized into four layers:
+The repository CI/CD layout is organized into six workflow layers:
 
 1. `ci.yml`
    Standard push and pull-request validation for formatting, static analysis, Python, Go, native builds, Windows validation, and full local validation.
@@ -40,11 +42,28 @@ The repository CI/CD layout is organized into four layers:
 2. `nightly.yml`
    Deep validation for warnings-as-errors, sanitizer runs, coverage generation, package validation, SBOM generation, and extended artifact capture.
 
-3. `release.yml`
+3. `phase10-enterprise-validation.yml`
+   Pull-request and manual enterprise-validation workflow for deployment assets, compose validation, security audit hooks, performance suite reruns, and production packaging checks.
+
+4. `release-validation.yml`
+   Pull-request and manual release-readiness workflow for Dockerfiles, compose files, Go tests, schema validation, and container smoke tests.
+
+5. `release.yml`
    Tag-driven and manual release packaging for Linux and Windows, with checksums, install validation, and release publication support.
 
-4. `security.yml`
+6. `security.yml`
    Security-specific validation covering dependency review, secret scanning, dependency vulnerability scanning, and CodeQL analysis.
+
+## Workflow Count Versus Job Count
+
+GitHub Actions can make the pipeline appear larger than the number of workflow files because one workflow can contain many jobs.
+
+- current workflow file count: `6`
+- normal push-to-`main` workflow count: usually `2`
+- job count inside `ci.yml`: multiple jobs including formatting, Go CI, Python CI, Linux/Windows validation, and integration gates
+- job count inside `nightly.yml`: multiple deep-validation jobs such as sanitizer, coverage, and package validation
+
+This is the main reason a user may remember seeing a larger number such as `15`: GitHub may have been showing job entries rather than top-level workflow files.
 
 ## Trigger Model
 
@@ -67,6 +86,24 @@ This makes it the primary regression gate for Phase 3 code changes.
 
 This provides recurring evidence for deeper quality gates that are too heavy for every pull request.
 
+### Phase 10 Enterprise Validation
+
+`.github/workflows/phase10-enterprise-validation.yml` runs on:
+
+- pull requests that touch deployment, control-plane, Docker, or script paths listed in the workflow
+- manual dispatch
+
+This is a targeted workflow, not a default push workflow.
+
+### Release Readiness Validation
+
+`.github/workflows/release-validation.yml` runs on:
+
+- pull requests that touch release-oriented paths listed in the workflow
+- manual dispatch
+
+This is also a targeted workflow rather than a standard push workflow.
+
 ### Release Validation
 
 `.github/workflows/release.yml` runs on:
@@ -86,6 +123,19 @@ This gives a release-oriented validation path for packaged outputs.
 - manual dispatch
 
 This ensures security review is continuous rather than one-time.
+
+## What Runs On A Normal Push To `main`
+
+For a standard source push to `main`, the default workflow behavior is:
+
+- `ci.yml`: runs
+- `security.yml`: runs
+- `nightly.yml`: does not run unless scheduled or started manually
+- `release.yml`: does not run unless a matching `v*` tag is pushed or it is started manually
+- `release-validation.yml`: does not run on ordinary pushes
+- `phase10-enterprise-validation.yml`: does not run on ordinary pushes
+
+That means GitHub may show only a small subset of the total CI/CD design for a normal push even though the repository contains a broader automation stack.
 
 ## CI Workflow Coverage
 
@@ -251,6 +301,33 @@ The Windows path performs:
 
 The workflow contains a publication stage using `gh release create` for tagged releases after packaging jobs complete.
 
+## Targeted Validation Workflows
+
+Two additional workflows extend the repository beyond the original four baseline layers.
+
+### Phase 10 enterprise validation workflow
+
+This workflow adds targeted checks for:
+
+- deployment script syntax validation
+- control-plane build and test reruns
+- compose stack validation
+- Phase 10 security audit execution
+- Phase 6 performance-suite reruns
+- production image packaging
+
+### Release-readiness validation workflow
+
+This workflow adds targeted checks for:
+
+- schema validation
+- Go tests
+- production and development container builds
+- compose expansion validation
+- simulation endpoint smoke tests
+
+These workflows do not usually appear on every push because they are designed around pull-request path filters and manual execution.
+
 ## Security Workflow Coverage
 
 The security workflow adds a security-focused CI layer that complements functional validation.
@@ -316,6 +393,7 @@ The following table maps pipeline coverage back to the Phase 3 backend/orchestra
 | Operator and scripting compatibility | Python syntax checks and unit-test coverage |
 | Repo-wide orchestration regression checks | `scripts/local_validate.py` in `full-validator` |
 | Long-running validation depth | nightly deep validation workflow |
+| Deployment and release-path safety | targeted enterprise and release-validation workflows |
 | Release readiness | release packaging workflow |
 | Security posture | secret scanning, dependency audit, CodeQL |
 
