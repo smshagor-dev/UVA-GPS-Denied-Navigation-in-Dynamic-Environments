@@ -1,0 +1,75 @@
+[
+  {
+    "timestamp": "2026-07-16T20:00:00Z",
+    "vehicle_state": {
+      "drone_id": 9101,
+      "position": [1.0, 2.0, 1.5],
+      "velocity": [0.1, 0.0, 0.0],
+      "battery_pct": 86.5
+    },
+    "imu_data": {
+      "accel": {"x": 0.03, "y": 0.01, "z": 9.81},
+      "gyro": {"x": 0.0, "y": 0.0, "z": 0.02},
+      "sample_rate_hz": 200.0
+    },
+    "gps_localization": {
+      "status": "degraded",
+      "localization_source": "vio-tdoa-fused",
+      "confidence": 0.58
+    },
+    "telemetry": {
+      "delay_ms": 220.0,
+      "packet_loss_pct": 8.0,
+      "peer_count": 3
+    },
+    "mission_state": "corridor_replan",
+    "sensor_confidence": {
+      "camera": 0.78,
+      "lidar": 0.92,
+      "estimator": 0.58
+    },
+    "failure_labels": ["gps_denied", "telemetry_delay"],
+    "ai_decision_output": {
+      "prediction": "communication_resilient_plan",
+      "confidence": 0.74,
+      "fallback_required": false
+    }
+  },
+  {
+    "timestamp": "2026-07-16T20:00:01Z",
+    "vehicle_state": {
+      "drone_id": 9102,
+      "position": [1.4, 1.6, 1.5],
+      "velocity": [0.0, 0.1, 0.0],
+      "battery_pct": 81.0
+    },
+    "imu_data": {
+      "accel": {"x": 0.04, "y": 0.0, "z": 9.81},
+      "gyro": {"x": 0.0, "y": 0.0, "z": -0.01},
+      "sample_rate_hz": 200.0
+    },
+    "gps_localization": {
+      "status": "nominal",
+      "localization_source": "vision-inertial",
+      "confidence": 0.91
+    },
+    "telemetry": {
+      "delay_ms": 0.0,
+      "packet_loss_pct": 0.0,
+      "peer_count": 4
+    },
+    "mission_state": "formation_hold",
+    "sensor_confidence": {
+      "camera": 0.9,
+      "lidar": 0.89,
+      "estimator": 0.91
+    },
+    "failure_labels": [],
+    "ai_decision_output": {
+      "prediction": "continue_nominal_track",
+      "confidence": 0.88,
+      "fallback_required": false
+    }
+  }
+]
+

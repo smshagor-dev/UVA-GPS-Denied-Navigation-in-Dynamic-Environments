@@ -1,0 +1,102 @@
+name: Release Validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/release-validation.yml"
+      - "Dockerfile"
+      - "Dockerfile.dev"
+      - ".dockerignore"
+      - "docker-compose.yml"
+      - "docker-compose.simulation.yml"
+      - "cmd/control-plane/**"
+      - "internal/controlplane/**"
+      - "config/**"
+      - "scripts/validate_config_schemas.py"
+      - "docs/phase5/**"
+
+permissions:
+  contents: read
+
+jobs:
+  release-readiness:
+    name: Release Readiness Validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Install schema validation dependency
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install jsonschema
+
+      - name: Validate configuration schemas
+        shell: bash
+        run: python scripts/validate_config_schemas.py
+
+      - name: Run Go tests
+        shell: bash
+        run: go test ./...
+
+      - name: Build production container
+        shell: bash
+        run: docker build -t drone-swarm-control-plane:release-validation -f Dockerfile .
+
+      - name: Build development container
+        shell: bash
+        run: docker build -t drone-swarm-dev:release-validation -f Dockerfile.dev .
+
+      - name: Validate Compose files
+        shell: bash
+        run: |
+          set -euxo pipefail
+          docker compose -f docker-compose.yml config > "${RUNNER_TEMP}/docker-compose.expanded.yml"
+          docker compose -f docker-compose.simulation.yml config > "${RUNNER_TEMP}/docker-compose.simulation.expanded.yml"
+
+      - name: Smoke test simulation container endpoints
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cid="$(docker run -d -p 18080:8080 \
+            -e DRONE_BACKEND_MODE=simulation \
+            -e DRONE_BACKEND_SIMULATION_ENABLED=true \
+            -e DRONE_BACKEND_DEMO_FLEET_SIZE=3 \
+            drone-swarm-control-plane:release-validation)"
+          trap 'docker logs "$cid" > "${RUNNER_TEMP}/control-plane.log" 2>&1 || true; docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          for _ in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:18080/api/v1/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:18080/api/v1/health > "${RUNNER_TEMP}/health.json"
+          curl --fail --silent http://127.0.0.1:18080/api/v1/ready > "${RUNNER_TEMP}/ready.json"
+          curl --fail --silent http://127.0.0.1:18080/metrics > "${RUNNER_TEMP}/metrics.txt"
+
+      - name: Upload release validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-validation-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/docker-compose.expanded.yml
+            ${{ runner.temp }}/docker-compose.simulation.expanded.yml
+            ${{ runner.temp }}/health.json
+            ${{ runner.temp }}/ready.json
+            ${{ runner.temp }}/metrics.txt
+            ${{ runner.temp }}/control-plane.log
+          retention-days: 30
+

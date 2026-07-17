@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -244,6 +245,116 @@ func TestHealthEndpointReflectsCriticalLocalizationLoss(t *testing.T) {
 	}
 	if health.CriticalAlerts == 0 {
 		t.Fatal("expected critical alerts when lost localization telemetry is present")
+	}
+}
+
+func TestReadinessEndpointWaitsForTelemetryInProductionMode(t *testing.T) {
+	server := newTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ready", nil)
+	rec := httptest.NewRecorder()
+	server.http.Handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected readiness to wait for telemetry, got %d", rec.Code)
+	}
+
+	var readiness ReadinessReport
+	if err := json.Unmarshal(rec.Body.Bytes(), &readiness); err != nil {
+		t.Fatalf("unmarshal readiness: %v", err)
+	}
+	if readiness.Ready {
+		t.Fatal("expected readiness false before telemetry arrives")
+	}
+	if readiness.Status != "waiting_for_telemetry" {
+		t.Fatalf("expected waiting_for_telemetry status, got %q", readiness.Status)
+	}
+}
+
+func TestReadinessEndpointReportsReadyWhenFreshTelemetryExists(t *testing.T) {
+	server := newTestServer()
+	server.state.UpsertTelemetry(DroneTelemetry{
+		DroneID:                5,
+		ClusterID:              "cluster-01",
+		Role:                   "LEADER",
+		Source:                 "real",
+		Connectivity:           "Mesh",
+		Reachable:              true,
+		Position:               [3]float64{0, 0, 1},
+		Velocity:               [3]float64{0, 0, 0},
+		AttitudeRPY:            [3]float64{},
+		ThrustVector:           [3]float64{0, 0, 9.81},
+		MissionState:           "hold",
+		LocalizationSource:     "vision-inertial",
+		LocalizationDataSource: "real",
+		LocalizationState:      "nominal",
+		LocalizationConfidence: 0.9,
+		SyncConfidence:         0.95,
+		Timestamp:              time.Now().UTC(),
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/ready", nil)
+	rec := httptest.NewRecorder()
+	server.http.Handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected readiness ok, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var readiness ReadinessReport
+	if err := json.Unmarshal(rec.Body.Bytes(), &readiness); err != nil {
+		t.Fatalf("unmarshal readiness: %v", err)
+	}
+	if !readiness.Ready {
+		t.Fatalf("expected readiness true, got %+v", readiness)
+	}
+}
+
+func TestMetricsEndpointPublishesOperationalCounters(t *testing.T) {
+	server := newSimulationTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	rec := httptest.NewRecorder()
+	server.http.Handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected metrics ok, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "drone_swarm_controlplane_ready") {
+		t.Fatalf("expected readiness metric, got %s", body)
+	}
+	if !strings.Contains(body, "drone_swarm_total_drones") {
+		t.Fatalf("expected total drone metric, got %s", body)
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.Contains(got, "text/plain") {
+		t.Fatalf("expected text/plain metrics content type, got %q", got)
+	}
+}
+
+func TestResponsesIncludeSecurityHeaders(t *testing.T) {
+	server := newSimulationTestServer()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
+	rec := httptest.NewRecorder()
+	server.http.Handler.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected health ok, got %d", rec.Code)
+	}
+	if got := rec.Header().Get("X-Content-Type-Options"); got != "nosniff" {
+		t.Fatalf("expected nosniff header, got %q", got)
+	}
+	if got := rec.Header().Get("X-Frame-Options"); got != "DENY" {
+		t.Fatalf("expected frame deny header, got %q", got)
+	}
+	if got := rec.Header().Get("Referrer-Policy"); got != "no-referrer" {
+		t.Fatalf("expected referrer policy header, got %q", got)
+	}
+	if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("expected cache-control no-store, got %q", got)
+	}
+	if got := rec.Header().Get("Content-Security-Policy"); !strings.Contains(got, "default-src 'none'") {
+		t.Fatalf("expected content security policy, got %q", got)
+	}
+	if got := rec.Header().Get("Permissions-Policy"); !strings.Contains(got, "camera=()") {
+		t.Fatalf("expected permissions policy, got %q", got)
 	}
 }
 

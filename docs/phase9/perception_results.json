@@ -1,0 +1,160 @@
+{
+  "generated_at": "2026-07-17T07:40:15.995180Z",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "model_backend": "pytorch-mock",
+  "validation_cases": [
+    {
+      "name": "nominal_operation",
+      "expected_labels": [
+        "nominal_operation"
+      ],
+      "detected_labels": [
+        "nominal_operation"
+      ],
+      "matched_labels": [
+        "nominal_operation"
+      ],
+      "confidence_score": 0.891,
+      "latency_ms": 1.8793999910354615,
+      "decision_input": {
+        "top_detection": "nominal_operation",
+        "detection_labels": [
+          "nominal_operation"
+        ],
+        "confidence_score": 0.891,
+        "prediction": "continue_nominal_track",
+        "prediction_backend": "pytorch-mock",
+        "fallback_required": false
+      },
+      "inference": {
+        "prediction": "continue_nominal_track",
+        "confidence": 0.8720000000000001,
+        "backend": "pytorch-mock",
+        "latency_ms": 1.85
+      }
+    },
+    {
+      "name": "obstacle_awareness",
+      "expected_labels": [
+        "obstacle_cluster"
+      ],
+      "detected_labels": [
+        "obstacle_cluster"
+      ],
+      "matched_labels": [
+        "obstacle_cluster"
+      ],
+      "confidence_score": 0.8610000000000001,
+      "latency_ms": 2.093300022929907,
+      "decision_input": {
+        "top_detection": "obstacle_cluster",
+        "detection_labels": [
+          "obstacle_cluster"
+        ],
+        "confidence_score": 0.8610000000000001,
+        "prediction": "continue_nominal_track",
+        "prediction_backend": "pytorch-mock",
+        "fallback_required": false
+      },
+      "inference": {
+        "prediction": "continue_nominal_track",
+        "confidence": 0.9220000000000002,
+        "backend": "pytorch-mock",
+        "latency_ms": 2.075
+      }
+    },
+    {
+      "name": "telemetry_and_localization_degradation",
+      "expected_labels": [
+        "localization_degradation",
+        "telemetry_degradation",
+        "sensor_dropout"
+      ],
+      "detected_labels": [
+        "localization_degradation",
+        "telemetry_degradation",
+        "sensor_dropout"
+      ],
+      "matched_labels": [
+        "localization_degradation",
+        "telemetry_degradation",
+        "sensor_dropout"
+      ],
+      "confidence_score": 0.7885,
+      "latency_ms": 1.8661000061780215,
+      "decision_input": {
+        "top_detection": "sensor_dropout",
+        "detection_labels": [
+          "localization_degradation",
+          "telemetry_degradation",
+          "sensor_dropout"
+        ],
+        "confidence_score": 0.7885,
+        "prediction": "fallback_localization",
+        "prediction_backend": "pytorch-mock",
+        "fallback_required": false
+      },
+      "inference": {
+        "prediction": "fallback_localization",
+        "confidence": 0.6970000000000001,
+        "backend": "pytorch-mock",
+        "latency_ms": 1.85
+      }
+    },
+    {
+      "name": "sensor_dropout_handling",
+      "expected_labels": [
+        "sensor_dropout",
+        "localization_degradation",
+        "obstacle_cluster"
+      ],
+      "detected_labels": [
+        "obstacle_cluster",
+        "localization_degradation",
+        "sensor_dropout"
+      ],
+      "matched_labels": [
+        "sensor_dropout",
+        "localization_degradation",
+        "obstacle_cluster"
+      ],
+      "confidence_score": 0.7865,
+      "latency_ms": 1.9087999886646867,
+      "decision_input": {
+        "top_detection": "sensor_dropout",
+        "detection_labels": [
+          "obstacle_cluster",
+          "localization_degradation",
+          "sensor_dropout"
+        ],
+        "confidence_score": 0.7865,
+        "prediction": "fallback_localization",
+        "prediction_backend": "pytorch-mock",
+        "fallback_required": false
+      },
+      "inference": {
+        "prediction": "fallback_localization",
+        "confidence": 0.6930000000000001,
+        "backend": "pytorch-mock",
+        "latency_ms": 1.895
+      }
+    }
+  ],
+  "summary": {
+    "case_count": 4,
+    "label_accuracy": 1.0,
+    "average_confidence": 0.83175,
+    "latency_ms": {
+      "count": 4.0,
+      "average_ms": 1.936900002202019,
+      "p50_ms": 1.9087999886646867,
+      "p95_ms": 2.093300022929907,
+      "p99_ms": 2.093300022929907,
+      "max_ms": 2.093300022929907
+    }
+  },
+  "status": "PASS"
+}

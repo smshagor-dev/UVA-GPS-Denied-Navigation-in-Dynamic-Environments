@@ -33,6 +33,7 @@
 #include "safety/SafetyManager.hpp"
 #include "security/DroneSecurity.hpp"
 #include "swarm/V2XMeshNetwork.hpp"
+#include "utils/SimpleJson.hpp"
 #include "swarm/SwarmSecurity.hpp"
 #include "utils/RuntimeLogging.hpp"
 
@@ -44,7 +45,6 @@
 #include <filesystem>
 #include <iomanip>
 #include <mutex>
-#include <regex>
 #include <sstream>
 #include <tuple>
 #include <string_view>
@@ -152,40 +152,6 @@ struct NodeConfig {
     drone::security::PacketAuthConfig edge_auth{};
 };
 
-std::optional<std::string> extract_local_json_string(const std::string& content,
-                                                     const std::string& key) {
-    const std::regex pattern("\"" + key + "\"\\s*:\\s*\"([^\"]+)\"", std::regex::icase);
-    std::smatch match;
-    if (std::regex_search(content, match, pattern) && match.size() >= 2) {
-        return match[1].str();
-    }
-    return std::nullopt;
-}
-
-std::optional<bool> extract_local_json_bool(const std::string& content, const std::string& key) {
-    const std::regex pattern("\"" + key + "\"\\s*:\\s*(true|false)", std::regex::icase);
-    std::smatch match;
-    if (std::regex_search(content, match, pattern) && match.size() >= 2) {
-        std::string value = match[1].str();
-        std::transform(value.begin(), value.end(), value.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        return value == "true";
-    }
-    return std::nullopt;
-}
-
-std::optional<uint64_t> extract_local_json_u64(const std::string& content, const std::string& key) {
-    const std::regex pattern("\"" + key + "\"\\s*:\\s*([0-9]+)", std::regex::icase);
-    std::smatch match;
-    if (std::regex_search(content, match, pattern) && match.size() >= 2) {
-        try {
-            return static_cast<uint64_t>(std::stoull(match[1].str()));
-        } catch (const std::exception&) {
-        }
-    }
-    return std::nullopt;
-}
-
 void apply_edge_protocol_config(NodeConfig& cfg) {
     if (cfg.edge_protocol_config_path.empty() ||
         !std::filesystem::exists(cfg.edge_protocol_config_path)) {
@@ -199,25 +165,27 @@ void apply_edge_protocol_config(NodeConfig& cfg) {
     std::ostringstream buffer;
     buffer << in.rdbuf();
     const std::string content = buffer.str();
-    if (const auto mode = extract_local_json_string(content, "serialization_mode")) {
+    if (const auto mode = drone::utils::simple_json::extract_string(content, "serialization_mode")) {
         cfg.edge_serialization_mode = *mode;
     }
-    if (const auto mode = extract_local_json_string(content, "mode")) {
+    if (const auto mode = drone::utils::simple_json::extract_string(content, "mode")) {
         cfg.edge_auth.mode = drone::security::parse_auth_mode(*mode).value_or(cfg.edge_auth.mode);
     }
-    if (const auto allow = extract_local_json_bool(content, "allow_unsigned_in_simulation")) {
+    if (const auto allow =
+            drone::utils::simple_json::extract_bool(content, "allow_unsigned_in_simulation")) {
         cfg.edge_auth.allow_unsigned_in_simulation = *allow;
     }
-    if (const auto allow = extract_local_json_bool(content, "allow_unsigned_in_bench")) {
+    if (const auto allow =
+            drone::utils::simple_json::extract_bool(content, "allow_unsigned_in_bench")) {
         cfg.edge_auth.allow_unsigned_in_bench = *allow;
     }
-    if (const auto epoch = extract_local_json_u64(content, "trust_epoch")) {
+    if (const auto epoch = drone::utils::simple_json::extract_u64(content, "trust_epoch")) {
         cfg.edge_auth.trust_epoch = *epoch;
     }
-    if (const auto skew = extract_local_json_u64(content, "max_clock_skew_ms")) {
+    if (const auto skew = drone::utils::simple_json::extract_u64(content, "max_clock_skew_ms")) {
         cfg.edge_auth.max_clock_skew_ms = *skew;
     }
-    if (const auto env = extract_local_json_string(content, "shared_secret_env")) {
+    if (const auto env = drone::utils::simple_json::extract_string(content, "shared_secret_env")) {
         cfg.edge_auth.shared_secret_env = *env;
     }
 }

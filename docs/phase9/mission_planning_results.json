@@ -1,0 +1,175 @@
+{
+  "generated_at": "2026-07-17T07:40:15.980035Z",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "scenario_count": 4,
+  "decisions": [
+    {
+      "scenario": "dynamic_route_selection",
+      "selected_route": "corridor_alpha",
+      "route_score": 64.248,
+      "task_allocation": [
+        {
+          "drone_id": 9201,
+          "task": "recon",
+          "battery_pct": 88.0,
+          "role": "LEADER"
+        },
+        {
+          "drone_id": 9202,
+          "task": "relay",
+          "battery_pct": 83.0,
+          "role": "FOLLOWER"
+        },
+        {
+          "drone_id": 9203,
+          "task": "mapping",
+          "battery_pct": 79.0,
+          "role": "FOLLOWER"
+        },
+        {
+          "drone_id": 9204,
+          "task": "reserve",
+          "battery_pct": 76.0,
+          "role": "FOLLOWER"
+        }
+      ],
+      "replan_triggered": false,
+      "recovery_plan": "continue_mission",
+      "success": true,
+      "recovery_success": true,
+      "latency_ms": 1.7152000870108606,
+      "confidence_score": 0.9336354196093712,
+      "model_prediction": "balanced_plan"
+    },
+    {
+      "scenario": "risk_aware_replan",
+      "selected_route": "mesh_safe_lane",
+      "route_score": 78.012,
+      "task_allocation": [
+        {
+          "drone_id": 9201,
+          "task": "recon",
+          "battery_pct": 88.0,
+          "role": "LEADER"
+        },
+        {
+          "drone_id": 9202,
+          "task": "relay",
+          "battery_pct": 83.0,
+          "role": "FOLLOWER"
+        },
+        {
+          "drone_id": 9203,
+          "task": "mapping",
+          "battery_pct": 79.0,
+          "role": "FOLLOWER"
+        },
+        {
+          "drone_id": 9204,
+          "task": "reserve",
+          "battery_pct": 76.0,
+          "role": "FOLLOWER"
+        }
+      ],
+      "replan_triggered": true,
+      "recovery_plan": "tighten_formation_and_use_resilient_route",
+      "success": true,
+      "recovery_success": true,
+      "latency_ms": 1.6075000777542592,
+      "confidence_score": 0.833519881356313,
+      "model_prediction": "communication_resilient_plan"
+    },
+    {
+      "scenario": "resource_aware_allocation",
+      "selected_route": "reserve_supported",
+      "route_score": 70.04800000000002,
+      "task_allocation": [
+        {
+          "drone_id": 9201,
+          "task": "recon",
+          "battery_pct": 88.0,
+          "role": "LEADER"
+        },
+        {
+          "drone_id": 9202,
+          "task": "relay",
+          "battery_pct": 83.0,
+          "role": "FOLLOWER"
+        },
+        {
+          "drone_id": 9203,
+          "task": "mapping",
+          "battery_pct": 79.0,
+          "role": "FOLLOWER"
+        },
+        {
+          "drone_id": 9204,
+          "task": "reserve",
+          "battery_pct": 76.0,
+          "role": "FOLLOWER"
+        }
+      ],
+      "replan_triggered": true,
+      "recovery_plan": "reallocate_mapping_to_reserve_drone",
+      "success": true,
+      "recovery_success": true,
+      "latency_ms": 1.4672999848574402,
+      "confidence_score": 0.8899092510350018,
+      "model_prediction": "balanced_plan"
+    },
+    {
+      "scenario": "failure_aware_sensor_fault",
+      "selected_route": "safe_corridor",
+      "route_score": 68.782,
+      "task_allocation": [
+        {
+          "drone_id": 9201,
+          "task": "recon",
+          "battery_pct": 88.0,
+          "role": "LEADER"
+        },
+        {
+          "drone_id": 9202,
+          "task": "relay",
+          "battery_pct": 83.0,
+          "role": "FOLLOWER"
+        },
+        {
+          "drone_id": 9203,
+          "task": "mapping",
+          "battery_pct": 79.0,
+          "role": "FOLLOWER"
+        },
+        {
+          "drone_id": 9204,
+          "task": "reserve",
+          "battery_pct": 76.0,
+          "role": "FOLLOWER"
+        }
+      ],
+      "replan_triggered": true,
+      "recovery_plan": "fallback_to_safe_corridor_and_reduce_speed",
+      "success": true,
+      "recovery_success": true,
+      "latency_ms": 1.4886999650597572,
+      "confidence_score": 0.8928002407839699,
+      "model_prediction": "balanced_plan"
+    }
+  ],
+  "summary": {
+    "success_rate": 1.0,
+    "recovery_rate": 1.0,
+    "decision_timing_ms": {
+      "count": 4.0,
+      "average_ms": 1.5696750286705794,
+      "p50_ms": 1.6075000777542592,
+      "p95_ms": 1.7152000870108606,
+      "p99_ms": 1.7152000870108606,
+      "max_ms": 1.7152000870108606
+    }
+  },
+  "status": "PASS"
+}

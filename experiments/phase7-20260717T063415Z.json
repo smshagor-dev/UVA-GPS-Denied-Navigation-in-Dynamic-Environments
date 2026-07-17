@@ -1,0 +1,39 @@
+{
+  "experiment_id": "phase7-20260717T063415Z",
+  "run_id": "phase7-20260717T063415Z",
+  "phase": "Phase 7",
+  "started_at": "2026-07-17T06:34:15.815090Z",
+  "completed_at": "2026-07-17T06:34:21.450087Z",
+  "artifact": "docs\\phase7\\mission_results.json",
+  "status": "PASS",
+  "config_snapshots": [
+    {
+      "path": "config\\runtime.json",
+      "exists": true,
+      "sha256": "4ed6e827f513e42e8cbe401ba3e3bfd3f438d087bc70cb1ff0573f31349c9fea",
+      "bytes": 1280466,
+      "modified_at": "2026-07-13T19:02:11.945192Z"
+    },
+    {
+      "path": "config\\anchors.json",
+      "exists": true,
+      "sha256": "f45f70d65e47e1a1e303f259559c82c6ce7cf0bbe08b27979f7ce2fcf6fe27b8",
+      "bytes": 97564,
+      "modified_at": "2026-05-09T18:53:00.172254Z"
+    },
+    {
+      "path": "config\\lidar.json",
+      "exists": true,
+      "sha256": "f9189261a0388b9b5e392ef1be9600159e03c748b2f4ce4646de5b72ac69876b",
+      "bytes": 1313724,
+      "modified_at": "2026-05-09T18:55:36.855445Z"
+    },
+    {
+      "path": "config\\swarm_edge_protocol.json",
+      "exists": true,
+      "sha256": "7d7a0a342b090e293ae6c7f659a670d6d558e8cdab27f10acead29c844105fa7",
+      "bytes": 2904,
+      "modified_at": "2026-05-15T04:38:52.843710Z"
+    }
+  ]
+}

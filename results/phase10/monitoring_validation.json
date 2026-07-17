@@ -1,0 +1,44 @@
+{
+  "generated_at": "2026-07-17T06:03:47.591266Z",
+  "backend_startup_ms": 6402.535400004126,
+  "health": {
+    "online_drones": 4,
+    "total_drones": 4,
+    "critical_alerts": 0,
+    "avg_battery_pct": 99.986226746,
+    "max_cpu_temp_c": 58.873233771541436,
+    "updated_at": "2026-07-17T06:03:47.5689038Z",
+    "backend_mode": "simulation",
+    "mesh_topology_mode": "adaptive_mesh",
+    "simulation_enabled": true,
+    "real_drone_count": 0,
+    "stale_drone_count": 0
+  },
+  "readiness": {
+    "ready": true,
+    "status": "ready",
+    "reason": "control-plane operational",
+    "uptime_seconds": 0.5464145,
+    "updated_at": "2026-07-17T06:03:47.5842807Z",
+    "backend_mode": "simulation",
+    "simulation_enabled": true,
+    "total_drones": 4,
+    "real_drone_count": 0,
+    "stale_drone_count": 0
+  },
+  "metrics_count": 9,
+  "metrics_names": [
+    "drone_swarm_controlplane_ready",
+    "drone_swarm_online_drones",
+    "drone_swarm_total_drones",
+    "drone_swarm_real_drones",
+    "drone_swarm_stale_drones",
+    "drone_swarm_critical_alerts",
+    "drone_swarm_pending_approvals",
+    "drone_swarm_event_log_entries",
+    "drone_swarm_command_log_entries"
+  ],
+  "prometheus_config": "deployment\\monitoring\\prometheus.yml",
+  "grafana_dashboard": "deployment\\monitoring\\grafana-control-plane-dashboard.json",
+  "status": "PASS"
+}

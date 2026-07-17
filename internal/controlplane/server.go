@@ -27,6 +27,7 @@ type Server struct {
 	tls         TLSConfig
 	commandAuth *CommandSecurityValidator
 	mode        string
+	startedAt   time.Time
 }
 
 type ServerConfig struct {
@@ -76,6 +77,7 @@ func NewServer(addr string, security SecurityConfig, tlsCfg TLSConfig, cfg Serve
 		tls:         tlsCfg,
 		commandAuth: NewCommandSecurityValidator(securityCfg),
 		mode:        cfg.Mode,
+		startedAt:   time.Now().UTC(),
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/v1/telemetry", s.withRecovery(s.handleTelemetry))
@@ -83,9 +85,11 @@ func NewServer(addr string, security SecurityConfig, tlsCfg TLSConfig, cfg Serve
 	mux.HandleFunc("/api/v1/commands", s.withRecovery(s.handleCommands))
 	mux.HandleFunc("/api/v1/missions", s.withRecovery(s.handleMissions))
 	mux.HandleFunc("/api/v1/health", s.withRecovery(s.handleHealth))
+	mux.HandleFunc("/api/v1/ready", s.withRecovery(s.handleReadiness))
 	mux.HandleFunc("/api/v1/events", s.withRecovery(s.handleEvents))
 	mux.HandleFunc("/api/v1/approvals", s.withRecovery(s.handleApprovals))
 	mux.HandleFunc("/api/v1/discovery", s.withRecovery(s.handleDiscovery))
+	mux.HandleFunc("/metrics", s.withRecovery(s.handleMetrics))
 	s.http = &http.Server{
 		Addr:              addr,
 		Handler:           mux,
@@ -681,6 +685,42 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.state.Health())
 }
 
+func (s *Server) handleReadiness(w http.ResponseWriter, r *http.Request) {
+	log.Printf("handleReadiness method=%s remote=%s", r.Method, r.RemoteAddr)
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	health := s.state.Health()
+	report := ReadinessReport{
+		Ready:             true,
+		Status:            "ready",
+		Reason:            "control-plane operational",
+		UptimeSeconds:     time.Since(s.startedAt).Seconds(),
+		UpdatedAt:         time.Now().UTC(),
+		BackendMode:       health.BackendMode,
+		SimulationEnabled: health.SimulationEnabled,
+		TotalDrones:       health.TotalDrones,
+		RealDroneCount:    health.RealDroneCount,
+		StaleDroneCount:   health.StaleDroneCount,
+	}
+	if !health.SimulationEnabled && health.TotalDrones == 0 {
+		report.Ready = false
+		report.Status = "waiting_for_telemetry"
+		report.Reason = "no fleet telemetry has been ingested yet"
+	}
+	if health.TotalDrones > 0 && health.StaleDroneCount == health.TotalDrones {
+		report.Ready = false
+		report.Status = "stale"
+		report.Reason = "all known drone telemetry is stale"
+	}
+	status := http.StatusOK
+	if !report.Ready {
+		status = http.StatusServiceUnavailable
+	}
+	writeJSON(w, status, report)
+}
+
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	log.Printf("handleEvents method=%s remote=%s", r.Method, r.RemoteAddr)
 	if _, ok := s.requireAuthorizedPeer(w, r, "security event access", "", "operator", "commander", "maintenance", "control-plane"); !ok {
@@ -730,12 +770,89 @@ func (s *Server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	log.Printf("handleMetrics method=%s remote=%s", r.Method, r.RemoteAddr)
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
+		return
+	}
+	health := s.state.Health()
+	events := s.state.Events()
+	commands := s.state.Commands()
+	ready := 1
+	if !health.SimulationEnabled && health.TotalDrones == 0 {
+		ready = 0
+	}
+	if health.TotalDrones > 0 && health.StaleDroneCount == health.TotalDrones {
+		ready = 0
+	}
+	metrics := fmt.Sprintf(
+		"# HELP drone_swarm_controlplane_ready Control-plane readiness state.\n"+
+			"# TYPE drone_swarm_controlplane_ready gauge\n"+
+			"drone_swarm_controlplane_ready %d\n"+
+			"# HELP drone_swarm_online_drones Number of reachable drones.\n"+
+			"# TYPE drone_swarm_online_drones gauge\n"+
+			"drone_swarm_online_drones %d\n"+
+			"# HELP drone_swarm_total_drones Number of known drones.\n"+
+			"# TYPE drone_swarm_total_drones gauge\n"+
+			"drone_swarm_total_drones %d\n"+
+			"# HELP drone_swarm_real_drones Number of real-source drones.\n"+
+			"# TYPE drone_swarm_real_drones gauge\n"+
+			"drone_swarm_real_drones %d\n"+
+			"# HELP drone_swarm_stale_drones Number of stale drones.\n"+
+			"# TYPE drone_swarm_stale_drones gauge\n"+
+			"drone_swarm_stale_drones %d\n"+
+			"# HELP drone_swarm_critical_alerts Number of critical fleet alerts.\n"+
+			"# TYPE drone_swarm_critical_alerts gauge\n"+
+			"drone_swarm_critical_alerts %d\n"+
+			"# HELP drone_swarm_pending_approvals Number of pending approvals.\n"+
+			"# TYPE drone_swarm_pending_approvals gauge\n"+
+			"drone_swarm_pending_approvals %d\n"+
+			"# HELP drone_swarm_event_log_entries Number of security and runtime event entries.\n"+
+			"# TYPE drone_swarm_event_log_entries gauge\n"+
+			"drone_swarm_event_log_entries %d\n"+
+			"# HELP drone_swarm_command_log_entries Number of recorded command entries.\n"+
+			"# TYPE drone_swarm_command_log_entries gauge\n"+
+			"drone_swarm_command_log_entries %d\n",
+		ready,
+		health.OnlineDrones,
+		health.TotalDrones,
+		health.RealDroneCount,
+		health.StaleDroneCount,
+		health.CriticalAlerts,
+		len(s.state.PendingApprovals()),
+		len(events),
+		len(commands),
+	)
+	writeText(w, http.StatusOK, "text/plain; version=0.0.4; charset=utf-8", metrics)
+}
+
 func writeJSON(w http.ResponseWriter, status int, value any) {
+	setSecurityHeaders(w)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(value); err != nil {
 		log.Printf("writeJSON failed: %v", err)
 	}
+}
+
+func writeText(w http.ResponseWriter, status int, contentType, value string) {
+	setSecurityHeaders(w)
+	w.Header().Set("Content-Type", contentType)
+	w.WriteHeader(status)
+	if _, err := io.WriteString(w, value); err != nil {
+		log.Printf("writeText failed: %v", err)
+	}
+}
+
+func setSecurityHeaders(w http.ResponseWriter) {
+	headers := w.Header()
+	headers.Set("X-Content-Type-Options", "nosniff")
+	headers.Set("X-Frame-Options", "DENY")
+	headers.Set("Referrer-Policy", "no-referrer")
+	headers.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+	headers.Set("Permissions-Policy", "accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), usb=()")
+	headers.Set("Cache-Control", "no-store")
 }
 
 func decodeJSONBody(r *http.Request, target any) error {

@@ -1,0 +1,102 @@
+{
+  "generated_at": "2026-07-17T07:40:16.023791Z",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "case_count": 6,
+  "cases": [
+    {
+      "name": "invalid_ai_command_rejection",
+      "ai_output": {
+        "command": "increase_speed_into_obstacle",
+        "confidence": 0.88
+      },
+      "expected_behavior": "reject",
+      "observed_behavior": "reject",
+      "fallback_state": "safe_hold",
+      "latency_ms": 1.8,
+      "pass": true
+    },
+    {
+      "name": "low_confidence_fallback",
+      "ai_output": {
+        "command": "reroute",
+        "confidence": 0.34
+      },
+      "expected_behavior": "fallback",
+      "observed_behavior": "fallback",
+      "fallback_state": "degraded_localization",
+      "latency_ms": 1.6,
+      "pass": true
+    },
+    {
+      "name": "sensor_failure_handling",
+      "ai_output": {
+        "command": "continue_nominal",
+        "confidence": 0.72
+      },
+      "expected_behavior": "override",
+      "observed_behavior": "override",
+      "fallback_state": "sensor_fault_safe_mode",
+      "latency_ms": 1.9,
+      "pass": true
+    },
+    {
+      "name": "missing_model_fallback",
+      "ai_output": {
+        "command": "model_unavailable",
+        "confidence": 0.0
+      },
+      "expected_behavior": "fallback",
+      "observed_behavior": "fallback",
+      "fallback_state": "rule_based_plan",
+      "latency_ms": 1.2,
+      "pass": true
+    },
+    {
+      "name": "unsafe_decision_prevention",
+      "ai_output": {
+        "command": "ignore_emergency_land",
+        "confidence": 0.91
+      },
+      "expected_behavior": "reject",
+      "observed_behavior": "reject",
+      "fallback_state": "emergency_land",
+      "latency_ms": 1.7,
+      "pass": true
+    },
+    {
+      "name": "safe_degraded_operation",
+      "ai_output": {
+        "command": "tighten_formation",
+        "confidence": 0.67
+      },
+      "expected_behavior": "allow_degraded",
+      "observed_behavior": "allow_degraded",
+      "fallback_state": "degraded_autonomy",
+      "latency_ms": 1.5,
+      "pass": true
+    }
+  ],
+  "summary": {
+    "pass_rate": 1.0,
+    "latency_ms": {
+      "count": 6.0,
+      "average_ms": 1.6166666666666665,
+      "p50_ms": 1.6,
+      "p95_ms": 1.9,
+      "p99_ms": 1.9,
+      "max_ms": 1.9
+    },
+    "safety_fallbacks_observed": [
+      "safe_hold",
+      "degraded_localization",
+      "sensor_fault_safe_mode",
+      "rule_based_plan",
+      "emergency_land",
+      "degraded_autonomy"
+    ]
+  },
+  "status": "PASS"
+}

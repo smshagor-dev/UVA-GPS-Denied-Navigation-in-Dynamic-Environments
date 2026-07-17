@@ -1,0 +1,4 @@
+﻿{
+    "StatusCode":  503,
+    "Content":  "{\"ready\":false,\"status\":\"waiting_for_telemetry\",\"reason\":\"no fleet telemetry has been ingested yet\",\"uptime_seconds\":7.856273306,\"updated_at\":\"2026-07-16T14:23:37.385086853Z\",\"backend_mode\":\"production\",\"simulation_enabled\":false,\"total_drones\":0,\"real_drone_count\":0,\"stale_drone_count\":0}\n"
+}

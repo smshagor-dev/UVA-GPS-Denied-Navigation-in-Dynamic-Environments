@@ -1,0 +1,11 @@
+﻿2026/07/16 14:23:29 control-plane logging initialized
+2026/07/16 14:23:29 control-plane security profile=lab signed_commands_required=false operator_id= operator_role=operator
+2026/07/16 14:23:29 control-plane transport tls_enabled=false client_cert_required=false cert=/app/certs/server.crt ca=/app/certs/ca.crt
+2026/07/16 14:23:29 control-plane runtime backend_mode=production simulation_enabled=false stale_after=5s demo_fleet_size=5
+2026/07/16 14:23:29 FleetState initialized backend_mode=production simulation_enabled=false stale_after=5s
+2026/07/16 14:23:29 control-plane backend mode=production simulation_enabled=false stale_after=5s
+2026/07/16 14:23:29 go control-plane listening on :8080
+2026/07/16 14:23:34 handleHealth method=GET remote=127.0.0.1:39494
+2026/07/16 14:23:34 FleetState.Health requested
+2026/07/16 14:23:34 FleetState.Snapshot requested
+2026/07/16 14:23:34 request complete method=GET path=/api/v1/health remote=127.0.0.1:39494 duration=1.165526ms

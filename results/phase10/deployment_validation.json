@@ -1,0 +1,65 @@
+{
+  "generated_at": "2026-07-17T07:40:16.625624Z",
+  "presence": {
+    "root_dockerfile": true,
+    "production_dockerfile": true,
+    "root_compose": true,
+    "root_production_compose": true,
+    "deployment_production_compose": true,
+    "env_template": true,
+    "secret_template": true
+  },
+  "production_dockerfile": {
+    "multi_stage": true,
+    "uses_non_root": true,
+    "has_healthcheck": true,
+    "has_graceful_stop": true
+  },
+  "compose_validation": {
+    "default": {
+      "command": [
+        "docker",
+        "compose",
+        "-f",
+        "docker-compose.yml",
+        "config"
+      ],
+      "returncode": 0,
+      "stdout": "name: drone_swarm\nservices:\n  control-plane:\n    build:\n      context: E:\\Final Project\\drone_swarm\n      dockerfile: Dockerfile\n    environment:\n      DRONE_BACKEND_DEMO_FLEET_SIZE: \"5\"\n      DRONE_BACKEND_MODE: production\n      DRONE_BACKEND_SIMULATION_ENABLED: \"false\"\n      DRONE_BACKEND_STALE_SEC: \"5\"\n      DRONE_REQUIRE_SIGNED_COMMANDS: \"false\"\n      DRONE_SECURITY_PROFILE: lab\n      DRONE_SWARM_ADDR: :8080\n      DRONE_TLS_CA_FILE: /app/certs/ca.crt\n      DRONE_TLS_CERT_FILE: /app/certs/server.crt\n      DRONE_TLS_ENABLED: \"false\"\n      DRONE_TLS_KEY_FILE: /app/certs/server.key\n      DRONE_TLS_REQUIRE_CLIENT_CERT: \"false\"\n    healthcheck:\n      test:\n        - CMD\n        - curl\n        - --fail\n        - http://127.0.0.1:8080/api/v1/health\n      timeout: 5s\n      interval: 30s\n      retries: 3\n      start_period: 10s\n    image: drone-swarm/control-plane:local\n    networks:\n      default: null\n    ports:\n      - mode: ingress\n        target: 8080\n        published: \"8080\"\n        protocol: tcp\n    restart: unless-stopped\n    volumes:\n      - type: bind\n        source: E:\\Final Project\\drone_swarm\\logs\\control-plane\n        target: /app/logs/control-plane\n        bind: {}\n      - type: bind\n        source: E:\\Final Project\\drone_swarm\\certs\n        target: /app/certs\n        read_only: true\n        bind: {}\nnetworks:\n  default:\n    name: drone_swarm_default\n",
+      "stderr": ""
+    },
+    "production": {
+      "command": [
+        "docker",
+        "compose",
+        "-f",
+        "docker-compose.production.yml",
+        "config"
+      ],
+      "returncode": 0,
+      "stdout": "name: drone_swarm\nservices:\n  control-plane:\n    build:\n      context: E:\\Final Project\\drone_swarm\n      dockerfile: deployment/docker/Dockerfile.production\n    cap_drop:\n      - ALL\n    environment:\n      DRONE_BACKEND_DEMO_FLEET_SIZE: \"0\"\n      DRONE_BACKEND_MODE: production\n      DRONE_BACKEND_SIMULATION_ENABLED: \"false\"\n      DRONE_BACKEND_STALE_SEC: \"5\"\n      DRONE_DEVICE_REGISTRY_FILE: /app/config/device-registry.json\n      DRONE_REQUIRE_SIGNED_COMMANDS: \"false\"\n      DRONE_SECURITY_PROFILE: lab\n      DRONE_SWARM_ADDR: :8080\n      DRONE_TLS_CA_FILE: /app/certs/ca.crt\n      DRONE_TLS_CERT_FILE: /app/certs/server.crt\n      DRONE_TLS_ENABLED: \"false\"\n      DRONE_TLS_KEY_FILE: /app/certs/server.key\n      DRONE_TLS_REQUIRE_CLIENT_CERT: \"false\"\n    healthcheck:\n      test:\n        - CMD\n        - curl\n        - --fail\n        - --silent\n        - http://127.0.0.1:8080/api/v1/ready\n      timeout: 5s\n      interval: 30s\n      retries: 3\n      start_period: 15s\n    image: drone-swarm/control-plane:production\n    logging:\n      driver: json-file\n      options:\n        max-file: \"5\"\n        max-size: 10m\n    networks:\n      default: null\n    ports:\n      - mode: ingress\n        target: 8080\n        published: \"8080\"\n        protocol: tcp\n    read_only: true\n    restart: unless-stopped\n    security_opt:\n      - no-new-privileges:true\n    stop_grace_period: 20s\n    tmpfs:\n      - /tmp/control-plane\n    volumes:\n      - type: bind\n        source: E:\\Final Project\\drone_swarm\\logs\\control-plane\n        target: /app/logs/control-plane\n        bind: {}\n      - type: bind\n        source: E:\\Final Project\\drone_swarm\\certs\n        target: /app/certs\n        read_only: true\n        bind: {}\n      - type: bind\n        source: E:\\Final Project\\drone_swarm\\config\n        target: /app/config\n        read_only: true\n        bind: {}\nnetworks:\n  default:\n    name: drone_swarm_default\n",
+      "stderr": ""
+    }
+  },
+  "env_validation": {
+    "path": "E:\\Final Project\\drone_swarm\\deployment\\compose\\.env.production.example",
+    "keys_present": [
+      "DRONE_BACKEND_DEMO_FLEET_SIZE",
+      "DRONE_BACKEND_MODE",
+      "DRONE_BACKEND_SIMULATION_ENABLED",
+      "DRONE_BACKEND_STALE_SEC",
+      "DRONE_CONTROL_PLANE_PORT",
+      "DRONE_DEVICE_REGISTRY_FILE",
+      "DRONE_REQUIRE_SIGNED_COMMANDS",
+      "DRONE_SECURITY_PROFILE",
+      "DRONE_TLS_CA_FILE",
+      "DRONE_TLS_CERT_FILE",
+      "DRONE_TLS_ENABLED",
+      "DRONE_TLS_KEY_FILE",
+      "DRONE_TLS_REQUIRE_CLIENT_CERT"
+    ],
+    "missing_keys": [],
+    "valid": true
+  },
+  "status": "PASS"
+}

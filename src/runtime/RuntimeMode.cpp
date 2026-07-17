@@ -1,4 +1,5 @@
 #include "runtime/RuntimeMode.hpp"
+#include "utils/SimpleJson.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -20,29 +21,6 @@ std::string lowercase(std::string_view value) {
     std::transform(out.begin(), out.end(), out.begin(),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return out;
-}
-
-std::optional<std::string> extract_json_string(const std::string& content, const std::string& key) {
-    const std::regex pattern("\"" + key + "\"\\s*:\\s*\"([^\"]+)\"", std::regex::icase);
-    std::smatch match;
-    if (std::regex_search(content, match, pattern) && match.size() >= 2) {
-        return match[1].str();
-    }
-    return std::nullopt;
-}
-
-std::optional<double> extract_json_number(const std::string& content, const std::string& key) {
-    const std::regex pattern("\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)",
-                             std::regex::icase);
-    std::smatch match;
-    if (!(std::regex_search(content, match, pattern) && match.size() >= 2)) {
-        return std::nullopt;
-    }
-    try {
-        return std::stod(match[1].str());
-    } catch (...) {
-        return std::nullopt;
-    }
 }
 
 bool finite_coord(double value) {
@@ -175,16 +153,19 @@ RuntimeFileConfig load_runtime_file(const std::string& path) {
     const std::string content = buffer.str();
     config.loaded = true;
 
-    if (const auto mode = extract_json_string(content, "runtime_mode")) {
+    if (const auto mode = drone::utils::simple_json::extract_string(content, "runtime_mode")) {
         config.runtime_mode = parse_runtime_mode(*mode);
     }
-    if (const auto anchor_path = extract_json_string(content, "anchor_config_path")) {
+    if (const auto anchor_path =
+            drone::utils::simple_json::extract_string(content, "anchor_config_path")) {
         config.anchor_config_path = *anchor_path;
     }
-    if (const auto lidar_path = extract_json_string(content, "lidar_config_path")) {
+    if (const auto lidar_path =
+            drone::utils::simple_json::extract_string(content, "lidar_config_path")) {
         config.lidar_config_path = *lidar_path;
     }
-    if (const auto detector_labels_path = extract_json_string(content, "detector_labels_path")) {
+    if (const auto detector_labels_path =
+            drone::utils::simple_json::extract_string(content, "detector_labels_path")) {
         config.detector_labels_path = *detector_labels_path;
     }
     return config;
@@ -246,8 +227,9 @@ AnchorConfigLoadResult load_anchor_config_json(const std::string& path) {
     std::stringstream buffer;
     buffer << input.rdbuf();
     const std::string content = buffer.str();
-    result.coordinate_frame = extract_json_string(content, "coordinate_frame").value_or("unknown");
-    result.units = extract_json_string(content, "units").value_or("unknown");
+    result.coordinate_frame =
+        drone::utils::simple_json::extract_string(content, "coordinate_frame").value_or("unknown");
+    result.units = drone::utils::simple_json::extract_string(content, "units").value_or("unknown");
 
     const std::regex anchor_pattern(
         "\\{[^\\{\\}]*\"id\"\\s*:\\s*\"([^\"]+)\"[^\\{\\}]*\"x\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?(?:"
@@ -333,31 +315,26 @@ LidarConfigLoadResult load_lidar_config_json(const std::string& path) {
     buffer << input.rdbuf();
     const std::string content = buffer.str();
 
-    result.host = extract_json_string(content, "host").value_or(result.host);
-    if (const auto port = extract_json_number(content, "port")) {
+    result.host = drone::utils::simple_json::extract_string(content, "host").value_or(result.host);
+    if (const auto port = drone::utils::simple_json::extract_number(content, "port")) {
         if (*port >= 1.0 && *port <= 65535.0) {
             result.port = static_cast<uint16_t>(*port);
         } else {
             result.errors.push_back("lidar port must be between 1 and 65535");
         }
     }
-    result.model = extract_json_string(content, "model").value_or(result.model);
-    result.frame_id = extract_json_string(content, "frame_id").value_or(result.frame_id);
-    if (const auto min_range = extract_json_number(content, "min_range_m")) {
+    result.model =
+        drone::utils::simple_json::extract_string(content, "model").value_or(result.model);
+    result.frame_id =
+        drone::utils::simple_json::extract_string(content, "frame_id").value_or(result.frame_id);
+    if (const auto min_range = drone::utils::simple_json::extract_number(content, "min_range_m")) {
         result.min_range_m = static_cast<float>(*min_range);
     }
-    if (const auto max_range = extract_json_number(content, "max_range_m")) {
+    if (const auto max_range = drone::utils::simple_json::extract_number(content, "max_range_m")) {
         result.max_range_m = static_cast<float>(*max_range);
     }
-    if (const auto required = extract_json_string(content, "required")) {
-        const auto normalized = lowercase(*required);
-        result.required = (normalized == "true" || normalized == "1" || normalized == "yes");
-    } else {
-        const std::regex bool_pattern("\"required\"\\s*:\\s*(true|false)", std::regex::icase);
-        std::smatch match;
-        if (std::regex_search(content, match, bool_pattern) && match.size() >= 2) {
-            result.required = lowercase(match[1].str()) == "true";
-        }
+    if (const auto required = drone::utils::simple_json::extract_bool(content, "required")) {
+        result.required = *required;
     }
 
     if (result.host.empty()) {

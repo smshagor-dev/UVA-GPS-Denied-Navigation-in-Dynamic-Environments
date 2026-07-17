@@ -1,0 +1,33 @@
+{
+  "title": "Drone Swarm Control Plane",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "title": "Ready",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [{"expr": "drone_swarm_controlplane_ready"}]
+    },
+    {
+      "title": "Online Drones",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [{"expr": "drone_swarm_online_drones"}]
+    },
+    {
+      "title": "Stale Drones",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "targets": [{"expr": "drone_swarm_stale_drones"}]
+    },
+    {
+      "title": "Critical Alerts",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "targets": [{"expr": "drone_swarm_critical_alerts"}]
+    }
+  ]
+}
+

@@ -1,0 +1,25 @@
+{
+  "generated_at": "2026-07-17T06:10:05.050217Z",
+  "secret_scan_findings": [],
+  "static_checks": {
+    "security_headers_middleware": true,
+    "tls_hardening": true,
+    "signed_command_enforcement": true,
+    "compose_least_privilege": true
+  },
+  "workflow_checks": {
+    "gitleaks_configured": true,
+    "pip_audit_configured": true,
+    "govulncheck_configured": true,
+    "codeql_configured": true
+  },
+  "live_headers": {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+    "Permissions-Policy": "accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), usb=()",
+    "Cache-Control": "no-store"
+  },
+  "status": "PASS"
+}

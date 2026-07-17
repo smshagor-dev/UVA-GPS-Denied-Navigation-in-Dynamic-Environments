@@ -1,0 +1,43 @@
+name: drone_swarm
+services:
+  control-plane:
+    build:
+      context: E:\Final Project\drone_swarm
+      dockerfile: Dockerfile
+    environment:
+      DRONE_BACKEND_DEMO_FLEET_SIZE: "5"
+      DRONE_BACKEND_MODE: simulation
+      DRONE_BACKEND_SIMULATION_ENABLED: "true"
+      DRONE_BACKEND_STALE_SEC: "5"
+      DRONE_REQUIRE_SIGNED_COMMANDS: "false"
+      DRONE_SECURITY_PROFILE: lab
+      DRONE_SWARM_ADDR: :8080
+      DRONE_TLS_ENABLED: "false"
+      DRONE_TLS_REQUIRE_CLIENT_CERT: "false"
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - http://127.0.0.1:8080/api/v1/ready
+      timeout: 5s
+      interval: 30s
+      retries: 3
+      start_period: 10s
+    image: drone-swarm/control-plane:simulation
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 8080
+        published: "56802"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: E:\Final Project\drone_swarm\logs\control-plane
+        target: /app/logs/control-plane
+        bind: {}
+networks:
+  default:
+    name: drone_swarm_default

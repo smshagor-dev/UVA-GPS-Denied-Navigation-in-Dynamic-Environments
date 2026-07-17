@@ -1,0 +1,26 @@
+Phase 6.11 CPU profiling closure notes
+Date: 2026-07-16
+
+Linux perf:
+- `perf` not available in the WSL environment on 2026-07-16
+- no `perf record`, `perf report`, or `perf script` artifact could be collected
+
+FlameGraph:
+- `flamegraph.pl` not available
+- `stackcollapse-perf.pl` not available
+
+Windows ETW:
+- `wpr.exe` is installed
+- attempted command: `wpr -start CPU -filemode`
+- result: failed with `Error code: 0xc5585011`
+- message: `Failed to enable the policy to profile system performance.`
+
+Implication:
+- stronger system-level CPU sampling could not be added in this pass
+- the strongest available validated CPU evidence remains:
+  - `docs/phase6/controlplane_cpu.pprof`
+  - `docs/phase6/controlplane_cpu_top.txt`
+  - `docs/phase6/callgrind_ekf.out`
+  - `docs/phase6/callgrind_ekf.txt`
+  - `docs/phase6/callgrind_navigation.out`
+  - `docs/phase6/callgrind_navigation.txt`

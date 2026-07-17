@@ -1,0 +1,181 @@
+{
+  "generated_at": "2026-07-16T13:22:35.046292Z",
+  "metrics": [
+    {
+      "name": "config_load::config\\runtime.json",
+      "kind": "python-json",
+      "iterations": 20,
+      "total_ms": 593.6314000282437,
+      "mean_ms": 29.681570001412183,
+      "median_ms": 29.474400042090565,
+      "p95_ms": 33.35689997766167,
+      "extra": {
+        "peak_kib": 2578.990234375,
+        "bytes": 1234908
+      }
+    },
+    {
+      "name": "config_load::config\\anchors.json",
+      "kind": "python-json",
+      "iterations": 50,
+      "total_ms": 148.47479958552867,
+      "mean_ms": 2.9694959917105734,
+      "median_ms": 2.5947500253096223,
+      "p95_ms": 4.5316999312490225,
+      "extra": {
+        "peak_kib": 238.111328125,
+        "bytes": 93228
+      }
+    },
+    {
+      "name": "config_load::config\\lidar.json",
+      "kind": "python-json",
+      "iterations": 50,
+      "total_ms": 2101.6696005826816,
+      "mean_ms": 42.03339201165363,
+      "median_ms": 40.357550024054945,
+      "p95_ms": 50.306999939493835,
+      "extra": {
+        "peak_kib": 2380.53125,
+        "bytes": 1255629
+      }
+    },
+    {
+      "name": "ekf_update_path",
+      "kind": "native",
+      "iterations": 50,
+      "total_ms": 857.8395001823083,
+      "mean_ms": 17.156790003646165,
+      "median_ms": 8.598949993029237,
+      "p95_ms": 108.94400009419769,
+      "extra": {
+        "command": [
+          "E:\\Final Project\\drone_swarm\\build\\validation-msvc\\tests\\Release\\test_ekf.exe",
+          "--gtest_filter=EKFTest.FreeFallVelocity"
+        ],
+        "repeat": 50
+      }
+    },
+    {
+      "name": "lidar_processing_path",
+      "kind": "native",
+      "iterations": 50,
+      "total_ms": 780.6455000536516,
+      "mean_ms": 15.612910001073033,
+      "median_ms": 6.9061999674886465,
+      "p95_ms": 111.41259991563857,
+      "extra": {
+        "command": [
+          "E:\\Final Project\\drone_swarm\\build\\validation-msvc\\tests\\Release\\test_sensors.exe",
+          "--gtest_filter=LidarSensor.ObstacleListGeneratedFromValidScan"
+        ],
+        "repeat": 50
+      }
+    },
+    {
+      "name": "sensor_fusion_path",
+      "kind": "native",
+      "iterations": 30,
+      "total_ms": 946.6998998541385,
+      "mean_ms": 31.556663328471284,
+      "median_ms": 12.93825003085658,
+      "p95_ms": 127.57780007086694,
+      "extra": {
+        "command": [
+          "E:\\Final Project\\drone_swarm\\build\\validation-msvc\\tests\\Release\\test_navigation_intelligence.exe",
+          "--gtest_filter=LocalizationFusion.PrefersTdoaWhenVioDriftIsHigh"
+        ],
+        "repeat": 30
+      }
+    },
+    {
+      "name": "telemetry_serialization_path",
+      "kind": "native",
+      "iterations": 60,
+      "total_ms": 503.27420025132596,
+      "mean_ms": 8.387903337522099,
+      "median_ms": 6.30430004093796,
+      "p95_ms": 8.67909996304661,
+      "extra": {
+        "command": [
+          "E:\\Final Project\\drone_swarm\\build\\validation-msvc\\tests\\Release\\test_telemetry.exe",
+          "--gtest_filter=ControlPlaneTelemetryClient.SerializesTelemetryPayload"
+        ],
+        "repeat": 60
+      }
+    },
+    {
+      "name": "security_packet_auth_path",
+      "kind": "native",
+      "iterations": 60,
+      "total_ms": 736.7348001571372,
+      "mean_ms": 12.278913335952288,
+      "median_ms": 6.49615004658699,
+      "p95_ms": 12.435400043614209,
+      "extra": {
+        "command": [
+          "E:\\Final Project\\drone_swarm\\build\\validation-msvc\\tests\\Release\\test_edge_swarm.exe",
+          "--gtest_filter=PeerPacketAuth.HmacSignedPacketVerifies"
+        ],
+        "repeat": 60
+      }
+    },
+    {
+      "name": "backend_startup",
+      "kind": "process",
+      "iterations": 1,
+      "total_ms": 724.5626000221819,
+      "mean_ms": 724.5626000221819,
+      "median_ms": 724.5626000221819,
+      "p95_ms": 724.5626000221819,
+      "extra": {
+        "mode": "production",
+        "simulation_enabled": false
+      }
+    },
+    {
+      "name": "backend_fleet_get",
+      "kind": "http",
+      "iterations": 25,
+      "total_ms": 110.28339993208647,
+      "mean_ms": 4.411335997283459,
+      "median_ms": 3.0804999405518174,
+      "p95_ms": 14.921599999070168,
+      "extra": {
+        "url": "http://127.0.0.1:18080/api/v1/fleet"
+      }
+    },
+    {
+      "name": "backend_telemetry_post",
+      "kind": "http",
+      "iterations": 25,
+      "total_ms": 47.085200319997966,
+      "mean_ms": 1.8834080127999187,
+      "median_ms": 1.2835999950766563,
+      "p95_ms": 2.7982998872175813,
+      "extra": {
+        "url": "http://127.0.0.1:18080/api/v1/telemetry",
+        "accepted": 25,
+        "throughput_hz": 530.9523975707083
+      }
+    }
+  ],
+  "smoke_results": [
+    {
+      "script": "scripts/telemetry_smoke_test.py",
+      "returncode": 0,
+      "stdout": "PASS: simulation telemetry round-trip succeeded.\nbackend_mode=production simulation_enabled=False real_drone_count=0\ndrone_id=15154 source=simulation lidar_points=256",
+      "stderr": ""
+    },
+    {
+      "script": "scripts/production_telemetry_smoke_test.py",
+      "returncode": 0,
+      "stdout": "PASS: production telemetry unavailable-source path behaved as expected.\nbackend_mode=production simulation_enabled=False real_drone_count=0\ndrone_id=17155 source=unavailable localization_data_source=unavailable",
+      "stderr": ""
+    }
+  ],
+  "notes": [
+    "All benchmark numbers are wall-clock measurements collected on the local Windows workspace.",
+    "Memory and allocator micro-metrics were limited to Python JSON-load tracemalloc measurements in this environment."
+  ]
+}

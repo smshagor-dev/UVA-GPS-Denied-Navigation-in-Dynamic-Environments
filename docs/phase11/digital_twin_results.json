@@ -1,0 +1,189 @@
+{
+  "generated_at": "2026-07-17T07:40:16.117840Z",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "digital_twin": {
+    "steps": [
+      {
+        "step": 0,
+        "swarm_consistency": 0.92,
+        "mission": {
+          "mission_name": "phase11_digital_twin_validation",
+          "progress": 0.65,
+          "state": "tracking"
+        },
+        "environment": {
+          "environment": "indoor_gps_denied",
+          "wind_factor": 0.232,
+          "obstacle_density": 0.344,
+          "semantic_zone_count": 5
+        },
+        "fault": {
+          "fault_name": "telemetry_delay",
+          "severity": 0.22,
+          "active": true
+        },
+        "sensor_sync": {
+          "event_latency_ms": 3.48,
+          "sensor_sync_score": 0.891,
+          "gps_status": "live",
+          "camera_status": "live"
+        },
+        "twin_sync_latency_ms": 1.86,
+        "state_hash": "9386036e6e0c81dbed0699ecd5eb0456b4717de76352aedcb61a97ba4833bb3d"
+      },
+      {
+        "step": 1,
+        "swarm_consistency": 0.92,
+        "mission": {
+          "mission_name": "phase11_digital_twin_validation",
+          "progress": 0.65,
+          "state": "tracking"
+        },
+        "environment": {
+          "environment": "indoor_gps_denied",
+          "wind_factor": 0.232,
+          "obstacle_density": 0.344,
+          "semantic_zone_count": 5
+        },
+        "fault": {
+          "fault_name": "telemetry_delay",
+          "severity": 0.22,
+          "active": true
+        },
+        "sensor_sync": {
+          "event_latency_ms": 3.48,
+          "sensor_sync_score": 0.891,
+          "gps_status": "live",
+          "camera_status": "live"
+        },
+        "twin_sync_latency_ms": 1.91,
+        "state_hash": "c73c6ed959902629fc884d45e3935987ee939c0c0de1ff5577f8d2b0aa6c1fad"
+      },
+      {
+        "step": 2,
+        "swarm_consistency": 0.92,
+        "mission": {
+          "mission_name": "phase11_digital_twin_validation",
+          "progress": 0.65,
+          "state": "tracking"
+        },
+        "environment": {
+          "environment": "indoor_gps_denied",
+          "wind_factor": 0.232,
+          "obstacle_density": 0.344,
+          "semantic_zone_count": 5
+        },
+        "fault": {
+          "fault_name": "telemetry_delay",
+          "severity": 0.22,
+          "active": true
+        },
+        "sensor_sync": {
+          "event_latency_ms": 3.48,
+          "sensor_sync_score": 0.891,
+          "gps_status": "live",
+          "camera_status": "live"
+        },
+        "twin_sync_latency_ms": 1.96,
+        "state_hash": "a2bb4bdb7c8838530beb775a704d12b226c08d81d4c36a3f2cf13507e1647473"
+      },
+      {
+        "step": 3,
+        "swarm_consistency": 0.92,
+        "mission": {
+          "mission_name": "phase11_digital_twin_validation",
+          "progress": 0.65,
+          "state": "tracking"
+        },
+        "environment": {
+          "environment": "indoor_gps_denied",
+          "wind_factor": 0.232,
+          "obstacle_density": 0.344,
+          "semantic_zone_count": 5
+        },
+        "fault": {
+          "fault_name": "telemetry_delay",
+          "severity": 0.22,
+          "active": true
+        },
+        "sensor_sync": {
+          "event_latency_ms": 3.48,
+          "sensor_sync_score": 0.891,
+          "gps_status": "live",
+          "camera_status": "live"
+        },
+        "twin_sync_latency_ms": 2.01,
+        "state_hash": "0c4856972110d74406c905dbd6d9acc46f48bf33a10126839689efca66831e0e"
+      },
+      {
+        "step": 4,
+        "swarm_consistency": 0.92,
+        "mission": {
+          "mission_name": "phase11_digital_twin_validation",
+          "progress": 0.65,
+          "state": "tracking"
+        },
+        "environment": {
+          "environment": "indoor_gps_denied",
+          "wind_factor": 0.232,
+          "obstacle_density": 0.344,
+          "semantic_zone_count": 5
+        },
+        "fault": {
+          "fault_name": "telemetry_delay",
+          "severity": 0.22,
+          "active": true
+        },
+        "sensor_sync": {
+          "event_latency_ms": 3.48,
+          "sensor_sync_score": 0.891,
+          "gps_status": "live",
+          "camera_status": "live"
+        },
+        "twin_sync_latency_ms": 2.06,
+        "state_hash": "8c7af1d06272fca59a032e69bed78191f89a67e4cf9a42bd984835b708b22f9f"
+      },
+      {
+        "step": 5,
+        "swarm_consistency": 0.92,
+        "mission": {
+          "mission_name": "phase11_digital_twin_validation",
+          "progress": 0.65,
+          "state": "tracking"
+        },
+        "environment": {
+          "environment": "indoor_gps_denied",
+          "wind_factor": 0.232,
+          "obstacle_density": 0.344,
+          "semantic_zone_count": 5
+        },
+        "fault": {
+          "fault_name": "telemetry_delay",
+          "severity": 0.22,
+          "active": true
+        },
+        "sensor_sync": {
+          "event_latency_ms": 3.48,
+          "sensor_sync_score": 0.891,
+          "gps_status": "live",
+          "camera_status": "live"
+        },
+        "twin_sync_latency_ms": 2.11,
+        "state_hash": "985c879e053f76298aacc503b38bf5401c67e57e563f68950cf657863ee02018"
+      }
+    ],
+    "summary": {
+      "twin_synchronization_ms_avg": 1.985,
+      "event_latency_ms_avg": 3.48,
+      "sensor_sync_score_avg": 0.891,
+      "state_consistency_ratio": 1.0,
+      "swarm_consistency_avg": 0.92,
+      "wall_time_ms": 0.939
+    },
+    "status": "PASS"
+  },
+  "status": "PASS"
+}

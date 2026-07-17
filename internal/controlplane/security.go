@@ -90,7 +90,44 @@ func NormalizeOperatorRole(role string) string {
 	}
 }
 
+func cloneOperatorCredentials(values map[string]OperatorCredential) map[string]OperatorCredential {
+	if values == nil {
+		return nil
+	}
+	cloned := make(map[string]OperatorCredential, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func cloneDeviceRecords(values map[string]DeviceRecord) map[string]DeviceRecord {
+	if values == nil {
+		return nil
+	}
+	cloned := make(map[string]DeviceRecord, len(values))
+	for key, value := range values {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func cloneStringSet(values map[string]struct{}) map[string]struct{} {
+	if values == nil {
+		return nil
+	}
+	cloned := make(map[string]struct{}, len(values))
+	for key := range values {
+		cloned[key] = struct{}{}
+	}
+	return cloned
+}
+
 func (cfg SecurityConfig) normalized() SecurityConfig {
+	cfg.Operators = cloneOperatorCredentials(cfg.Operators)
+	cfg.Devices = cloneDeviceRecords(cfg.Devices)
+	cfg.RevokedFingerprints = cloneStringSet(cfg.RevokedFingerprints)
+	cfg.RevokedIdentities = cloneStringSet(cfg.RevokedIdentities)
 	cfg.Profile = NormalizeSecurityProfile(cfg.Profile)
 	cfg.OperatorRole = NormalizeOperatorRole(cfg.OperatorRole)
 	if cfg.Operators == nil {

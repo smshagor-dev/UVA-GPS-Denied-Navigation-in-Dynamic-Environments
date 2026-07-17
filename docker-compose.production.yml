@@ -1,0 +1,47 @@
+services:
+  control-plane:
+    build:
+      context: .
+      dockerfile: deployment/docker/Dockerfile.production
+    image: drone-swarm/control-plane:production
+    ports:
+      - "${DRONE_CONTROL_PLANE_PORT:-8080}:8080"
+    environment:
+      DRONE_SWARM_ADDR: ":8080"
+      DRONE_BACKEND_MODE: "${DRONE_BACKEND_MODE:-production}"
+      DRONE_BACKEND_SIMULATION_ENABLED: "${DRONE_BACKEND_SIMULATION_ENABLED:-false}"
+      DRONE_BACKEND_STALE_SEC: "${DRONE_BACKEND_STALE_SEC:-5}"
+      DRONE_BACKEND_DEMO_FLEET_SIZE: "${DRONE_BACKEND_DEMO_FLEET_SIZE:-0}"
+      DRONE_SECURITY_PROFILE: "${DRONE_SECURITY_PROFILE:-production}"
+      DRONE_REQUIRE_SIGNED_COMMANDS: "${DRONE_REQUIRE_SIGNED_COMMANDS:-true}"
+      DRONE_TLS_ENABLED: "${DRONE_TLS_ENABLED:-true}"
+      DRONE_TLS_REQUIRE_CLIENT_CERT: "${DRONE_TLS_REQUIRE_CLIENT_CERT:-true}"
+      DRONE_TLS_CERT_FILE: "${DRONE_TLS_CERT_FILE:-/app/certs/server.crt}"
+      DRONE_TLS_KEY_FILE: "${DRONE_TLS_KEY_FILE:-/app/certs/server.key}"
+      DRONE_TLS_CA_FILE: "${DRONE_TLS_CA_FILE:-/app/certs/ca.crt}"
+      DRONE_DEVICE_REGISTRY_FILE: "${DRONE_DEVICE_REGISTRY_FILE:-/app/config/device-registry.json}"
+    volumes:
+      - ./logs/control-plane:/app/logs/control-plane
+      - ./certs:/app/certs:ro
+      - ./config:/app/config:ro
+    read_only: true
+    tmpfs:
+      - /tmp/control-plane
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/api/v1/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+    stop_grace_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+

@@ -1,0 +1,52 @@
+{
+  "generated_at": "2026-07-17T07:40:16.761724Z",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "perception": {
+    "iterations": 60,
+    "inference_latency_ms": {
+      "count": 60.0,
+      "average_ms": 1.9252516733047864,
+      "p50_ms": 1.9440000304579736,
+      "p95_ms": 1.994399955160916,
+      "p99_ms": 1.994999959729612,
+      "max_ms": 1.9977999810501934
+    },
+    "decision_accuracy": 0.8666666666666667,
+    "confidence_score_avg": 0.7873
+  },
+  "planning": {
+    "iterations": 40,
+    "planning_latency_ms": {
+      "count": 40.0,
+      "average_ms": 1.468537486428395,
+      "p50_ms": 1.430199946023524,
+      "p95_ms": 1.5819000601544977,
+      "p99_ms": 1.6036999933198095,
+      "max_ms": 1.6036999933198095
+    },
+    "mission_success_rate": 1.0,
+    "recovery_success_rate": 1.0
+  },
+  "swarm": {
+    "iterations": 40,
+    "swarm_decision_latency_ms": {
+      "count": 40.0,
+      "average_ms": 1.0341400095950812,
+      "p50_ms": 1.0330999376475811,
+      "p95_ms": 1.0386000959426165,
+      "p99_ms": 1.0539999803751707,
+      "max_ms": 1.0539999803751707
+    },
+    "coordination_success_rate": 1.0
+  },
+  "resource_usage": {
+    "cpu_seconds_delta": 0.0,
+    "working_set_mb_delta": 0.0546875,
+    "working_set_mb_end": 27.32421875,
+    "private_memory_mb_end": 19.0625
+  },
+  "status": "PASS"
+}

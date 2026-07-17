@@ -1,0 +1,25 @@
+{
+  "system_name": "UVA_GPS_DENIED_LIDAR_SAMPLE",
+  "version": "1.0",
+  "dataset_type": "non_production_example",
+  "data_source": "example",
+  "note": "Example LiDAR configuration for documentation, bench setup, and dry-run validation only.",
+  "coordinate_frame": "local_enu",
+  "units": "meters",
+  "runtime_mode": "bench",
+  "host": "0.0.0.0",
+  "port": 2368,
+  "transport_protocol": "UDP",
+  "model": "generic_udp_cartesian_v1",
+  "frame_id": "lidar_front",
+  "required": false,
+  "network": {
+    "bind_address": "0.0.0.0",
+    "multicast_enabled": false,
+    "timeout_ms": 1500
+  },
+  "range": {
+    "min_range_m": 0.3,
+    "max_range_m": 50.0
+  }
+}

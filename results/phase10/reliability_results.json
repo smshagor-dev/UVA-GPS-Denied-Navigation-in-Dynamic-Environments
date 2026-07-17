@@ -1,0 +1,25 @@
+{
+  "generated_at": "2026-07-17T06:03:48.930782Z",
+  "startup_ms": 5866.145299980417,
+  "restart_ms": 4.958999925293028,
+  "readiness_after_restart": {
+    "status": 200,
+    "body": {
+      "ready": true,
+      "status": "ready",
+      "reason": "control-plane operational",
+      "uptime_seconds": 1.4556926,
+      "updated_at": "2026-07-17T06:03:48.0119531Z",
+      "backend_mode": "simulation",
+      "simulation_enabled": true,
+      "total_drones": 3,
+      "real_drone_count": 0,
+      "stale_drone_count": 0
+    }
+  },
+  "config_validation": true,
+  "log_growth_bytes": 100777,
+  "log_rotation_configured": true,
+  "backup_validation": true,
+  "status": "PASS"
+}

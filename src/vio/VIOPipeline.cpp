@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <mutex>
 #include <numeric>
 
 namespace drone::vio {
@@ -25,6 +26,26 @@ constexpr double kMaxReprojectionErrorPx = 3.5;
 constexpr size_t kMaxFeatures = 300;
 constexpr double kDefaultVisualConfidenceOnFailure = 0.18;
 constexpr double kDefaultVisualConfidenceOnPlaceholder = 0.42;
+
+bool thread_sanitizer_enabled() {
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+    return true;
+#endif
+#endif
+#if defined(__SANITIZE_THREAD__)
+    return true;
+#endif
+    return false;
+}
+
+void configure_opencv_threads_for_tsan() {
+    static std::once_flag once;
+    if (!thread_sanitizer_enabled()) {
+        return;
+    }
+    std::call_once(once, [] { cv::setNumThreads(1); });
+}
 
 cv::Mat to_gray(const cv::Mat& image) {
     if (image.empty()) {
@@ -80,6 +101,7 @@ VisualFrontendResult run_visual_frontend(const cv::Mat& previous_gray, const cv:
                                          const Eigen::Matrix3d& K,
                                          const PoseEstimate& previous_pose,
                                          const PoseEstimate& current_predicted_pose, double dt_s) {
+    configure_opencv_threads_for_tsan();
     VisualFrontendResult result;
     if (previous_gray.empty() || current_gray.empty() || dt_s <= 0.0) {
         result.metrics.visual_update_confidence = kDefaultVisualConfidenceOnFailure;

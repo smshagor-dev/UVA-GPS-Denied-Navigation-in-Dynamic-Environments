@@ -1,0 +1,189 @@
+{
+  "generated_at": "2026-07-16T19:25:44.618710Z",
+  "scenarios": [
+    {
+      "requests": 1000,
+      "workers": 100,
+      "wall_elapsed_ms": 486.6174999624491,
+      "throughput_hz": 2055.002132223291,
+      "latency": {
+        "name": "stress_post_latency",
+        "kind": "http-stress",
+        "iterations": 1000,
+        "total_ms": 24685.8527980512,
+        "mean_ms": 24.6858527980512,
+        "median_ms": 23.659100057557225,
+        "p50_ms": 23.659600061364472,
+        "p95_ms": 46.32339999079704,
+        "p99_ms": 56.69630004558712,
+        "max_ms": 86.63050003815442,
+        "extra": {}
+      },
+      "failures": [],
+      "resource_before": {
+        "cpu_seconds": 0.703125,
+        "working_set_mb": 28.6796875,
+        "private_memory_mb": 61.9296875,
+        "handles": 393.0,
+        "thread_count": 21.0,
+        "open_file_descriptors": 393.0,
+        "uptime_s": 0.82369
+      },
+      "resource_after": {
+        "cpu_seconds": 0.703125,
+        "working_set_mb": 28.2578125,
+        "private_memory_mb": 61.4921875,
+        "handles": 393.0,
+        "thread_count": 21.0,
+        "open_file_descriptors": 393.0,
+        "uptime_s": 1.546815
+      },
+      "cpu_seconds_delta": 0.0,
+      "working_set_mb_delta": -0.421875,
+      "private_memory_mb_delta": -0.4375,
+      "thread_count_delta": 0.0,
+      "handle_delta": 0.0,
+      "name": "api_stress_100",
+      "startup_ms": 545.7127999980003
+    },
+    {
+      "requests": 2500,
+      "workers": 500,
+      "wall_elapsed_ms": 1143.1313999928534,
+      "throughput_hz": 2186.9751806447007,
+      "latency": {
+        "name": "stress_post_latency",
+        "kind": "http-stress",
+        "iterations": 2500,
+        "total_ms": 94614.57659653388,
+        "mean_ms": 37.84583063861355,
+        "median_ms": 36.065150052309036,
+        "p50_ms": 36.07080003712326,
+        "p95_ms": 71.82309997733682,
+        "p99_ms": 85.15419997274876,
+        "max_ms": 104.62929995264858,
+        "extra": {}
+      },
+      "failures": [],
+      "resource_before": {
+        "cpu_seconds": 0.609375,
+        "working_set_mb": 29.04296875,
+        "private_memory_mb": 62.1953125,
+        "handles": 369.0,
+        "thread_count": 18.0,
+        "open_file_descriptors": 369.0,
+        "uptime_s": 0.758097
+      },
+      "resource_after": {
+        "cpu_seconds": 0.609375,
+        "working_set_mb": 28.60546875,
+        "private_memory_mb": 61.7578125,
+        "handles": 369.0,
+        "thread_count": 18.0,
+        "open_file_descriptors": 369.0,
+        "uptime_s": 2.140654
+      },
+      "cpu_seconds_delta": 0.0,
+      "working_set_mb_delta": -0.4375,
+      "private_memory_mb_delta": -0.4375,
+      "thread_count_delta": 0.0,
+      "handle_delta": 0.0,
+      "name": "api_stress_500",
+      "startup_ms": 502.77869997080415
+    },
+    {
+      "requests": 5000,
+      "workers": 1000,
+      "wall_elapsed_ms": 2289.2640000209212,
+      "throughput_hz": 2184.1080801315643,
+      "latency": {
+        "name": "stress_post_latency",
+        "kind": "http-stress",
+        "iterations": 5000,
+        "total_ms": 259718.87120220345,
+        "mean_ms": 51.94377424044069,
+        "median_ms": 49.36745000304654,
+        "p50_ms": 49.37190003693104,
+        "p95_ms": 93.91930000856519,
+        "p99_ms": 114.4695000257343,
+        "max_ms": 158.48660003393888,
+        "extra": {}
+      },
+      "failures": [],
+      "resource_before": {
+        "cpu_seconds": 0.640625,
+        "working_set_mb": 29.91796875,
+        "private_memory_mb": 62.83203125,
+        "handles": 387.0,
+        "thread_count": 21.0,
+        "open_file_descriptors": 387.0,
+        "uptime_s": 0.757483
+      },
+      "resource_after": {
+        "cpu_seconds": 0.640625,
+        "working_set_mb": 27.48828125,
+        "private_memory_mb": 60.390625,
+        "handles": 387.0,
+        "thread_count": 21.0,
+        "open_file_descriptors": 387.0,
+        "uptime_s": 3.287067
+      },
+      "cpu_seconds_delta": 0.0,
+      "working_set_mb_delta": -2.4296875,
+      "private_memory_mb_delta": -2.44140625,
+      "thread_count_delta": 0.0,
+      "handle_delta": 0.0,
+      "name": "api_stress_1000",
+      "startup_ms": 510.447800043039
+    },
+    {
+      "requests": 4000,
+      "workers": 200,
+      "wall_elapsed_ms": 1832.1316000074148,
+      "throughput_hz": 2183.2492818658943,
+      "latency": {
+        "name": "stress_post_latency",
+        "kind": "http-stress",
+        "iterations": 4000,
+        "total_ms": 178127.9838947812,
+        "mean_ms": 44.5319959736953,
+        "median_ms": 43.86640002485365,
+        "p50_ms": 43.866700027137995,
+        "p95_ms": 79.0675999596715,
+        "p99_ms": 95.71500006131828,
+        "max_ms": 126.08289998024702,
+        "extra": {}
+      },
+      "failures": [],
+      "resource_before": {
+        "cpu_seconds": 0.640625,
+        "working_set_mb": 29.08984375,
+        "private_memory_mb": 62.14453125,
+        "handles": 375.0,
+        "thread_count": 18.0,
+        "open_file_descriptors": 375.0,
+        "uptime_s": 0.77009
+      },
+      "resource_after": {
+        "cpu_seconds": 0.640625,
+        "working_set_mb": 28.02734375,
+        "private_memory_mb": 61.08203125,
+        "handles": 375.0,
+        "thread_count": 18.0,
+        "open_file_descriptors": 375.0,
+        "uptime_s": 2.827964
+      },
+      "cpu_seconds_delta": 0.0,
+      "working_set_mb_delta": -1.0625,
+      "private_memory_mb_delta": -1.0625,
+      "thread_count_delta": 0.0,
+      "handle_delta": 0.0,
+      "name": "telemetry_burst_multi_node",
+      "startup_ms": 515.4427000088617
+    }
+  ],
+  "notes": [
+    "Stress scenarios were run against the local Windows control-plane backend in production mode.",
+    "The 1000-client scenario is thread-limited by the local workstation and should be treated as a host-saturation check, not a production capacity claim."
+  ]
+}

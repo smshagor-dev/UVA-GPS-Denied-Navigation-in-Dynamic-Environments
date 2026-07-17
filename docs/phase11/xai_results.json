@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-07-17T07:40:16.087399Z",
+  "explanations": [
+    {
+      "timestamp": "2026-07-17T07:40:16.087340Z",
+      "scenario": "nominal_coordination",
+      "reasoning": "Selected route balanced_plan after observing nominal_operation with coordination mode direct_commit.",
+      "confidence_explanation": "Confidence remained at 0.880 because perception, planning, and coordination signals stayed within bounded degradation.",
+      "planning_explanation": "Planning favored balanced_plan to balance mission progress against failure mode nominal.",
+      "failure_explanation": "No active failure trigger was present.",
+      "recovery_explanation": "Recovery path completed in 0.600 s with safety state NORMAL.",
+      "confidence_score": 0.88,
+      "safety_state": "NORMAL"
+    },
+    {
+      "timestamp": "2026-07-17T07:40:16.087369Z",
+      "scenario": "telemetry_delay_recovery",
+      "reasoning": "Selected route communication_resilient_plan after observing telemetry_degradation with coordination mode delayed_quorum.",
+      "confidence_explanation": "Confidence remained at 0.720 because perception, planning, and coordination signals stayed within bounded degradation.",
+      "planning_explanation": "Planning favored communication_resilient_plan to balance mission progress against failure mode telemetry_delay.",
+      "failure_explanation": "Failure mode telemetry_delay reduced autonomy margin and triggered explanation logging.",
+      "recovery_explanation": "Recovery path completed in 1.900 s with safety state RECOVERY.",
+      "confidence_score": 0.72,
+      "safety_state": "RECOVERY"
+    },
+    {
+      "timestamp": "2026-07-17T07:40:16.087381Z",
+      "scenario": "estimator_recovery",
+      "reasoning": "Selected route safe_corridor_plan after observing localization_degradation with coordination mode priority_vote.",
+      "confidence_explanation": "Confidence remained at 0.670 because perception, planning, and coordination signals stayed within bounded degradation.",
+      "planning_explanation": "Planning favored safe_corridor_plan to balance mission progress against failure mode estimator_degradation.",
+      "failure_explanation": "Failure mode estimator_degradation reduced autonomy margin and triggered explanation logging.",
+      "recovery_explanation": "Recovery path completed in 2.400 s with safety state RECOVERY.",
+      "confidence_score": 0.67,
+      "safety_state": "RECOVERY"
+    }
+  ],
+  "summary": {
+    "scenario_count": 3,
+    "confidence_avg": 0.757,
+    "recovery_case_count": 2,
+    "normal_case_count": 1
+  },
+  "status": "PASS",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  }
+}

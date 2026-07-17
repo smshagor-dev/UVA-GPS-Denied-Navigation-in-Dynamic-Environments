@@ -1,0 +1,14 @@
+{
+  "generated_at": "2026-07-17T06:03:48.917395Z",
+  "archive_path": "results\\phase10\\phase10_backup.zip",
+  "file_count": 61,
+  "manifest_matches": true,
+  "tracked_roots": [
+    "config",
+    "datasets\\autonomy",
+    "docs\\phase9",
+    "docs\\phase10",
+    "research\\ai"
+  ],
+  "status": "PASS"
+}

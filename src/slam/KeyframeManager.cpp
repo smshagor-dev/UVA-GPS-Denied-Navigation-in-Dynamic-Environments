@@ -12,8 +12,10 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <mutex>
 #include <utility>
 
+#include <opencv2/core/utility.hpp>
 #include <opencv2/imgproc.hpp>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
@@ -22,6 +24,26 @@ namespace drone::slam {
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
+
+bool thread_sanitizer_enabled() {
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+    return true;
+#endif
+#endif
+#if defined(__SANITIZE_THREAD__)
+    return true;
+#endif
+    return false;
+}
+
+void configure_opencv_threads_for_tsan() {
+    static std::once_flag once;
+    if (!thread_sanitizer_enabled()) {
+        return;
+    }
+    std::call_once(once, [] { cv::setNumThreads(1); });
+}
 
 uint64_t make_global_keyframe_id(uint32_t drone_id, uint64_t local_id) {
     return (static_cast<uint64_t>(drone_id) << 32) | (local_id & 0xFFFFFFFFull);
@@ -113,6 +135,7 @@ KeyframeManager::KeyframeManager(uint32_t drone_id, std::shared_ptr<swarm::V2XMe
                                  KeyframeSelectionPolicy policy)
     : drone_id_(drone_id), net_(std::move(net)), policy_(std::move(policy)),
       orb_(cv::ORB::create(512)), matcher_(cv::BFMatcher::create(cv::NORM_HAMMING, false)) {
+    configure_opencv_threads_for_tsan();
     logger_ = spdlog::get("SLAM");
     if (!logger_) {
         logger_ = spdlog::stdout_color_mt("SLAM");

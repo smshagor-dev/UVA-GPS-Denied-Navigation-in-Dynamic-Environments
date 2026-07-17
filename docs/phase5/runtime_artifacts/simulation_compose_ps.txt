@@ -1,0 +1,2 @@
+NAME                          IMAGE                                  COMMAND                  SERVICE         CREATED         STATUS                   PORTS
+drone_swarm-control-plane-1   drone-swarm/control-plane:simulation   "/usr/local/bin/cont…"   control-plane   7 seconds ago   Up 6 seconds (healthy)   0.0.0.0:56802->8080/tcp, [::]:56802->8080/tcp

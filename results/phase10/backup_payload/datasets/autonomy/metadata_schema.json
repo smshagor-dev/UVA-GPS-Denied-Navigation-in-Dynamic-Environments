@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Phase 9 autonomy dataset entry",
+  "type": "object",
+  "required": [
+    "timestamp",
+    "vehicle_state",
+    "imu_data",
+    "gps_localization",
+    "telemetry",
+    "mission_state",
+    "sensor_confidence",
+    "failure_labels",
+    "ai_decision_output"
+  ],
+  "properties": {
+    "timestamp": {
+      "type": "string"
+    },
+    "vehicle_state": {
+      "type": "object"
+    },
+    "imu_data": {
+      "type": "object"
+    },
+    "gps_localization": {
+      "type": "object"
+    },
+    "telemetry": {
+      "type": "object"
+    },
+    "mission_state": {
+      "type": "string"
+    },
+    "sensor_confidence": {
+      "type": "object"
+    },
+    "failure_labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ai_decision_output": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}
+

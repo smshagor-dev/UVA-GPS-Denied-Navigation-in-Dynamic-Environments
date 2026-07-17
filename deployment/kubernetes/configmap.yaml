@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: control-plane-config
+  namespace: drone-swarm
+data:
+  DRONE_SWARM_ADDR: ":8080"
+  DRONE_BACKEND_MODE: "production"
+  DRONE_BACKEND_SIMULATION_ENABLED: "false"
+  DRONE_BACKEND_STALE_SEC: "5"
+  DRONE_BACKEND_DEMO_FLEET_SIZE: "0"
+  DRONE_SECURITY_PROFILE: "production"
+  DRONE_REQUIRE_SIGNED_COMMANDS: "true"
+  DRONE_TLS_ENABLED: "true"
+  DRONE_TLS_REQUIRE_CLIENT_CERT: "true"
+  DRONE_TLS_CERT_FILE: "/app/certs/server.crt"
+  DRONE_TLS_KEY_FILE: "/app/certs/server.key"
+  DRONE_TLS_CA_FILE: "/app/certs/ca.crt"
+  DRONE_DEVICE_REGISTRY_FILE: "/app/config/device-registry.json"
+

@@ -1,0 +1,98 @@
+{
+  "profile_name": "swarm_edge_protocol_v1",
+  "validated_state": "design_only_not_flight_validated",
+  "serialization": {
+    "serialization_mode": "cbor",
+    "supported_modes": [
+      "json",
+      "cbor",
+      "protobuf_placeholder"
+    ],
+    "json_runtime_policy": "bench_debug_only",
+    "binary_transport_required_for_safety_critical_loops": true,
+    "schema_version": 1
+  },
+  "mesh_topology_mode": "adaptive_mesh",
+  "auth": {
+    "mode": "hmac_sha256",
+    "allow_unsigned_in_simulation": true,
+    "allow_unsigned_in_bench": false,
+    "trust_epoch": 1,
+    "max_clock_skew_ms": 2000,
+    "shared_secret_env": "DRONE_SWARM_SECRET",
+    "pqc_roadmap": {
+      "signature": "ML-DSA/Dilithium",
+      "key_establishment": "ML-KEM/Kyber",
+      "status": "planned"
+    }
+  },
+  "bandwidth_caps": {
+    "per_peer_kbps": 48,
+    "swarm_awareness_kbps": 180,
+    "burst_kbps": 256
+  },
+  "update_intervals_ms": {
+    "peer_heartbeat": 100,
+    "peer_pose": 80,
+    "shared_obstacles": 120,
+    "consensus_state": 150,
+    "health_state": 250,
+    "backend_summary": 500
+  },
+  "packet_types": [
+    {
+      "name": "peer_heartbeat",
+      "priority": "critical",
+      "fields": ["drone_id", "epoch", "peer_count", "edge_health_status", "timestamp_ms"]
+    },
+    {
+      "name": "peer_pose",
+      "priority": "high",
+      "fields": ["drone_id", "position", "velocity", "localization_confidence", "sync_confidence"]
+    },
+    {
+      "name": "shared_obstacle_digest",
+      "priority": "high",
+      "fields": ["drone_id", "local_obstacle_count", "shared_obstacle_count", "obstacle_cells", "confidence"]
+    },
+    {
+      "name": "consensus_state",
+      "priority": "high",
+      "fields": ["drone_id", "local_consensus_state", "local_consensus_epoch", "vote_hash"]
+    },
+    {
+      "name": "edge_health",
+      "priority": "medium",
+      "fields": ["drone_id", "edge_autonomy_state", "edge_inference_status", "mesh_bandwidth_kbps", "disconnected_operation"]
+    }
+  ],
+  "retransmission_policy": {
+    "critical_packets_max_retries": 3,
+    "critical_retry_backoff_ms": [40, 80, 160],
+    "drop_noncritical_if_queue_depth_over": 32
+  },
+  "local_cache_limits": {
+    "peer_state_entries": 32,
+    "shared_obstacle_cells": 512,
+    "consensus_history_entries": 64,
+    "health_history_entries": 120
+  },
+  "edge_synchronization": {
+    "clock_skew_budget_ms": 25,
+    "peer_sync_timeout_ms": 350,
+    "edge_synchronization_timeout_ms": 700,
+    "stale_peer_timeout_ms": 900,
+    "split_swarm_rejoin_grace_ms": 2500
+  },
+  "stale_peer_detection": {
+    "heartbeat_miss_threshold": 3,
+    "confidence_decay_per_miss": 0.2,
+    "reject_stale_peer_from_consensus": true
+  },
+  "distributed_health_monitoring": {
+    "quorum_for_collective_action": 3,
+    "minimum_local_battery_pct_for_leader": 25,
+    "minimum_link_integrity_score": 0.45,
+    "minimum_localization_confidence": 0.55
+  }
+}

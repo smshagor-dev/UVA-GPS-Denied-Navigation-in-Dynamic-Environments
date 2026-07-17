@@ -1,0 +1,121 @@
+{
+  "generated_at": "2026-07-16T12:16:34.428062Z",
+  "ok": true,
+  "files_checked": 10,
+  "passed": 10,
+  "failed": 0,
+  "results": [
+    {
+      "path": "config\\runtime.json",
+      "ok": true,
+      "facts": {
+        "anchor_config_path": "config/anchors.json",
+        "lidar_config_path": "config/lidar.json",
+        "detector_labels_path": "config/detector_labels.json",
+        "runtime_mode": "edge_swarm",
+        "dataset_type": "simulation_runtime_dataset"
+      },
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "path": "config\\runtime.example.json",
+      "ok": true,
+      "facts": {
+        "anchor_config_path": "config/anchors.example.json",
+        "lidar_config_path": "config/lidar.example.json",
+        "detector_labels_path": "config/detector_labels.example.json",
+        "runtime_mode": "bench",
+        "dataset_type": "non_production_example"
+      },
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "path": "config\\anchors.json",
+      "ok": true,
+      "facts": {
+        "anchor_count": 12,
+        "coordinate_frame": "local_enu",
+        "units": "meters"
+      },
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "path": "config\\anchors.example.json",
+      "ok": true,
+      "facts": {
+        "anchor_count": 4,
+        "coordinate_frame": "local_enu",
+        "units": "meters"
+      },
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "path": "config\\lidar.json",
+      "ok": true,
+      "facts": {
+        "host": "0.0.0.0",
+        "port": 2368,
+        "required": true,
+        "runtime_mode": "bench"
+      },
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "path": "config\\lidar.example.json",
+      "ok": true,
+      "facts": {
+        "host": "0.0.0.0",
+        "port": 2368,
+        "required": false,
+        "runtime_mode": "bench"
+      },
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "path": "config\\detector_labels.json",
+      "ok": true,
+      "facts": {
+        "label_count": 100,
+        "dataset_type": "simulation_example_detection_dataset"
+      },
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "path": "config\\detector_labels.example.json",
+      "ok": true,
+      "facts": {
+        "label_count": 10,
+        "dataset_type": "non_production_example"
+      },
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "path": "config\\swarm_edge_protocol.json",
+      "ok": true,
+      "facts": {
+        "serialization_mode": "cbor",
+        "auth_mode": "hmac_sha256"
+      },
+      "warnings": [],
+      "errors": []
+    },
+    {
+      "path": "config\\swarm_edge_protocol.example.json",
+      "ok": true,
+      "facts": {
+        "serialization_mode": "cbor",
+        "auth_mode": "hmac_sha256"
+      },
+      "warnings": [],
+      "errors": []
+    }
+  ]
+}

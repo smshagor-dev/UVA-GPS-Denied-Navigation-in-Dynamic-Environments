@@ -1,0 +1,228 @@
+{
+  "generated_at": "2026-07-16T19:31:36.573443Z",
+  "metrics": [
+    {
+      "name": "config_load::config\\runtime.json",
+      "kind": "python-json",
+      "iterations": 20,
+      "total_ms": 105.40289990603924,
+      "mean_ms": 5.270144995301962,
+      "median_ms": 4.811849968973547,
+      "p50_ms": 4.840899957343936,
+      "p95_ms": 7.106099976226687,
+      "p99_ms": 8.048499934375286,
+      "max_ms": 8.048499934375286,
+      "extra": {
+        "bytes": 1234908
+      }
+    },
+    {
+      "name": "config_load::config\\anchors.json",
+      "kind": "python-json",
+      "iterations": 20,
+      "total_ms": 9.243999957107008,
+      "mean_ms": 0.4621999978553504,
+      "median_ms": 0.4036500467918813,
+      "p50_ms": 0.40380004793405533,
+      "p95_ms": 0.8122000144794583,
+      "p99_ms": 0.8569000056013465,
+      "max_ms": 0.8569000056013465,
+      "extra": {
+        "bytes": 93228
+      }
+    },
+    {
+      "name": "config_load::config\\lidar.json",
+      "kind": "python-json",
+      "iterations": 20,
+      "total_ms": 137.1522000990808,
+      "mean_ms": 6.85761000495404,
+      "median_ms": 6.485549965873361,
+      "p50_ms": 6.550199934281409,
+      "p95_ms": 8.424600004218519,
+      "p99_ms": 9.7314000595361,
+      "max_ms": 9.7314000595361,
+      "extra": {
+        "bytes": 1255629
+      }
+    },
+    {
+      "name": "ekf_update_path",
+      "kind": "native",
+      "iterations": 30,
+      "total_ms": 682.0683999685571,
+      "mean_ms": 22.735613332285237,
+      "median_ms": 8.60594998812303,
+      "p50_ms": 8.582400041632354,
+      "p95_ms": 114.87410007975996,
+      "p99_ms": 118.0636000353843,
+      "max_ms": 118.0636000353843,
+      "extra": {
+        "command": [
+          "E:\\Final Project\\drone_swarm\\build\\validation-msvc\\tests\\Release\\test_ekf.exe",
+          "--gtest_filter=EKFTest.FreeFallVelocity"
+        ],
+        "repeat": 30
+      }
+    },
+    {
+      "name": "lidar_processing_path",
+      "kind": "native",
+      "iterations": 30,
+      "total_ms": 758.2553999964148,
+      "mean_ms": 25.275179999880493,
+      "median_ms": 7.284749997779727,
+      "p50_ms": 7.238700054585934,
+      "p95_ms": 115.67550001200289,
+      "p99_ms": 119.29329996928573,
+      "max_ms": 119.29329996928573,
+      "extra": {
+        "command": [
+          "E:\\Final Project\\drone_swarm\\build\\validation-msvc\\tests\\Release\\test_sensors.exe",
+          "--gtest_filter=LidarSensor.ObstacleListGeneratedFromValidScan"
+        ],
+        "repeat": 30
+      }
+    },
+    {
+      "name": "sensor_fusion_path",
+      "kind": "native",
+      "iterations": 20,
+      "total_ms": 376.23230018652976,
+      "mean_ms": 18.811615009326488,
+      "median_ms": 12.215850001666695,
+      "p50_ms": 12.261299998499453,
+      "p95_ms": 24.679900030605495,
+      "p99_ms": 125.37159991916269,
+      "max_ms": 125.37159991916269,
+      "extra": {
+        "command": [
+          "E:\\Final Project\\drone_swarm\\build\\validation-msvc\\tests\\Release\\test_navigation_intelligence.exe",
+          "--gtest_filter=LocalizationFusion.PrefersTdoaWhenVioDriftIsHigh"
+        ],
+        "repeat": 20
+      }
+    },
+    {
+      "name": "telemetry_serialization_path",
+      "kind": "native",
+      "iterations": 40,
+      "total_ms": 722.1802998101339,
+      "mean_ms": 18.054507495253347,
+      "median_ms": 7.067149970680475,
+      "p50_ms": 7.0955000119283795,
+      "p95_ms": 110.75280001387,
+      "p99_ms": 118.4992000926286,
+      "max_ms": 118.4992000926286,
+      "extra": {
+        "command": [
+          "E:\\Final Project\\drone_swarm\\build\\validation-msvc\\tests\\Release\\test_telemetry.exe",
+          "--gtest_filter=ControlPlaneTelemetryClient.SerializesTelemetryPayload"
+        ],
+        "repeat": 40
+      }
+    },
+    {
+      "name": "security_packet_auth_path",
+      "kind": "native",
+      "iterations": 40,
+      "total_ms": 389.94269992690533,
+      "mean_ms": 9.748567498172633,
+      "median_ms": 6.6759499604813755,
+      "p50_ms": 6.680399994365871,
+      "p95_ms": 9.809099952690303,
+      "p99_ms": 118.67550003807992,
+      "max_ms": 118.67550003807992,
+      "extra": {
+        "command": [
+          "E:\\Final Project\\drone_swarm\\build\\validation-msvc\\tests\\Release\\test_edge_swarm.exe",
+          "--gtest_filter=PeerPacketAuth.HmacSignedPacketVerifies"
+        ],
+        "repeat": 40
+      }
+    },
+    {
+      "name": "backend_startup",
+      "kind": "process",
+      "iterations": 1,
+      "total_ms": 548.6786999972537,
+      "mean_ms": 548.6786999972537,
+      "median_ms": 548.6786999972537,
+      "p50_ms": 548.6786999972537,
+      "p95_ms": 548.6786999972537,
+      "p99_ms": 548.6786999972537,
+      "max_ms": 548.6786999972537,
+      "extra": {
+        "mode": "production"
+      }
+    },
+    {
+      "name": "backend_fleet_get",
+      "kind": "http",
+      "iterations": 30,
+      "total_ms": 172.52220027148724,
+      "mean_ms": 5.750740009049575,
+      "median_ms": 0.631549977697432,
+      "p50_ms": 0.6303000263869762,
+      "p95_ms": 15.920899924822152,
+      "p99_ms": 16.160600003786385,
+      "max_ms": 16.160600003786385,
+      "extra": {
+        "url": "http://127.0.0.1:57078/api/v1/fleet"
+      }
+    },
+    {
+      "name": "backend_telemetry_post",
+      "kind": "http",
+      "iterations": 30,
+      "total_ms": 184.39509987365454,
+      "mean_ms": 6.146503329121818,
+      "median_ms": 0.8795999456197023,
+      "p50_ms": 0.8756999159231782,
+      "p95_ms": 22.849999950267375,
+      "p99_ms": 24.824999971315265,
+      "max_ms": 24.824999971315265,
+      "extra": {
+        "url": "http://127.0.0.1:57078/api/v1/telemetry",
+        "accepted": 30,
+        "throughput_hz": 162.69412810077742
+      }
+    },
+    {
+      "name": "backend_metrics_get",
+      "kind": "http",
+      "iterations": 30,
+      "total_ms": 108.27739990781993,
+      "mean_ms": 3.6092466635939977,
+      "median_ms": 0.6462999735958874,
+      "p50_ms": 0.6422000005841255,
+      "p95_ms": 16.044599935412407,
+      "p99_ms": 19.35850002337247,
+      "max_ms": 19.35850002337247,
+      "extra": {
+        "url": "http://127.0.0.1:57078/metrics"
+      }
+    },
+    {
+      "name": "backend_command_post",
+      "kind": "http",
+      "iterations": 30,
+      "total_ms": 169.44070009049028,
+      "mean_ms": 5.648023336349676,
+      "median_ms": 0.7519500213675201,
+      "p50_ms": 0.7374000269919634,
+      "p95_ms": 16.000699950382113,
+      "p99_ms": 25.635800091549754,
+      "max_ms": 25.635800091549754,
+      "extra": {
+        "url": "http://127.0.0.1:57172/api/v1/commands",
+        "accepted": 30,
+        "throughput_hz": 177.0530928164155
+      }
+    }
+  ],
+  "notes": [
+    "Phase 6 benchmark results were collected on the local Windows workspace.",
+    "Backend command latency was measured against the lab-profile control plane using unsigned commands in benchmark mode."
+  ]
+}

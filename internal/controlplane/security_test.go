@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -182,4 +183,37 @@ func TestRoleAllowsActionEnforcesCommanderOnlyElection(t *testing.T) {
 	if !RoleAllowsAction("maintenance", "firmware_update") {
 		t.Fatal("expected maintenance role to be allowed firmware updates")
 	}
+}
+
+func TestSecurityConfigNormalizedIsSafeUnderConcurrency(t *testing.T) {
+	cfg := testSecurityConfig()
+	cfg.Devices = map[string]DeviceRecord{
+		"drone-node-1": {
+			Identity:   "drone-node-1",
+			DeviceType: "drone",
+			Status:     "active",
+		},
+	}
+	const goroutines = 32
+	const iterations = 200
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+	for i := 0; i < goroutines; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < iterations; j++ {
+				normalized := cfg.normalized()
+				if normalized.Profile != "production" {
+					t.Fatalf("expected production profile, got %q", normalized.Profile)
+				}
+				if _, ok := normalized.Devices["operator-console-1"]; !ok {
+					t.Fatal("expected normalized device registry to include operator-derived identity")
+				}
+				if _, ok := normalized.Operators["operator-console-1"]; !ok {
+					t.Fatal("expected normalized operators to include primary operator")
+				}
+			}
+		}()
+	}
+	wg.Wait()
 }

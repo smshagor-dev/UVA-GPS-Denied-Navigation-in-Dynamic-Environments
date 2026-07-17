@@ -1,0 +1,50 @@
+FROM golang:1.22-bookworm AS builder
+
+WORKDIR /src
+
+COPY go.mod ./
+COPY cmd ./cmd
+COPY internal ./internal
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o /out/control-plane ./cmd/control-plane
+
+FROM debian:bookworm-slim
+
+LABEL org.opencontainers.image.title="drone-swarm-control-plane" \
+      org.opencontainers.image.description="Production-ready Go control-plane for the drone swarm platform" \
+      org.opencontainers.image.licenses="GPL-3.0-only"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl tini tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /out/control-plane /usr/local/bin/control-plane
+
+RUN groupadd --system drone \
+    && useradd --system --gid drone --create-home --home-dir /home/drone drone \
+    && mkdir -p /app/logs/control-plane /app/certs /app/config /tmp/control-plane \
+    && chown -R drone:drone /app /home/drone /tmp/control-plane
+
+ENV DRONE_SWARM_ADDR=:8080
+ENV DRONE_BACKEND_MODE=production
+ENV DRONE_BACKEND_SIMULATION_ENABLED=false
+ENV DRONE_SECURITY_PROFILE=production
+ENV DRONE_REQUIRE_SIGNED_COMMANDS=true
+ENV DRONE_TLS_ENABLED=true
+ENV DRONE_TLS_REQUIRE_CLIENT_CERT=true
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl --fail --silent http://127.0.0.1:8080/api/v1/health || exit 1
+
+STOPSIGNAL SIGTERM
+
+USER drone
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/control-plane"]
+

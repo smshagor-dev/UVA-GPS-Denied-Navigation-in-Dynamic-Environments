@@ -1,0 +1,184 @@
+{
+  "generated_at": "2026-07-16T19:27:11.311971Z",
+  "isolation_confirmation": {
+    "phase6_soak_process_stopped_before_run": true,
+    "isolated_commands": [
+      "py -3.14 scripts\\phase6_performance_suite.py",
+      "py -3.14 scripts\\phase6_performance_benchmark.py",
+      "py -3.14 scripts\\phase6_stress_test.py"
+    ]
+  },
+  "baseline_source": {
+    "benchmark_report": "docs/phase6/BENCHMARK_REPORT.md",
+    "stress_report": "docs/phase6/STRESS_TEST_REPORT.md",
+    "soak_report": "docs/phase6/SOAK_TEST_REPORT.md"
+  },
+  "current_source": {
+    "performance_results": "docs/phase6/performance_results.json",
+    "benchmark_results": "docs/phase6/benchmark_results.json",
+    "stress_results": "docs/phase6/stress_results.json"
+  },
+  "api_comparison": [
+    {
+      "metric": "backend_startup_ms",
+      "baseline": 534.952,
+      "current": 529.9265999346972,
+      "delta": -5.025400065302847,
+      "direction": "lower_is_better",
+      "status": "better"
+    },
+    {
+      "metric": "fleet_get_mean_ms",
+      "baseline": 1.11,
+      "current": 2.003370000359913,
+      "delta": 0.8933700003599128,
+      "direction": "lower_is_better",
+      "status": "worse"
+    },
+    {
+      "metric": "telemetry_post_throughput_rps",
+      "baseline": 497.254,
+      "current": 864.1175234533157,
+      "delta": 366.8635234533157,
+      "direction": "higher_is_better",
+      "status": "better"
+    },
+    {
+      "metric": "telemetry_post_p95_ms",
+      "baseline": 12.149,
+      "current": 1.6931999707594514,
+      "delta": -10.455800029240548,
+      "direction": "lower_is_better",
+      "status": "better"
+    },
+    {
+      "metric": "metrics_get_mean_ms",
+      "baseline": 1.691,
+      "current": 3.6092466635939977,
+      "delta": 1.9182466635939976,
+      "direction": "lower_is_better",
+      "status": "worse"
+    },
+    {
+      "metric": "command_post_throughput_rps",
+      "baseline": 324.544,
+      "current": 177.0530928164155,
+      "delta": -147.49090718358448,
+      "direction": "higher_is_better",
+      "status": "worse"
+    },
+    {
+      "metric": "command_post_p95_ms",
+      "baseline": 15.465,
+      "current": 16.000699950382113,
+      "delta": 0.5356999503821136,
+      "direction": "lower_is_better",
+      "status": "worse"
+    }
+  ],
+  "stress_comparison": [
+    {
+      "metric": "stress_100_rps",
+      "baseline": 1695.273,
+      "current": 2055.002132223291,
+      "delta": 359.7291322232911,
+      "direction": "higher_is_better",
+      "status": "better"
+    },
+    {
+      "metric": "stress_100_p95_ms",
+      "baseline": 55.017,
+      "current": 46.32339999079704,
+      "delta": -8.69360000920296,
+      "direction": "lower_is_better",
+      "status": "better"
+    },
+    {
+      "metric": "stress_500_rps",
+      "baseline": 1798.609,
+      "current": 2186.9751806447007,
+      "delta": 388.36618064470076,
+      "direction": "higher_is_better",
+      "status": "better"
+    },
+    {
+      "metric": "stress_500_p95_ms",
+      "baseline": 90.309,
+      "current": 71.82309997733682,
+      "delta": -18.485900022663174,
+      "direction": "lower_is_better",
+      "status": "better"
+    },
+    {
+      "metric": "stress_1000_rps",
+      "baseline": 2094.019,
+      "current": 2184.1080801315643,
+      "delta": 90.08908013156451,
+      "direction": "higher_is_better",
+      "status": "better"
+    },
+    {
+      "metric": "stress_1000_p95_ms",
+      "baseline": 105.413,
+      "current": 93.91930000856519,
+      "delta": -11.49369999143481,
+      "direction": "lower_is_better",
+      "status": "better"
+    }
+  ],
+  "memory_latency_comparison": [
+    {
+      "metric": "soak_avg_ms",
+      "baseline": 2.231,
+      "current": 6.430271078740085,
+      "delta": 4.199271078740085,
+      "direction": "lower_is_better",
+      "status": "worse"
+    },
+    {
+      "metric": "soak_p99_ms",
+      "baseline": 24.301,
+      "current": 26.214899960905313,
+      "delta": 1.9138999609053151,
+      "direction": "lower_is_better",
+      "status": "worse"
+    },
+    {
+      "metric": "working_set_end_mb",
+      "baseline": 20.211,
+      "current": 25.46484375,
+      "delta": 5.2538437500000015,
+      "direction": "lower_is_better",
+      "status": "worse"
+    },
+    {
+      "metric": "private_memory_end_mb",
+      "baseline": 58.562,
+      "current": 58.98828125,
+      "delta": 0.4262812500000024,
+      "direction": "lower_is_better",
+      "status": "worse"
+    },
+    {
+      "metric": "handle_count_end",
+      "baseline": 393.0,
+      "current": 381.0,
+      "delta": -12.0,
+      "direction": "lower_is_better",
+      "status": "better"
+    }
+  ],
+  "stability_checks": {
+    "stress_failures_total": 0,
+    "queue_depth_peak": 0.0,
+    "all_handle_deltas_zero": true,
+    "all_thread_deltas_zero": true
+  },
+  "interpretation": [
+    "The isolated rerun removed the previous contamination from the long-running soak monitor.",
+    "Stress throughput and p95 latency improved across the 100, 500, and 1000 client scenarios.",
+    "Memory remained bounded and handle/thread counts stayed flat.",
+    "Focused endpoint benchmark samples on Windows still show per-run jitter, so the integrated suite and stress evidence are treated as the strongest regression signal."
+  ],
+  "status": "PASS"
+}

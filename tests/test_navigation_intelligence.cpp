@@ -273,6 +273,30 @@ TEST(RuntimeMode, SimulationAllowsSyntheticFallbackWithoutAnchorConfig) {
               "simulation");
 }
 
+TEST(RuntimeMode, RuntimeFileLoadsEscapedPaths) {
+    const auto temp_path = std::filesystem::temp_directory_path() / "runtime_valid.json";
+    {
+        std::ofstream output(temp_path.string(), std::ios::trunc);
+        ASSERT_TRUE(output.is_open());
+        output << R"({
+  "runtime_mode": "edge_swarm",
+  "anchor_config_path": "config\/anchors.json",
+  "lidar_config_path": "config\/lidar.json",
+  "detector_labels_path": "config\/detector_labels.json"
+})";
+    }
+
+    const auto result = runtime::load_runtime_file(temp_path.string());
+    EXPECT_TRUE(result.loaded);
+    ASSERT_TRUE(result.runtime_mode.has_value());
+    EXPECT_EQ(*result.runtime_mode, runtime::RuntimeMode::EDGE_SWARM);
+    EXPECT_EQ(result.anchor_config_path, "config/anchors.json");
+    EXPECT_EQ(result.lidar_config_path, "config/lidar.json");
+    EXPECT_EQ(result.detector_labels_path, "config/detector_labels.json");
+
+    std::filesystem::remove(temp_path);
+}
+
 TEST(RuntimeMode, ValidAnchorJsonLoads) {
     const auto temp_path = std::filesystem::temp_directory_path() / "anchors_valid.json";
     {
@@ -370,6 +394,30 @@ TEST(RuntimeMode, ValidLidarConfigLoads) {
     EXPECT_EQ(result.port, 2368);
     EXPECT_EQ(result.model, "generic_udp_cartesian_v1");
     EXPECT_TRUE(result.required);
+
+    std::filesystem::remove(temp_path);
+}
+
+TEST(RuntimeMode, LidarConfigFalseRequiredLoads) {
+    const auto temp_path = std::filesystem::temp_directory_path() / "lidar_optional.json";
+    {
+        std::ofstream output(temp_path.string(), std::ios::trunc);
+        ASSERT_TRUE(output.is_open());
+        output << R"({
+  "host": "192.168.1.10",
+  "port": 2368,
+  "model": "generic_udp_cartesian_v1",
+  "frame_id": "lidar_rear",
+  "min_range_m": 0.4,
+  "max_range_m": 60.0,
+  "required": false
+})";
+    }
+
+    const auto result = runtime::load_lidar_config_json(temp_path.string());
+    EXPECT_TRUE(result.ok);
+    EXPECT_FALSE(result.required);
+    EXPECT_EQ(result.frame_id, "lidar_rear");
 
     std::filesystem::remove(temp_path);
 }

@@ -1,0 +1,106 @@
+name: Phase 10 Enterprise Validation
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/phase10-enterprise-validation.yml"
+      - "deployment/**"
+      - "docker-compose.production.yml"
+      - "Dockerfile"
+      - "internal/controlplane/**"
+      - "cmd/control-plane/**"
+      - "scripts/**"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Lint Python entrypoints
+        run: python -m compileall scripts deployment/scripts
+
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build control-plane
+        run: go build ./...
+
+  unit-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Run Go tests
+        run: go test ./...
+
+  integration-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate compose stacks
+        run: |
+          docker compose -f docker-compose.yml config
+          docker compose -f docker-compose.production.yml config
+
+  security-scan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run Phase 10 security audit
+        run: python deployment/scripts/phase10_security_audit.py
+
+  performance-validation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Run Phase 6 suite
+        run: python scripts/phase6_performance_suite.py
+
+  packaging:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build production image
+        run: docker build -f deployment/docker/Dockerfile.production -t drone-swarm/control-plane:phase10 .
+
+  release-validation:
+    runs-on: ubuntu-24.04
+    needs:
+      - lint
+      - build
+      - unit-tests
+      - integration-tests
+      - security-scan
+      - performance-validation
+      - packaging
+    steps:
+      - uses: actions/checkout@v6
+      - name: Upload release metadata
+        uses: actions/upload-artifact@v6
+        with:
+          name: phase10-enterprise-validation
+          path: |
+            docs/phase10
+            deployment

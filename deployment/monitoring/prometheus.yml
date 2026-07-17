@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: drone-swarm-control-plane
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - control-plane:8080
+
