@@ -39,6 +39,7 @@ option(DRONE_ENABLE_ASAN "Enable AddressSanitizer on supported toolchains" OFF)
 option(DRONE_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer on supported toolchains" OFF)
 option(DRONE_ENABLE_COVERAGE "Enable native coverage instrumentation on supported toolchains" OFF)
 option(DRONE_ENABLE_CPACK "Enable archive packaging via CPack" OFF)
+option(DRONE_ENABLE_EXPERIMENTAL_ESTIMATOR_SHADOW "Enable phase 16 shadow-estimator plumbing" ON)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -74,6 +75,7 @@ function(drone_append_build_interface_paths out_var)
 endfunction()
 
 drone_resolve_dependencies()
+drone_enable_nlohmann_json()
 
 drone_append_build_interface_paths(DRONE_OPENCV_BUILD_INCLUDE_DIRS ${DRONE_OPENCV_INCLUDE_DIRS})
 drone_append_build_interface_paths(DRONE_PCL_BUILD_INCLUDE_DIRS ${DRONE_PCL_INCLUDE_DIRS})
@@ -92,6 +94,10 @@ set(DRONE_CORE_SOURCES
     src/localization/TimeSyncTracker.cpp
     src/localization/UWBSerialDriver.cpp
     src/runtime/RuntimeMode.cpp
+    src/estimation/EstimatorComparison.cpp
+    src/estimation/EstimatorCoordinator.cpp
+    src/estimation/MeasurementAdapters.cpp
+    src/estimation/MinimalEskfAdapter.cpp
     src/security/PeerPacketAuth.cpp
     src/swarm/EdgeConsensusManager.cpp
     src/swarm/EdgePeerProtocol.cpp
@@ -114,6 +120,16 @@ set(DRONE_CORE_SOURCES
     src/hal/JetsonHAL.cpp
     src/swarm/V2XMeshNetwork.cpp
     third_party/crypto/monocypher.c
+    third_party/crypto/sha3.c
+)
+
+set(DRONE_ESTIMATOR_CORE_SOURCES
+    src/estimation/EstimatorComparison.cpp
+    src/estimation/EstimatorCoordinator.cpp
+    src/estimation/MeasurementAdapters.cpp
+    src/estimation/MinimalEskfAdapter.cpp
+    src/runtime/RuntimeMode.cpp
+    src/vio/EKFEstimator.cpp
     third_party/crypto/sha3.c
 )
 
@@ -153,6 +169,7 @@ target_compile_definitions(sensor_fusion_core
     PUBLIC
         $<$<BOOL:${DRONE_HAVE_FASTDDS_TRANSPORT}>:DRONE_HAS_FASTDDS_TRANSPORT>
         $<$<BOOL:${DRONE_HAVE_TENSORRT}>:DRONE_HAS_TENSORRT>
+        $<$<BOOL:${DRONE_ENABLE_EXPERIMENTAL_ESTIMATOR_SHADOW}>:DRONE_ENABLE_EXPERIMENTAL_ESTIMATOR_SHADOW>
         ${DRONE_PCL_COMPILE_DEFINITIONS}
 )
 drone_apply_project_warnings(sensor_fusion_core)
@@ -160,12 +177,70 @@ drone_enable_coverage(sensor_fusion_core)
 drone_enable_sanitizers(sensor_fusion_core)
 drone_set_target_output_dirs(sensor_fusion_core "bin" "lib" "lib")
 
+add_library(estimator_validation_core STATIC)
+target_sources(estimator_validation_core PRIVATE ${DRONE_ESTIMATOR_CORE_SOURCES})
+target_compile_features(estimator_validation_core PUBLIC cxx_std_20)
+set_target_properties(estimator_validation_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(estimator_validation_core
+    PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/third_party/crypto>
+)
+target_link_libraries(estimator_validation_core
+    PUBLIC
+        Eigen3::Eigen
+        Threads::Threads
+        spdlog::spdlog
+)
+target_compile_definitions(estimator_validation_core
+    PUBLIC
+        $<$<BOOL:${DRONE_ENABLE_EXPERIMENTAL_ESTIMATOR_SHADOW}>:DRONE_ENABLE_EXPERIMENTAL_ESTIMATOR_SHADOW>
+)
+drone_apply_project_warnings(estimator_validation_core)
+drone_enable_coverage(estimator_validation_core)
+drone_enable_sanitizers(estimator_validation_core)
+drone_set_target_output_dirs(estimator_validation_core "bin" "lib" "lib")
+
+add_library(estimator_replay_support STATIC
+    src/estimation/ReplayRunner.cpp
+)
+target_link_libraries(estimator_replay_support
+    PUBLIC
+        estimator_validation_core
+        nlohmann_json::nlohmann_json
+)
+target_include_directories(estimator_replay_support
+    PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+)
+drone_apply_project_warnings(estimator_replay_support)
+drone_enable_coverage(estimator_replay_support)
+drone_enable_sanitizers(estimator_replay_support)
+drone_set_target_output_dirs(estimator_replay_support "bin" "lib" "lib")
+
 add_executable(drone_node src/main.cpp)
 target_link_libraries(drone_node PRIVATE sensor_fusion_core)
 drone_apply_project_warnings(drone_node)
 drone_enable_coverage(drone_node)
 drone_enable_sanitizers(drone_node)
 drone_set_target_output_dirs(drone_node "bin" "lib" "lib")
+
+add_executable(estimator_replay_runner tools/estimator_replay_runner.cpp)
+target_link_libraries(estimator_replay_runner PRIVATE estimator_replay_support)
+drone_apply_project_warnings(estimator_replay_runner)
+drone_enable_coverage(estimator_replay_runner)
+drone_enable_sanitizers(estimator_replay_runner)
+drone_set_target_output_dirs(estimator_replay_runner "tools" "tools" "tools")
+
+add_executable(estimator_shadow_benchmark tools/estimator_shadow_benchmark.cpp)
+target_link_libraries(estimator_shadow_benchmark PRIVATE
+    estimator_validation_core
+    nlohmann_json::nlohmann_json
+)
+drone_apply_project_warnings(estimator_shadow_benchmark)
+drone_enable_coverage(estimator_shadow_benchmark)
+drone_enable_sanitizers(estimator_shadow_benchmark)
+drone_set_target_output_dirs(estimator_shadow_benchmark "tools" "tools" "tools")
 
 if(DRONE_ENABLE_PYTHON_BINDINGS AND DRONE_HAVE_PYTHON_BINDINGS)
     pybind11_add_module(drone_bridge src/drone_bridge.cpp)

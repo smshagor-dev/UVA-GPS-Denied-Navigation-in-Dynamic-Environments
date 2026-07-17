@@ -17,6 +17,36 @@ set(DRONE_HAVE_PYTHON_BINDINGS FALSE)
 set(DRONE_FASTDDS_STATUS "DISABLED")
 set(DRONE_TENSORRT_STATUS "DISABLED")
 set(DRONE_PYTHON_BINDINGS_STATUS "DISABLED")
+set(DRONE_HAVE_NLOHMANN_JSON FALSE)
+
+function(drone_enable_nlohmann_json)
+    if(TARGET nlohmann_json::nlohmann_json)
+        set(DRONE_HAVE_NLOHMANN_JSON TRUE PARENT_SCOPE)
+        return()
+    endif()
+
+    find_package(nlohmann_json CONFIG QUIET)
+    if(TARGET nlohmann_json::nlohmann_json)
+        set(DRONE_HAVE_NLOHMANN_JSON TRUE PARENT_SCOPE)
+        message(STATUS "nlohmann_json: FOUND - package config mode")
+        return()
+    endif()
+
+    FetchContent_Declare(
+        nlohmann_json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG v3.11.3
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(nlohmann_json)
+    if(TARGET nlohmann_json::nlohmann_json)
+        set(DRONE_HAVE_NLOHMANN_JSON TRUE PARENT_SCOPE)
+        message(STATUS "nlohmann_json: FETCHED - FetchContent fallback enabled")
+        return()
+    endif()
+
+    message(FATAL_ERROR "nlohmann_json is required for replay tooling but could not be resolved.")
+endfunction()
 
 function(drone_enable_googletest)
     if(TARGET GTest::gtest_main)

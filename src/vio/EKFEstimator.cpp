@@ -9,11 +9,24 @@
 #include <Eigen/Cholesky>
 #include <Eigen/SVD>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <numeric>
 
 namespace drone::vio {
 
 static constexpr double kGravity = 9.81;
+static constexpr double kCovarianceFloor = 1.0e-12;
+static constexpr double kMaxCorrectionNorm = 100.0;
+
+namespace {
+
+template <typename Derived>
+bool matrix_is_finite(const Eigen::MatrixBase<Derived>& matrix) {
+    return matrix.array().isFinite().all();
+}
+
+} // namespace
 
 EKFEstimator::EKFEstimator(EKFConfig cfg) : cfg_(cfg) {
     logger_ = spdlog::get("EKF");
@@ -26,6 +39,9 @@ EKFEstimator::EKFEstimator(EKFConfig cfg) : cfg_(cfg) {
     Q_imu_.block<3, 3>(3, 3) = Eigen::Matrix3d::Identity() * cfg_.sigma_ng * cfg_.sigma_ng;
     Q_imu_.block<3, 3>(6, 6) = Eigen::Matrix3d::Identity() * cfg_.sigma_nba * cfg_.sigma_nba;
     Q_imu_.block<3, 3>(9, 9) = Eigen::Matrix3d::Identity() * cfg_.sigma_nbg * cfg_.sigma_nbg;
+    diagnostics_.minimum_covariance_diagonal_seen = kCovarianceFloor;
+    diagnostics_.covariance_min_diagonal = kCovarianceFloor;
+    diagnostics_.health_state = EstimatorHealthState::INITIALIZING;
 }
 
 void EKFEstimator::reset(const Eigen::Vector3d& p0, const Eigen::Quaterniond& q0,
@@ -46,10 +62,14 @@ void EKFEstimator::reset(const Eigen::Vector3d& p0, const Eigen::Quaterniond& q0
     P_.block<3, 3>(12, 12) = Eigen::Matrix3d::Identity() * cfg_.init_bg_std * cfg_.init_bg_std;
 
     timestamp_ = 0.0;
-    total_drift_ = 0.0;
+    estimated_position_uncertainty_m_ = 0.0;
     initialized_ = true;
     last_vision_update_ts_ = -1.0;
     last_depth_update_ts_ = -1.0;
+    diagnostics_ = {};
+    diagnostics_.covariance_min_diagonal = P_.diagonal().minCoeff();
+    diagnostics_.minimum_covariance_diagonal_seen = diagnostics_.covariance_min_diagonal;
+    diagnostics_.health_state = EstimatorHealthState::INITIALIZING;
     logger_->info("EKF reset. p0=[{:.3f},{:.3f},{:.3f}]", p0.x(), p0.y(), p0.z());
 }
 
@@ -57,8 +77,28 @@ void EKFEstimator::reset(const Eigen::Vector3d& p0, const Eigen::Quaterniond& q0
 
 void EKFEstimator::propagate_imu(const Eigen::Vector3d& accel_mps2,
                                  const Eigen::Vector3d& gyro_rads, double dt) {
-    if (!initialized_ || dt <= 0.0 || dt > 0.5)
+    if (!initialized_)
         return;
+    if ((validation_cfg_.reject_non_finite_measurements &&
+         (!matrix_is_finite(accel_mps2) || !matrix_is_finite(gyro_rads) || !std::isfinite(dt)))) {
+        std::lock_guard lock(mtx_);
+        mark_invalid_input("non-finite imu sample rejected");
+        return;
+    }
+    if (dt <= 0.0 ||
+        (validation_cfg_.require_monotonic_timestamps && dt <= 0.0)) {
+        std::lock_guard lock(mtx_);
+        ++diagnostics_.timestamp_rejection_count;
+        mark_measurement_rejected(EstimatorSensorType::IMU, "non-monotonic imu timestamp");
+        return;
+    }
+    if (dt > validation_cfg_.max_imu_dt_s) {
+        std::lock_guard lock(mtx_);
+        ++diagnostics_.timestamp_rejection_count;
+        mark_measurement_rejected(EstimatorSensorType::IMU, "imu dt exceeds configured limit");
+        return;
+    }
+    const auto started_at = std::chrono::steady_clock::now();
     std::lock_guard lock(mtx_);
 
     // Remove bias estimates
@@ -93,10 +133,14 @@ void EKFEstimator::propagate_imu(const Eigen::Vector3d& accel_mps2,
     P_ = F * P_ * F.transpose() + Q_d;
 
     // Symmetrize to prevent numerical drift
-    P_ = 0.5 * (P_ + P_.transpose());
-    total_drift_ = P_.diagonal().head<3>().cwiseSqrt().norm();
+    finalize_covariance_locked();
 
     timestamp_ += dt;
+    ++diagnostics_.propagation_count;
+    accumulate_propagation_latency(
+        std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - started_at)
+            .count());
+    update_health_locked();
 }
 
 // Vision Update  (feature reprojection)
@@ -118,6 +162,12 @@ void EKFEstimator::update_vision(const std::vector<Eigen::Vector2d>& z_pixels,
 
     bool accepted_update = false;
     for (size_t i = 0; i < z_pixels.size(); ++i) {
+        if ((validation_cfg_.reject_non_finite_measurements &&
+             (!matrix_is_finite(z_pixels[i]) || !matrix_is_finite(p_world[i]) ||
+              !matrix_is_finite(K)))) {
+            mark_invalid_input("non-finite vision feature input rejected");
+            return;
+        }
         // Project map point into current camera frame
         const Eigen::Vector3d p_c = R.transpose() * (p_world[i] - pos_);
 
@@ -151,39 +201,10 @@ void EKFEstimator::update_vision(const std::vector<Eigen::Vector2d>& z_pixels,
 
         // Innovation
         const Eigen::Vector2d innov{z_pixels[i].x() - u_hat, z_pixels[i].y() - v_hat};
-
-        // Mahalanobis gating
-        const Eigen::Matrix2d S = H * P_ * H.transpose() + R_meas;
-        const double mah_sq = innov.transpose() * S.ldlt().solve(innov);
-        if (mah_sq > cfg_.mahal_gate)
-            continue; // outlier
-
-        // Kalman gain
-        const Eigen::Matrix<double, 15, 2> K_gain = P_ * H.transpose() * S.inverse();
-
-        // Error state correction
-        const Eigen::Matrix<double, 15, 1> dx = K_gain * innov;
-
-        // Apply correction to nominal state
-        pos_ += dx.segment<3>(0);
-        vel_ += dx.segment<3>(3);
-        ba_ += dx.segment<3>(9);
-        bg_ += dx.segment<3>(12);
-
-        // Quaternion box-plus
-        const Eigen::Vector3d dtheta = dx.segment<3>(6);
-        if (dtheta.norm() > 1e-8) {
-            q_ = q_ * rotvec_to_quat(dtheta);
-            q_.normalize();
+        if (apply_linear_update(H, innov, R_meas, EstimatorSensorType::VISION_FEATURE,
+                                "vision_feature")) {
+            accepted_update = true;
         }
-
-        // Joseph form covariance update (numerically stable)
-        const Eigen::Matrix<double, 15, 15> I_KH =
-            Eigen::Matrix<double, 15, 15>::Identity() - K_gain * H;
-        P_ = I_KH * P_ * I_KH.transpose() + K_gain * R_meas * K_gain.transpose();
-        P_ = 0.5 * (P_ + P_.transpose());
-        total_drift_ = P_.diagonal().head<3>().cwiseSqrt().norm();
-        accepted_update = true;
     }
 
     if (accepted_update) {
@@ -194,23 +215,30 @@ void EKFEstimator::update_vision(const std::vector<Eigen::Vector2d>& z_pixels,
 void EKFEstimator::update_depth(double z_depth_m, double sigma_m) {
     if (!initialized_)
         return;
+    if (validation_cfg_.reject_non_finite_measurements &&
+        (!std::isfinite(z_depth_m) || !std::isfinite(sigma_m))) {
+        std::lock_guard lock(mtx_);
+        mark_invalid_input("non-finite depth measurement rejected");
+        return;
+    }
+    if (!validate_measurement_noise(sigma_m, "depth")) {
+        std::lock_guard lock(mtx_);
+        mark_invalid_input("invalid depth covariance rejected");
+        return;
+    }
     std::lock_guard lock(mtx_);
 
     // H = [0 0 1 | 0...] (z-position only)
     Eigen::Matrix<double, 1, 15> H = Eigen::Matrix<double, 1, 15>::Zero();
     H(0, 2) = 1.0;
 
-    const double innov = z_depth_m - pos_.z();
-    const double S = H * P_ * H.transpose() + sigma_m * sigma_m;
-    const auto K_gain = P_ * H.transpose() / S;
-    const auto dx = K_gain * innov;
-
-    pos_ += dx.segment<3>(0);
-    vel_ += dx.segment<3>(3);
-    P_ -= K_gain * H * P_;
-    P_ = 0.5 * (P_ + P_.transpose());
-    total_drift_ = P_.diagonal().head<3>().cwiseSqrt().norm();
-    last_depth_update_ts_ = timestamp_;
+    const Eigen::Matrix<double, 1, 1> innovation =
+        (Eigen::Matrix<double, 1, 1>() << (z_depth_m - pos_.z())).finished();
+    const Eigen::Matrix<double, 1, 1> R_meas =
+        (Eigen::Matrix<double, 1, 1>() << sigma_m * sigma_m).finished();
+    if (apply_linear_update(H, innovation, R_meas, EstimatorSensorType::DEPTH, "depth")) {
+        last_depth_update_ts_ = timestamp_;
+    }
 }
 
 void EKFEstimator::update_visual_pose(const Eigen::Vector3d& observed_position,
@@ -218,6 +246,19 @@ void EKFEstimator::update_visual_pose(const Eigen::Vector3d& observed_position,
                                       double sigma_position_m, double sigma_velocity_mps) {
     if (!initialized_)
         return;
+    if (validation_cfg_.reject_non_finite_measurements &&
+        (!matrix_is_finite(observed_position) || !matrix_is_finite(observed_velocity) ||
+         !std::isfinite(sigma_position_m) || !std::isfinite(sigma_velocity_mps))) {
+        std::lock_guard lock(mtx_);
+        mark_invalid_input("non-finite visual pose input rejected");
+        return;
+    }
+    if (!validate_measurement_noise(sigma_position_m, "visual_pose_position") ||
+        !validate_measurement_noise(sigma_velocity_mps, "visual_pose_velocity")) {
+        std::lock_guard lock(mtx_);
+        mark_invalid_input("invalid visual pose covariance rejected");
+        return;
+    }
     std::lock_guard lock(mtx_);
 
     Eigen::Matrix<double, 6, 15> H = Eigen::Matrix<double, 6, 15>::Zero();
@@ -232,22 +273,9 @@ void EKFEstimator::update_visual_pose(const Eigen::Vector3d& observed_position,
     Eigen::Matrix<double, 6, 1> innov;
     innov.segment<3>(0) = observed_position - pos_;
     innov.segment<3>(3) = observed_velocity - vel_;
-
-    const Eigen::Matrix<double, 6, 6> S = H * P_ * H.transpose() + R_meas;
-    const Eigen::Matrix<double, 15, 6> K_gain = P_ * H.transpose() * S.inverse();
-    const auto dx = K_gain * innov;
-
-    pos_ += dx.segment<3>(0);
-    vel_ += dx.segment<3>(3);
-    ba_ += dx.segment<3>(9);
-    bg_ += dx.segment<3>(12);
-
-    const Eigen::Matrix<double, 15, 15> I_KH =
-        Eigen::Matrix<double, 15, 15>::Identity() - K_gain * H;
-    P_ = I_KH * P_ * I_KH.transpose() + K_gain * R_meas * K_gain.transpose();
-    P_ = 0.5 * (P_ + P_.transpose());
-    total_drift_ = P_.diagonal().head<3>().cwiseSqrt().norm();
-    last_vision_update_ts_ = timestamp_;
+    if (apply_linear_update(H, innov, R_meas, EstimatorSensorType::VISUAL_POSE, "visual_pose")) {
+        last_vision_update_ts_ = timestamp_;
+    }
 }
 
 void EKFEstimator::update_zupt() {
@@ -259,18 +287,10 @@ void EKFEstimator::update_zupt() {
     Eigen::Matrix<double, 3, 15> H = Eigen::Matrix<double, 3, 15>::Zero();
     H.block<3, 3>(0, 3) = Eigen::Matrix3d::Identity();
 
-    const Eigen::Matrix3d R_meas = Eigen::Matrix3d::Identity() * 1e-4;
+    const Eigen::Matrix3d R_meas = Eigen::Matrix3d::Identity() * 1e-6;
     const Eigen::Vector3d innov = -vel_;
-
-    const Eigen::Matrix3d S = H * P_ * H.transpose() + R_meas;
-    const Eigen::Matrix<double, 15, 3> K_gain = P_ * H.transpose() * S.inverse();
-    const auto dx = K_gain * innov;
-
-    vel_ += dx.segment<3>(3);
-    vel_.setZero();
-    P_ -= K_gain * H * P_;
-    P_ = 0.5 * (P_ + P_.transpose());
-    total_drift_ = P_.diagonal().head<3>().cwiseSqrt().norm();
+    apply_linear_update(H, innov, R_meas, EstimatorSensorType::ZUPT, "zupt",
+                        true, true, true, false);
 }
 
 PoseEstimate EKFEstimator::state() const {
@@ -282,8 +302,8 @@ PoseEstimate EKFEstimator::state() const {
     est.orientation = q_;
     est.accel_bias = ba_;
     est.gyro_bias = bg_;
-    est.pos_std = P_.diagonal().head<3>().cwiseSqrt();
-    est.drift_m = total_drift_;
+    est.pos_std = P_.diagonal().head<3>().cwiseMax(kCovarianceFloor).cwiseSqrt();
+    est.drift_m = estimated_position_uncertainty_m_;
 
     const double uncertainty_norm = est.pos_std.norm();
     const double vision_age = (last_vision_update_ts_ >= 0.0)
@@ -319,6 +339,30 @@ PoseEstimate EKFEstimator::state() const {
         est.localization_source = "imu-dead-reckoning";
     }
     return est;
+}
+
+EstimatorDiagnostics EKFEstimator::diagnostics() const {
+    std::lock_guard lock(mtx_);
+    return diagnostics_;
+}
+
+void EKFEstimator::set_validation_config(EstimatorValidationConfig config) {
+    std::lock_guard lock(mtx_);
+    validation_cfg_ = std::move(config);
+    update_health_locked();
+}
+
+void EKFEstimator::note_timestamp_violation(const std::string& reason) {
+    std::lock_guard lock(mtx_);
+    ++diagnostics_.timestamp_rejection_count;
+    mark_measurement_rejected(EstimatorSensorType::IMU, reason);
+}
+
+void EKFEstimator::note_dropped_sensor_event(const std::string& reason) {
+    std::lock_guard lock(mtx_);
+    ++diagnostics_.dropped_sensor_event_count;
+    diagnostics_.last_rejection_reason = reason;
+    update_health_locked();
 }
 
 // Private helpers
@@ -372,6 +416,193 @@ Eigen::Quaterniond EKFEstimator::rotvec_to_quat(const Eigen::Vector3d& rv) {
 Eigen::Vector3d EKFEstimator::quat_to_rotvec(const Eigen::Quaterniond& q) {
     const Eigen::AngleAxisd aa(q);
     return aa.axis() * aa.angle();
+}
+
+template <int N>
+bool EKFEstimator::apply_linear_update(const Eigen::Matrix<double, N, 15>& H,
+                                       const Eigen::Matrix<double, N, 1>& innovation,
+                                       const Eigen::Matrix<double, N, N>& R_meas,
+                                       EstimatorSensorType sensor_type, const char* sensor_name,
+                                       bool apply_velocity, bool apply_biases,
+                                       bool apply_attitude, bool enable_gating) {
+    const auto started_at = std::chrono::steady_clock::now();
+    if (!matrix_is_finite(H) || !matrix_is_finite(innovation) || !matrix_is_finite(R_meas)) {
+        mark_invalid_input(std::string(sensor_name) + " update had non-finite matrices");
+        return false;
+    }
+
+    const Eigen::Matrix<double, N, N> S = H * P_ * H.transpose() + R_meas;
+    if (!matrix_is_finite(S)) {
+        mark_measurement_rejected(sensor_type, std::string(sensor_name) + " innovation covariance invalid");
+        return false;
+    }
+    Eigen::LDLT<Eigen::Matrix<double, N, N>> ldlt(S);
+    if (ldlt.info() != Eigen::Success) {
+        mark_measurement_rejected(sensor_type, std::string(sensor_name) + " innovation solve failed");
+        return false;
+    }
+
+    const double innovation_magnitude = innovation.norm();
+    const double mahal_sq = innovation.dot(ldlt.solve(innovation));
+    if (!std::isfinite(mahal_sq)) {
+        mark_measurement_rejected(sensor_type, std::string(sensor_name) + " mahalanobis invalid");
+        return false;
+    }
+    if (enable_gating && mahal_sq > cfg_.mahal_gate) {
+        mark_measurement_rejected(sensor_type, std::string(sensor_name) + " innovation gated");
+        diagnostics_.last_innovation_magnitude = innovation_magnitude;
+        diagnostics_.last_mahalanobis_distance = std::sqrt(std::max(0.0, mahal_sq));
+        return false;
+    }
+
+    const Eigen::Matrix<double, 15, N> K_gain =
+        ldlt.solve(H * P_.transpose()).transpose();
+    const Eigen::Matrix<double, 15, 1> dx = K_gain * innovation;
+    if (!matrix_is_finite(dx) || dx.norm() > kMaxCorrectionNorm) {
+        mark_measurement_rejected(sensor_type, std::string(sensor_name) + " correction invalid");
+        return false;
+    }
+
+    pos_ += dx.segment<3>(0);
+    if (apply_velocity) {
+        vel_ += dx.segment<3>(3);
+    }
+    if (apply_biases) {
+        ba_ += dx.segment<3>(9);
+        bg_ += dx.segment<3>(12);
+    }
+    if (apply_attitude) {
+        const Eigen::Vector3d dtheta = dx.segment<3>(6);
+        if (dtheta.norm() > 1e-8) {
+            q_ = q_ * rotvec_to_quat(dtheta);
+            q_.normalize();
+        }
+    }
+
+    const Eigen::Matrix<double, 15, 15> I_KH =
+        Eigen::Matrix<double, 15, 15>::Identity() - K_gain * H;
+    P_ = I_KH * P_ * I_KH.transpose() + K_gain * R_meas * K_gain.transpose();
+    finalize_covariance_locked();
+
+    mark_measurement_accepted(sensor_type, innovation_magnitude, std::sqrt(std::max(0.0, mahal_sq)));
+    accumulate_measurement_latency(
+        std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - started_at)
+            .count());
+    update_health_locked();
+    return true;
+}
+
+bool EKFEstimator::validate_measurement_noise(double sigma_m, const char* sensor_name) {
+    if (!std::isfinite(sigma_m) || sigma_m <= 0.0) {
+        if (logger_) {
+            logger_->warn("{} measurement rejected due to invalid sigma {}", sensor_name, sigma_m);
+        }
+        return false;
+    }
+    return true;
+}
+
+bool EKFEstimator::validate_state_finite() const {
+    return matrix_is_finite(pos_) && matrix_is_finite(vel_) && matrix_is_finite(ba_) &&
+           matrix_is_finite(bg_) && std::isfinite(q_.w()) && std::isfinite(q_.x()) &&
+           std::isfinite(q_.y()) && std::isfinite(q_.z());
+}
+
+bool EKFEstimator::validate_covariance_finite() const {
+    return matrix_is_finite(P_);
+}
+
+void EKFEstimator::finalize_covariance_locked() {
+    P_ = 0.5 * (P_ + P_.transpose());
+    for (int i = 0; i < P_.rows(); ++i) {
+        if (!std::isfinite(P_(i, i)) || P_(i, i) < kCovarianceFloor) {
+            P_(i, i) = kCovarianceFloor;
+        }
+    }
+    diagnostics_.covariance_symmetry_error = (P_ - P_.transpose()).cwiseAbs().maxCoeff();
+    diagnostics_.max_covariance_asymmetry =
+        std::max(diagnostics_.max_covariance_asymmetry, diagnostics_.covariance_symmetry_error);
+    diagnostics_.covariance_min_diagonal = P_.diagonal().minCoeff();
+    diagnostics_.minimum_covariance_diagonal_seen =
+        diagnostics_.propagation_count == 0 &&
+                diagnostics_.accepted_updates[sensor_index(EstimatorSensorType::VISION_FEATURE)] == 0 &&
+                diagnostics_.accepted_updates[sensor_index(EstimatorSensorType::VISUAL_POSE)] == 0 &&
+                diagnostics_.accepted_updates[sensor_index(EstimatorSensorType::DEPTH)] == 0 &&
+                diagnostics_.accepted_updates[sensor_index(EstimatorSensorType::ZUPT)] == 0
+            ? diagnostics_.covariance_min_diagonal
+            : std::min(diagnostics_.minimum_covariance_diagonal_seen,
+                       diagnostics_.covariance_min_diagonal);
+    estimated_position_uncertainty_m_ =
+        P_.diagonal().head<3>().cwiseMax(kCovarianceFloor).cwiseSqrt().norm();
+    diagnostics_.has_non_finite_covariance = !validate_covariance_finite();
+    diagnostics_.has_non_finite_state = !validate_state_finite();
+}
+
+void EKFEstimator::mark_measurement_rejected(EstimatorSensorType sensor_type, std::string reason) {
+    ++diagnostics_.rejected_updates[sensor_index(sensor_type)];
+    diagnostics_.last_rejection_reason = std::move(reason);
+    update_health_locked();
+}
+
+void EKFEstimator::mark_measurement_accepted(EstimatorSensorType sensor_type,
+                                             double innovation_magnitude,
+                                             double mahalanobis_distance) {
+    ++diagnostics_.accepted_updates[sensor_index(sensor_type)];
+    diagnostics_.last_innovation_magnitude = innovation_magnitude;
+    diagnostics_.last_mahalanobis_distance = mahalanobis_distance;
+    diagnostics_.last_rejection_reason = "none";
+}
+
+void EKFEstimator::mark_invalid_input(std::string reason) {
+    ++diagnostics_.invalid_input_count;
+    diagnostics_.last_rejection_reason = std::move(reason);
+    update_health_locked();
+}
+
+void EKFEstimator::update_health_locked() {
+    diagnostics_.has_non_finite_state = !validate_state_finite();
+    diagnostics_.has_non_finite_covariance = !validate_covariance_finite();
+    if (diagnostics_.has_non_finite_state || diagnostics_.has_non_finite_covariance) {
+        diagnostics_.health_state = EstimatorHealthState::INVALID;
+        return;
+    }
+    if (!initialized_) {
+        diagnostics_.health_state = EstimatorHealthState::INITIALIZING;
+        return;
+    }
+    if (diagnostics_.covariance_min_diagonal <= kCovarianceFloor ||
+        diagnostics_.covariance_symmetry_error > 1.0e-6) {
+        diagnostics_.health_state = EstimatorHealthState::NUMERICAL_WARNING;
+        return;
+    }
+    const uint64_t rejected_total = std::accumulate(diagnostics_.rejected_updates.begin(),
+                                                    diagnostics_.rejected_updates.end(), uint64_t{0});
+    if (rejected_total > 0 && diagnostics_.propagation_count == 0) {
+        diagnostics_.health_state = EstimatorHealthState::REJECTING_MEASUREMENTS;
+        return;
+    }
+    if (estimated_position_uncertainty_m_ > 1.8 || diagnostics_.invalid_input_count > 0) {
+        diagnostics_.health_state = EstimatorHealthState::DEGRADED;
+        return;
+    }
+    diagnostics_.health_state = EstimatorHealthState::NOMINAL;
+}
+
+void EKFEstimator::accumulate_propagation_latency(double latency_us) {
+    diagnostics_.max_update_latency_us = std::max(diagnostics_.max_update_latency_us, latency_us);
+    const double count = static_cast<double>(std::max<uint64_t>(1, diagnostics_.propagation_count));
+    diagnostics_.average_propagation_latency_us =
+        ((diagnostics_.average_propagation_latency_us * (count - 1.0)) + latency_us) / count;
+}
+
+void EKFEstimator::accumulate_measurement_latency(double latency_us) {
+    diagnostics_.max_update_latency_us = std::max(diagnostics_.max_update_latency_us, latency_us);
+    const uint64_t accepted_total =
+        std::accumulate(diagnostics_.accepted_updates.begin(), diagnostics_.accepted_updates.end(),
+                        uint64_t{0});
+    const double count = static_cast<double>(std::max<uint64_t>(1, accepted_total));
+    diagnostics_.average_measurement_latency_us =
+        ((diagnostics_.average_measurement_latency_us * (count - 1.0)) + latency_us) / count;
 }
 
 } // namespace drone::vio

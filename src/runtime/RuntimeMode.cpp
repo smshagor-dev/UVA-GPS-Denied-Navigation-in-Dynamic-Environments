@@ -168,6 +168,142 @@ RuntimeFileConfig load_runtime_file(const std::string& path) {
             drone::utils::simple_json::extract_string(content, "detector_labels_path")) {
         config.detector_labels_path = *detector_labels_path;
     }
+    config.estimator_config_present = content.find("\"estimator\"") != std::string::npos;
+    if (const auto mode = drone::utils::simple_json::extract_string(content, "mode")) {
+        config.estimator_mode = *mode;
+    }
+    if (const auto enable = drone::utils::simple_json::extract_bool(content,
+                                                                    "enable_experimental_hybrid")) {
+        config.estimator_enable_experimental_hybrid = *enable;
+    }
+    if (const auto enable = drone::utils::simple_json::extract_bool(content, "enable_fej")) {
+        config.estimator_enable_fej = *enable;
+    }
+    if (const auto enable = drone::utils::simple_json::extract_bool(content, "enable_msckf")) {
+        config.estimator_enable_msckf = *enable;
+    }
+    if (const auto enable = drone::utils::simple_json::extract_bool(
+            content, "enable_loop_closure_correction")) {
+        config.estimator_enable_loop_closure_correction = *enable;
+    }
+    if (const auto enable =
+            drone::utils::simple_json::extract_bool(content, "enable_automatic_zupt")) {
+        config.estimator_enable_automatic_zupt = *enable;
+    }
+    if (const auto enable = drone::utils::simple_json::extract_bool(content, "enabled")) {
+        config.estimator_shadow_requested = *enable;
+        config.estimator_enable_shadow_estimator = *enable;
+    }
+    if (const auto enable =
+            drone::utils::simple_json::extract_bool(content, "comparison_enabled")) {
+        config.estimator_shadow_comparison_enabled = *enable;
+    }
+    if (const auto implementation =
+            drone::utils::simple_json::extract_string(content, "implementation")) {
+        config.estimator_shadow_implementation = *implementation;
+    }
+    if (const auto max_depth =
+            drone::utils::simple_json::extract_number(content, "max_queue_depth")) {
+        config.estimator_shadow_max_queue_depth = static_cast<size_t>(*max_depth);
+    }
+    if (const auto max_lag =
+            drone::utils::simple_json::extract_number(content, "max_lag_ms")) {
+        config.estimator_shadow_max_lag_ms = *max_lag;
+    }
+    if (const auto threshold =
+            drone::utils::simple_json::extract_number(content, "position_divergence_m")) {
+        config.estimator_shadow_position_divergence_m = *threshold;
+    }
+    if (const auto threshold =
+            drone::utils::simple_json::extract_number(content, "velocity_divergence_mps")) {
+        config.estimator_shadow_velocity_divergence_mps = *threshold;
+    }
+    if (const auto threshold =
+            drone::utils::simple_json::extract_number(content, "orientation_divergence_deg")) {
+        config.estimator_shadow_orientation_divergence_deg = *threshold;
+    }
+    if (const auto samples = drone::utils::simple_json::extract_u64(
+            content, "required_consecutive_divergent_samples")) {
+        config.estimator_shadow_required_consecutive_divergent_samples =
+            static_cast<uint32_t>(*samples);
+    }
+    if (const auto enable = drone::utils::simple_json::extract_bool(
+            content, "reject_non_finite_measurements")) {
+        config.estimator_reject_non_finite_measurements = *enable;
+    }
+    if (const auto enable = drone::utils::simple_json::extract_bool(
+            content, "require_monotonic_timestamps")) {
+        config.estimator_require_monotonic_timestamps = *enable;
+    }
+    if (const auto dt = drone::utils::simple_json::extract_number(content, "max_imu_dt_s")) {
+        config.estimator_max_imu_dt_s = *dt;
+    }
+    if (const auto enable =
+            drone::utils::simple_json::extract_bool(content, "diagnostics_enabled")) {
+        config.estimator_diagnostics_enabled = *enable;
+    }
+    if (!std::isfinite(config.estimator_max_imu_dt_s) || config.estimator_max_imu_dt_s <= 0.0 ||
+        config.estimator_max_imu_dt_s > 0.5) {
+        config.estimator_config_valid = false;
+        config.estimator_errors.push_back("estimator.max_imu_dt_s must be finite and within (0, 0.5]");
+    }
+    if (const auto estimator_mode = lowercase(config.estimator_mode);
+        estimator_mode != "minimal" && estimator_mode != "hybrid_active") {
+        config.estimator_config_valid = false;
+        config.estimator_errors.push_back("unknown estimator.mode; only \"minimal\" is supported");
+    }
+    if (lowercase(config.estimator_mode) == "hybrid_active") {
+        config.estimator_config_valid = false;
+        config.estimator_errors.push_back(
+            "estimator.mode=\"hybrid_active\" is unsupported and rejected in phase 16");
+    }
+    if (config.estimator_enable_experimental_hybrid || config.estimator_enable_fej ||
+        config.estimator_enable_msckf || config.estimator_enable_loop_closure_correction) {
+        config.estimator_config_valid = false;
+        config.estimator_errors.push_back(
+            "Phase 15 keeps experimental hybrid/FEJ/MSCKF/loop-closure estimator features disabled");
+    }
+    if (config.estimator_enable_automatic_zupt) {
+        config.estimator_config_valid = false;
+        config.estimator_errors.push_back(
+            "automatic ZUPT remains disabled in phase 16");
+    }
+    if (config.estimator_shadow_requested && !config.estimator_shadow_compile_time_supported) {
+        config.estimator_config_valid = false;
+        config.estimator_errors.push_back(
+            "shadow estimator requested but compile-time shadow support is disabled");
+    }
+    if (config.estimator_shadow_implementation != "minimal_eskf_clone" &&
+        config.estimator_shadow_implementation != "minimal_shadow_clone") {
+        config.estimator_config_valid = false;
+        config.estimator_errors.push_back(
+            "shadow implementation is unsupported; expected minimal_eskf_clone");
+    }
+    if (config.estimator_shadow_max_queue_depth == 0 ||
+        config.estimator_shadow_max_queue_depth > 4096) {
+        config.estimator_config_valid = false;
+        config.estimator_errors.push_back(
+            "shadow.max_queue_depth must be within [1, 4096]");
+    }
+    for (const auto value : {config.estimator_shadow_max_lag_ms,
+                             config.estimator_shadow_position_divergence_m,
+                             config.estimator_shadow_velocity_divergence_mps,
+                             config.estimator_shadow_orientation_divergence_deg}) {
+        if (!std::isfinite(value) || value < 0.0) {
+            config.estimator_config_valid = false;
+            config.estimator_errors.push_back(
+                "shadow thresholds and lag values must be finite and non-negative");
+            break;
+        }
+    }
+    if (config.estimator_shadow_required_consecutive_divergent_samples == 0) {
+        config.estimator_config_valid = false;
+        config.estimator_errors.push_back(
+            "shadow.required_consecutive_divergent_samples must be positive");
+    }
+    config.estimator_shadow_effective =
+        config.estimator_config_valid && config.estimator_shadow_requested &&
+        config.estimator_shadow_compile_time_supported;
     return config;
 }
 

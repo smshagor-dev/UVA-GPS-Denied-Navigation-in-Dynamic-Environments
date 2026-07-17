@@ -160,7 +160,7 @@ jobs:
 
       - name: Python syntax validation
         shell: bash
-        run: python3 -m py_compile tests/__init__.py tests/test_dashboard_backend_status.py main.py scripts/generate_firmware_manifest.py scripts/drone_setup.py scripts/bench_check.py scripts/local_validate.py scripts/generate_tls_certs.py scripts/pre_arm_check.py scripts/production_telemetry_smoke_test.py scripts/telemetry_smoke_test.py gui/dashboard.py gui/backend_status.py gui/operator_console.py
+        run: python3 -m py_compile tests/__init__.py tests/test_dashboard_backend_status.py main.py scripts/generate_firmware_manifest.py scripts/drone_setup.py scripts/bench_check.py scripts/local_validate.py scripts/generate_tls_certs.py scripts/pre_arm_check.py scripts/production_telemetry_smoke_test.py scripts/telemetry_smoke_test.py scripts/phase15_estimator_replay.py gui/dashboard.py gui/backend_status.py gui/operator_console.py
 
       - name: Python unit tests with coverage
         shell: bash
@@ -171,12 +171,29 @@ jobs:
           python3 -m coverage report | tee "${RUNNER_TEMP}/python-coverage/coverage.txt"
           python3 -m coverage xml -o "${RUNNER_TEMP}/python-coverage/coverage.xml"
 
+      - name: Deterministic estimator replay baseline
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/phase15-estimator"
+          python3 scripts/phase15_estimator_replay.py \
+            --input datasets/estimator/phase15_stationary_replay.json \
+            --output "${RUNNER_TEMP}/phase15-estimator/replay_report.json"
+
       - name: Upload Python coverage
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: python-coverage-${{ github.sha }}
           path: ${{ runner.temp }}/python-coverage
+          retention-days: 14
+
+      - name: Upload estimator replay report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: phase15-estimator-replay-${{ github.sha }}
+          path: ${{ runner.temp }}/phase15-estimator
           retention-days: 14
 
   go-ci:
@@ -254,12 +271,31 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/ctest-linux-gcc-validation"
           ctest --preset validation-linux-gcc --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-gcc-validation/junit.xml"
 
+      - name: Native replay and benchmark smoke
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p "${RUNNER_TEMP}/phase16-estimator"
+          build_dir="build/validation-linux-gcc"
+          "${build_dir}/tools/Release/estimator_replay_runner" \
+            --input datasets/estimator/phase15_stationary_replay.json \
+            --output "${RUNNER_TEMP}/phase16-estimator/replay_active.json" \
+            --mode active_only
+          "${build_dir}/tools/Release/estimator_replay_runner" \
+            --input datasets/estimator/phase15_stationary_replay.json \
+            --output "${RUNNER_TEMP}/phase16-estimator/replay_shadow.json" \
+            --mode active_with_identical_shadow
+          "${build_dir}/tools/Release/estimator_shadow_benchmark" \
+            --output "${RUNNER_TEMP}/phase16-estimator/benchmark.json"
+
       - name: Upload Linux GCC reports
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: ctest-linux-gcc-validation-${{ github.sha }}
-          path: ${{ runner.temp }}/ctest-linux-gcc-validation
+          path: |
+            ${{ runner.temp }}/ctest-linux-gcc-validation
+            ${{ runner.temp }}/phase16-estimator
           retention-days: 14
 
   linux-gcc-debug:
@@ -450,12 +486,33 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\ctest-windows-msvc-validation" | Out-Null
           ctest --preset validation-msvc --parallel 2 --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-validation\junit.xml"
 
+      - name: Native replay and benchmark smoke
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\phase16-estimator" | Out-Null
+          $buildDir = "build/validation-msvc"
+          & "$buildDir/tools/Release/estimator_replay_runner.exe" `
+            --input "datasets/estimator/phase15_stationary_replay.json" `
+            --output "$env:RUNNER_TEMP\phase16-estimator\replay_active.json" `
+            --mode active_only
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$buildDir/tools/Release/estimator_replay_runner.exe" `
+            --input "datasets/estimator/phase15_stationary_replay.json" `
+            --output "$env:RUNNER_TEMP\phase16-estimator\replay_shadow.json" `
+            --mode active_with_identical_shadow
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$buildDir/tools/Release/estimator_shadow_benchmark.exe" `
+            --output "$env:RUNNER_TEMP\phase16-estimator\benchmark.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Upload Windows validation reports
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: ctest-windows-msvc-validation-${{ github.sha }}
-          path: ${{ runner.temp }}\ctest-windows-msvc-validation
+          path: |
+            ${{ runner.temp }}\ctest-windows-msvc-validation
+            ${{ runner.temp }}\phase16-estimator
           if-no-files-found: ignore
           retention-days: 14
 

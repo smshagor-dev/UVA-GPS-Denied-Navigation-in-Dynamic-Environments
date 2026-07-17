@@ -154,6 +154,25 @@ TEST(LocalizationFusion, MarksLocalizationLostWhenCameraAndSyncCollapse) {
     EXPECT_LT(output.confidence, 0.22);
 }
 
+TEST(LocalizationFusion, RejectsNonFiniteTdoaInput) {
+    localization::LocalizationFusion fusion;
+    localization::LocalizationFusionInput input;
+    input.vio_pose.position = Eigen::Vector3d(1.0, 2.0, 3.0);
+    input.vio_pose.drift_m = 0.5;
+    input.vio_pose.localization_confidence = 0.8;
+    input.camera_available = true;
+
+    localization::TDOALocalizer::Solution tdoa_solution;
+    tdoa_solution.position =
+        Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0);
+    tdoa_solution.confidence = 0.9;
+    input.tdoa_solution = tdoa_solution;
+
+    const auto output = fusion.update(input);
+    EXPECT_EQ(output.source, "vision-inertial");
+    EXPECT_DOUBLE_EQ(output.tdoa_weight, 0.0);
+}
+
 TEST(OccupancyGridMap, TracksAnchorAndObstacleCoverage) {
     slam::OccupancyGridMap map;
     sensors::LidarMeasurement scan;
@@ -293,6 +312,42 @@ TEST(RuntimeMode, RuntimeFileLoadsEscapedPaths) {
     EXPECT_EQ(result.anchor_config_path, "config/anchors.json");
     EXPECT_EQ(result.lidar_config_path, "config/lidar.json");
     EXPECT_EQ(result.detector_labels_path, "config/detector_labels.json");
+
+    std::filesystem::remove(temp_path);
+}
+
+TEST(RuntimeMode, RuntimeFileLoadsEstimatorValidationDefaults) {
+    const auto temp_path = std::filesystem::temp_directory_path() / "runtime_estimator.json";
+    {
+        std::ofstream output(temp_path.string(), std::ios::trunc);
+        ASSERT_TRUE(output.is_open());
+        output << R"({
+  "runtime_mode": "bench",
+  "anchor_config_path": "config\/anchors.json",
+  "lidar_config_path": "config\/lidar.json",
+  "detector_labels_path": "config\/detector_labels.json",
+  "estimator": {
+    "mode": "minimal",
+    "enable_experimental_hybrid": false,
+    "enable_fej": false,
+    "enable_msckf": false,
+    "enable_loop_closure_correction": false,
+    "enable_automatic_zupt": false,
+    "reject_non_finite_measurements": true,
+    "require_monotonic_timestamps": true,
+    "max_imu_dt_s": 0.1,
+    "diagnostics_enabled": true
+  }
+})";
+    }
+
+    const auto result = runtime::load_runtime_file(temp_path.string());
+    EXPECT_TRUE(result.loaded);
+    EXPECT_TRUE(result.estimator_config_present);
+    EXPECT_TRUE(result.estimator_config_valid);
+    EXPECT_EQ(result.estimator_mode, "minimal");
+    EXPECT_FALSE(result.estimator_enable_experimental_hybrid);
+    EXPECT_DOUBLE_EQ(result.estimator_max_imu_dt_s, 0.1);
 
     std::filesystem::remove(temp_path);
 }

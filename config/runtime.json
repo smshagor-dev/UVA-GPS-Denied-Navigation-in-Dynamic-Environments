@@ -21,6 +21,18 @@
     "simulation_fallback_enabled": false,
     "pre_arm_required": true,
     "bench_validation_required": true,
+    "estimator": {
+      "mode": "minimal",
+      "enable_experimental_hybrid": false,
+      "enable_fej": false,
+      "enable_msckf": false,
+      "enable_loop_closure_correction": false,
+      "enable_automatic_zupt": false,
+      "reject_non_finite_measurements": true,
+      "require_monotonic_timestamps": true,
+      "max_imu_dt_s": 0.1,
+      "diagnostics_enabled": true
+    },
     "edge_swarm_defaults": {
       "mesh_topology_mode": "adaptive_mesh",
       "peer_sync_interval_ms": 100,

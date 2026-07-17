@@ -24,6 +24,35 @@ struct RuntimeFileConfig {
     std::string anchor_config_path;
     std::string lidar_config_path;
     std::string detector_labels_path;
+    bool estimator_config_present{false};
+    bool estimator_config_valid{true};
+    std::vector<std::string> estimator_errors{};
+    std::string estimator_mode{"minimal"};
+    bool estimator_enable_experimental_hybrid{false};
+    bool estimator_enable_fej{false};
+    bool estimator_enable_msckf{false};
+    bool estimator_enable_loop_closure_correction{false};
+    bool estimator_enable_automatic_zupt{false};
+    bool estimator_shadow_requested{false};
+    bool estimator_enable_shadow_estimator{false};
+    bool estimator_shadow_effective{false};
+#ifdef DRONE_ENABLE_EXPERIMENTAL_ESTIMATOR_SHADOW
+    bool estimator_shadow_compile_time_supported{true};
+#else
+    bool estimator_shadow_compile_time_supported{false};
+#endif
+    bool estimator_shadow_comparison_enabled{true};
+    std::string estimator_shadow_implementation{"minimal_eskf_clone"};
+    size_t estimator_shadow_max_queue_depth{512};
+    double estimator_shadow_max_lag_ms{100.0};
+    double estimator_shadow_position_divergence_m{0.25};
+    double estimator_shadow_velocity_divergence_mps{0.20};
+    double estimator_shadow_orientation_divergence_deg{5.0};
+    uint32_t estimator_shadow_required_consecutive_divergent_samples{10};
+    bool estimator_reject_non_finite_measurements{true};
+    bool estimator_require_monotonic_timestamps{true};
+    double estimator_max_imu_dt_s{0.1};
+    bool estimator_diagnostics_enabled{true};
 };
 
 struct RuntimeValidationInputs {

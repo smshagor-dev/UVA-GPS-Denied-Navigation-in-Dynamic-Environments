@@ -20,6 +20,29 @@
     "safety_manager_enabled": true,
     "simulation_fallback_enabled": false,
     "pre_arm_required": true,
-    "bench_validation_required": true
+    "bench_validation_required": true,
+    "estimator": {
+      "mode": "minimal",
+      "enable_experimental_hybrid": false,
+      "enable_fej": false,
+      "enable_msckf": false,
+      "enable_loop_closure_correction": false,
+      "enable_automatic_zupt": false,
+      "shadow": {
+        "enabled": false,
+        "comparison_enabled": true,
+        "implementation": "minimal_eskf_clone",
+        "max_queue_depth": 512,
+        "max_lag_ms": 100.0,
+        "position_divergence_m": 0.25,
+        "velocity_divergence_mps": 0.2,
+        "orientation_divergence_deg": 5.0,
+        "required_consecutive_divergent_samples": 10
+      },
+      "reject_non_finite_measurements": true,
+      "require_monotonic_timestamps": true,
+      "max_imu_dt_s": 0.1,
+      "diagnostics_enabled": true
+    }
   }
 }

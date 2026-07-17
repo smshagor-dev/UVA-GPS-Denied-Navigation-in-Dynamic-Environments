@@ -10,7 +10,9 @@
 
 #include <Eigen/Core>
 #include <Eigen/Geometry>
+#include <array>
 #include <chrono>
+#include <cstdint>
 #include <mutex>
 #include <numbers>
 #include <optional>
@@ -58,6 +60,67 @@ struct EKFConfig {
 
     // Outlier rejection gate (chiÂ² threshold, 3 dof)
     double mahal_gate{7.815};
+};
+
+enum class EstimatorSensorType : uint8_t {
+    IMU = 0,
+    VISION_FEATURE = 1,
+    VISUAL_POSE = 2,
+    DEPTH = 3,
+    ZUPT = 4,
+    COUNT = 5,
+};
+
+enum class EstimatorHealthState : uint8_t {
+    INITIALIZING = 0,
+    NOMINAL,
+    DEGRADED,
+    REJECTING_MEASUREMENTS,
+    NUMERICAL_WARNING,
+    INVALID,
+};
+
+struct EstimatorValidationConfig {
+    std::string mode{"minimal"};
+    bool enable_experimental_hybrid{false};
+    bool enable_fej{false};
+    bool enable_msckf{false};
+    bool enable_loop_closure_correction{false};
+    bool enable_automatic_zupt{false};
+    bool enable_shadow_estimator{false};
+    bool shadow_comparison_enabled{true};
+    size_t shadow_max_queue_depth{512};
+    double shadow_max_lag_ms{100.0};
+    double shadow_position_divergence_m{0.25};
+    double shadow_velocity_divergence_mps{0.20};
+    double shadow_orientation_divergence_deg{5.0};
+    uint32_t shadow_required_consecutive_divergent_samples{10};
+    bool reject_non_finite_measurements{true};
+    bool require_monotonic_timestamps{true};
+    double max_imu_dt_s{0.1};
+    bool diagnostics_enabled{true};
+};
+
+struct EstimatorDiagnostics {
+    uint64_t propagation_count{0};
+    std::array<uint64_t, static_cast<size_t>(EstimatorSensorType::COUNT)> accepted_updates{};
+    std::array<uint64_t, static_cast<size_t>(EstimatorSensorType::COUNT)> rejected_updates{};
+    uint64_t invalid_input_count{0};
+    uint64_t timestamp_rejection_count{0};
+    uint64_t dropped_sensor_event_count{0};
+    double last_innovation_magnitude{0.0};
+    double last_mahalanobis_distance{0.0};
+    double covariance_symmetry_error{0.0};
+    double covariance_min_diagonal{0.0};
+    double max_covariance_asymmetry{0.0};
+    double minimum_covariance_diagonal_seen{0.0};
+    double max_update_latency_us{0.0};
+    double average_propagation_latency_us{0.0};
+    double average_measurement_latency_us{0.0};
+    bool has_non_finite_state{false};
+    bool has_non_finite_covariance{false};
+    EstimatorHealthState health_state{EstimatorHealthState::INITIALIZING};
+    std::string last_rejection_reason{"none"};
 };
 
 // Pose output
@@ -125,11 +188,21 @@ public:
     //  Query â”€
     [[nodiscard]] PoseEstimate state() const;
     [[nodiscard]] double total_drift_m() const {
-        return total_drift_;
+        return estimated_position_uncertainty_m_;
+    }
+    [[nodiscard]] double estimated_position_uncertainty_m() const {
+        return estimated_position_uncertainty_m_;
     }
     [[nodiscard]] bool is_initialized() const {
         return initialized_;
     }
+    [[nodiscard]] EstimatorDiagnostics diagnostics() const;
+    void set_validation_config(EstimatorValidationConfig config);
+    [[nodiscard]] const EstimatorValidationConfig& validation_config() const {
+        return validation_cfg_;
+    }
+    void note_timestamp_violation(const std::string& reason);
+    void note_dropped_sensor_event(const std::string& reason);
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -145,6 +218,28 @@ private:
     // Box-plus / box-minus for error-state
     static Eigen::Vector3d quat_to_rotvec(const Eigen::Quaterniond& q);
     static Eigen::Quaterniond rotvec_to_quat(const Eigen::Vector3d& rv);
+    static constexpr size_t sensor_index(EstimatorSensorType sensor) {
+        return static_cast<size_t>(sensor);
+    }
+
+    template <int N>
+    bool apply_linear_update(const Eigen::Matrix<double, N, 15>& H,
+                             const Eigen::Matrix<double, N, 1>& innovation,
+                             const Eigen::Matrix<double, N, N>& R_meas,
+                             EstimatorSensorType sensor_type, const char* sensor_name,
+                             bool apply_velocity = true, bool apply_biases = true,
+                             bool apply_attitude = true, bool enable_gating = true);
+    [[nodiscard]] bool validate_measurement_noise(double sigma_m, const char* sensor_name);
+    [[nodiscard]] bool validate_state_finite() const;
+    [[nodiscard]] bool validate_covariance_finite() const;
+    void finalize_covariance_locked();
+    void mark_measurement_rejected(EstimatorSensorType sensor_type, std::string reason);
+    void mark_measurement_accepted(EstimatorSensorType sensor_type, double innovation_magnitude,
+                                   double mahalanobis_distance);
+    void mark_invalid_input(std::string reason);
+    void update_health_locked();
+    void accumulate_propagation_latency(double latency_us);
+    void accumulate_measurement_latency(double latency_us);
 
     // Nominal state
     Eigen::Vector3d pos_{Eigen::Vector3d::Zero()};
@@ -160,12 +255,14 @@ private:
     QNoiseMat Q_imu_{QNoiseMat::Zero()};
 
     double timestamp_{0.0};
-    double total_drift_{0.0};
+    double estimated_position_uncertainty_m_{0.0};
     bool initialized_{false};
     double last_vision_update_ts_{-1.0};
     double last_depth_update_ts_{-1.0};
 
     EKFConfig cfg_;
+    EstimatorValidationConfig validation_cfg_{};
+    EstimatorDiagnostics diagnostics_{};
     mutable std::mutex mtx_;
 
     std::shared_ptr<spdlog::logger> logger_{spdlog::get("EKF")};

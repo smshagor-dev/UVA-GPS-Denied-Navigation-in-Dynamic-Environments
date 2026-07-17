@@ -9,6 +9,9 @@
 // Drone Swarm Sensor Fusion  |  Phase 2
 
 #include "vio/EKFEstimator.hpp"
+#include "estimation/EstimatorCoordinator.hpp"
+#include "estimation/MeasurementAdapters.hpp"
+#include "estimation/MinimalEskfAdapter.hpp"
 #include "sensors/IMUSensor.hpp"
 #include "sensors/CameraSensor.hpp"
 #include "sensors/LidarSensor.hpp"
@@ -87,6 +90,21 @@ struct RuntimeTelemetry {
     double visual_update_confidence{0.0};
     bool visual_frontend_valid{false};
     bool visual_placeholder_active{false};
+    std::string active_estimator_name{"minimal_eskf"};
+    std::string shadow_estimator_name{"disabled"};
+    std::string active_estimator_health{"initializing"};
+    std::string shadow_estimator_health{"disabled"};
+    bool shadow_enabled{false};
+    double shadow_lag_ms{0.0};
+    size_t shadow_queue_depth{0};
+    size_t shadow_queue_high_water_mark{0};
+    uint64_t shadow_dropped_events{0};
+    double shadow_position_delta_m{0.0};
+    double shadow_velocity_delta_mps{0.0};
+    double shadow_orientation_delta_deg{0.0};
+    bool shadow_divergence_active{false};
+    std::string shadow_last_failure_reason{"none"};
+    uint64_t shadow_comparable_snapshot_count{0};
 };
 
 struct VisualFrontendMetrics {
@@ -121,7 +139,7 @@ class VIOPipeline {
 public:
     using PoseCallback = std::function<void(const PoseEstimate&)>;
 
-    explicit VIOPipeline(EKFConfig cfg = EKFConfig{}) : ekf_(cfg) {}
+    explicit VIOPipeline(EKFConfig cfg = EKFConfig{});
 
     ~VIOPipeline() {
         stop();
@@ -139,11 +157,18 @@ public:
     void set_runtime_mode(drone::runtime::RuntimeMode mode) {
         runtime_mode_ = mode;
     }
+    void set_estimator_validation_config(const EstimatorValidationConfig& config) {
+        estimator_validation_config_ = config;
+        active_estimator_->set_validation_config(config);
+    }
+    [[nodiscard]] EstimatorDiagnostics estimator_diagnostics() const {
+        return coordinator_.active_snapshot().diagnostics;
+    }
 
     //  State query â”€
     [[nodiscard]] PoseEstimate current_pose() const;
     [[nodiscard]] double drift_m() const {
-        return ekf_.total_drift_m();
+        return coordinator_.active_snapshot().pose.drift_m;
     }
     [[nodiscard]] RuntimeTelemetry runtime_telemetry() const {
         std::lock_guard lock(runtime_mutex_);
@@ -167,6 +192,22 @@ public:
         telemetry.visual_update_confidence = runtime_telemetry_.visual_update_confidence;
         telemetry.visual_frontend_valid = runtime_telemetry_.visual_frontend_valid;
         telemetry.visual_placeholder_active = runtime_telemetry_.visual_placeholder_active;
+        telemetry.active_estimator_name = runtime_telemetry_.active_estimator_name;
+        telemetry.shadow_estimator_name = runtime_telemetry_.shadow_estimator_name;
+        telemetry.active_estimator_health = runtime_telemetry_.active_estimator_health;
+        telemetry.shadow_estimator_health = runtime_telemetry_.shadow_estimator_health;
+        telemetry.shadow_enabled = runtime_telemetry_.shadow_enabled;
+        telemetry.shadow_lag_ms = runtime_telemetry_.shadow_lag_ms;
+        telemetry.shadow_queue_depth = runtime_telemetry_.shadow_queue_depth;
+        telemetry.shadow_queue_high_water_mark = runtime_telemetry_.shadow_queue_high_water_mark;
+        telemetry.shadow_dropped_events = runtime_telemetry_.shadow_dropped_events;
+        telemetry.shadow_position_delta_m = runtime_telemetry_.shadow_position_delta_m;
+        telemetry.shadow_velocity_delta_mps = runtime_telemetry_.shadow_velocity_delta_mps;
+        telemetry.shadow_orientation_delta_deg = runtime_telemetry_.shadow_orientation_delta_deg;
+        telemetry.shadow_divergence_active = runtime_telemetry_.shadow_divergence_active;
+        telemetry.shadow_last_failure_reason = runtime_telemetry_.shadow_last_failure_reason;
+        telemetry.shadow_comparable_snapshot_count =
+            runtime_telemetry_.shadow_comparable_snapshot_count;
         runtime_telemetry_ = std::move(telemetry);
     }
 
@@ -180,8 +221,14 @@ private:
     void handle(const sensors::CameraFrame& frame);
     void handle(const sensors::LidarMeasurement&);
     void apply_visual_quality_to_pose(PoseEstimate& pose) const;
+    void update_shadow_runtime_telemetry();
+    [[nodiscard]] static std::string estimator_health_to_string(EstimatorHealthState state);
+    [[nodiscard]] static std::string shadow_health_to_string(estimation::ShadowHealthState state);
 
-    EKFEstimator ekf_;
+    EKFConfig ekf_config_{};
+    std::shared_ptr<estimation::MinimalEskfAdapter> active_estimator_;
+    estimation::EstimatorCoordinator coordinator_;
+    EstimatorValidationConfig estimator_validation_config_{};
 
     std::shared_ptr<sensors::IMUSensor> imu_;
     std::shared_ptr<sensors::CameraSensor> cam_;
@@ -206,6 +253,7 @@ private:
     VisualFrontendMetrics last_visual_metrics_{};
     mutable std::mutex runtime_mutex_;
     RuntimeTelemetry runtime_telemetry_{};
+    uint64_t measurement_sequence_{0};
 
     std::shared_ptr<spdlog::logger> logger_{spdlog::get("VIO")};
 };

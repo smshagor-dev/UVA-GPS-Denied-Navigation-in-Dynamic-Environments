@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "scenario": "stationary_bias_free_baseline",
+  "initial_state": {
+    "position": [0.0, 0.0, 0.0],
+    "velocity": [0.0, 0.0, 0.0],
+    "yaw_rad": 0.0
+  },
+  "records": [
+    {
+      "type": "imu",
+      "timestamp_s": 0.01,
+      "accel_mps2": [0.0, 0.0, 9.81],
+      "gyro_rads": [0.0, 0.0, 0.0]
+    },
+    {
+      "type": "imu",
+      "timestamp_s": 0.02,
+      "accel_mps2": [0.0, 0.0, 9.81],
+      "gyro_rads": [0.0, 0.0, 0.0]
+    },
+    {
+      "type": "depth",
+      "timestamp_s": 0.03,
+      "z_world_m": 0.02,
+      "sigma_m": 0.05
+    },
+    {
+      "type": "visual_pose",
+      "timestamp_s": 0.04,
+      "position_m": [0.01, 0.0, 0.02],
+      "velocity_mps": [0.0, 0.0, 0.0],
+      "sigma_position_m": 0.2,
+      "sigma_velocity_mps": 0.2
+    },
+    {
+      "type": "ground_truth",
+      "timestamp_s": 0.05,
+      "position_m": [0.01, 0.0, 0.02],
+      "velocity_mps": [0.0, 0.0, 0.0],
+      "yaw_rad": 0.0
+    }
+  ]
+}

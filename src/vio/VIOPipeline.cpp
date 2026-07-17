@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <mutex>
+#include <memory>
 #include <numeric>
 
 namespace drone::vio {
@@ -72,6 +73,12 @@ double mean_optical_flow_error(const std::vector<float>& errors, const std::vect
 }
 
 } // namespace
+
+VIOPipeline::VIOPipeline(EKFConfig cfg)
+    : ekf_config_(cfg), active_estimator_(std::make_shared<estimation::MinimalEskfAdapter>(cfg)),
+      coordinator_(std::static_pointer_cast<estimation::StateEstimator>(active_estimator_)) {
+    active_estimator_->set_validation_config(estimator_validation_config_);
+}
 
 bool visual_placeholder_allowed(drone::runtime::RuntimeMode mode) {
     return mode == drone::runtime::RuntimeMode::SIMULATION;
@@ -266,7 +273,27 @@ bool VIOPipeline::start() {
     if (running_.exchange(true))
         return true;
 
-    ekf_.reset();
+    coordinator_.reset({});
+    if (estimator_validation_config_.enable_shadow_estimator) {
+        estimation::ShadowEstimatorConfig shadow_config;
+        shadow_config.enabled = true;
+        shadow_config.comparison_enabled = estimator_validation_config_.shadow_comparison_enabled;
+        shadow_config.max_queue_depth = estimator_validation_config_.shadow_max_queue_depth;
+        shadow_config.max_lag_ms = estimator_validation_config_.shadow_max_lag_ms;
+        shadow_config.thresholds.position_divergence_m =
+            estimator_validation_config_.shadow_position_divergence_m;
+        shadow_config.thresholds.velocity_divergence_mps =
+            estimator_validation_config_.shadow_velocity_divergence_mps;
+        shadow_config.thresholds.orientation_divergence_deg =
+            estimator_validation_config_.shadow_orientation_divergence_deg;
+        shadow_config.thresholds.required_consecutive_divergent_samples =
+            estimator_validation_config_.shadow_required_consecutive_divergent_samples;
+        auto shadow = std::make_unique<estimation::MinimalEskfAdapter>(ekf_config_);
+        shadow->set_validation_config(estimator_validation_config_);
+        coordinator_.configure_shadow(std::move(shadow_config), std::move(shadow));
+    } else {
+        coordinator_.stop_shadow();
+    }
 
     proc_thread_ = std::thread([this] { processing_loop(); });
 
@@ -281,6 +308,7 @@ void VIOPipeline::stop() {
     queue_cv_.notify_all();
     if (proc_thread_.joinable())
         proc_thread_.join();
+    coordinator_.stop_shadow();
     if (logger_)
         logger_->info("VIO pipeline stopped");
 }
@@ -289,9 +317,10 @@ void VIOPipeline::reset() {
     std::lock_guard lock(queue_mutex_);
     while (!event_queue_.empty())
         event_queue_.pop();
-    ekf_.reset();
+    coordinator_.reset({});
     last_imu_ts_ = -1.0;
     last_camera_ts_ = -1.0;
+    measurement_sequence_ = 0;
     previous_gray_frame_.release();
     previous_camera_pose_valid_ = false;
     {
@@ -301,7 +330,7 @@ void VIOPipeline::reset() {
 }
 
 PoseEstimate VIOPipeline::current_pose() const {
-    auto pose = ekf_.state();
+    auto pose = coordinator_.active_snapshot().pose;
     apply_visual_quality_to_pose(pose);
     return pose;
 }
@@ -340,28 +369,41 @@ void VIOPipeline::processing_loop() {
 }
 
 void VIOPipeline::handle(const sensors::ImuMeasurement& imu) {
-    if (!ekf_.is_initialized()) {
-        ekf_.reset();
+    if (coordinator_.active_snapshot().diagnostics.health_state == EstimatorHealthState::INITIALIZING &&
+        last_imu_ts_ < 0.0) {
+        coordinator_.reset({});
         last_imu_ts_ = imu.timestamp;
         return;
     }
 
-    const double dt = (last_imu_ts_ > 0.0) ? (imu.timestamp - last_imu_ts_) : 0.0025;
-
-    last_imu_ts_ = imu.timestamp;
-
-    if (dt > 0.0 && dt < 0.1) {
-        ekf_.propagate_imu(imu.accel_mps2, imu.gyro_rads, dt);
+    if (!imu.accel_mps2.array().isFinite().all() || !imu.gyro_rads.array().isFinite().all() ||
+        !std::isfinite(imu.timestamp)) {
+        return;
     }
+
+    const double dt = (last_imu_ts_ > 0.0) ? (imu.timestamp - last_imu_ts_) : 0.0025;
+    if (last_imu_ts_ > 0.0 && dt <= 0.0) {
+        return;
+    }
+    if (dt >= 0.1) {
+        last_imu_ts_ = imu.timestamp;
+        return;
+    }
+    last_imu_ts_ = imu.timestamp;
+    const auto adapted = estimation::MeasurementAdapters::adapt_imu(imu, ++measurement_sequence_);
+    if (adapted.measurement.has_value()) {
+        static_cast<void>(coordinator_.process(*adapted.measurement));
+    }
+    update_shadow_runtime_telemetry();
 }
 
 void VIOPipeline::handle(const sensors::CameraFrame& frame) {
-    if (!ekf_.is_initialized())
+    if (coordinator_.active_snapshot().diagnostics.health_state == EstimatorHealthState::INITIALIZING)
         return;
     if (frame.detections.empty() && frame.image.empty())
         return;
 
-    const auto predicted_pose = ekf_.state();
+    const auto predicted_pose = coordinator_.active_snapshot().pose;
     VisualFrontendResult frontend_result;
     cv::Mat current_gray = to_gray(frame.image);
     const double dt = (last_camera_ts_ > 0.0) ? (frame.timestamp - last_camera_ts_) : 0.0;
@@ -375,13 +417,13 @@ void VIOPipeline::handle(const sensors::CameraFrame& frame) {
     }
 
     if (frontend_result.metrics.update_accepted) {
-        const double sigma_position_m = std::clamp(
-            0.50 - (frontend_result.metrics.visual_update_confidence * 0.28), 0.14, 0.50);
-        const double sigma_velocity_mps = std::clamp(
-            0.65 - (frontend_result.metrics.visual_update_confidence * 0.30), 0.18, 0.65);
-        ekf_.update_visual_pose(frontend_result.observed_position,
-                                frontend_result.observed_velocity, sigma_position_m,
-                                sigma_velocity_mps);
+        const auto adapted = estimation::MeasurementAdapters::adapt_visual_pose(
+            frame.timestamp, frontend_result.observed_position, frontend_result.observed_velocity,
+            frontend_result.relative_orientation, frontend_result.metrics.visual_update_confidence,
+            frontend_result.metrics.update_accepted, ++measurement_sequence_, false);
+        if (adapted.measurement.has_value()) {
+            static_cast<void>(coordinator_.process(*adapted.measurement));
+        }
     } else if (visual_placeholder_allowed(runtime_mode_) && !frame.detections.empty()) {
         const auto placeholder =
             build_placeholder_visual_frontend_result(frame, predicted_pose, K_);
@@ -402,7 +444,7 @@ void VIOPipeline::handle(const sensors::CameraFrame& frame) {
             p_world.push_back(predicted_pose.position + forward * 5.0);
         }
         if (!z_pixels.empty()) {
-            ekf_.update_vision(z_pixels, p_world, K_);
+            active_estimator_->estimator().update_vision(z_pixels, p_world, K_);
         }
     }
 
@@ -422,13 +464,15 @@ void VIOPipeline::handle(const sensors::CameraFrame& frame) {
     }
 
     previous_gray_frame_ = current_gray;
-    previous_camera_pose_ = ekf_.state();
+    previous_camera_pose_ = coordinator_.active_snapshot().pose;
     previous_camera_pose_valid_ = true;
     last_camera_ts_ = frame.timestamp;
+    update_shadow_runtime_telemetry();
 }
 
 void VIOPipeline::handle(const sensors::LidarMeasurement& lidar) {
-    if (!ekf_.is_initialized() || !lidar.cloud)
+    if (coordinator_.active_snapshot().diagnostics.health_state == EstimatorHealthState::INITIALIZING ||
+        !lidar.cloud)
         return;
 
     if (lidar.cloud->empty())
@@ -446,10 +490,15 @@ void VIOPipeline::handle(const sensors::LidarMeasurement& lidar) {
     std::nth_element(z_vals.begin(), z_vals.begin() + z_vals.size() / 2, z_vals.end());
     const double ground_z = z_vals[z_vals.size() / 2];
 
-    const auto pose = ekf_.state();
+    const auto pose = coordinator_.active_snapshot().pose;
     const double height = pose.position.z() - ground_z;
-    if (height > 0.3 && height < 100.0)
-        ekf_.update_depth(pose.position.z(), 0.05);
+    if (!std::isfinite(height) || height <= 0.3 || height >= 100.0) {
+        return;
+    }
+    // Phase 15 safety baseline: this plane fit only provides a local sensor-frame ground-relative
+    // height. Without explicit frame calibration and observability to world-frame altitude, it is
+    // unsafe to feed it into the active EKF depth update.
+    update_shadow_runtime_telemetry();
 }
 
 void VIOPipeline::apply_visual_quality_to_pose(PoseEstimate& pose) const {
@@ -477,6 +526,69 @@ void VIOPipeline::apply_visual_quality_to_pose(PoseEstimate& pose) const {
     if (pose.localization_confidence < 0.22) {
         pose.localization_lost = true;
     }
+}
+
+void VIOPipeline::update_shadow_runtime_telemetry() {
+    const auto telemetry = coordinator_.telemetry();
+    {
+        std::lock_guard lock(runtime_mutex_);
+        runtime_telemetry_.active_estimator_name = telemetry.active_estimator_name;
+        runtime_telemetry_.shadow_estimator_name = telemetry.shadow_estimator_name;
+        runtime_telemetry_.active_estimator_health =
+            estimator_health_to_string(telemetry.active_health);
+        runtime_telemetry_.shadow_estimator_health = shadow_health_to_string(telemetry.shadow_health);
+        runtime_telemetry_.shadow_enabled = telemetry.enabled;
+        runtime_telemetry_.shadow_lag_ms = telemetry.lag_ms;
+        runtime_telemetry_.shadow_queue_depth = telemetry.queue_depth;
+        runtime_telemetry_.shadow_queue_high_water_mark = telemetry.queue_high_water_mark;
+        runtime_telemetry_.shadow_dropped_events = telemetry.dropped_events;
+        runtime_telemetry_.shadow_position_delta_m = telemetry.position_delta_m;
+        runtime_telemetry_.shadow_velocity_delta_mps = telemetry.velocity_delta_mps;
+        runtime_telemetry_.shadow_orientation_delta_deg = telemetry.orientation_delta_deg;
+        runtime_telemetry_.shadow_divergence_active = telemetry.divergence_active;
+        runtime_telemetry_.shadow_last_failure_reason = telemetry.last_failure_reason;
+        runtime_telemetry_.shadow_comparable_snapshot_count = telemetry.comparable_snapshot_count;
+    }
+}
+
+std::string VIOPipeline::estimator_health_to_string(EstimatorHealthState state) {
+    switch (state) {
+    case EstimatorHealthState::INITIALIZING:
+        return "initializing";
+    case EstimatorHealthState::NOMINAL:
+        return "nominal";
+    case EstimatorHealthState::DEGRADED:
+        return "degraded";
+    case EstimatorHealthState::REJECTING_MEASUREMENTS:
+        return "rejecting_measurements";
+    case EstimatorHealthState::NUMERICAL_WARNING:
+        return "numerical_warning";
+    case EstimatorHealthState::INVALID:
+        return "invalid";
+    }
+    return "unknown";
+}
+
+std::string VIOPipeline::shadow_health_to_string(estimation::ShadowHealthState state) {
+    switch (state) {
+    case estimation::ShadowHealthState::DISABLED:
+        return "disabled";
+    case estimation::ShadowHealthState::STARTING:
+        return "starting";
+    case estimation::ShadowHealthState::SYNCHRONIZED:
+        return "synchronized";
+    case estimation::ShadowHealthState::LAGGING:
+        return "lagging";
+    case estimation::ShadowHealthState::STALE:
+        return "stale";
+    case estimation::ShadowHealthState::DIVERGED:
+        return "diverged";
+    case estimation::ShadowHealthState::FAILED:
+        return "failed";
+    case estimation::ShadowHealthState::STOPPED:
+        return "stopped";
+    }
+    return "unknown";
 }
 
 } // namespace drone::vio

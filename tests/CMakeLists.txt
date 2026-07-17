@@ -82,6 +82,10 @@ add_executable(test_navigation_intelligence
     ../src/localization/TDOAIngestor.cpp
     ../src/localization/TDOALocalizer.cpp
     ../src/localization/TimeSyncTracker.cpp
+    ../src/estimation/EstimatorComparison.cpp
+    ../src/estimation/EstimatorCoordinator.cpp
+    ../src/estimation/MeasurementAdapters.cpp
+    ../src/estimation/MinimalEskfAdapter.cpp
     ../src/runtime/RuntimeMode.cpp
     ../src/safety/SafetyManager.cpp
     ../src/security/PeerPacketAuth.cpp
@@ -113,6 +117,25 @@ target_link_libraries(test_navigation_intelligence PRIVATE
 )
 target_compile_definitions(test_navigation_intelligence PRIVATE ${DRONE_PCL_COMPILE_DEFINITIONS})
 drone_register_gtest(test_navigation_intelligence "unit;navigation;sensor;swarm;telemetry;security;simulation")
+
+add_executable(test_estimator_shadow test_estimator_shadow.cpp)
+target_link_libraries(test_estimator_shadow PRIVATE
+    drone_test_support
+    estimator_validation_core
+    Eigen3::Eigen
+)
+drone_register_gtest(test_estimator_shadow "unit;navigation;estimation")
+
+add_executable(test_estimator_replay test_estimator_replay.cpp)
+target_link_libraries(test_estimator_replay PRIVATE
+    drone_test_support
+    estimator_replay_support
+    Eigen3::Eigen
+)
+target_compile_definitions(test_estimator_replay PRIVATE
+    DRONE_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+drone_register_gtest(test_estimator_replay "unit;navigation;estimation;replay")
 
 add_executable(test_swarm_security
     test_swarm_security.cpp
