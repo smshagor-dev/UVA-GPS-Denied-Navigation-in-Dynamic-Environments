@@ -8,7 +8,8 @@ MinimalEskfAdapter::MinimalEskfAdapter(drone::vio::EKFConfig config) : estimator
     estimator_.set_validation_config(validation_);
 }
 
-void MinimalEskfAdapter::set_validation_config(const drone::vio::EstimatorValidationConfig& config) {
+void MinimalEskfAdapter::set_validation_config(
+    const drone::vio::EstimatorValidationConfig& config) {
     validation_ = config;
     estimator_.set_validation_config(validation_);
 }
@@ -32,16 +33,17 @@ EstimatorUpdateResult MinimalEskfAdapter::process(const EstimatorMeasurement& me
     switch (measurement.header.type) {
     case MeasurementType::IMU: {
         const auto& imu = std::get<ImuMeasurementData>(measurement.data);
-        const double dt = last_timestamp_s_ >= 0.0 ? (measurement.header.timestamp_s - last_timestamp_s_) : 0.0025;
+        const double dt = last_timestamp_s_ >= 0.0
+                              ? (measurement.header.timestamp_s - last_timestamp_s_)
+                              : 0.0025;
         estimator_.propagate_imu(imu.acceleration_mps2, imu.angular_velocity_rads, dt);
         break;
     }
     case MeasurementType::VISUAL_POSE: {
         const auto& visual = std::get<VisualPoseMeasurementData>(measurement.data);
-        estimator_.update_visual_pose(
-            visual.position, visual.velocity,
-            std::sqrt(std::max(0.0, visual.covariance.matrix(0, 0))),
-            std::sqrt(std::max(0.0, visual.covariance.matrix(3, 3))));
+        estimator_.update_visual_pose(visual.position, visual.velocity,
+                                      std::sqrt(std::max(0.0, visual.covariance.matrix(0, 0))),
+                                      std::sqrt(std::max(0.0, visual.covariance.matrix(3, 3))));
         result.validation.orientation_consumed = false;
         if (visual.orientation.has_value()) {
             result.validation.reason =
@@ -97,9 +99,10 @@ std::string_view MinimalEskfAdapter::name() const noexcept {
     return "minimal_eskf";
 }
 
-EstimatorUpdateResult MinimalEskfAdapter::unsupported_result(const EstimatorMeasurement& measurement,
-                                                             MeasurementValidationStatus status,
-                                                             std::string reason) const {
+EstimatorUpdateResult
+MinimalEskfAdapter::unsupported_result(const EstimatorMeasurement& measurement,
+                                       MeasurementValidationStatus status,
+                                       std::string reason) const {
     EstimatorUpdateResult result;
     result.status = status == MeasurementValidationStatus::IGNORED_SHADOW_ONLY
                         ? EstimatorUpdateStatus::IGNORED

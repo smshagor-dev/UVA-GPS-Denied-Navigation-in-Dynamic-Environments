@@ -18,8 +18,7 @@ namespace {
 
 using json = nlohmann::json;
 
-template <typename T, size_t N>
-std::array<T, N> require_array(const json& node, const char* key) {
+template <typename T, size_t N> std::array<T, N> require_array(const json& node, const char* key) {
     if (!node.contains(key) || !node.at(key).is_array() || node.at(key).size() != N) {
         throw std::runtime_error(std::string(key) + " must be an array of length " +
                                  std::to_string(N));
@@ -121,12 +120,18 @@ std::string fixed_scalar(double value) {
 
 std::string canonical_hash_payload(const ReplayReport& report) {
     std::ostringstream oss;
-    oss << report.report_schema_version << '\n' << report.replay_input_schema_version << '\n'
-        << report.replay_mode << '\n' << report.active_estimator_name << '\n'
-        << report.shadow_estimator_name << '\n' << report.coordinate_frame << '\n'
-        << report.input_record_count << '\n' << report.processed_record_count << '\n'
-        << report.accepted_update_count << '\n' << report.rejected_update_count << '\n'
-        << report.invalid_record_count << '\n' << report.timestamp_violation_count << '\n'
+    oss << report.report_schema_version << '\n'
+        << report.replay_input_schema_version << '\n'
+        << report.replay_mode << '\n'
+        << report.active_estimator_name << '\n'
+        << report.shadow_estimator_name << '\n'
+        << report.coordinate_frame << '\n'
+        << report.input_record_count << '\n'
+        << report.processed_record_count << '\n'
+        << report.accepted_update_count << '\n'
+        << report.rejected_update_count << '\n'
+        << report.invalid_record_count << '\n'
+        << report.timestamp_violation_count << '\n'
         << report.unsupported_measurement_count << '\n'
         << fixed_scalar(report.final_pose.position.x()) << '\n'
         << fixed_scalar(report.final_pose.position.y()) << '\n'
@@ -150,14 +155,18 @@ std::string canonical_hash_payload(const ReplayReport& report) {
         << fixed_scalar(report.active_shadow_position_delta_m) << '\n'
         << fixed_scalar(report.active_shadow_velocity_delta_mps) << '\n'
         << fixed_scalar(report.active_shadow_orientation_delta_deg) << '\n'
-        << report.comparable_snapshot_count << '\n' << report.skipped_comparison_count << '\n'
-        << report.shadow_dropped_event_count << '\n' << report.shadow_queue_high_water_mark << '\n'
+        << report.comparable_snapshot_count << '\n'
+        << report.skipped_comparison_count << '\n'
+        << report.shadow_dropped_event_count << '\n'
+        << report.shadow_queue_high_water_mark << '\n'
         << report.shadow_synchronization_state << '\n'
-        << (report.success ? "1" : "0") << '\n' << report.failure_reason << '\n';
+        << (report.success ? "1" : "0") << '\n'
+        << report.failure_reason << '\n';
     return oss.str();
 }
 
-EstimatorMeasurement make_measurement_from_record(const json& record, CoordinateFrame coordinate_frame,
+EstimatorMeasurement make_measurement_from_record(const json& record,
+                                                  CoordinateFrame coordinate_frame,
                                                   uint64_t sequence_id, size_t max_string_length,
                                                   uint64_t& unsupported_count) {
     const auto type = require_string_bounded(record, "type", max_string_length);
@@ -167,8 +176,8 @@ EstimatorMeasurement make_measurement_from_record(const json& record, Coordinate
         EstimatorMeasurement measurement;
         measurement.header = {timestamp_s, sequence_id, SensorSource::IMU, CoordinateFrame::BODY,
                               MeasurementType::IMU};
-        measurement.data =
-            ImuMeasurementData{require_vec3(record, "accel_mps2"), require_vec3(record, "gyro_rads")};
+        measurement.data = ImuMeasurementData{require_vec3(record, "accel_mps2"),
+                                              require_vec3(record, "gyro_rads")};
         return measurement;
     }
     if (type == "visual_pose") {
@@ -236,8 +245,8 @@ EstimatorMeasurement make_measurement_from_record(const json& record, Coordinate
         if (confidence < 0.0 || confidence > 1.0) {
             throw std::runtime_error("confidence must be within [0, 1]");
         }
-        measurement.data = TdoaPositionMeasurementData{require_vec3(record, "position_m"),
-                                                       confidence, true};
+        measurement.data =
+            TdoaPositionMeasurementData{require_vec3(record, "position_m"), confidence, true};
         return measurement;
     }
     if (type == "ground_truth") {
@@ -281,7 +290,8 @@ ReplayRunResult run_replay_file(const std::filesystem::path& input_path,
             throw std::runtime_error("replay input file could not be opened");
         }
         json payload = json::parse(input, nullptr, true, true);
-        report.replay_input_schema_version = payload.value("schema_version", payload.value("version", 0));
+        report.replay_input_schema_version =
+            payload.value("schema_version", payload.value("version", 0));
         if (report.replay_input_schema_version != 1) {
             throw std::runtime_error("unsupported replay schema version");
         }
@@ -319,7 +329,8 @@ ReplayRunResult run_replay_file(const std::filesystem::path& input_path,
         if (config.mode == ReplayMode::ACTIVE_WITH_IDENTICAL_SHADOW) {
             ShadowEstimatorConfig shadow_config;
             shadow_config.enabled = true;
-            shadow_config.max_queue_depth = std::max<size_t>(8, config.validation.shadow_max_queue_depth);
+            shadow_config.max_queue_depth =
+                std::max<size_t>(8, config.validation.shadow_max_queue_depth);
             shadow_config.max_lag_ms = std::max(1.0, config.validation.shadow_max_lag_ms);
             auto shadow = std::make_unique<MinimalEskfAdapter>(config.ekf_config);
             shadow->set_validation_config(config.validation);
@@ -341,10 +352,9 @@ ReplayRunResult run_replay_file(const std::filesystem::path& input_path,
                 require_finite_number(record, "timestamp_s");
                 continue;
             }
-            EstimatorMeasurement measurement =
-                make_measurement_from_record(record, coordinate_frame, ++sequence_id,
-                                             config.limits.max_string_length,
-                                             report.unsupported_measurement_count);
+            EstimatorMeasurement measurement = make_measurement_from_record(
+                record, coordinate_frame, ++sequence_id, config.limits.max_string_length,
+                report.unsupported_measurement_count);
             if (last_timestamp_s >= 0.0 && measurement.header.timestamp_s <= last_timestamp_s) {
                 report.timestamp_violation_count += 1;
                 throw std::runtime_error("timestamps must be strictly monotonic");
@@ -400,7 +410,8 @@ ReplayRunResult run_replay_file(const std::filesystem::path& input_path,
         report.maximum_propagation_latency_us = active_snapshot.diagnostics.max_update_latency_us;
         report.average_measurement_update_latency_us =
             active_snapshot.diagnostics.average_measurement_latency_us;
-        report.maximum_measurement_update_latency_us = active_snapshot.diagnostics.max_update_latency_us;
+        report.maximum_measurement_update_latency_us =
+            active_snapshot.diagnostics.max_update_latency_us;
         report.success = true;
         report.failure_reason = "none";
         report.deterministic_result_hash = security::sha3_hex(canonical_hash_payload(report));
@@ -435,10 +446,9 @@ std::string replay_report_json(const ReplayReport& report) {
                                   report.final_pose.position.z()};
     output["final_velocity_mps"] = {report.final_pose.velocity.x(), report.final_pose.velocity.y(),
                                     report.final_pose.velocity.z()};
-    output["final_orientation_wxyz"] = {report.final_pose.orientation.w(),
-                                        report.final_pose.orientation.x(),
-                                        report.final_pose.orientation.y(),
-                                        report.final_pose.orientation.z()};
+    output["final_orientation_wxyz"] = {
+        report.final_pose.orientation.w(), report.final_pose.orientation.x(),
+        report.final_pose.orientation.y(), report.final_pose.orientation.z()};
     output["final_accel_bias_mps2"] = {report.final_pose.accel_bias.x(),
                                        report.final_pose.accel_bias.y(),
                                        report.final_pose.accel_bias.z()};

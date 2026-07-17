@@ -369,7 +369,8 @@ void VIOPipeline::processing_loop() {
 }
 
 void VIOPipeline::handle(const sensors::ImuMeasurement& imu) {
-    if (coordinator_.active_snapshot().diagnostics.health_state == EstimatorHealthState::INITIALIZING &&
+    if (coordinator_.active_snapshot().diagnostics.health_state ==
+            EstimatorHealthState::INITIALIZING &&
         last_imu_ts_ < 0.0) {
         coordinator_.reset({});
         last_imu_ts_ = imu.timestamp;
@@ -398,7 +399,8 @@ void VIOPipeline::handle(const sensors::ImuMeasurement& imu) {
 }
 
 void VIOPipeline::handle(const sensors::CameraFrame& frame) {
-    if (coordinator_.active_snapshot().diagnostics.health_state == EstimatorHealthState::INITIALIZING)
+    if (coordinator_.active_snapshot().diagnostics.health_state ==
+        EstimatorHealthState::INITIALIZING)
         return;
     if (frame.detections.empty() && frame.image.empty())
         return;
@@ -471,7 +473,8 @@ void VIOPipeline::handle(const sensors::CameraFrame& frame) {
 }
 
 void VIOPipeline::handle(const sensors::LidarMeasurement& lidar) {
-    if (coordinator_.active_snapshot().diagnostics.health_state == EstimatorHealthState::INITIALIZING ||
+    if (coordinator_.active_snapshot().diagnostics.health_state ==
+            EstimatorHealthState::INITIALIZING ||
         !lidar.cloud)
         return;
 
@@ -536,7 +539,8 @@ void VIOPipeline::update_shadow_runtime_telemetry() {
         runtime_telemetry_.shadow_estimator_name = telemetry.shadow_estimator_name;
         runtime_telemetry_.active_estimator_health =
             estimator_health_to_string(telemetry.active_health);
-        runtime_telemetry_.shadow_estimator_health = shadow_health_to_string(telemetry.shadow_health);
+        runtime_telemetry_.shadow_estimator_health =
+            shadow_health_to_string(telemetry.shadow_health);
         runtime_telemetry_.shadow_enabled = telemetry.enabled;
         runtime_telemetry_.shadow_lag_ms = telemetry.lag_ms;
         runtime_telemetry_.shadow_queue_depth = telemetry.queue_depth;

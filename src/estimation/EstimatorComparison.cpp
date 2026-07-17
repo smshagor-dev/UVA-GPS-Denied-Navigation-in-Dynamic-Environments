@@ -32,19 +32,16 @@ EstimatorComparisonSnapshot EstimatorComparison::compare(const EstimatorSnapshot
     latest_.position_delta_m = (active.pose.position - shadow.pose.position).norm();
     latest_.velocity_delta_mps = (active.pose.velocity - shadow.pose.velocity).norm();
     latest_.orientation_delta_deg =
-        Eigen::AngleAxisd(active.pose.orientation.conjugate() * shadow.pose.orientation)
-            .angle() *
+        Eigen::AngleAxisd(active.pose.orientation.conjugate() * shadow.pose.orientation).angle() *
         (180.0 / std::numbers::pi_v<double>);
     latest_.accel_bias_delta = (active.pose.accel_bias - shadow.pose.accel_bias).norm();
     latest_.gyro_bias_delta = (active.pose.gyro_bias - shadow.pose.gyro_bias).norm();
-    latest_.uncertainty_delta =
-        std::abs(active.pose.pos_std.norm() - shadow.pose.pos_std.norm());
+    latest_.uncertainty_delta = std::abs(active.pose.pos_std.norm() - shadow.pose.pos_std.norm());
     ++latest_.comparable_snapshot_count;
 
-    const bool divergent =
-        latest_.position_delta_m > thresholds_.position_divergence_m ||
-        latest_.velocity_delta_mps > thresholds_.velocity_divergence_mps ||
-        latest_.orientation_delta_deg > thresholds_.orientation_divergence_deg;
+    const bool divergent = latest_.position_delta_m > thresholds_.position_divergence_m ||
+                           latest_.velocity_delta_mps > thresholds_.velocity_divergence_mps ||
+                           latest_.orientation_delta_deg > thresholds_.orientation_divergence_deg;
     if (divergent) {
         latest_.consecutive_divergent_samples += 1;
         if (latest_.position_delta_m > thresholds_.position_divergence_m) {

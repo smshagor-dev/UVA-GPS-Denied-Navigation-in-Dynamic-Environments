@@ -15,7 +15,8 @@ bool finite_vec3(const Eigen::Vector3d& value) {
 MeasurementAdapterResult MeasurementAdapters::adapt_imu(const drone::sensors::ImuMeasurement& imu,
                                                         uint64_t sequence_id) {
     MeasurementAdapterResult out;
-    if (!std::isfinite(imu.timestamp) || !finite_vec3(imu.accel_mps2) || !finite_vec3(imu.gyro_rads)) {
+    if (!std::isfinite(imu.timestamp) || !finite_vec3(imu.accel_mps2) ||
+        !finite_vec3(imu.gyro_rads)) {
         out.validation.status = MeasurementValidationStatus::REJECTED_INVALID;
         out.validation.reason = "imu measurement contains non-finite values";
         return out;
@@ -142,9 +143,8 @@ MeasurementAdapterResult MeasurementAdapters::adapt_altitude(double timestamp_s,
     return out;
 }
 
-MeasurementAdapterResult
-MeasurementAdapters::adapt_tdoa_position_candidate(double timestamp_s, const Eigen::Vector3d& position,
-                                                   double confidence, uint64_t sequence_id) {
+MeasurementAdapterResult MeasurementAdapters::adapt_tdoa_position_candidate(
+    double timestamp_s, const Eigen::Vector3d& position, double confidence, uint64_t sequence_id) {
     MeasurementAdapterResult out;
     if (!std::isfinite(timestamp_s) || !finite_vec3(position) || !std::isfinite(confidence) ||
         confidence < 0.0 || confidence > 1.0) {
@@ -181,7 +181,8 @@ MeasurementValidationResult MeasurementAdapters::validate(const EstimatorMeasure
         result.reason = "measurement frame is unsupported";
         return result;
     }
-    if (newest_timestamp_s >= 0.0 && measurement.header.timestamp_s + max_staleness_s < newest_timestamp_s) {
+    if (newest_timestamp_s >= 0.0 &&
+        measurement.header.timestamp_s + max_staleness_s < newest_timestamp_s) {
         result.status = MeasurementValidationStatus::REJECTED_STALE;
         result.reason = "measurement is stale";
         return result;

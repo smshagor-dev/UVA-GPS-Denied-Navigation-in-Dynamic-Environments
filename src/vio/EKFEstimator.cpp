@@ -21,8 +21,7 @@ static constexpr double kMaxCorrectionNorm = 100.0;
 
 namespace {
 
-template <typename Derived>
-bool matrix_is_finite(const Eigen::MatrixBase<Derived>& matrix) {
+template <typename Derived> bool matrix_is_finite(const Eigen::MatrixBase<Derived>& matrix) {
     return matrix.array().isFinite().all();
 }
 
@@ -85,8 +84,7 @@ void EKFEstimator::propagate_imu(const Eigen::Vector3d& accel_mps2,
         mark_invalid_input("non-finite imu sample rejected");
         return;
     }
-    if (dt <= 0.0 ||
-        (validation_cfg_.require_monotonic_timestamps && dt <= 0.0)) {
+    if (dt <= 0.0 || (validation_cfg_.require_monotonic_timestamps && dt <= 0.0)) {
         std::lock_guard lock(mtx_);
         ++diagnostics_.timestamp_rejection_count;
         mark_measurement_rejected(EstimatorSensorType::IMU, "non-monotonic imu timestamp");
@@ -289,8 +287,8 @@ void EKFEstimator::update_zupt() {
 
     const Eigen::Matrix3d R_meas = Eigen::Matrix3d::Identity() * 1e-6;
     const Eigen::Vector3d innov = -vel_;
-    apply_linear_update(H, innov, R_meas, EstimatorSensorType::ZUPT, "zupt",
-                        true, true, true, false);
+    apply_linear_update(H, innov, R_meas, EstimatorSensorType::ZUPT, "zupt", true, true, true,
+                        false);
 }
 
 PoseEstimate EKFEstimator::state() const {
@@ -423,8 +421,8 @@ bool EKFEstimator::apply_linear_update(const Eigen::Matrix<double, N, 15>& H,
                                        const Eigen::Matrix<double, N, 1>& innovation,
                                        const Eigen::Matrix<double, N, N>& R_meas,
                                        EstimatorSensorType sensor_type, const char* sensor_name,
-                                       bool apply_velocity, bool apply_biases,
-                                       bool apply_attitude, bool enable_gating) {
+                                       bool apply_velocity, bool apply_biases, bool apply_attitude,
+                                       bool enable_gating) {
     const auto started_at = std::chrono::steady_clock::now();
     if (!matrix_is_finite(H) || !matrix_is_finite(innovation) || !matrix_is_finite(R_meas)) {
         mark_invalid_input(std::string(sensor_name) + " update had non-finite matrices");
@@ -433,12 +431,14 @@ bool EKFEstimator::apply_linear_update(const Eigen::Matrix<double, N, 15>& H,
 
     const Eigen::Matrix<double, N, N> S = H * P_ * H.transpose() + R_meas;
     if (!matrix_is_finite(S)) {
-        mark_measurement_rejected(sensor_type, std::string(sensor_name) + " innovation covariance invalid");
+        mark_measurement_rejected(sensor_type,
+                                  std::string(sensor_name) + " innovation covariance invalid");
         return false;
     }
     Eigen::LDLT<Eigen::Matrix<double, N, N>> ldlt(S);
     if (ldlt.info() != Eigen::Success) {
-        mark_measurement_rejected(sensor_type, std::string(sensor_name) + " innovation solve failed");
+        mark_measurement_rejected(sensor_type,
+                                  std::string(sensor_name) + " innovation solve failed");
         return false;
     }
 
@@ -455,8 +455,7 @@ bool EKFEstimator::apply_linear_update(const Eigen::Matrix<double, N, 15>& H,
         return false;
     }
 
-    const Eigen::Matrix<double, 15, N> K_gain =
-        ldlt.solve(H * P_.transpose()).transpose();
+    const Eigen::Matrix<double, 15, N> K_gain = ldlt.solve(H * P_.transpose()).transpose();
     const Eigen::Matrix<double, 15, 1> dx = K_gain * innovation;
     if (!matrix_is_finite(dx) || dx.norm() > kMaxCorrectionNorm) {
         mark_measurement_rejected(sensor_type, std::string(sensor_name) + " correction invalid");
@@ -484,7 +483,8 @@ bool EKFEstimator::apply_linear_update(const Eigen::Matrix<double, N, 15>& H,
     P_ = I_KH * P_ * I_KH.transpose() + K_gain * R_meas * K_gain.transpose();
     finalize_covariance_locked();
 
-    mark_measurement_accepted(sensor_type, innovation_magnitude, std::sqrt(std::max(0.0, mahal_sq)));
+    mark_measurement_accepted(sensor_type, innovation_magnitude,
+                              std::sqrt(std::max(0.0, mahal_sq)));
     accumulate_measurement_latency(
         std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - started_at)
             .count());
@@ -525,8 +525,10 @@ void EKFEstimator::finalize_covariance_locked() {
     diagnostics_.covariance_min_diagonal = P_.diagonal().minCoeff();
     diagnostics_.minimum_covariance_diagonal_seen =
         diagnostics_.propagation_count == 0 &&
-                diagnostics_.accepted_updates[sensor_index(EstimatorSensorType::VISION_FEATURE)] == 0 &&
-                diagnostics_.accepted_updates[sensor_index(EstimatorSensorType::VISUAL_POSE)] == 0 &&
+                diagnostics_.accepted_updates[sensor_index(EstimatorSensorType::VISION_FEATURE)] ==
+                    0 &&
+                diagnostics_.accepted_updates[sensor_index(EstimatorSensorType::VISUAL_POSE)] ==
+                    0 &&
                 diagnostics_.accepted_updates[sensor_index(EstimatorSensorType::DEPTH)] == 0 &&
                 diagnostics_.accepted_updates[sensor_index(EstimatorSensorType::ZUPT)] == 0
             ? diagnostics_.covariance_min_diagonal
@@ -575,8 +577,8 @@ void EKFEstimator::update_health_locked() {
         diagnostics_.health_state = EstimatorHealthState::NUMERICAL_WARNING;
         return;
     }
-    const uint64_t rejected_total = std::accumulate(diagnostics_.rejected_updates.begin(),
-                                                    diagnostics_.rejected_updates.end(), uint64_t{0});
+    const uint64_t rejected_total = std::accumulate(
+        diagnostics_.rejected_updates.begin(), diagnostics_.rejected_updates.end(), uint64_t{0});
     if (rejected_total > 0 && diagnostics_.propagation_count == 0) {
         diagnostics_.health_state = EstimatorHealthState::REJECTING_MEASUREMENTS;
         return;
@@ -597,9 +599,8 @@ void EKFEstimator::accumulate_propagation_latency(double latency_us) {
 
 void EKFEstimator::accumulate_measurement_latency(double latency_us) {
     diagnostics_.max_update_latency_us = std::max(diagnostics_.max_update_latency_us, latency_us);
-    const uint64_t accepted_total =
-        std::accumulate(diagnostics_.accepted_updates.begin(), diagnostics_.accepted_updates.end(),
-                        uint64_t{0});
+    const uint64_t accepted_total = std::accumulate(
+        diagnostics_.accepted_updates.begin(), diagnostics_.accepted_updates.end(), uint64_t{0});
     const double count = static_cast<double>(std::max<uint64_t>(1, accepted_total));
     diagnostics_.average_measurement_latency_us =
         ((diagnostics_.average_measurement_latency_us * (count - 1.0)) + latency_us) / count;

@@ -77,14 +77,14 @@ void EstimatorCoordinator::stop_shadow() {
     shadow_estimator_.reset();
     telemetry_.queue_depth = 0;
     telemetry_.lag_ms = 0.0;
-    telemetry_.shadow_health = telemetry_.enabled ? ShadowHealthState::STOPPED : ShadowHealthState::DISABLED;
+    telemetry_.shadow_health =
+        telemetry_.enabled ? ShadowHealthState::STOPPED : ShadowHealthState::DISABLED;
 }
 
 bool EstimatorCoordinator::wait_for_shadow_idle(std::chrono::milliseconds timeout) {
     std::unique_lock lock(shadow_mutex_);
-    return shadow_idle_cv_.wait_for(lock, timeout, [this] {
-        return shadow_queue_.empty() && shadow_inflight_ == 0;
-    });
+    return shadow_idle_cv_.wait_for(
+        lock, timeout, [this] { return shadow_queue_.empty() && shadow_inflight_ == 0; });
 }
 
 EstimatorUpdateResult EstimatorCoordinator::process(const EstimatorMeasurement& measurement) {
@@ -137,7 +137,8 @@ void EstimatorCoordinator::worker_loop() {
         std::optional<QueuedMeasurement> queued;
         {
             std::unique_lock lock(shadow_mutex_);
-            shadow_cv_.wait(lock, [this] { return stop_requested_.load() || !shadow_queue_.empty(); });
+            shadow_cv_.wait(lock,
+                            [this] { return stop_requested_.load() || !shadow_queue_.empty(); });
             if (stop_requested_.load()) {
                 return;
             }
@@ -156,8 +157,9 @@ void EstimatorCoordinator::worker_loop() {
             last_shadow_snapshot_ = shadow_result.snapshot;
             telemetry_.queue_depth = shadow_queue_.size();
             telemetry_.lag_ms = lag_ms;
-            telemetry_.shadow_health = lag_ms > shadow_config_.max_lag_ms ? ShadowHealthState::LAGGING
-                                                                          : ShadowHealthState::SYNCHRONIZED;
+            telemetry_.shadow_health = lag_ms > shadow_config_.max_lag_ms
+                                           ? ShadowHealthState::LAGGING
+                                           : ShadowHealthState::SYNCHRONIZED;
             if (telemetry_.dropped_events > 0 && telemetry_.queue_depth == 0) {
                 telemetry_.shadow_health = ShadowHealthState::STALE;
             }

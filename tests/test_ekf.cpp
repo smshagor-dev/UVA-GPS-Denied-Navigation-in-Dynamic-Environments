@@ -93,8 +93,8 @@ TEST_F(EKFTest, ZUPTClearsVelocity) {
 }
 
 TEST_F(EKFTest, LongStationaryPropagationRemainsFiniteAndNormalized) {
-    const auto s = propagate_constant(
-        ekf_, Eigen::Vector3d{0.0, 0.0, 9.81}, Eigen::Vector3d::Zero(), 0.0025, 4000);
+    const auto s = propagate_constant(ekf_, Eigen::Vector3d{0.0, 0.0, 9.81},
+                                      Eigen::Vector3d::Zero(), 0.0025, 4000);
     const auto diagnostics = ekf_.diagnostics();
 
     EXPECT_NEAR(s.position.norm(), 0.0, 0.1);
@@ -197,9 +197,8 @@ TEST_F(EKFTest, ExcessiveImuTimeStepIsRejected) {
 
 TEST_F(EKFTest, NaNImuInputIsRejected) {
     const auto before = ekf_.state();
-    ekf_.propagate_imu(
-        Eigen::Vector3d{std::numeric_limits<double>::quiet_NaN(), 0.0, 9.81},
-        Eigen::Vector3d::Zero(), 0.01);
+    ekf_.propagate_imu(Eigen::Vector3d{std::numeric_limits<double>::quiet_NaN(), 0.0, 9.81},
+                       Eigen::Vector3d::Zero(), 0.01);
     const auto after = ekf_.state();
     const auto diagnostics = ekf_.diagnostics();
 

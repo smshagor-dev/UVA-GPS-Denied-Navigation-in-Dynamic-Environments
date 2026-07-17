@@ -163,8 +163,7 @@ TEST(LocalizationFusion, RejectsNonFiniteTdoaInput) {
     input.camera_available = true;
 
     localization::TDOALocalizer::Solution tdoa_solution;
-    tdoa_solution.position =
-        Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0);
+    tdoa_solution.position = Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0);
     tdoa_solution.confidence = 0.9;
     input.tdoa_solution = tdoa_solution;
 

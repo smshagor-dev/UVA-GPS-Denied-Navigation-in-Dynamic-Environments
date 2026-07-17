@@ -94,8 +94,8 @@ public:
         snapshot_.diagnostics.health_state = vio::EstimatorHealthState::INITIALIZING;
     }
 
-    estimation::EstimatorUpdateResult process(
-        const estimation::EstimatorMeasurement& measurement) override {
+    estimation::EstimatorUpdateResult
+    process(const estimation::EstimatorMeasurement& measurement) override {
         if (process_delay_.count() > 0) {
             std::this_thread::sleep_for(process_delay_);
         }
@@ -179,9 +179,9 @@ TEST(EstimatorAdapter, MatchesDirectEkfBehavior) {
 
     for (int i = 0; i < 50; ++i) {
         const double timestamp_s = 0.0025 * static_cast<double>(i + 1);
-        const auto imu = make_imu_measurement(static_cast<uint64_t>(i + 1), timestamp_s,
-                                              Eigen::Vector3d{0.01, 0.0, 9.81},
-                                              Eigen::Vector3d{0.0, 0.0, 0.01});
+        const auto imu =
+            make_imu_measurement(static_cast<uint64_t>(i + 1), timestamp_s,
+                                 Eigen::Vector3d{0.01, 0.0, 9.81}, Eigen::Vector3d{0.0, 0.0, 0.01});
         direct.propagate_imu(Eigen::Vector3d{0.01, 0.0, 9.81}, Eigen::Vector3d{0.0, 0.0, 0.01},
                              0.0025);
         static_cast<void>(adapter.process(imu));
@@ -234,9 +234,9 @@ TEST(EstimatorCoordinator, ShadowDisabledLeavesActiveOutputUnchanged) {
     coordinator.reset({});
 
     for (int i = 0; i < 20; ++i) {
-        static_cast<void>(coordinator.process(make_imu_measurement(
-            static_cast<uint64_t>(i + 1), 0.0025 * static_cast<double>(i + 1),
-            Eigen::Vector3d{0.0, 0.0, 9.81}, Eigen::Vector3d::Zero())));
+        static_cast<void>(coordinator.process(
+            make_imu_measurement(static_cast<uint64_t>(i + 1), 0.0025 * static_cast<double>(i + 1),
+                                 Eigen::Vector3d{0.0, 0.0, 9.81}, Eigen::Vector3d::Zero())));
     }
 
     const auto coordinated = coordinator.active_snapshot().pose;
@@ -244,9 +244,9 @@ TEST(EstimatorCoordinator, ShadowDisabledLeavesActiveOutputUnchanged) {
     estimation::MinimalEskfAdapter direct;
     direct.reset({});
     for (int i = 0; i < 20; ++i) {
-        static_cast<void>(direct.process(make_imu_measurement(
-            static_cast<uint64_t>(i + 1), 0.0025 * static_cast<double>(i + 1),
-            Eigen::Vector3d{0.0, 0.0, 9.81}, Eigen::Vector3d::Zero())));
+        static_cast<void>(direct.process(
+            make_imu_measurement(static_cast<uint64_t>(i + 1), 0.0025 * static_cast<double>(i + 1),
+                                 Eigen::Vector3d{0.0, 0.0, 9.81}, Eigen::Vector3d::Zero())));
     }
     const auto direct_state = direct.snapshot().pose;
     EXPECT_TRUE(coordinated.position.isApprox(direct_state.position, 1e-12));
@@ -270,10 +270,9 @@ TEST(EstimatorCoordinator, ShadowEnabledDoesNotChangeActiveOutputAndTracksOverfl
     auto baseline = std::make_shared<ControlledTestEstimator>("baseline_test");
     baseline->reset({});
     for (int i = 0; i < 30; ++i) {
-        const auto imu = make_imu_measurement(static_cast<uint64_t>(i + 1),
-                                              0.0025 * static_cast<double>(i + 1),
-                                              Eigen::Vector3d{0.0, 0.0, 9.81},
-                                              Eigen::Vector3d::Zero());
+        const auto imu =
+            make_imu_measurement(static_cast<uint64_t>(i + 1), 0.0025 * static_cast<double>(i + 1),
+                                 Eigen::Vector3d{0.0, 0.0, 9.81}, Eigen::Vector3d::Zero());
         static_cast<void>(coordinator.process(imu));
         static_cast<void>(baseline->process(imu));
     }
@@ -329,9 +328,9 @@ TEST(EstimatorCoordinator, ActiveProcessingDoesNotWaitForDelayedShadow) {
     const auto started_at = std::chrono::steady_clock::now();
     static_cast<void>(coordinator.process(
         make_imu_measurement(1, 0.01, Eigen::Vector3d{0.0, 0.0, 9.81}, Eigen::Vector3d::Zero())));
-    const auto elapsed_ms = std::chrono::duration<double, std::milli>(
-                                std::chrono::steady_clock::now() - started_at)
-                                .count();
+    const auto elapsed_ms =
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started_at)
+            .count();
 
     EXPECT_LT(elapsed_ms, 30.0);
     ASSERT_TRUE(coordinator.wait_for_shadow_idle(std::chrono::milliseconds(5000)));
@@ -353,9 +352,9 @@ TEST(EstimatorCoordinator, ShadowQueueDropsBecomeStaleAfterDrain) {
     coordinator.configure_shadow(std::move(shadow_config), std::move(shadow));
 
     for (uint64_t i = 1; i <= 16; ++i) {
-        static_cast<void>(coordinator.process(
-            make_imu_measurement(i, 0.01 * static_cast<double>(i), Eigen::Vector3d{0.0, 0.0, 9.81},
-                                 Eigen::Vector3d::Zero())));
+        static_cast<void>(coordinator.process(make_imu_measurement(i, 0.01 * static_cast<double>(i),
+                                                                   Eigen::Vector3d{0.0, 0.0, 9.81},
+                                                                   Eigen::Vector3d::Zero())));
     }
 
     ASSERT_TRUE(coordinator.wait_for_shadow_idle(std::chrono::milliseconds(5000)));
@@ -482,9 +481,8 @@ TEST(EstimatorCoordinator, ShadowPoseNeverBecomesAuthoritativePose) {
 }
 
 TEST(RuntimeMode, RejectsUnsupportedHybridActiveConfiguration) {
-    const auto temp_path = write_runtime_file(
-        "runtime_hybrid_active_phase16.json",
-        R"({
+    const auto temp_path = write_runtime_file("runtime_hybrid_active_phase16.json",
+                                              R"({
   "runtime_mode": "production",
   "anchor_config_path": "config/anchors.json",
   "estimator": {
@@ -504,9 +502,8 @@ TEST(RuntimeMode, RejectsUnsupportedHybridActiveConfiguration) {
 }
 
 TEST(RuntimeMode, ShadowRemainsDisabledByDefault) {
-    const auto temp_path = write_runtime_file(
-        "runtime_phase16_default_shadow.json",
-        R"({
+    const auto temp_path = write_runtime_file("runtime_phase16_default_shadow.json",
+                                              R"({
   "runtime_mode": "bench",
   "anchor_config_path": "config/anchors.json",
   "estimator": {
@@ -523,9 +520,8 @@ TEST(RuntimeMode, ShadowRemainsDisabledByDefault) {
 }
 
 TEST(RuntimeMode, RejectsUnknownEstimatorMode) {
-    const auto temp_path = write_runtime_file(
-        "runtime_phase16_unknown_mode.json",
-        R"({
+    const auto temp_path = write_runtime_file("runtime_phase16_unknown_mode.json",
+                                              R"({
   "runtime_mode": "bench",
   "anchor_config_path": "config/anchors.json",
   "estimator": {
@@ -539,9 +535,8 @@ TEST(RuntimeMode, RejectsUnknownEstimatorMode) {
 }
 
 TEST(RuntimeMode, RejectsInvalidShadowLimitsAndImplementation) {
-    const auto temp_path = write_runtime_file(
-        "runtime_phase16_bad_shadow.json",
-        R"({
+    const auto temp_path = write_runtime_file("runtime_phase16_bad_shadow.json",
+                                              R"({
   "runtime_mode": "bench",
   "anchor_config_path": "config/anchors.json",
   "estimator": {
@@ -567,9 +562,8 @@ TEST(RuntimeMode, RejectsInvalidShadowLimitsAndImplementation) {
 }
 
 TEST(RuntimeMode, RejectsDisabledExperimentalFeatures) {
-    const auto temp_path = write_runtime_file(
-        "runtime_phase16_bad_experimental_flags.json",
-        R"({
+    const auto temp_path = write_runtime_file("runtime_phase16_bad_experimental_flags.json",
+                                              R"({
   "runtime_mode": "bench",
   "anchor_config_path": "config/anchors.json",
   "estimator": {
@@ -587,9 +581,8 @@ TEST(RuntimeMode, RejectsDisabledExperimentalFeatures) {
 }
 
 TEST(RuntimeMode, ShadowReportsEffectiveWhenValidAndSupported) {
-    const auto temp_path = write_runtime_file(
-        "runtime_phase16_shadow_enabled.json",
-        R"({
+    const auto temp_path = write_runtime_file("runtime_phase16_shadow_enabled.json",
+                                              R"({
   "runtime_mode": "bench",
   "anchor_config_path": "config/anchors.json",
   "estimator": {

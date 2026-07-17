@@ -154,11 +154,10 @@ TEST(EstimatorReplay, ExcessiveRecordCountFails) {
     auto payload = baseline_payload();
     payload["records"] = json::array();
     for (int i = 0; i < 5; ++i) {
-        payload["records"].push_back(
-            {{"type", "imu"},
-             {"timestamp_s", 0.01 * static_cast<double>(i + 1)},
-             {"accel_mps2", {0.0, 0.0, 9.81}},
-             {"gyro_rads", {0.0, 0.0, 0.0}}});
+        payload["records"].push_back({{"type", "imu"},
+                                      {"timestamp_s", 0.01 * static_cast<double>(i + 1)},
+                                      {"accel_mps2", {0.0, 0.0, 9.81}},
+                                      {"gyro_rads", {0.0, 0.0, 0.0}}});
     }
     const auto path = write_json_file("replay_record_limit_phase16b.json", payload);
     estimation::ReplayRunConfig config;

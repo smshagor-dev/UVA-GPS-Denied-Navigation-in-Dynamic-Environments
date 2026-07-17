@@ -50,7 +50,8 @@ public:
     ~EstimatorCoordinator();
 
     void reset(const EstimatorInitialState& initial);
-    void configure_shadow(ShadowEstimatorConfig config, std::unique_ptr<StateEstimator> shadow_estimator);
+    void configure_shadow(ShadowEstimatorConfig config,
+                          std::unique_ptr<StateEstimator> shadow_estimator);
     void stop_shadow();
     [[nodiscard]] bool wait_for_shadow_idle(std::chrono::milliseconds timeout);
     [[nodiscard]] EstimatorUpdateResult process(const EstimatorMeasurement& measurement);
