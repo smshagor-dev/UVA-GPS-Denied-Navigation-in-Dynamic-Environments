@@ -41,7 +41,7 @@
 > **CI scope notice**
 > The GitHub Actions badges above represent repository validation for source quality, supported build presets, tests, packaging, and security scanning. They do **not** represent flight certification, hardware-in-the-loop clearance, or operational airworthiness approval.
 
-This repository was developed through a structured **14-phase research engineering lifecycle** spanning foundation work, build and validation hardening, performance engineering, research validation, AI autonomy, deployment readiness, publication packaging, final system maturity review, and external validation packaging.
+This repository was developed through a structured **17-stage research engineering lifecycle** spanning foundation work, build and validation hardening, performance engineering, research validation, AI autonomy, deployment readiness, publication packaging, final system maturity review, external validation, and estimator hardening with shadow-estimator validation.
 
 ---
 
@@ -49,7 +49,7 @@ This repository was developed through a structured **14-phase research engineeri
 
 1. [Project Overview](#project-overview)
 2. [Status Banner](#status-banner)
-3. [14 Phase Development Timeline](#14-phase-development-timeline)
+3. [17 Stage Development Timeline](#17-stage-development-timeline)
 4. [Architecture Overview](#architecture-overview)
 5. [Executive Summary](#executive-summary)
 6. [System Overview](#system-overview)
@@ -85,16 +85,16 @@ This repository was developed through a structured **14-phase research engineeri
 36. [Expanded Repository Structure](#expanded-repository-structure)
 37. [Research Quick Start](#research-quick-start)
 38. [Contribution Workflow](#contribution-workflow)
-39. [Phase Evidence Index](#phase-evidence-index)
+39. [Lifecycle Evidence Index](#lifecycle-evidence-index)
 40. [Related Documentation](#related-documentation)
 
 ---
 
 ## Project Overview
 
-This project is a full-stack GPS-denied autonomous UAV swarm software platform developed through a 14-phase lifecycle. The repository now contains validated software architecture, reproducible experiments, AI autonomy layers, deployment assets, publication packaging, DOI-backed artifact documentation, and an external-facing engineering review package.
+This project is a full-stack GPS-denied autonomous UAV swarm software platform developed through a 17-stage lifecycle. The repository now contains validated software architecture, reproducible experiments, AI autonomy layers, deployment assets, publication packaging, DOI-backed artifact documentation, an external-facing engineering review package, and hardened estimator shadow-validation evidence.
 
-Phase 14 classifies the repository as:
+Stage 17 classifies the repository as:
 
 - production-grade software architecture
 - ready for scientific replication
@@ -147,9 +147,9 @@ REQUIRES HARDWARE VALIDATION
 
 ---
 
-## 14 Phase Development Timeline
+## 17 Stage Development Timeline
 
-### Phase 1 — Foundation & Repository Hygiene
+### Stage 1 — Foundation & Repository Hygiene
 
 Objective:
 Establish repository hygiene, baseline validation, and dependency visibility.
@@ -165,12 +165,12 @@ Validation:
 - workstation evidence capture
 
 Report:
-[docs/phase1/PHASE1_FINAL_REPORT.md](docs/phase1/PHASE1_FINAL_REPORT.md)
+[docs/foundation-repository-hygiene/FINAL_REPORT.md](docs/foundation-repository-hygiene/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 2 — Build System, Dependencies & Cross-Platform Validation
+### Stage 2 — Build System, Dependencies & Cross-Platform Validation
 
 Objective:
 Harden build, install, and preset-based cross-platform validation.
@@ -186,12 +186,12 @@ Validation:
 - install validation
 
 Report:
-[docs/phase2/PHASE2_FINAL_REPORT.md](docs/phase2/PHASE2_FINAL_REPORT.md)
+[docs/build-system-cross-platform-validation/FINAL_REPORT.md](docs/build-system-cross-platform-validation/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 3 — CI/CD & Control-Plane Orchestration Documentation
+### Stage 3 — CI/CD & Control-Plane Orchestration Documentation
 
 Objective:
 Document the workflow and CI/CD layer that supports the control-plane lifecycle.
@@ -206,12 +206,12 @@ Validation:
 - mixed-language CI/CD evidence mapping
 
 Report:
-[docs/phase3/CICD_REPORT.md](docs/phase3/CICD_REPORT.md)
+[docs/ci-cd-control-plane-orchestration/CICD_REPORT.md](docs/ci-cd-control-plane-orchestration/CICD_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 4 — Architecture, Safety & Software Validation Hardening
+### Stage 4 — Architecture, Safety & Software Validation Hardening
 
 Objective:
 Strengthen architecture review, safety evidence, sanitizers, and software validation.
@@ -228,12 +228,12 @@ Validation:
 - software research validation
 
 Report:
-[docs/phase4/PHASE4_FINAL_REPORT.md](docs/phase4/PHASE4_FINAL_REPORT.md)
+[docs/architecture-safety-validation-hardening/FINAL_REPORT.md](docs/architecture-safety-validation-hardening/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 5 — Production Readiness, Deployment & Reproducibility Foundations
+### Stage 5 — Production Readiness, Deployment & Reproducibility Foundations
 
 Objective:
 Package the platform for production-oriented software use without reopening core runtime design.
@@ -249,12 +249,12 @@ Validation:
 - runtime and reproducibility evidence
 
 Report:
-[docs/phase5/PHASE5_FINAL_REPORT.md](docs/phase5/PHASE5_FINAL_REPORT.md)
+[docs/production-readiness-deployment-reproducibility/FINAL_REPORT.md](docs/production-readiness-deployment-reproducibility/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 6 — Performance Engineering & Stability Validation
+### Stage 6 — Performance Engineering & Stability Validation
 
 Objective:
 Measure latency, throughput, stability, and profiling evidence.
@@ -271,12 +271,12 @@ Validation:
 - soak and profiling artifacts
 
 Report:
-[docs/phase6/PHASE6_FINAL_REPORT.md](docs/phase6/PHASE6_FINAL_REPORT.md)
+[docs/performance-engineering-stability-validation/FINAL_REPORT.md](docs/performance-engineering-stability-validation/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 7 — Research Validation, Software HIL & Scenario Framework
+### Stage 7 — Research Validation, Software HIL & Scenario Framework
 
 Objective:
 Create deterministic research validation and software HIL evidence.
@@ -293,12 +293,12 @@ Validation:
 - safety and observability evidence
 
 Report:
-[docs/phase7/PHASE7_FINAL_REPORT.md](docs/phase7/PHASE7_FINAL_REPORT.md)
+[docs/research-validation-software-hil-scenarios/FINAL_REPORT.md](docs/research-validation-software-hil-scenarios/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 8 — Open Research Release & Advanced Scenario Evaluation
+### Stage 8 — Open Research Release & Advanced Scenario Evaluation
 
 Objective:
 Prepare the repository for open scientific use and advanced autonomy experimentation.
@@ -315,12 +315,12 @@ Validation:
 - benchmark comparison package
 
 Report:
-[docs/phase8/PHASE8_FINAL_REPORT.md](docs/phase8/PHASE8_FINAL_REPORT.md)
+[docs/open-research-release-advanced-scenarios/FINAL_REPORT.md](docs/open-research-release-advanced-scenarios/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 9 — AI Autonomy & Intelligent Decision Layer
+### Stage 9 — AI Autonomy & Intelligent Decision Layer
 
 Objective:
 Add software-only AI autonomy, planning, swarm, and safety interfaces.
@@ -338,12 +338,12 @@ Validation:
 - AI benchmark and safety reruns
 
 Report:
-[docs/phase9/PHASE9_FINAL_REPORT.md](docs/phase9/PHASE9_FINAL_REPORT.md)
+[docs/ai-autonomy-intelligent-decision-layer/FINAL_REPORT.md](docs/ai-autonomy-intelligent-decision-layer/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 10 — Enterprise Deployment, Security & Production Readiness
+### Stage 10 — Enterprise Deployment, Security & Production Readiness
 
 Objective:
 Deliver enterprise-grade software deployment, monitoring, security, and operations assets.
@@ -359,12 +359,12 @@ Validation:
 - scalability and reliability checks
 
 Report:
-[docs/phase10/PHASE10_FINAL_REPORT.md](docs/phase10/PHASE10_FINAL_REPORT.md)
+[docs/enterprise-deployment-security-readiness/FINAL_REPORT.md](docs/enterprise-deployment-security-readiness/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 11 — Multi-Agent AI, Reinforcement Learning & Digital Twin
+### Stage 11 — Multi-Agent AI, Reinforcement Learning & Digital Twin
 
 Objective:
 Extend the platform with multi-agent coordination, RL abstraction, world modeling, XAI, and digital twin support.
@@ -376,16 +376,16 @@ Work:
 - XAI and AI evaluation package
 
 Validation:
-- Phase 11 script reruns
+- Stage 11 script reruns
 - AI evaluation and benchmark artifacts
 
 Report:
-[docs/phase11/PHASE11_FINAL_REPORT.md](docs/phase11/PHASE11_FINAL_REPORT.md)
+[docs/multi-agent-ai-rl-digital-twin/FINAL_REPORT.md](docs/multi-agent-ai-rl-digital-twin/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 12 — Scientific Publication & Artifact Evaluation
+### Stage 12 — Scientific Publication & Artifact Evaluation
 
 Objective:
 Prepare the software artifact for publication-oriented replication, citation, and open-science packaging.
@@ -402,34 +402,34 @@ Validation:
 - artifact package validation
 
 Report:
-[docs/phase12/PHASE12_FINAL_REPORT.md](docs/phase12/PHASE12_FINAL_REPORT.md)
+[docs/scientific-publication-artifact-evaluation/FINAL_REPORT.md](docs/scientific-publication-artifact-evaluation/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 13 — Final System Maturity, Production Readiness & Research Certification
+### Stage 13 — Final System Maturity, Production Readiness & Research Certification
 
 Objective:
 Finalize readiness classification, lifecycle indexing, final maturity presentation, and integrated architecture review.
 
 Work:
-- phase index
+- lifecycle index
 - final architecture review
 - final quality audit
 - system readiness classification
 
 Validation:
 - core regression checks
-- representative Phase 6-12 validation reruns
+- representative Stage 6-12 validation reruns
 - README and artifact package integration checks
 
 Report:
-[docs/phase13/PHASE13_FINAL_REPORT.md](docs/phase13/PHASE13_FINAL_REPORT.md)
+[docs/final-system-maturity-readiness-certification/FINAL_REPORT.md](docs/final-system-maturity-readiness-certification/FINAL_REPORT.md)
 
 Status:
 COMPLETE
 
-### Phase 14 — External Validation, Benchmarking & Industry Readiness
+### Stage 14 — External Validation, Benchmarking & Industry Readiness
 
 Objective:
 Package the repository for external software review, benchmark methodology discussion, engineering maturity scoring, and industry-facing readiness communication.
@@ -441,12 +441,84 @@ Work:
 - final audit and external-facing presentation assets
 
 Validation:
-- Phase 6-13 evidence cross-check
+- Stage 6-13 evidence cross-check
 - Go, Python, native, and config validation reruns
 - documentation consistency audit
 
 Report:
-[docs/phase14/PHASE14_FINAL_REPORT.md](docs/phase14/PHASE14_FINAL_REPORT.md)
+[docs/external-validation-benchmarking-industry-readiness/FINAL_REPORT.md](docs/external-validation-benchmarking-industry-readiness/FINAL_REPORT.md)
+
+Status:
+COMPLETE
+
+### Stage 15 — Estimator Safety Hardening & Deterministic Replay Baseline
+
+Objective:
+Harden the native EKF update path with transactional safety checks, deterministic replay, and regression-grade validation.
+
+Work:
+- estimator validation config and fail-closed runtime wiring
+- timestamp-validating IMU ingestion path
+- transactional propagation and correction commit behavior
+- Joseph-form covariance correction flow
+- deterministic replay executable and expanded EKF regression coverage
+
+Validation:
+- EKF unit tests
+- deterministic replay
+- long-duration replay stability
+- formatting and static-analysis checks
+
+Report:
+[docs/estimator-safety-deterministic-replay-baseline/FINAL_REPORT.md](docs/estimator-safety-deterministic-replay-baseline/FINAL_REPORT.md)
+
+Status:
+COMPLETE
+
+### Stage 16 — Shadow Estimator Architecture & Native Replay Validation
+
+Objective:
+Introduce active/shadow estimator architecture without changing active estimator authority.
+
+Work:
+- `StateEstimator` abstraction and adapter layering
+- `EstimatorCoordinator` worker and isolation flow
+- measurement envelope and adapter integration
+- native replay workflow and long-duration shadow replay
+- shadow-only validation and evidence closure
+
+Validation:
+- Stage 16 unit suite
+- shadow replay and determinism
+- active-output equivalence
+- compiler, formatting, and sanitizer lanes
+
+Report:
+[docs/shadow-estimator-native-replay-validation/FINAL_REPORT.md](docs/shadow-estimator-native-replay-validation/FINAL_REPORT.md)
+
+Status:
+COMPLETE
+
+### Stage 17 — ESKF Mathematical Hardening & Shadow Validation
+
+Objective:
+Harden the error-state estimator mathematics while preserving shadow-only execution and active-estimator authority.
+
+Work:
+- nominal/error-state convention verification
+- hardened IMU propagation and process-noise discretization
+- safe error-state injection and reset Jacobian handling
+- shadow-only Stage 17 integration through `EstimatorCoordinator`
+- native Linux TSan validation and evidence closure
+
+Validation:
+- Stage 17 unit and replay suites
+- deterministic long-duration shadow replay
+- active-output equivalence
+- native Linux TSan, compiler, formatting, and static-analysis checks
+
+Report:
+[docs/eskf-mathematical-hardening-shadow-validation/FINAL_REPORT.md](docs/eskf-mathematical-hardening-shadow-validation/FINAL_REPORT.md)
 
 Status:
 COMPLETE
@@ -459,13 +531,13 @@ The final architecture has seven major layers:
 
 - control plane: Go backend for telemetry, readiness, metrics, and supervision
 - onboard autonomy: C++ runtime for sensing, fusion, mission logic, swarm logic, and safety
-- AI autonomy layer: Phase 9 and Phase 11 software modules for perception, planning, swarm intelligence, RL abstraction, and XAI
+- AI autonomy layer: Stage 9 and Stage 11 software modules for perception, planning, swarm intelligence, RL abstraction, and XAI
 - simulation layer: deterministic software HIL, scenario runners, fault injection, and digital twin
 - research layer: datasets, experiments, reproducibility metadata, and publication packaging
 - deployment layer: Docker, Compose, Kubernetes, monitoring, reliability, and disaster recovery
-- documentation ecosystem: phase reports, replication guides, DOI citations, and final maturity review
+- documentation ecosystem: lifecycle reports, replication guides, DOI citations, and final maturity review
 
-The full integrated review is documented in [docs/phase13/FINAL_ARCHITECTURE_REVIEW.md](docs/phase13/FINAL_ARCHITECTURE_REVIEW.md).
+The full integrated review is documented in [docs/final-system-maturity-readiness-certification/FINAL_ARCHITECTURE_REVIEW.md](docs/final-system-maturity-readiness-certification/FINAL_ARCHITECTURE_REVIEW.md).
 
 ---
 
@@ -1359,9 +1431,9 @@ Supporting evidence:
 
 Primary references:
 
-- [docs/phase12/REPLICATION_GUIDE.md](docs/phase12/REPLICATION_GUIDE.md)
-- [docs/phase12/ARTIFACT_EVALUATION.md](docs/phase12/ARTIFACT_EVALUATION.md)
-- [docs/phase13/SYSTEM_READINESS_REPORT.md](docs/phase13/SYSTEM_READINESS_REPORT.md)
+- [docs/scientific-publication-artifact-evaluation/REPLICATION_GUIDE.md](docs/scientific-publication-artifact-evaluation/REPLICATION_GUIDE.md)
+- [docs/scientific-publication-artifact-evaluation/ARTIFACT_EVALUATION.md](docs/scientific-publication-artifact-evaluation/ARTIFACT_EVALUATION.md)
+- [docs/final-system-maturity-readiness-certification/SYSTEM_READINESS_REPORT.md](docs/final-system-maturity-readiness-certification/SYSTEM_READINESS_REPORT.md)
 
 ---
 
@@ -1388,9 +1460,9 @@ The software platform includes deployment, monitoring, security, and operational
 
 Primary references:
 
-- [docs/phase10/PHASE10_FINAL_REPORT.md](docs/phase10/PHASE10_FINAL_REPORT.md)
-- [docs/phase13/FINAL_QUALITY_AUDIT.md](docs/phase13/FINAL_QUALITY_AUDIT.md)
-- [docs/phase13/SYSTEM_READINESS_REPORT.md](docs/phase13/SYSTEM_READINESS_REPORT.md)
+- [docs/enterprise-deployment-security-readiness/FINAL_REPORT.md](docs/enterprise-deployment-security-readiness/FINAL_REPORT.md)
+- [docs/final-system-maturity-readiness-certification/FINAL_QUALITY_AUDIT.md](docs/final-system-maturity-readiness-certification/FINAL_QUALITY_AUDIT.md)
+- [docs/final-system-maturity-readiness-certification/SYSTEM_READINESS_REPORT.md](docs/final-system-maturity-readiness-certification/SYSTEM_READINESS_REPORT.md)
 
 ---
 
@@ -1400,22 +1472,22 @@ Official DOI:
 
 `https://doi.org/10.5281/zenodo.20195953`
 
-Use the archived DOI as the canonical software citation target for this repository. Citation formats and metadata are documented in [docs/phase12/DOI_CITATION.md](docs/phase12/DOI_CITATION.md).
+Use the archived DOI as the canonical software citation target for this repository. Citation formats and metadata are documented in [docs/scientific-publication-artifact-evaluation/DOI_CITATION.md](docs/scientific-publication-artifact-evaluation/DOI_CITATION.md).
 
 ---
 
 ## Replication Guide
 
-The software evidence bundle can be reproduced without external hardware by following [docs/phase12/REPLICATION_GUIDE.md](docs/phase12/REPLICATION_GUIDE.md). The recommended replication path covers:
+The software evidence bundle can be reproduced without external hardware by following [docs/scientific-publication-artifact-evaluation/REPLICATION_GUIDE.md](docs/scientific-publication-artifact-evaluation/REPLICATION_GUIDE.md). The recommended replication path covers:
 
 - schema validation
 - Go and native tests
-- Phase 6 benchmark rerun
-- Phase 7 scenarios and software HIL
-- Phase 8 advanced scenarios
-- Phase 9 AI workflows
-- Phase 10 deployment validation
-- Phase 11 multi-agent and digital twin validation
+- Stage 6 benchmark rerun
+- Stage 7 scenarios and software HIL
+- Stage 8 advanced scenarios
+- Stage 9 AI workflows
+- Stage 10 deployment validation
+- Stage 11 multi-agent and digital twin validation
 
 ---
 
@@ -1423,14 +1495,14 @@ The software evidence bundle can be reproduced without external hardware by foll
 
 Primary documentation entry points:
 
-- [Phase Index](docs/PHASE_INDEX.md)
-- [Phase 14 Final Report](docs/phase14/PHASE14_FINAL_REPORT.md)
-- [Phase 14 Validation Report](docs/phase14/PHASE14_VALIDATION_REPORT.md)
-- [Phase 14 External Validation Report](docs/phase14/EXTERNAL_VALIDATION_REPORT.md)
-- [Phase 13 Final Report](docs/phase13/PHASE13_FINAL_REPORT.md)
-- [Phase 13 Validation Report](docs/phase13/PHASE13_VALIDATION_REPORT.md)
-- [Phase 12 Publication Package](docs/phase12/PUBLICATION_PACKAGE.md)
-- [Phase 12 Artifact Evaluation](docs/phase12/ARTIFACT_EVALUATION.md)
+- [Lifecycle Index](docs/LIFECYCLE_INDEX.md)
+- [Stage 14 Final Report](docs/external-validation-benchmarking-industry-readiness/FINAL_REPORT.md)
+- [Stage 14 Validation Report](docs/external-validation-benchmarking-industry-readiness/VALIDATION_REPORT.md)
+- [Stage 14 External Validation Report](docs/external-validation-benchmarking-industry-readiness/EXTERNAL_VALIDATION_REPORT.md)
+- [Stage 13 Final Report](docs/final-system-maturity-readiness-certification/FINAL_REPORT.md)
+- [Stage 13 Validation Report](docs/final-system-maturity-readiness-certification/VALIDATION_REPORT.md)
+- [Stage 12 Publication Package](docs/scientific-publication-artifact-evaluation/PUBLICATION_PACKAGE.md)
+- [Stage 12 Artifact Evaluation](docs/scientific-publication-artifact-evaluation/ARTIFACT_EVALUATION.md)
 - [Research Release](RESEARCH_RELEASE.md)
 
 ---
@@ -1443,8 +1515,8 @@ READY FOR EXTERNAL-FACING SOFTWARE REVIEW
 
 Primary references:
 
-- [docs/phase14/EXTERNAL_VALIDATION_REPORT.md](docs/phase14/EXTERNAL_VALIDATION_REPORT.md)
-- [docs/phase14/FINAL_AUDIT_REPORT.md](docs/phase14/FINAL_AUDIT_REPORT.md)
+- [docs/external-validation-benchmarking-industry-readiness/EXTERNAL_VALIDATION_REPORT.md](docs/external-validation-benchmarking-industry-readiness/EXTERNAL_VALIDATION_REPORT.md)
+- [docs/external-validation-benchmarking-industry-readiness/FINAL_AUDIT_REPORT.md](docs/external-validation-benchmarking-industry-readiness/FINAL_AUDIT_REPORT.md)
 
 ---
 
@@ -1456,7 +1528,7 @@ Engineering maturity score:
 
 Primary reference:
 
-- [docs/phase14/ENGINEERING_SCORECARD.md](docs/phase14/ENGINEERING_SCORECARD.md)
+- [docs/external-validation-benchmarking-industry-readiness/ENGINEERING_SCORECARD.md](docs/external-validation-benchmarking-industry-readiness/ENGINEERING_SCORECARD.md)
 
 ---
 
@@ -1468,7 +1540,7 @@ READY FOR OPEN COLLABORATION
 
 Primary reference:
 
-- [docs/phase14/COMMUNITY_READINESS.md](docs/phase14/COMMUNITY_READINESS.md)
+- [docs/external-validation-benchmarking-industry-readiness/COMMUNITY_READINESS.md](docs/external-validation-benchmarking-industry-readiness/COMMUNITY_READINESS.md)
 
 ---
 
@@ -1480,7 +1552,7 @@ PASS
 
 Primary reference:
 
-- [docs/phase14/RESEARCH_IMPACT.md](docs/phase14/RESEARCH_IMPACT.md)
+- [docs/external-validation-benchmarking-industry-readiness/RESEARCH_IMPACT.md](docs/external-validation-benchmarking-industry-readiness/RESEARCH_IMPACT.md)
 
 ---
 
@@ -1496,8 +1568,8 @@ physical deployment: REQUIRES HARDWARE VALIDATION
 
 Primary references:
 
-- [docs/phase14/PHASE14_FINAL_REPORT.md](docs/phase14/PHASE14_FINAL_REPORT.md)
-- [docs/phase13/SYSTEM_READINESS_REPORT.md](docs/phase13/SYSTEM_READINESS_REPORT.md)
+- [docs/external-validation-benchmarking-industry-readiness/FINAL_REPORT.md](docs/external-validation-benchmarking-industry-readiness/FINAL_REPORT.md)
+- [docs/final-system-maturity-readiness-certification/SYSTEM_READINESS_REPORT.md](docs/final-system-maturity-readiness-certification/SYSTEM_READINESS_REPORT.md)
 
 ---
 
@@ -1551,12 +1623,12 @@ Verified on 2026-07-14:
 - Python 3.14.5
 - `vcpkg` manifest mode with `VCPKG_ROOT` set
 
-Supported but not fully verified in this phase:
+Supported but not fully verified in this validation pass:
 
 - Linux GCC and Clang via `CMakePresets.json`
 - Linux sanitizer presets for GCC/Clang
 
-Blocked in this phase:
+Blocked in this validation pass:
 
 - Linux runtime validation in WSL Ubuntu because `cmake` was not installed in the Linux environment on 2026-07-14
 
@@ -1583,7 +1655,7 @@ $env:VCPKG_ROOT="$env:USERPROFILE\vcpkg"
 & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat"
 ```
 
-The Phase 2 presets use manifest mode automatically. Do not pre-install individual packages unless you are intentionally warming the cache.
+The Stage 2 presets use manifest mode automatically. Do not pre-install individual packages unless you are intentionally warming the cache.
 
 ### Windows configure, build, and test
 
@@ -1908,27 +1980,30 @@ This workflow reproduces the current software evidence bundle without claiming h
 External research and engineering contributions should start with:
 
 1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
-2. Preserve prior evidence under `docs/phase*/`.
+2. Preserve prior evidence under the lifecycle documentation directories in `docs/`.
 3. Prefer reproducible scripts plus machine-readable outputs over narrative-only changes.
 4. Document limitations explicitly when a capability is simulated, synthetic, or workstation-local.
 
-Phase 8 community-facing collaboration guidance is summarized in [docs/phase8/COMMUNITY_GUIDE.md](docs/phase8/COMMUNITY_GUIDE.md), and release-scope expectations are collected in [RESEARCH_RELEASE.md](RESEARCH_RELEASE.md).
+Stage 8 community-facing collaboration guidance is summarized in [docs/open-research-release-advanced-scenarios/COMMUNITY_GUIDE.md](docs/open-research-release-advanced-scenarios/COMMUNITY_GUIDE.md), and release-scope expectations are collected in [RESEARCH_RELEASE.md](RESEARCH_RELEASE.md).
 
 ---
 
-## Phase Evidence Index
+## Lifecycle Evidence Index
 
-- Phase lifecycle master index: `docs/PHASE_INDEX.md`
-- Phase 3 CI/CD documentation: `docs/phase3/`
-- Phase 6 performance evidence: `docs/phase6/`
-- Phase 7 research validation evidence: `docs/phase7/`
-- Phase 8 publication and collaboration package: `docs/phase8/`
-- Phase 9 AI autonomy evidence: `docs/phase9/`
-- Phase 10 enterprise deployment and readiness evidence: `docs/phase10/`
-- Phase 11 multi-agent AI and digital twin evidence: `docs/phase11/`
-- Phase 12 publication and artifact evaluation package: `docs/phase12/`
-- Phase 13 final maturity and readiness evidence: `docs/phase13/`
-- Phase 14 external validation and industry-readiness package: `docs/phase14/`
+- Lifecycle master index: `docs/LIFECYCLE_INDEX.md`
+- Stage 3 CI/CD documentation: `docs/ci-cd-control-plane-orchestration/`
+- Stage 6 performance evidence: `docs/performance-engineering-stability-validation/`
+- Stage 7 research validation evidence: `docs/research-validation-software-hil-scenarios/`
+- Stage 8 publication and collaboration package: `docs/open-research-release-advanced-scenarios/`
+- Stage 9 AI autonomy evidence: `docs/ai-autonomy-intelligent-decision-layer/`
+- Stage 10 enterprise deployment and readiness evidence: `docs/enterprise-deployment-security-readiness/`
+- Stage 11 multi-agent AI and digital twin evidence: `docs/multi-agent-ai-rl-digital-twin/`
+- Stage 12 publication and artifact evaluation package: `docs/scientific-publication-artifact-evaluation/`
+- Stage 13 final maturity and readiness evidence: `docs/final-system-maturity-readiness-certification/`
+- Stage 14 external validation and industry-readiness package: `docs/external-validation-benchmarking-industry-readiness/`
+- Stage 15 estimator safety hardening and deterministic replay baseline: `docs/estimator-safety-deterministic-replay-baseline/`
+- Stage 16 shadow estimator architecture and native replay validation: `docs/shadow-estimator-native-replay-validation/`
+- Stage 17 ESKF mathematical hardening and shadow validation: `docs/eskf-mathematical-hardening-shadow-validation/`
 - Research scaffolding for future AI/ML work: `research/`
 - Benchmark dataset standard and schema: `datasets/benchmark/`
 - Autonomous dataset standard and sample: `datasets/autonomy/`
@@ -1951,30 +2026,30 @@ Phase 8 community-facing collaboration guidance is summarized in [docs/phase8/CO
 - [Edge Swarm Research Notes](docs/EDGE_SWARM_RESEARCH_NOTES.md)
 - [Benchmark Mock Data](docs/benchmarks/edge_swarm_benchmark_mock_data.json)
 - [Documentation Visual Assets](docs/assets/README.md)
-- [Phase 7 Final Report](docs/phase7/PHASE7_FINAL_REPORT.md)
-- [Phase 8 Validation Report](docs/phase8/PHASE8_VALIDATION_REPORT.md)
-- [Phase 8 Final Benchmark Report](docs/phase8/FINAL_BENCHMARK_REPORT.md)
-- [Phase 8 Final Report](docs/phase8/PHASE8_FINAL_REPORT.md)
-- [Phase 9 Validation Report](docs/phase9/PHASE9_VALIDATION_REPORT.md)
-- [Phase 9 Final Report](docs/phase9/PHASE9_FINAL_REPORT.md)
-- [Phase 9 AI Model Interface](docs/phase9/AI_MODEL_INTERFACE.md)
-- [Phase 3 CI/CD Report](docs/phase3/CICD_REPORT.md)
-- [Phase 10 Validation Report](docs/phase10/PHASE10_VALIDATION_REPORT.md)
-- [Phase 10 Final Report](docs/phase10/PHASE10_FINAL_REPORT.md)
-- [Phase 10 Deployment Guide](docs/phase10/DEPLOYMENT_GUIDE.md)
-- [Phase 11 Validation Report](docs/phase11/PHASE11_VALIDATION_REPORT.md)
-- [Phase 11 Final Report](docs/phase11/PHASE11_FINAL_REPORT.md)
-- [Phase 11 Multi-Agent Report](docs/phase11/MULTI_AGENT_REPORT.md)
-- [Phase 12 Validation Report](docs/phase12/PHASE12_VALIDATION_REPORT.md)
-- [Phase 12 Final Report](docs/phase12/PHASE12_FINAL_REPORT.md)
-- [Phase 12 Publication Package](docs/phase12/PUBLICATION_PACKAGE.md)
-- [Phase Index](docs/PHASE_INDEX.md)
-- [Phase 14 Validation Report](docs/phase14/PHASE14_VALIDATION_REPORT.md)
-- [Phase 14 Final Report](docs/phase14/PHASE14_FINAL_REPORT.md)
-- [Phase 14 External Validation Report](docs/phase14/EXTERNAL_VALIDATION_REPORT.md)
-- [Phase 13 Validation Report](docs/phase13/PHASE13_VALIDATION_REPORT.md)
-- [Phase 13 Final Report](docs/phase13/PHASE13_FINAL_REPORT.md)
-- [Phase 13 System Readiness Report](docs/phase13/SYSTEM_READINESS_REPORT.md)
+- [Stage 7 Final Report](docs/research-validation-software-hil-scenarios/FINAL_REPORT.md)
+- [Stage 8 Validation Report](docs/open-research-release-advanced-scenarios/VALIDATION_REPORT.md)
+- [Stage 8 Final Benchmark Report](docs/open-research-release-advanced-scenarios/FINAL_BENCHMARK_REPORT.md)
+- [Stage 8 Final Report](docs/open-research-release-advanced-scenarios/FINAL_REPORT.md)
+- [Stage 9 Validation Report](docs/ai-autonomy-intelligent-decision-layer/VALIDATION_REPORT.md)
+- [Stage 9 Final Report](docs/ai-autonomy-intelligent-decision-layer/FINAL_REPORT.md)
+- [Stage 9 AI Model Interface](docs/ai-autonomy-intelligent-decision-layer/AI_MODEL_INTERFACE.md)
+- [Stage 3 CI/CD Report](docs/ci-cd-control-plane-orchestration/CICD_REPORT.md)
+- [Stage 10 Validation Report](docs/enterprise-deployment-security-readiness/VALIDATION_REPORT.md)
+- [Stage 10 Final Report](docs/enterprise-deployment-security-readiness/FINAL_REPORT.md)
+- [Stage 10 Deployment Guide](docs/enterprise-deployment-security-readiness/DEPLOYMENT_GUIDE.md)
+- [Stage 11 Validation Report](docs/multi-agent-ai-rl-digital-twin/VALIDATION_REPORT.md)
+- [Stage 11 Final Report](docs/multi-agent-ai-rl-digital-twin/FINAL_REPORT.md)
+- [Stage 11 Multi-Agent Report](docs/multi-agent-ai-rl-digital-twin/MULTI_AGENT_REPORT.md)
+- [Stage 12 Validation Report](docs/scientific-publication-artifact-evaluation/VALIDATION_REPORT.md)
+- [Stage 12 Final Report](docs/scientific-publication-artifact-evaluation/FINAL_REPORT.md)
+- [Stage 12 Publication Package](docs/scientific-publication-artifact-evaluation/PUBLICATION_PACKAGE.md)
+- [Lifecycle Index](docs/LIFECYCLE_INDEX.md)
+- [Stage 14 Validation Report](docs/external-validation-benchmarking-industry-readiness/VALIDATION_REPORT.md)
+- [Stage 14 Final Report](docs/external-validation-benchmarking-industry-readiness/FINAL_REPORT.md)
+- [Stage 14 External Validation Report](docs/external-validation-benchmarking-industry-readiness/EXTERNAL_VALIDATION_REPORT.md)
+- [Stage 13 Validation Report](docs/final-system-maturity-readiness-certification/VALIDATION_REPORT.md)
+- [Stage 13 Final Report](docs/final-system-maturity-readiness-certification/FINAL_REPORT.md)
+- [Stage 13 System Readiness Report](docs/final-system-maturity-readiness-certification/SYSTEM_READINESS_REPORT.md)
 
 ## License
 
@@ -2002,3 +2077,5 @@ flight readiness: NOT READY
 ```
 
 The intended next step is disciplined HIL validation, followed by tethered and flight-adjacent testing only after hardware timing, radio behavior, sensor stability, and safety invariants are demonstrated under controlled conditions.
+
+

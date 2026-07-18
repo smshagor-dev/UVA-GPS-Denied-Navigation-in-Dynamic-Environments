@@ -1,0 +1,8 @@
+﻿gh : You are not logged into any GitHub hosts. To log in, run: gh auth login
+At line:2 char:1
++ gh auth status *> 'docs/production-readiness-deployment-reproducibility/evidence/gh_auth_status.txt'
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (You are not log...: gh auth login:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
