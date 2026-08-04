@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install actionlint
         shell: bash
@@ -58,15 +58,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements.txt
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: false
@@ -107,7 +107,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -135,9 +135,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
@@ -173,7 +173,7 @@ jobs:
 
       - name: Upload Python coverage
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: python-coverage-${{ github.sha }}
           path: ${{ runner.temp }}/python-coverage
@@ -184,9 +184,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: false
@@ -212,7 +212,7 @@ jobs:
 
       - name: Upload Go coverage
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: go-coverage-${{ github.sha }}
           path: ${{ runner.temp }}/go-coverage
@@ -223,7 +223,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: ./.github/actions/setup-linux-deps
 
@@ -256,7 +256,7 @@ jobs:
 
       - name: Upload Linux GCC reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ctest-linux-gcc-validation-${{ github.sha }}
           path: ${{ runner.temp }}/ctest-linux-gcc-validation
@@ -268,7 +268,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -292,7 +292,7 @@ jobs:
           ctest --preset linux-gcc-debug --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-gcc-debug/junit.xml"
       - name: Upload Linux GCC Debug reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ctest-linux-gcc-debug-${{ github.sha }}
           path: ${{ runner.temp }}/ctest-linux-gcc-debug
@@ -304,7 +304,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -328,7 +328,7 @@ jobs:
           ctest --preset linux-gcc-release --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-gcc-release/junit.xml"
       - name: Upload Linux GCC Release reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ctest-linux-gcc-release-${{ github.sha }}
           path: ${{ runner.temp }}/ctest-linux-gcc-release
@@ -339,7 +339,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -364,7 +364,7 @@ jobs:
           ctest --preset linux-clang-release --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-clang-release/junit.xml"
       - name: Upload Linux Clang Release reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ctest-linux-clang-release-${{ github.sha }}
           path: ${{ runner.temp }}/ctest-linux-clang-release
@@ -376,7 +376,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -400,7 +400,7 @@ jobs:
           ctest --preset linux-clang-debug --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-clang-debug/junit.xml"
       - name: Upload Linux Clang Debug reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ctest-linux-clang-debug-${{ github.sha }}
           path: ${{ runner.temp }}/ctest-linux-clang-debug
@@ -411,9 +411,9 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
 
@@ -452,7 +452,7 @@ jobs:
 
       - name: Upload Windows validation reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ctest-windows-msvc-validation-${{ github.sha }}
           path: ${{ runner.temp }}\ctest-windows-msvc-validation
@@ -465,8 +465,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - uses: ./.github/actions/setup-vcpkg
@@ -498,7 +498,7 @@ jobs:
           ctest --preset windows-msvc-debug --parallel 2 --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-debug\junit.xml"
       - name: Upload Windows Debug reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ctest-windows-msvc-debug-${{ github.sha }}
           path: ${{ runner.temp }}\ctest-windows-msvc-debug
@@ -511,8 +511,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - uses: ./.github/actions/setup-vcpkg
@@ -544,7 +544,7 @@ jobs:
           ctest --preset windows-msvc-release --parallel 2 --output-on-failure --output-junit "$env:RUNNER_TEMP\ctest-windows-msvc-release\junit.xml"
       - name: Upload Windows Release reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ctest-windows-msvc-release-${{ github.sha }}
           path: ${{ runner.temp }}\ctest-windows-msvc-release
@@ -556,13 +556,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements.txt
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: false
@@ -584,7 +584,7 @@ jobs:
             --report "${RUNNER_TEMP}/local-validate/local_validate_report.json"
       - name: Upload validator report
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: local-validator-${{ github.sha }}
           path: ${{ runner.temp }}/local-validate
@@ -595,7 +595,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Print tool versions
         shell: bash
@@ -626,7 +626,7 @@ jobs:
             --manifest-out "${RUNNER_TEMP}/install-manifest/install-manifest.json"
       - name: Upload install manifest
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: install-consumer-${{ github.sha }}
           path: |

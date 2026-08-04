@@ -25,8 +25,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: false
@@ -82,7 +82,7 @@ jobs:
             sha256sum ./* > SHA256SUMS.txt
           )
       - name: Upload Linux release artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-linux-${{ github.sha }}
           path: |
@@ -95,8 +95,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
       - uses: ./.github/actions/setup-vcpkg
@@ -144,7 +144,7 @@ jobs:
           }
           $lines | Set-Content -LiteralPath "$env:RUNNER_TEMP\release\windows\SHA256SUMS.txt"
       - name: Upload Windows release artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-windows-${{ github.sha }}
           path: ${{ runner.temp }}\release\windows
