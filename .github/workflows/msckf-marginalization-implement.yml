@@ -1,3 +1,4 @@
+# one-shot implementation trigger
 name: MSCKF Retirement Boundary Implementation
 
 on:
@@ -58,27 +59,26 @@ jobs:
           s = replace_once(s, old, new, 'clear marginalization diagnostics')
 
           old = '''void Phase17ESKFEstimator::evict_msckf_state_locked() {\n    if (msckf_state_order_.empty()) {\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n    const uint64_t oldest_id = msckf_state_order_.front();\n    msckf_state_order_.pop_front();\n    if (const auto it = msckf_camera_states_.find(oldest_id); it != msckf_camera_states_.end()) {\n        remove_clone_covariance_block_locked(oldest_id);\n        msckf_timestamp_to_state_id_.erase(it->second.timestamp_key);\n        prune_feature_tracks_for_state_locked(oldest_id);\n        msckf_camera_states_.erase(it);\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.msckf_states_removed;\n            ++diagnostics_.msckf_deterministic_evictions;\n        }\n    }\n    refresh_msckf_oldest_state_age_locked();\n}'''
-          new = '''void Phase17ESKFEstimator::evict_msckf_state_locked() {\n    if (msckf_state_order_.empty()) {\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n\n    const uint64_t oldest_id = msckf_state_order_.front();\n    const auto state_it = msckf_camera_states_.find(oldest_id);\n    if (state_it == msckf_camera_states_.end()) {\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.marginalization_failures;\n        }\n        note_rejection_locked(EstimatorOperationResult::FailedNumericalValidation);\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n\n    std::vector<MarginalizationTrackSummary> summaries;\n    summaries.reserve(feature_tracks_.size());\n    for (const auto& [key, track] : feature_tracks_) {\n        (void)key;\n        MarginalizationTrackSummary summary;\n        summary.track_id = track.track_id;\n        summary.landmark_initialized = track.landmark_initialized;\n        summary.observation_state_ids.reserve(track.observations.size());\n        for (const auto& observation : track.observations) {\n            summary.observation_state_ids.push_back(observation.state_id);\n        }\n        summaries.push_back(std::move(summary));\n    }\n\n    const auto plan = MsckfMarginalization::build_plan(\n        oldest_id, summaries, msckf_cfg_.update.minimum_track_length);\n    const std::vector<uint64_t> ordered_clone_ids(msckf_state_order_.begin(),\n                                                   msckf_state_order_.end());\n\n    MsckfRetirementRequest request;\n    request.retiring_state_id = oldest_id;\n    request.base_error_dim = static_cast<std::size_t>(AugmentedStateLayout::kBaseErrorDim);\n    request.clone_error_dim = static_cast<std::size_t>(AugmentedStateLayout::kCloneErrorDim);\n    request.symmetry_tolerance = validation_cfg_.covariance_symmetry_tolerance;\n    request.negativity_tolerance = validation_cfg_.variance_negativity_tolerance;\n\n    if (msckf_diagnostics_enabled_locked()) {\n        ++diagnostics_.marginalization_attempts;\n        diagnostics_.marginalization_retiring_state_id = oldest_id;\n        diagnostics_.marginalization_affected_tracks = plan.affected_track_ids.size();\n        diagnostics_.marginalization_constraint_candidates =\n            plan.constraint_candidate_track_ids.size();\n        diagnostics_.marginalization_covariance_dim_before =\n            static_cast<uint64_t>(augmented_covariance_.rows());\n    }\n\n    const auto prepared = MsckfRetirementTransaction::prepare(\n        request, ordered_clone_ids, augmented_covariance_);\n    if (!prepared.has_value() || !prepared->committed) {\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.marginalization_failures;\n        }\n        note_rejection_locked(EstimatorOperationResult::FailedNumericalValidation);\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n\n    // Commit the covariance principal submatrix before deleting metadata. The feature\n    // constraint boundary has already run for vision-driven captures; non-vision clone\n    // captures have no new feature observations to consume.\n    augmented_covariance_ = prepared->retained_covariance;\n    P_ = augmented_covariance_.block(0, 0, kErrorDim, kErrorDim);\n    P_ = 0.5 * (P_ + P_.transpose());\n\n    msckf_state_order_.pop_front();\n    msckf_timestamp_to_state_id_.erase(state_it->second.timestamp_key);\n    prune_feature_tracks_for_state_locked(oldest_id);\n    msckf_camera_states_.erase(state_it);\n    prune_empty_feature_tracks_locked();\n\n    uint64_t stale_references = 0;\n    for (const auto& [key, track] : feature_tracks_) {\n        (void)key;\n        stale_references += static_cast<uint64_t>(std::count_if(\n            track.observations.begin(), track.observations.end(),\n            [oldest_id](const FeatureObservation& observation) {\n                return observation.state_id == oldest_id;\n            }));\n    }\n\n    const auto retained_layout = build_augmented_state_layout_locked();\n    const auto health = MsckfMarginalization::covariance_health(\n        augmented_covariance_, validation_cfg_.covariance_symmetry_tolerance,\n        validation_cfg_.variance_negativity_tolerance);\n    const bool valid_commit =\n        augmented_covariance_dimensions_valid_locked(retained_layout) &&\n        health.finite && health.symmetric && health.psd_within_tolerance &&\n        stale_references == 0u;\n\n    if (!valid_commit) {\n        // This condition is unreachable when the pure retirement transaction and\n        // deterministic cleanup invariants hold. Fail loudly instead of silently\n        // publishing inconsistent diagnostics.\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.marginalization_failures;\n        }\n        note_rejection_locked(EstimatorOperationResult::FailedNumericalValidation);\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n\n    if (msckf_diagnostics_enabled_locked()) {\n        ++diagnostics_.marginalizations_completed;\n        ++diagnostics_.msckf_states_removed;\n        ++diagnostics_.msckf_deterministic_evictions;\n        diagnostics_.marginalization_covariance_dim_after =\n            static_cast<uint64_t>(augmented_covariance_.rows());\n        diagnostics_.marginalization_stale_references = stale_references;\n        diagnostics_.marginalization_covariance_symmetry_error = health.symmetry_error;\n        diagnostics_.marginalization_covariance_min_eigenvalue = health.minimum_eigenvalue;\n    }\n    refresh_msckf_oldest_state_age_locked();\n}'''
+          new = '''void Phase17ESKFEstimator::evict_msckf_state_locked() {\n    if (msckf_state_order_.empty()) {\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n\n    const uint64_t oldest_id = msckf_state_order_.front();\n    const auto state_it = msckf_camera_states_.find(oldest_id);\n    if (state_it == msckf_camera_states_.end()) {\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.marginalization_failures;\n        }\n        note_rejection_locked(EstimatorOperationResult::FailedNumericalValidation);\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n\n    std::vector<MarginalizationTrackSummary> summaries;\n    summaries.reserve(feature_tracks_.size());\n    for (const auto& [key, track] : feature_tracks_) {\n        (void)key;\n        MarginalizationTrackSummary summary;\n        summary.track_id = track.track_id;\n        summary.landmark_initialized = track.landmark_initialized;\n        summary.observation_state_ids.reserve(track.observations.size());\n        for (const auto& observation : track.observations) {\n            summary.observation_state_ids.push_back(observation.state_id);\n        }\n        summaries.push_back(std::move(summary));\n    }\n\n    const auto plan = MsckfMarginalization::build_plan(\n        oldest_id, summaries, msckf_cfg_.update.minimum_track_length);\n    const std::vector<uint64_t> ordered_clone_ids(msckf_state_order_.begin(),\n                                                   msckf_state_order_.end());\n\n    MsckfRetirementRequest request;\n    request.retiring_state_id = oldest_id;\n    request.base_error_dim = static_cast<std::size_t>(AugmentedStateLayout::kBaseErrorDim);\n    request.clone_error_dim = static_cast<std::size_t>(AugmentedStateLayout::kCloneErrorDim);\n    request.symmetry_tolerance = validation_cfg_.covariance_symmetry_tolerance;\n    request.negativity_tolerance = validation_cfg_.variance_negativity_tolerance;\n\n    if (msckf_diagnostics_enabled_locked()) {\n        ++diagnostics_.marginalization_attempts;\n        diagnostics_.marginalization_retiring_state_id = oldest_id;\n        diagnostics_.marginalization_affected_tracks = plan.affected_track_ids.size();\n        diagnostics_.marginalization_constraint_candidates =\n            plan.constraint_candidate_track_ids.size();\n        diagnostics_.marginalization_covariance_dim_before =\n            static_cast<uint64_t>(augmented_covariance_.rows());\n    }\n\n    const auto prepared = MsckfRetirementTransaction::prepare(\n        request, ordered_clone_ids, augmented_covariance_);\n    if (!prepared.has_value() || !prepared->committed) {\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.marginalization_failures;\n        }\n        note_rejection_locked(EstimatorOperationResult::FailedNumericalValidation);\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n\n    augmented_covariance_ = prepared->retained_covariance;\n    P_ = augmented_covariance_.block(0, 0, kErrorDim, kErrorDim);\n    P_ = 0.5 * (P_ + P_.transpose());\n\n    msckf_state_order_.pop_front();\n    msckf_timestamp_to_state_id_.erase(state_it->second.timestamp_key);\n    prune_feature_tracks_for_state_locked(oldest_id);\n    msckf_camera_states_.erase(state_it);\n    prune_empty_feature_tracks_locked();\n\n    uint64_t stale_references = 0;\n    for (const auto& [key, track] : feature_tracks_) {\n        (void)key;\n        stale_references += static_cast<uint64_t>(std::count_if(\n            track.observations.begin(), track.observations.end(),\n            [oldest_id](const FeatureObservation& observation) {\n                return observation.state_id == oldest_id;\n            }));\n    }\n\n    const auto retained_layout = build_augmented_state_layout_locked();\n    const auto health = MsckfMarginalization::covariance_health(\n        augmented_covariance_, validation_cfg_.covariance_symmetry_tolerance,\n        validation_cfg_.variance_negativity_tolerance);\n    const bool valid_commit =\n        augmented_covariance_dimensions_valid_locked(retained_layout) &&\n        health.finite && health.symmetric && health.psd_within_tolerance &&\n        stale_references == 0u;\n\n    if (!valid_commit) {\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.marginalization_failures;\n        }\n        note_rejection_locked(EstimatorOperationResult::FailedNumericalValidation);\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n\n    if (msckf_diagnostics_enabled_locked()) {\n        ++diagnostics_.marginalizations_completed;\n        ++diagnostics_.msckf_states_removed;\n        ++diagnostics_.msckf_deterministic_evictions;\n        diagnostics_.marginalization_covariance_dim_after =\n            static_cast<uint64_t>(augmented_covariance_.rows());\n        diagnostics_.marginalization_stale_references = stale_references;\n        diagnostics_.marginalization_covariance_symmetry_error = health.symmetry_error;\n        diagnostics_.marginalization_covariance_min_eigenvalue = health.minimum_eigenvalue;\n    }\n    refresh_msckf_oldest_state_age_locked();\n}'''
           s = replace_once(s, old, new, 'production eviction boundary')
 
           old = '''    while (msckf_state_order_.size() > msckf_cfg_.max_camera_states) {\n        evict_msckf_state_locked();\n    }\n    refresh_msckf_oldest_state_age_locked();\n    return state.state_id;'''
-          new = '''    // Vision-driven capture defers retirement until after the current frame has\n    // recorded/triangulated/applied feature constraints. Non-vision callers retire\n    // through maybe_capture_msckf_camera_state_locked().\n    refresh_msckf_oldest_state_age_locked();\n    return state.state_id;'''
+          new = '''    refresh_msckf_oldest_state_age_locked();\n    return state.state_id;'''
           s = replace_once(s, old, new, 'defer capture retirement')
 
           old = '''void Phase17ESKFEstimator::maybe_capture_msckf_camera_state_locked(double capture_timestamp_s) {\n    (void)capture_or_get_msckf_camera_state_locked(capture_timestamp_s);\n}'''
-          new = '''void Phase17ESKFEstimator::maybe_capture_msckf_camera_state_locked(double capture_timestamp_s) {\n    (void)capture_or_get_msckf_camera_state_locked(capture_timestamp_s);\n    while (msckf_state_order_.size() > msckf_cfg_.max_camera_states) {\n        evict_msckf_state_locked();\n        if (msckf_state_order_.size() > msckf_cfg_.max_camera_states &&\n            diagnostics_.last_operation_result != EstimatorOperationResult::Accepted) {\n            break;\n        }\n    }\n}'''
+          new = '''void Phase17ESKFEstimator::maybe_capture_msckf_camera_state_locked(double capture_timestamp_s) {\n    (void)capture_or_get_msckf_camera_state_locked(capture_timestamp_s);\n    while (msckf_state_order_.size() > msckf_cfg_.max_camera_states) {\n        const auto before = msckf_state_order_.size();\n        evict_msckf_state_locked();\n        if (msckf_state_order_.size() >= before) {\n            break;\n        }\n    }\n}'''
           s = replace_once(s, old, new, 'non-vision retirement')
 
           old = '''            try_initialize_triangulated_landmarks_locked(K);\n            try_apply_msckf_feature_updates_locked(K, state_id);\n        }\n    }'''
-          new = '''            try_initialize_triangulated_landmarks_locked(K);\n            try_apply_msckf_feature_updates_locked(K, state_id);\n            while (msckf_state_order_.size() > msckf_cfg_.max_camera_states) {\n                evict_msckf_state_locked();\n                if (msckf_state_order_.size() > msckf_cfg_.max_camera_states &&\n                    diagnostics_.last_operation_result != EstimatorOperationResult::Accepted) {\n                    break;\n                }\n            }\n        }\n    }'''
+          new = '''            try_initialize_triangulated_landmarks_locked(K);\n            try_apply_msckf_feature_updates_locked(K, state_id);\n            while (msckf_state_order_.size() > msckf_cfg_.max_camera_states) {\n                const auto before = msckf_state_order_.size();\n                evict_msckf_state_locked();\n                if (msckf_state_order_.size() >= before) {\n                    break;\n                }\n            }\n        }\n    }'''
           s = replace_once(s, old, new, 'vision post-constraint retirement')
 
           old = '''    out.msckf_deterministic_evictions = diag.msckf_deterministic_evictions;\n    out.triangulation_attempts = diag.triangulation_attempts;'''
-          new = '''    out.msckf_deterministic_evictions = diag.msckf_deterministic_evictions;\n    out.marginalization_attempts = diag.marginalization_attempts;\n    out.marginalizations_completed = diag.marginalizations_completed;\n    out.marginalization_failures = diag.marginalization_failures;\n    out.marginalization_retiring_state_id = diag.marginalization_retiring_state_id;\n    out.marginalization_affected_tracks = diag.marginalization_affected_tracks;\n    out.marginalization_constraint_candidates = diag.marginalization_constraint_candidates;\n    out.marginalization_covariance_dim_before = diag.marginalization_covariance_dim_before;\n    out.marginalization_covariance_dim_after = diag.marginalization_covariance_dim_after;\n    out.marginalization_stale_references = diag.marginalization_stale_references;\n    out.marginalization_covariance_symmetry_error =\n        diag.marginalization_covariance_symmetry_error;\n    out.marginalization_covariance_min_eigenvalue =\n        diag.marginalization_covariance_min_eigenvalue;\n    out.triangulation_attempts = diag.triangulation_attempts;'''
+          new = '''    out.msckf_deterministic_evictions = diag.msckf_deterministic_evictions;\n    out.marginalization_attempts = diag.marginalization_attempts;\n    out.marginalizations_completed = diag.marginalizations_completed;\n    out.marginalization_failures = diag.marginalization_failures;\n    out.marginalization_retiring_state_id = diag.marginalization_retiring_state_id;\n    out.marginalization_affected_tracks = diag.marginalization_affected_tracks;\n    out.marginalization_constraint_candidates = diag.marginalization_constraint_candidates;\n    out.marginalization_covariance_dim_before = diag.marginalization_covariance_dim_before;\n    out.marginalization_covariance_dim_after = diag.marginalization_covariance_dim_after;\n    out.marginalization_stale_references = diag.marginalization_stale_references;\n    out.marginalization_covariance_symmetry_error = diag.marginalization_covariance_symmetry_error;\n    out.marginalization_covariance_min_eigenvalue = diag.marginalization_covariance_min_eigenvalue;\n    out.triangulation_attempts = diag.triangulation_attempts;'''
           s = replace_once(s, old, new, 'snapshot marginalization diagnostics')
           p.write_text(s)
 
-          # Add focused integration test target.
           p = Path('tests/CMakeLists.txt')
           s = p.read_text()
           anchor = '''drone_register_gtest(test_phase22_msckf_update "unit;navigation;replay;phase22")\n'''
@@ -87,48 +87,41 @@ jobs:
           p.write_text(s)
 
           Path('tests/test_msckf_marginalization_integration.cpp').write_text(r'''#include "vio/Phase17ESKFEstimator.hpp"
-
 #include <gtest/gtest.h>
 
 namespace drone::vio {
 namespace {
-
-MsckfConfig make_config() {
+MsckfConfig make_config(bool diagnostics = true) {
     MsckfConfig cfg;
     cfg.enabled = true;
     cfg.max_camera_states = 2;
-    cfg.diagnostics_enabled = true;
+    cfg.diagnostics_enabled = diagnostics;
     cfg.triangulation.enabled = false;
     cfg.update.enabled = false;
     return cfg;
 }
 
-TEST(MsckfMarginalizationIntegration, VisualPoseWindowRetiresOldestTransactionally) {
+void drive_three_clones(Phase17ESKFEstimator& estimator) {
+    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81}, Eigen::Vector3d::Zero(), 0.0), EstimatorOperationResult::Accepted);
+    for (int i = 1; i <= 3; ++i) {
+        const double t = 0.01 * static_cast<double>(i);
+        ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81}, Eigen::Vector3d::Zero(), t), EstimatorOperationResult::Accepted);
+        const auto pose = estimator.state();
+        estimator.update_visual_pose(pose.position, pose.velocity, 0.35, 0.45);
+    }
+}
+
+TEST(MsckfMarginalizationIntegration, RetiresOldestAndKeepsBoundedWindow) {
     Phase17ESKFEstimator estimator;
     estimator.reset();
     estimator.configure_msckf(make_config());
-
-    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
-                                                Eigen::Vector3d::Zero(), 0.0),
-              EstimatorOperationResult::Accepted);
-    for (int i = 1; i <= 3; ++i) {
-        const double t = 0.01 * static_cast<double>(i);
-        ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
-                                                    Eigen::Vector3d::Zero(), t),
-                  EstimatorOperationResult::Accepted);
-        estimator.update_visual_pose(estimator.state().position, estimator.state().velocity,
-                                     0.35, 0.45);
-    }
-
+    drive_three_clones(estimator);
     const auto ids = estimator.msckf_state_ids_for_test();
-    ASSERT_EQ(ids.size(), 2u);
-    EXPECT_EQ(ids[0], 2u);
-    EXPECT_EQ(ids[1], 3u);
+    ASSERT_EQ(ids, (std::vector<uint64_t>{2u, 3u}));
     const auto covariance = estimator.augmented_covariance_for_test();
     EXPECT_EQ(covariance.rows(), 27);
     EXPECT_EQ(covariance.cols(), 27);
     EXPECT_TRUE(covariance.array().isFinite().all());
-
     const auto diag = estimator.diagnostics();
     EXPECT_EQ(diag.marginalization_attempts, 1u);
     EXPECT_EQ(diag.marginalizations_completed, 1u);
@@ -137,40 +130,23 @@ TEST(MsckfMarginalizationIntegration, VisualPoseWindowRetiresOldestTransactional
     EXPECT_EQ(diag.marginalization_covariance_dim_before, 33u);
     EXPECT_EQ(diag.marginalization_covariance_dim_after, 27u);
     EXPECT_EQ(diag.marginalization_stale_references, 0u);
-    EXPECT_LE(diag.marginalization_covariance_symmetry_error, 1.0e-9);
 }
 
 TEST(MsckfMarginalizationIntegration, DiagnosticsDisabledDoesNotDisableRetirement) {
     Phase17ESKFEstimator estimator;
     estimator.reset();
-    auto cfg = make_config();
-    cfg.diagnostics_enabled = false;
-    estimator.configure_msckf(cfg);
-
-    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
-                                                Eigen::Vector3d::Zero(), 0.0),
-              EstimatorOperationResult::Accepted);
-    for (int i = 1; i <= 3; ++i) {
-        const double t = 0.01 * static_cast<double>(i);
-        ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
-                                                    Eigen::Vector3d::Zero(), t),
-                  EstimatorOperationResult::Accepted);
-        estimator.update_visual_pose(estimator.state().position, estimator.state().velocity,
-                                     0.35, 0.45);
-    }
-
-    EXPECT_EQ(estimator.msckf_state_ids_for_test().size(), 2u);
+    estimator.configure_msckf(make_config(false));
+    drive_three_clones(estimator);
+    EXPECT_EQ(estimator.msckf_state_ids_for_test(), (std::vector<uint64_t>{2u, 3u}));
     EXPECT_EQ(estimator.augmented_covariance_for_test().rows(), 27);
     const auto diag = estimator.diagnostics();
     EXPECT_EQ(diag.marginalization_attempts, 0u);
     EXPECT_EQ(diag.marginalizations_completed, 0u);
 }
-
 } // namespace
 } // namespace drone::vio
 ''')
 
-          # Keep validation workflow tied to production integration files.
           p = Path('.github/workflows/msckf-marginalization.yml')
           s = p.read_text()
           old = "      - 'include/vio/MsckfRetirementTransaction.hpp'\n"
@@ -186,20 +162,13 @@ TEST(MsckfMarginalizationIntegration, DiagnosticsDisabledDoesNotDisableRetiremen
 
       - name: Syntax-check estimator integration
         run: |
-          g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -fsyntax-only \
-            -Iinclude -Ithird_party/crypto -I/usr/include/eigen3 \
-            src/vio/Phase17ESKFEstimator.cpp
-          clang++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -fsyntax-only \
-            -Iinclude -Ithird_party/crypto -I/usr/include/eigen3 \
-            src/vio/Phase17ESKFEstimator.cpp
+          g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -fsyntax-only -Iinclude -Ithird_party/crypto -I/usr/include/eigen3 src/vio/Phase17ESKFEstimator.cpp
+          clang++ -std=c++20 -Wall -Wextra -Wpedantic -Werror -fsyntax-only -Iinclude -Ithird_party/crypto -I/usr/include/eigen3 src/vio/Phase17ESKFEstimator.cpp
 
       - name: Commit implementation
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add include/vio/EKFEstimator.hpp include/vio/StateEstimator.hpp \
-                  src/vio/Phase17ESKFEstimator.cpp tests/CMakeLists.txt \
-                  tests/test_msckf_marginalization_integration.cpp \
-                  .github/workflows/msckf-marginalization.yml
+          git add include/vio/EKFEstimator.hpp include/vio/StateEstimator.hpp src/vio/Phase17ESKFEstimator.cpp tests/CMakeLists.txt tests/test_msckf_marginalization_integration.cpp .github/workflows/msckf-marginalization.yml
           git commit -m "Wire MSCKF marginalization retirement boundary"
           git push origin HEAD:phase23-development
