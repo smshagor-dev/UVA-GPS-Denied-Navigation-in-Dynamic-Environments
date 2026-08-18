@@ -1,4 +1,4 @@
-name: Release Validation
+﻿name: Release Validation
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ on:
       - "internal/controlplane/**"
       - "config/**"
       - "scripts/validate_config_schemas.py"
-      - "docs/phase5/**"
+      - "docs/production-readiness-deployment-reproducibility/**"
 
 permissions:
   contents: read
@@ -99,4 +99,5 @@ jobs:
             ${{ runner.temp }}/metrics.txt
             ${{ runner.temp }}/control-plane.log
           retention-days: 30
+
 

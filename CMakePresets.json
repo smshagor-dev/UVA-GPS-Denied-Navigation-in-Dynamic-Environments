@@ -159,6 +159,23 @@
       }
     },
     {
+      "name": "linux-clang-tsan-phase17",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/build/linux-clang-tsan-phase17",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_C_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer -g",
+        "CMAKE_CXX_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer -g",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=thread",
+        "DRONE_ENABLE_PYTHON_BINDINGS": "OFF",
+        "DRONE_ENABLE_FASTDDS": "OFF",
+        "DRONE_ENABLE_PHASE17_HEADLESS_TSAN": "ON"
+      }
+    },
+    {
       "name": "linux-gcc-release-werror",
       "inherits": "linux-gcc-release",
       "binaryDir": "${sourceDir}/build/linux-gcc-release-werror",
@@ -214,6 +231,7 @@
     { "name": "linux-clang-release", "configurePreset": "linux-clang-release" },
     { "name": "linux-gcc-asan-ubsan", "configurePreset": "linux-gcc-asan-ubsan" },
     { "name": "linux-clang-asan-ubsan", "configurePreset": "linux-clang-asan-ubsan" },
+    { "name": "linux-clang-tsan-phase17", "configurePreset": "linux-clang-tsan-phase17" },
     { "name": "linux-gcc-release-werror", "configurePreset": "linux-gcc-release-werror" },
     { "name": "linux-gcc-release-minimal", "configurePreset": "linux-gcc-release-minimal" },
     { "name": "linux-gcc-coverage", "configurePreset": "linux-gcc-coverage" },
@@ -234,6 +252,7 @@
     { "name": "linux-clang-release", "configurePreset": "linux-clang-release", "output": { "outputOnFailure": true } },
     { "name": "linux-gcc-asan-ubsan", "configurePreset": "linux-gcc-asan-ubsan", "output": { "outputOnFailure": true } },
     { "name": "linux-clang-asan-ubsan", "configurePreset": "linux-clang-asan-ubsan", "output": { "outputOnFailure": true } },
+    { "name": "linux-clang-tsan-phase17", "configurePreset": "linux-clang-tsan-phase17", "output": { "outputOnFailure": true } },
     { "name": "linux-gcc-release-werror", "configurePreset": "linux-gcc-release-werror", "output": { "outputOnFailure": true } },
     { "name": "linux-gcc-release-minimal", "configurePreset": "linux-gcc-release-minimal", "output": { "outputOnFailure": true } },
     { "name": "linux-gcc-coverage", "configurePreset": "linux-gcc-coverage", "output": { "outputOnFailure": true } },

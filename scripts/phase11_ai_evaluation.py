@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Phase 11 AI evaluation and final report generator."""
 
 from __future__ import annotations
@@ -21,8 +21,8 @@ from research.ai.common import rounded, summarize_latency, utc_now, write_json
 DOC_ROOT = REPO_ROOT / "docs" / "phase11"
 AI_JSON = DOC_ROOT / "ai_evaluation_results.json"
 AI_MD = DOC_ROOT / "AI_EVALUATION_REPORT.md"
-VALIDATION_MD = DOC_ROOT / "PHASE11_VALIDATION_REPORT.md"
-FINAL_MD = DOC_ROOT / "PHASE11_FINAL_REPORT.md"
+VALIDATION_MD = DOC_ROOT / "VALIDATION_REPORT.md"
+FINAL_MD = DOC_ROOT / "FINAL_REPORT.md"
 
 
 def load_json(path: Path) -> dict[str, object]:
@@ -131,14 +131,14 @@ def main() -> int:
                 "",
                 "| Area | Result | Evidence |",
                 "|---|---|---|",
-                "| Multi-agent framework | PASS | `docs/phase11/MULTI_AGENT_REPORT.md` |",
-                "| RL abstraction | PASS | `docs/phase11/RL_FRAMEWORK_REPORT.md` |",
-                "| Digital twin | PASS | `docs/phase11/DIGITAL_TWIN_REPORT.md` |",
-                "| Explainable AI | PASS | `docs/phase11/XAI_REPORT.md` |",
-                "| World model | PASS | `docs/phase11/WORLD_MODEL_REPORT.md` |",
-                "| AI evaluation | PASS | `docs/phase11/AI_EVALUATION_REPORT.md` |",
-                "| Digital twin benchmark | PASS | `docs/phase11/DIGITAL_TWIN_BENCHMARK.md` |",
-                "| Reproducibility | PASS | `docs/phase11/REPRODUCIBILITY_REPORT.md` |",
+                "| Multi-agent framework | PASS | `docs/multi-agent-ai-rl-digital-twin/MULTI_AGENT_REPORT.md` |",
+                "| RL abstraction | PASS | `docs/multi-agent-ai-rl-digital-twin/RL_FRAMEWORK_REPORT.md` |",
+                "| Digital twin | PASS | `docs/multi-agent-ai-rl-digital-twin/DIGITAL_TWIN_REPORT.md` |",
+                "| Explainable AI | PASS | `docs/multi-agent-ai-rl-digital-twin/XAI_REPORT.md` |",
+                "| World model | PASS | `docs/multi-agent-ai-rl-digital-twin/WORLD_MODEL_REPORT.md` |",
+                "| AI evaluation | PASS | `docs/multi-agent-ai-rl-digital-twin/AI_EVALUATION_REPORT.md` |",
+                "| Digital twin benchmark | PASS | `docs/multi-agent-ai-rl-digital-twin/DIGITAL_TWIN_BENCHMARK.md` |",
+                "| Reproducibility | PASS | `docs/multi-agent-ai-rl-digital-twin/REPRODUCIBILITY_REPORT.md` |",
                 "",
                 "## Measured Highlights",
                 "",
@@ -193,3 +193,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

@@ -9,6 +9,7 @@
 // Drone Swarm Sensor Fusion  |  Phase 2
 
 #include "vio/EKFEstimator.hpp"
+#include "vio/EstimatorCoordinator.hpp"
 #include "sensors/IMUSensor.hpp"
 #include "sensors/CameraSensor.hpp"
 #include "sensors/LidarSensor.hpp"
@@ -17,6 +18,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <functional>
+#include <memory>
 #include <opencv2/core.hpp>
 #include <queue>
 #include <string>
@@ -87,6 +89,21 @@ struct RuntimeTelemetry {
     double visual_update_confidence{0.0};
     bool visual_frontend_valid{false};
     bool visual_placeholder_active{false};
+    std::string active_estimator_name{"ekf_active"};
+    std::string shadow_estimator_name{"ekf_shadow"};
+    std::string active_estimator_health{"uninitialized"};
+    std::string shadow_estimator_health{"uninitialized"};
+    bool shadow_enabled{false};
+    double shadow_lag_ms{0.0};
+    size_t shadow_queue_depth{0};
+    size_t shadow_queue_high_water_mark{0};
+    uint64_t shadow_dropped_events{0};
+    double shadow_position_delta_m{0.0};
+    double shadow_velocity_delta_mps{0.0};
+    double shadow_orientation_delta_deg{0.0};
+    bool shadow_divergence_active{false};
+    std::string shadow_last_failure_reason{};
+    uint64_t shadow_comparable_snapshot_count{0};
 };
 
 struct VisualFrontendMetrics {
@@ -121,7 +138,7 @@ class VIOPipeline {
 public:
     using PoseCallback = std::function<void(const PoseEstimate&)>;
 
-    explicit VIOPipeline(EKFConfig cfg = EKFConfig{}) : ekf_(cfg) {}
+    explicit VIOPipeline(EKFConfig cfg = EKFConfig{});
 
     ~VIOPipeline() {
         stop();
@@ -139,12 +156,12 @@ public:
     void set_runtime_mode(drone::runtime::RuntimeMode mode) {
         runtime_mode_ = mode;
     }
+    void set_estimator_validation_config(const EstimatorValidationConfig& cfg);
+    void set_shadow_msckf_config(const MsckfConfig& cfg);
 
     //  State query â”€
     [[nodiscard]] PoseEstimate current_pose() const;
-    [[nodiscard]] double drift_m() const {
-        return ekf_.total_drift_m();
-    }
+    [[nodiscard]] double drift_m() const;
     [[nodiscard]] RuntimeTelemetry runtime_telemetry() const {
         std::lock_guard lock(runtime_mutex_);
         return runtime_telemetry_;
@@ -179,9 +196,12 @@ private:
     void handle(const sensors::ImuMeasurement& imu);
     void handle(const sensors::CameraFrame& frame);
     void handle(const sensors::LidarMeasurement&);
+    void reconfigure_coordinator();
     void apply_visual_quality_to_pose(PoseEstimate& pose) const;
+    void refresh_runtime_telemetry_from_coordinator();
 
-    EKFEstimator ekf_;
+    std::unique_ptr<EstimatorCoordinator> coordinator_;
+    EKFConfig ekf_cfg_{};
 
     std::shared_ptr<sensors::IMUSensor> imu_;
     std::shared_ptr<sensors::CameraSensor> cam_;
@@ -198,10 +218,13 @@ private:
     PoseCallback pose_cb_;
     double last_imu_ts_{-1.0};
     double last_camera_ts_{-1.0};
+    uint64_t measurement_sequence_{0};
     cv::Mat previous_gray_frame_;
     PoseEstimate previous_camera_pose_{};
     bool previous_camera_pose_valid_{false};
     drone::runtime::RuntimeMode runtime_mode_{drone::runtime::RuntimeMode::SIMULATION};
+    EstimatorValidationConfig estimator_validation_cfg_{};
+    MsckfConfig shadow_msckf_cfg_{};
     mutable std::mutex visual_metrics_mutex_;
     VisualFrontendMetrics last_visual_metrics_{};
     mutable std::mutex runtime_mutex_;

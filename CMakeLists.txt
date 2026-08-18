@@ -39,6 +39,8 @@ option(DRONE_ENABLE_ASAN "Enable AddressSanitizer on supported toolchains" OFF)
 option(DRONE_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer on supported toolchains" OFF)
 option(DRONE_ENABLE_COVERAGE "Enable native coverage instrumentation on supported toolchains" OFF)
 option(DRONE_ENABLE_CPACK "Enable archive packaging via CPack" OFF)
+option(DRONE_ENABLE_PHASE17_HEADLESS_TSAN
+       "Build the Phase 17 TSan targets against a headless estimator-only core" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -107,6 +109,11 @@ set(DRONE_CORE_SOURCES
     src/sensors/MotorSensor.cpp
     src/telemetry/ControlPlaneTelemetryClient.cpp
     src/vio/EKFEstimator.cpp
+    src/vio/EKFStateEstimatorAdapter.cpp
+    src/vio/EstimatorCoordinator.cpp
+    src/vio/MeasurementEnvelope.cpp
+    src/vio/Phase17ESKFEstimator.cpp
+    src/vio/StateEstimator.cpp
     src/vio/VIOPipeline.cpp
     src/slam/KeyframeManager.cpp
     src/slam/MapPlanner.cpp

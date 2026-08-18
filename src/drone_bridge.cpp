@@ -119,7 +119,27 @@ PYBIND11_MODULE(drone_bridge, m) {
         .def_readwrite("visual_update_confidence", &vio::RuntimeTelemetry::visual_update_confidence)
         .def_readwrite("visual_frontend_valid", &vio::RuntimeTelemetry::visual_frontend_valid)
         .def_readwrite("visual_placeholder_active",
-                       &vio::RuntimeTelemetry::visual_placeholder_active);
+                       &vio::RuntimeTelemetry::visual_placeholder_active)
+        .def_readwrite("active_estimator_name", &vio::RuntimeTelemetry::active_estimator_name)
+        .def_readwrite("shadow_estimator_name", &vio::RuntimeTelemetry::shadow_estimator_name)
+        .def_readwrite("active_estimator_health", &vio::RuntimeTelemetry::active_estimator_health)
+        .def_readwrite("shadow_estimator_health", &vio::RuntimeTelemetry::shadow_estimator_health)
+        .def_readwrite("shadow_enabled", &vio::RuntimeTelemetry::shadow_enabled)
+        .def_readwrite("shadow_lag_ms", &vio::RuntimeTelemetry::shadow_lag_ms)
+        .def_readwrite("shadow_queue_depth", &vio::RuntimeTelemetry::shadow_queue_depth)
+        .def_readwrite("shadow_queue_high_water_mark",
+                       &vio::RuntimeTelemetry::shadow_queue_high_water_mark)
+        .def_readwrite("shadow_dropped_events", &vio::RuntimeTelemetry::shadow_dropped_events)
+        .def_readwrite("shadow_position_delta_m", &vio::RuntimeTelemetry::shadow_position_delta_m)
+        .def_readwrite("shadow_velocity_delta_mps",
+                       &vio::RuntimeTelemetry::shadow_velocity_delta_mps)
+        .def_readwrite("shadow_orientation_delta_deg",
+                       &vio::RuntimeTelemetry::shadow_orientation_delta_deg)
+        .def_readwrite("shadow_divergence_active", &vio::RuntimeTelemetry::shadow_divergence_active)
+        .def_readwrite("shadow_last_failure_reason",
+                       &vio::RuntimeTelemetry::shadow_last_failure_reason)
+        .def_readwrite("shadow_comparable_snapshot_count",
+                       &vio::RuntimeTelemetry::shadow_comparable_snapshot_count);
 
     //  SystemStats
     py::class_<hal::SystemStats>(m, "SystemStats")

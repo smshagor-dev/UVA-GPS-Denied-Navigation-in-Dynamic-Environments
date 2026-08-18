@@ -12,7 +12,7 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_PATH = REPO_ROOT / "docs" / "phase4" / "config_audit.json"
+OUTPUT_PATH = REPO_ROOT / "docs" / "architecture-safety-validation-hardening" / "config_audit.json"
 ALLOWED_RUNTIME_MODES = {"simulation", "bench", "production", "edge_swarm"}
 CONFIG_FILES = [
     "config/runtime.json",

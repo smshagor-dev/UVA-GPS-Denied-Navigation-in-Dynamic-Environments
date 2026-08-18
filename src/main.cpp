@@ -118,18 +118,29 @@ void setup_logging() {
 // Parse simple CLI args  --id=1  --esp32=192.168.4.1  --lidar=192.168.1.201
 
 struct NodeConfig {
-    uint32_t drone_id{1};
     std::string esp32_ip{"192.168.4.1"};
     std::string camera_stream_url{};
     std::string imu_device{"/dev/i2c-1"};
-    uint8_t imu_i2c_addr{0x68};
     std::string lidar_endpoint{"192.168.1.201:2368"};
     std::string swarm_group{"239.255.0.1"};
-    uint16_t swarm_port{7400};
     std::string yolo_engine{"models/yolov8n.engine"};
     std::string tdoa_measurements_csv{};
-    uint16_t tdoa_udp_port{0};
     std::string tdoa_serial_device{};
+    std::string security_profile{"lab"};
+    std::string runtime_config_path{"config/runtime.json"};
+    std::string anchor_config_path{};
+    std::string lidar_config_path{};
+    std::string detector_labels_path{"config/detector_labels.json"};
+    std::string edge_protocol_config_path{"config/swarm_edge_protocol.json"};
+    std::string edge_serialization_mode{"json"};
+    drone::security::PacketAuthConfig edge_auth{};
+    drone::vio::EstimatorValidationConfig estimator_validation{};
+    drone::vio::MsckfConfig shadow_msckf_config{};
+    uint32_t drone_id{1};
+    uint16_t swarm_port{7400};
+    uint16_t tdoa_udp_port{0};
+    uint16_t backend_telemetry_interval_ms{1000};
+    uint8_t imu_i2c_addr{0x68};
     bool enable_imu{true};
     bool enable_camera{true};
     bool enable_lidar{true};
@@ -140,16 +151,7 @@ struct NodeConfig {
     bool enable_uwb_serial{true};
     bool enable_tdoa_ingestor{true};
     bool enable_backend_telemetry{false};
-    uint16_t backend_telemetry_interval_ms{1000};
-    std::string security_profile{"lab"};
     drone::runtime::RuntimeMode runtime_mode{drone::runtime::RuntimeMode::SIMULATION};
-    std::string runtime_config_path{"config/runtime.json"};
-    std::string anchor_config_path{};
-    std::string lidar_config_path{};
-    std::string detector_labels_path{"config/detector_labels.json"};
-    std::string edge_protocol_config_path{"config/swarm_edge_protocol.json"};
-    std::string edge_serialization_mode{"json"};
-    drone::security::PacketAuthConfig edge_auth{};
 };
 
 void apply_edge_protocol_config(NodeConfig& cfg) {
@@ -232,7 +234,8 @@ void apply_env_overrides(NodeConfig& cfg) {
     if (const auto value = env_var("DRONE_NODE_ID")) {
         try {
             cfg.drone_id = static_cast<uint32_t>(std::stoul(*value));
-        } catch (const std::exception&) {
+        } catch (const std::exception& ex) {
+            spdlog::warn("Ignoring invalid DRONE_NODE_ID='{}': {}", *value, ex.what());
         }
     }
     if (const auto value = env_var("DRONE_ESP32_IP")) {
@@ -348,6 +351,102 @@ void apply_runtime_file_overrides(NodeConfig& cfg) {
     if (!file_cfg.detector_labels_path.empty()) {
         cfg.detector_labels_path = file_cfg.detector_labels_path;
     }
+    if (!file_cfg.estimator_config_valid) {
+        throw std::runtime_error(file_cfg.estimator_errors.empty()
+                                     ? "invalid estimator configuration in runtime file"
+                                     : file_cfg.estimator_errors.front());
+    }
+    cfg.estimator_validation.mode = file_cfg.estimator_mode;
+    cfg.estimator_validation.enable_experimental_hybrid =
+        file_cfg.estimator_enable_experimental_hybrid;
+    cfg.estimator_validation.enable_fej =
+        file_cfg.estimator_enable_fej || file_cfg.estimator_fej_enabled;
+    cfg.estimator_validation.fej.enabled =
+        file_cfg.estimator_enable_fej || file_cfg.estimator_fej_enabled;
+    cfg.estimator_validation.fej.validation_checks = file_cfg.estimator_fej_validation_checks;
+    cfg.estimator_validation.fej.diagnostics_enabled = file_cfg.estimator_fej_diagnostics_enabled;
+    cfg.shadow_msckf_config.enabled =
+        file_cfg.estimator_enable_msckf || file_cfg.estimator_msckf_enabled;
+    cfg.shadow_msckf_config.max_camera_states = file_cfg.estimator_msckf_max_camera_states;
+    cfg.shadow_msckf_config.eviction_policy = file_cfg.estimator_msckf_eviction_policy;
+    cfg.shadow_msckf_config.diagnostics_enabled = file_cfg.estimator_msckf_diagnostics_enabled;
+    cfg.shadow_msckf_config.triangulation.enabled = file_cfg.estimator_msckf_triangulation_enabled;
+    cfg.shadow_msckf_config.triangulation.minimum_observations =
+        file_cfg.estimator_msckf_triangulation_minimum_observations;
+    cfg.shadow_msckf_config.triangulation.minimum_baseline =
+        file_cfg.estimator_msckf_triangulation_minimum_baseline;
+    cfg.shadow_msckf_config.triangulation.maximum_reprojection_error =
+        file_cfg.estimator_msckf_triangulation_maximum_reprojection_error;
+    cfg.shadow_msckf_config.triangulation.minimum_depth =
+        file_cfg.estimator_msckf_triangulation_minimum_depth;
+    cfg.shadow_msckf_config.triangulation.maximum_depth =
+        file_cfg.estimator_msckf_triangulation_maximum_depth;
+    cfg.shadow_msckf_config.update.enabled = file_cfg.estimator_msckf_update_enabled;
+    cfg.shadow_msckf_config.update.chi_square_probability =
+        file_cfg.estimator_msckf_update_chi_square_probability;
+    cfg.shadow_msckf_config.update.minimum_track_length =
+        file_cfg.estimator_msckf_update_minimum_track_length;
+    cfg.shadow_msckf_config.update.maximum_track_length =
+        file_cfg.estimator_msckf_update_maximum_track_length;
+    cfg.shadow_msckf_config.update.maximum_residual =
+        file_cfg.estimator_msckf_update_maximum_residual;
+    cfg.shadow_msckf_config.update.validation_checks =
+        file_cfg.estimator_msckf_update_validation_checks;
+    cfg.shadow_msckf_config.update.diagnostics_enabled =
+        file_cfg.estimator_msckf_update_diagnostics_enabled;
+    cfg.estimator_validation.enable_loop_closure_correction =
+        file_cfg.estimator_enable_loop_closure_correction;
+    cfg.estimator_validation.enable_automatic_zupt = file_cfg.estimator_enable_automatic_zupt;
+    cfg.estimator_validation.enable_shadow_estimator = file_cfg.estimator_enable_shadow_estimator;
+    cfg.estimator_validation.shadow_comparison_enabled =
+        file_cfg.estimator_shadow_comparison_enabled;
+    cfg.estimator_validation.shadow_max_queue_depth = file_cfg.estimator_shadow_max_queue_depth;
+    cfg.estimator_validation.shadow_max_lag_ms = file_cfg.estimator_shadow_max_lag_ms;
+    cfg.estimator_validation.shadow_position_divergence_m =
+        file_cfg.estimator_shadow_position_divergence_m;
+    cfg.estimator_validation.shadow_velocity_divergence_mps =
+        file_cfg.estimator_shadow_velocity_divergence_mps;
+    cfg.estimator_validation.shadow_orientation_divergence_deg =
+        file_cfg.estimator_shadow_orientation_divergence_deg;
+    cfg.estimator_validation.shadow_required_consecutive_divergent_samples =
+        file_cfg.estimator_shadow_required_consecutive_divergent_samples;
+    cfg.estimator_validation.reject_non_finite_measurements =
+        file_cfg.estimator_reject_non_finite_measurements;
+    cfg.estimator_validation.require_monotonic_timestamps =
+        file_cfg.estimator_require_monotonic_timestamps;
+    cfg.estimator_validation.max_imu_dt_s = file_cfg.estimator_max_imu_dt_s;
+    cfg.estimator_validation.min_imu_dt_s = file_cfg.estimator_min_imu_dt_s;
+    cfg.estimator_validation.covariance_symmetry_tolerance =
+        file_cfg.estimator_covariance_symmetry_tolerance;
+    cfg.estimator_validation.variance_negativity_tolerance =
+        file_cfg.estimator_variance_negativity_tolerance;
+    cfg.estimator_validation.quaternion_min_norm = file_cfg.estimator_quaternion_min_norm;
+    cfg.estimator_validation.zupt_sigma_velocity_mps = file_cfg.estimator_zupt_sigma_velocity_mps;
+    cfg.estimator_validation.stationary_detector.enabled =
+        file_cfg.estimator_stationary_detector_enabled || file_cfg.estimator_enable_automatic_zupt;
+    cfg.estimator_validation.stationary_detector.accel_threshold_mps2 =
+        file_cfg.estimator_stationary_detector_accel_threshold;
+    cfg.estimator_validation.stationary_detector.gyro_threshold_rads =
+        file_cfg.estimator_stationary_detector_gyro_threshold;
+    cfg.estimator_validation.stationary_detector.window_size =
+        file_cfg.estimator_stationary_detector_window_size;
+    cfg.estimator_validation.stationary_detector.enter_count =
+        file_cfg.estimator_stationary_detector_enter_count;
+    cfg.estimator_validation.stationary_detector.exit_count =
+        file_cfg.estimator_stationary_detector_exit_count;
+    cfg.estimator_validation.stationary_detector.minimum_stationary_time_s =
+        file_cfg.estimator_stationary_detector_minimum_stationary_time;
+    cfg.estimator_validation.stationary_detector.accel_exit_threshold_mps2 =
+        file_cfg.estimator_stationary_detector_accel_exit_threshold;
+    cfg.estimator_validation.stationary_detector.gyro_exit_threshold_rads =
+        file_cfg.estimator_stationary_detector_gyro_exit_threshold;
+    cfg.estimator_validation.zupt.enabled =
+        file_cfg.estimator_zupt_enabled || file_cfg.estimator_enable_automatic_zupt;
+    cfg.estimator_validation.zupt.velocity_noise_mps = file_cfg.estimator_zupt_velocity_noise_mps;
+    cfg.estimator_validation.zupt.max_update_rate_hz = file_cfg.estimator_zupt_max_update_rate_hz;
+    cfg.estimator_validation.lidar_depth_correction_enabled =
+        file_cfg.estimator_lidar_depth_correction_enabled;
+    cfg.estimator_validation.diagnostics_enabled = file_cfg.estimator_diagnostics_enabled;
 }
 
 std::string normalize_security_profile(std::string value) {
@@ -540,7 +639,11 @@ NodeConfig parse_args(int argc, char** argv) {
     NodeConfig cfg;
     apply_env_overrides(cfg);
     apply_cli_overrides(cfg, argc, argv);
-    apply_runtime_file_overrides(cfg);
+    try {
+        apply_runtime_file_overrides(cfg);
+    } catch (const std::exception& ex) {
+        throw std::runtime_error(std::string("runtime configuration error: ") + ex.what());
+    }
     apply_edge_protocol_config(cfg);
     apply_env_overrides(cfg);
     apply_cli_overrides(cfg, argc, argv);
@@ -690,10 +793,10 @@ std::string replay_file_name(const std::string& path) {
     return std::filesystem::path(path).filename().string();
 }
 
-int main(int argc, char** argv) {
+int run_main(int argc, char** argv) {
     setup_logging();
-    std::signal(SIGINT, signal_handler);
-    std::signal(SIGTERM, signal_handler);
+    static_cast<void>(std::signal(SIGINT, signal_handler));
+    static_cast<void>(std::signal(SIGTERM, signal_handler));
 
     const auto cfg = parse_args(argc, argv);
     spdlog::info("Runtime mode active: {}",
@@ -851,7 +954,7 @@ int main(int argc, char** argv) {
     }
 
     // Attempt sensor initialization
-    for (auto& [name, enabled, sensor] :
+    for (const auto& [name, enabled, sensor] :
          std::initializer_list<std::tuple<const char*, bool, drone::sensors::SensorBase*>>{
              {"IMU", cfg.enable_imu, imu.get()},
              {"Camera", cfg.enable_camera, cam.get()},
@@ -909,6 +1012,8 @@ int main(int argc, char** argv) {
     drone::vio::EKFConfig ekf_cfg;
     auto vio = std::make_shared<drone::vio::VIOPipeline>(ekf_cfg);
     vio->set_runtime_mode(cfg.runtime_mode);
+    vio->set_estimator_validation_config(cfg.estimator_validation);
+    vio->set_shadow_msckf_config(cfg.shadow_msckf_config);
     vio->attach_imu(imu);
     vio->attach_camera(cam);
     vio->attach_lidar(lidar);
@@ -1785,7 +1890,7 @@ int main(int argc, char** argv) {
             snapshot.replay.status = sensor_status_tag(replay_active, false, false, replay_active);
             snapshot.replay.active = replay_active;
             snapshot.replay.file_name = replay_file_name(cfg.tdoa_measurements_csv);
-            snapshot.replay.progress = replay_active ? 0.0 : 0.0;
+            snapshot.replay.progress = 0.0;
             snapshot.replay.current_time = replay_active ? now_s : 0.0;
             snapshot.replay.source = replay_active ? "playback" : "unavailable";
             snapshot.replay.confidence_series.assign(replay_confidence_history.begin(),
@@ -1838,6 +1943,17 @@ int main(int argc, char** argv) {
 
     spdlog::info("Drone node {} shutdown complete.", cfg.drone_id);
     return EXIT_SUCCESS;
+}
+
+int main(int argc, char** argv) {
+    try {
+        return run_main(argc, argv);
+    } catch (const std::exception& ex) {
+        spdlog::critical("Fatal exception in main: {}", ex.what());
+    } catch (...) {
+        spdlog::critical("Fatal unknown exception in main");
+    }
+    return EXIT_FAILURE;
 }
 // System Designer and Developer: Md Shahanur Islam Shagor
 // Project: UVA GPS Denied Navigation in Dynamic Environments

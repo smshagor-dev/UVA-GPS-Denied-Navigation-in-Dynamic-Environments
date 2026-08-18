@@ -22,7 +22,7 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DOC_ROOT = REPO_ROOT / "docs" / "phase6"
+DOC_ROOT = REPO_ROOT / "docs" / "performance-engineering-stability-validation"
 OUTPUT_PATH = DOC_ROOT / "performance_results.json"
 LOG_PATH = DOC_ROOT / "performance_suite.log"
 BUILD_ROOT = REPO_ROOT / "build" / "validation-msvc"
@@ -656,14 +656,14 @@ def main() -> int:
         "stress_test": stress_result,
         "soak_test": soak_result,
         "memory_validation_references": {
-            "asan_lsan_report": "docs/phase4/MEMORY_AUDIT.md",
-            "valgrind_report": "docs/phase4/VALGRIND_REPORT.md",
-            "asan_log": "docs/phase4/asan_lsan_ctest.log",
+            "asan_lsan_report": "docs/architecture-safety-validation-hardening/MEMORY_AUDIT.md",
+            "valgrind_report": "docs/architecture-safety-validation-hardening/VALGRIND_REPORT.md",
+            "asan_log": "docs/architecture-safety-validation-hardening/asan_lsan_ctest.log",
             "valgrind_logs": [
-                "docs/phase4/valgrind_test_ekf.log",
-                "docs/phase4/valgrind_test_edge_swarm.log",
-                "docs/phase4/valgrind_drone_node.log",
-                "docs/phase4/valgrind_drone_node_suppressed.log",
+                "docs/architecture-safety-validation-hardening/valgrind_test_ekf.log",
+                "docs/architecture-safety-validation-hardening/valgrind_test_edge_swarm.log",
+                "docs/architecture-safety-validation-hardening/valgrind_drone_node.log",
+                "docs/architecture-safety-validation-hardening/valgrind_drone_node_suppressed.log",
             ],
         },
         "notes": [

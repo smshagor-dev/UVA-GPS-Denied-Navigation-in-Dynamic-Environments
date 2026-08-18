@@ -41,7 +41,7 @@
 > **CI scope notice**
 > The GitHub Actions badges above represent repository validation for source quality, supported build presets, tests, packaging, and security scanning. They do **not** represent flight certification, hardware-in-the-loop clearance, or operational airworthiness approval.
 
-This repository was developed through a structured **17-stage research engineering lifecycle** spanning foundation work, build and validation hardening, performance engineering, research validation, AI autonomy, deployment readiness, publication packaging, final system maturity review, external validation, and estimator hardening with shadow-estimator validation.
+This repository was developed through a structured **22-stage research engineering lifecycle** spanning foundation work, build and validation hardening, performance engineering, research validation, AI autonomy, deployment readiness, publication packaging, final system maturity review, external validation, and progressive estimator hardening with shadow-estimator validation, stationary detection, automatic ZUPT, FEJ support, MSCKF sliding-window groundwork, shadow-only feature triangulation, and shadow-only MSCKF feature constraint updates.
 
 ---
 
@@ -49,7 +49,7 @@ This repository was developed through a structured **17-stage research engineeri
 
 1. [Project Overview](#project-overview)
 2. [Status Banner](#status-banner)
-3. [17 Stage Development Timeline](#17-stage-development-timeline)
+3. [22 Stage Development Timeline](#22-stage-development-timeline)
 4. [Architecture Overview](#architecture-overview)
 5. [Executive Summary](#executive-summary)
 6. [System Overview](#system-overview)
@@ -92,9 +92,9 @@ This repository was developed through a structured **17-stage research engineeri
 
 ## Project Overview
 
-This project is a full-stack GPS-denied autonomous UAV swarm software platform developed through a 17-stage lifecycle. The repository now contains validated software architecture, reproducible experiments, AI autonomy layers, deployment assets, publication packaging, DOI-backed artifact documentation, an external-facing engineering review package, and hardened estimator shadow-validation evidence.
+This project is a full-stack GPS-denied autonomous UAV swarm software platform developed through a 22-stage lifecycle. The repository now contains validated software architecture, reproducible experiments, AI autonomy layers, deployment assets, publication packaging, DOI-backed artifact documentation, an external-facing engineering review package, and hardened estimator shadow-validation evidence through FEJ-ready shadow-estimator integration, MSCKF sliding-window groundwork, shadow-only geometric landmark initialization, and shadow-only MSCKF feature constraint updates.
 
-Stage 17 classifies the repository as:
+Stage 22 classifies the repository as:
 
 - production-grade software architecture
 - ready for scientific replication
@@ -147,7 +147,7 @@ REQUIRES HARDWARE VALIDATION
 
 ---
 
-## 17 Stage Development Timeline
+## 22 Stage Development Timeline
 
 ### Stage 1 — Foundation & Repository Hygiene
 
@@ -519,6 +519,116 @@ Validation:
 
 Report:
 [docs/eskf-mathematical-hardening-shadow-validation/FINAL_REPORT.md](docs/eskf-mathematical-hardening-shadow-validation/FINAL_REPORT.md)
+
+Status:
+COMPLETE
+
+### Stage 18 — Stationary Detection & ZUPT Shadow Validation
+
+Objective:
+Add explicit stationary detection and automatic zero-velocity updates to the shadow ESKF while preserving active-estimator authority.
+
+Work:
+- IMU-only stationary detector with hysteresis
+- configurable detector thresholds, windowing, and minimum stationary duration
+- shadow-only automatic ZUPT integration
+- replay and documentation evidence closure
+
+Validation:
+- Phase 18 unit and replay suites
+- active-output equivalence preservation
+- compiler, formatting, static-analysis, and sanitizer lanes
+
+Report:
+[docs/stationary-detection-zupt-shadow-validation/FINAL_REPORT.md](docs/stationary-detection-zupt-shadow-validation/FINAL_REPORT.md)
+
+Status:
+COMPLETE
+
+### Stage 19 — First-Estimate Jacobian Shadow Validation
+
+Objective:
+Add First-Estimate Jacobian support to the shadow ESKF while preserving nominal propagation, deterministic replay, and active-estimator authority.
+
+Work:
+- nested FEJ validation configuration
+- deterministic FEJ snapshot storage and lifecycle management
+- FEJ-aware measurement Jacobian evaluation in the shadow estimator
+- replay, sanitizer, and documentation evidence closure
+
+Validation:
+- Phase 19 unit and replay suites
+- deterministic replay and finite covariance checks
+- compiler, formatting, static-analysis, and sanitizer lanes including project-owned race validation
+
+Report:
+[docs/first-estimate-jacobian-shadow-validation/FINAL_REPORT.md](docs/first-estimate-jacobian-shadow-validation/FINAL_REPORT.md)
+
+Status:
+COMPLETE
+
+### Stage 20 — MSCKF Sliding-Window Shadow Validation
+
+Objective:
+Add a deterministic MSCKF camera-state sliding-window foundation to the shadow ESKF while preserving active-estimator authority.
+
+Work:
+- nested MSCKF validation configuration
+- deterministic camera-state creation, lookup, and reset handling
+- oldest-first deterministic eviction
+- replay, sanitizer, and documentation evidence closure
+
+Validation:
+- Phase 20 unit and replay suites
+- deterministic window lifecycle and finite covariance checks
+- compiler, formatting, static-analysis, and sanitizer lanes including project-owned race validation
+
+Report:
+[docs/msckf-sliding-window-shadow-validation/FINAL_REPORT.md](docs/msckf-sliding-window-shadow-validation/FINAL_REPORT.md)
+
+Status:
+COMPLETE
+
+### Stage 21 — Feature Triangulation & Geometric Initialization
+
+Objective:
+Add robust shadow-only feature triangulation and geometric landmark initialization on top of the MSCKF sliding window without changing active estimator authority.
+
+Work:
+- feature observation history and normalized bearing storage
+- multi-view triangulation with minimum observation and baseline gating
+- positive-depth and reprojection validation
+- triangulation diagnostics and replay evidence closure
+
+Validation:
+- Phase 21 unit and replay suites
+- deterministic replay and finite landmark checks
+- compiler, formatting, static-analysis, and sanitizer lanes including project-owned race validation
+
+Report:
+[docs/feature-triangulation-geometric-initialization-shadow-validation/FINAL_REPORT.md](docs/feature-triangulation-geometric-initialization-shadow-validation/FINAL_REPORT.md)
+
+Status:
+COMPLETE
+
+### Stage 22 — MSCKF Feature Constraint Update
+
+Objective:
+Add the first complete shadow-only MSCKF feature measurement update, including residual construction, null-space projection, residual stacking, and statistical gating, without changing active estimator authority.
+
+Work:
+- shadow-only residual and Jacobian construction over triangulated feature tracks
+- FEJ-aware null-space projection and deterministic stacked measurement formation
+- configurable chi-square and innovation-norm gating with transactional Joseph-form correction
+- feature-update diagnostics, replay evidence, and regression validation closure
+
+Validation:
+- Phase 22 unit and replay suites
+- Phase 15–21 regression and replay compatibility checks
+- compiler, formatting, static-analysis, and sanitizer lanes including project-owned race validation
+
+Report:
+[docs/msckf-feature-constraint-update-shadow-validation/FINAL_REPORT.md](docs/msckf-feature-constraint-update-shadow-validation/FINAL_REPORT.md)
 
 Status:
 COMPLETE
@@ -2004,6 +2114,11 @@ Stage 8 community-facing collaboration guidance is summarized in [docs/open-rese
 - Stage 15 estimator safety hardening and deterministic replay baseline: `docs/estimator-safety-deterministic-replay-baseline/`
 - Stage 16 shadow estimator architecture and native replay validation: `docs/shadow-estimator-native-replay-validation/`
 - Stage 17 ESKF mathematical hardening and shadow validation: `docs/eskf-mathematical-hardening-shadow-validation/`
+- Stage 18 stationary detection and ZUPT shadow validation: `docs/stationary-detection-zupt-shadow-validation/`
+- Stage 19 first-estimate Jacobian shadow validation: `docs/first-estimate-jacobian-shadow-validation/`
+- Stage 20 MSCKF sliding-window shadow validation: `docs/msckf-sliding-window-shadow-validation/`
+- Stage 21 feature triangulation and geometric initialization: `docs/feature-triangulation-geometric-initialization-shadow-validation/`
+- Stage 22 MSCKF feature constraint update: `docs/msckf-feature-constraint-update-shadow-validation/`
 - Research scaffolding for future AI/ML work: `research/`
 - Benchmark dataset standard and schema: `datasets/benchmark/`
 - Autonomous dataset standard and sample: `datasets/autonomy/`
