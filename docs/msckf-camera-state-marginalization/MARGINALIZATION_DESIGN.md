@@ -1,6 +1,6 @@
 # MSCKF Camera-State Marginalization & Feature-Track Retirement
 
-Status: **STARTED**
+Status: **IMPLEMENTATION IN PROGRESS**
 
 ## Objective
 
@@ -9,6 +9,22 @@ Replace eviction-only camera-clone removal with an explicit, auditable marginali
 ## Current Baseline
 
 The estimator already maintains an augmented covariance over the 15-DoF base error state plus 6-DoF camera clones. Clone removal currently deletes the corresponding covariance rows/columns and prunes observations tied to the evicted clone. Feature-constraint updates already support clone-state Jacobians, FEJ-aware linearization, null-space projection, DOF-aware chi-square gating, transactional correction, and Joseph/reset covariance handling.
+
+## Implementation Added
+
+The working branch now contains a dedicated `MsckfMarginalization` primitive layer with:
+
+- deterministic affected-track ordering by `track_id`;
+- deterministic identification of update-eligible tracks that reference the retiring clone;
+- duplicate retiring-state reference detection;
+- retained principal-submatrix covariance extraction;
+- preservation of retained base/clone cross-covariance entries;
+- finite/symmetry/PSD-tolerance covariance health evaluation;
+- retired-state reference checking after cleanup.
+
+Focused tests cover deterministic planning, duplicate/stale references, exact principal-submatrix extraction, retained cross-covariance preservation, invalid dimensions, missing clone handling, covariance health, and stale-reference cleanup. A standalone invariant smoke executable validates the real 15D base + 6D-per-clone layout, and a dedicated GitHub Actions workflow compiles and executes that smoke path with both GCC and Clang under warnings-as-errors.
+
+These primitives intentionally do not yet replace the estimator's eviction lifecycle. Wiring them into the production shadow-estimator retirement boundary is the next implementation step.
 
 ## Required Marginalization Lifecycle
 
@@ -107,7 +123,7 @@ Each scenario must persist active equivalence, queue-drain evidence, retired clo
 
 ## Validation Gate
 
-Do not call this work complete until all focused tests and replay scenarios pass and the full compiler/warnings/static-analysis/sanitizer/regression matrix is rerun with persisted evidence. Required lanes: MSVC, MSVC warnings-as-errors, Clang, Clang warnings-as-errors, GCC, GCC warnings-as-errors, clang-format, clang-tidy, ASan, UBSan, TSan, project-owned race validation, prior estimator regressions, and deterministic replay validation.
+Do not call this work complete until the estimator retirement boundary uses the new lifecycle, all focused tests and replay scenarios pass, and the full compiler/warnings/static-analysis/sanitizer/regression matrix is rerun with persisted evidence. Required lanes: MSVC, MSVC warnings-as-errors, Clang, Clang warnings-as-errors, GCC, GCC warnings-as-errors, clang-format, clang-tidy, ASan, UBSan, TSan, project-owned race validation, prior estimator regressions, and deterministic replay validation.
 
 ## Scope Boundary
 
