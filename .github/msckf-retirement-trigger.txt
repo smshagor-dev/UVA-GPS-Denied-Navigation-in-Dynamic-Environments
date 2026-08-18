@@ -1,3 +1,0 @@
-trigger: 2026-08-19T00:22+03:00
-purpose: integrate production MSCKF camera-state retirement boundary
-attempt: 2
