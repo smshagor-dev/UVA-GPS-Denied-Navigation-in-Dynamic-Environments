@@ -1,0 +1,218 @@
+name: Phase 22 Final Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase22-final-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-gcc:
+    name: Phase22 GCC Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          gcc --version | head -n 1
+          g++ --version | head -n 1
+          cmake --version
+          python3 --version
+      - name: Configure
+        run: cmake --preset linux-gcc-release
+      - name: Build
+        run: cmake --build --preset linux-gcc-release --target test_ekf test_phase16_shadow test_phase17_eskf test_phase18_zupt test_phase19_fej test_phase20_msckf test_phase21_triangulation test_phase22_msckf_update ekf_phase15_replay ekf_phase16_replay ekf_phase17_replay ekf_phase18_replay ekf_phase19_replay ekf_phase20_replay ekf_phase21_replay ekf_phase22_replay -- -j2
+      - name: Phase 15-22 regression tests
+        shell: bash
+        run: ctest --preset linux-gcc-release -L 'navigation|phase16|phase17|phase18|phase19|phase20|phase21|phase22' --output-on-failure
+      - name: Fresh Phase 22 replay artifact
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -f artifacts/phase22/ekf_phase22_replay_report.json
+          ctest --preset linux-gcc-release -R '^ekf_phase22_replay$' --output-on-failure
+          test -s artifacts/phase22/ekf_phase22_replay_report.json
+          python3 scripts/validate_phase22_replay_artifact.py artifacts/phase22/ekf_phase22_replay_report.json
+      - name: Upload Phase 22 GCC evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: phase22-gcc-${{ github.sha }}
+          path: artifacts/phase22/ekf_phase22_replay_report.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  linux-gcc-werror:
+    name: Phase22 GCC Werror
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - run: cmake --preset linux-gcc-release-werror
+      - run: cmake --build --preset linux-gcc-release-werror --target test_phase22_msckf_update ekf_phase22_replay -- -j2
+      - run: ctest --preset linux-gcc-release-werror -L phase22 --output-on-failure
+
+  linux-clang:
+    name: Phase22 Clang Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          clang --version | head -n 1
+          clang++ --version | head -n 1
+          cmake --version
+      - run: cmake --preset linux-clang-release
+      - run: cmake --build --preset linux-clang-release --target test_phase22_msckf_update ekf_phase22_replay -- -j2
+      - run: ctest --preset linux-clang-release -L phase22 --output-on-failure
+
+  linux-clang-werror:
+    name: Phase22 Clang Werror
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - run: cmake --preset linux-clang-release -DDRONE_WARNINGS_AS_ERRORS=ON
+      - run: cmake --build --preset linux-clang-release --target test_phase22_msckf_update ekf_phase22_replay -- -j2
+      - run: ctest --preset linux-clang-release -L phase22 --output-on-failure
+
+  windows-msvc:
+    name: Phase22 MSVC Release
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-key-suffix: phase22-release
+      - run: cmake --preset validation-msvc -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
+        shell: pwsh
+      - run: cmake --build --preset validation-msvc --target test_phase22_msckf_update ekf_phase22_replay --parallel 2
+        shell: pwsh
+      - run: ctest --preset validation-msvc -L phase22 --output-on-failure
+        shell: pwsh
+
+  windows-msvc-werror:
+    name: Phase22 MSVC Werror
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-key-suffix: phase22-werror
+      - run: cmake --preset windows-msvc-release-werror -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
+        shell: pwsh
+      - run: cmake --build --preset windows-msvc-release-werror --target test_phase22_msckf_update ekf_phase22_replay --parallel 2
+        shell: pwsh
+      - run: ctest --preset windows-msvc-release-werror -L phase22 --output-on-failure
+        shell: pwsh
+
+  format-and-tidy:
+    name: Phase22 Format and Tidy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Format
+        shell: bash
+        run: python3 scripts/check_clang_format.py
+      - name: Configure compile database
+        run: cmake --preset linux-gcc-release-minimal
+      - name: Tidy Phase 22 production code
+        shell: bash
+        run: clang-tidy -p build/linux-gcc-release-minimal src/vio/Phase17ESKFEstimator.cpp --warnings-as-errors='*'
+
+  asan-ubsan:
+    name: Phase22 ASan UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - run: cmake --preset linux-clang-asan-ubsan
+      - run: cmake --build --preset linux-clang-asan-ubsan --target test_phase17_eskf test_phase20_msckf test_phase21_triangulation test_phase22_msckf_update ekf_phase17_replay ekf_phase21_replay ekf_phase22_replay -- -j2
+      - name: Run sanitizer tests
+        shell: bash
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --preset linux-clang-asan-ubsan -L 'phase17|phase20|phase21|phase22' --output-on-failure
+
+  tsan:
+    name: Phase22 TSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Configure TSan headless estimator lane
+        run: cmake --preset linux-clang-tsan-phase17
+      - name: Build TSan targets
+        run: cmake --build --preset linux-clang-tsan-phase17 --target test_phase17_eskf test_phase22_msckf_update ekf_phase17_replay ekf_phase22_replay -- -j2
+      - name: Run TSan Phase 22 tests
+        shell: bash
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: ctest --preset linux-clang-tsan-phase17 -L 'phase17|phase22' --output-on-failure
+
+  acceptance:
+    name: Phase22 Acceptance
+    runs-on: ubuntu-24.04
+    if: always()
+    needs:
+      - linux-gcc
+      - linux-gcc-werror
+      - linux-clang
+      - linux-clang-werror
+      - windows-msvc
+      - windows-msvc-werror
+      - format-and-tidy
+      - asan-ubsan
+      - tsan
+    steps:
+      - name: Require all Phase 22 lanes
+        shell: bash
+        env:
+          GCC: ${{ needs.linux-gcc.result }}
+          GCC_WERROR: ${{ needs.linux-gcc-werror.result }}
+          CLANG: ${{ needs.linux-clang.result }}
+          CLANG_WERROR: ${{ needs.linux-clang-werror.result }}
+          MSVC: ${{ needs.windows-msvc.result }}
+          MSVC_WERROR: ${{ needs.windows-msvc-werror.result }}
+          FORMAT_TIDY: ${{ needs.format-and-tidy.result }}
+          ASAN_UBSAN: ${{ needs.asan-ubsan.result }}
+          TSAN: ${{ needs.tsan.result }}
+        run: |
+          set -euo pipefail
+          for status in "$GCC" "$GCC_WERROR" "$CLANG" "$CLANG_WERROR" "$MSVC" "$MSVC_WERROR" "$FORMAT_TIDY" "$ASAN_UBSAN" "$TSAN"; do
+            if [[ "$status" != success ]]; then
+              echo "Phase 22 validation dependency failed: $status"
+              exit 1
+            fi
+          done
+          echo 'Phase 22 final validation matrix passed.'
