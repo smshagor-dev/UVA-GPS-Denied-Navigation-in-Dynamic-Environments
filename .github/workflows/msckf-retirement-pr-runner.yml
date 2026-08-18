@@ -1,0 +1,49 @@
+name: MSCKF Retirement Integration Runner
+
+on:
+  pull_request:
+    branches:
+      - phase22-final-validation
+    paths:
+      - '.github/msckf-retirement-trigger.txt'
+      - '.github/workflows/msckf-retirement-pr-runner.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+
+      - name: Install workflow parser
+        run: python3 -m pip install --disable-pip-version-check pyyaml
+
+      - name: Execute reviewed integration steps
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          import yaml
+          from pathlib import Path
+
+          source = Path('.github/workflows/msckf-marginalization-implement.yml')
+          data = yaml.safe_load(source.read_text())
+          steps = data['jobs']['implement']['steps']
+          for step in steps:
+              command = step.get('run')
+              if not command:
+                  continue
+              name = step.get('name', 'unnamed')
+              print(f'::group::{name}')
+              completed = subprocess.run(['bash', '-euo', 'pipefail', '-c', command], check=False)
+              print('::endgroup::')
+              if completed.returncode != 0:
+                  raise SystemExit(completed.returncode)
+          PY
