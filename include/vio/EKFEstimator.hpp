@@ -1,4 +1,4 @@
-﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// System Designer and Developer: Md Shahanur Islam Shagor
 // Project: UVA GPS Denied Navigation in Dynamic Environments
 // Technology: C++, Python, Go, CMake
 
@@ -195,6 +195,17 @@ struct EKFDiagnostics {
     uint64_t msckf_states_removed{0};
     double msckf_oldest_state_age_s{0.0};
     uint64_t msckf_deterministic_evictions{0};
+    uint64_t marginalization_attempts{0};
+    uint64_t marginalizations_completed{0};
+    uint64_t marginalization_failures{0};
+    uint64_t marginalization_retiring_state_id{0};
+    uint64_t marginalization_affected_tracks{0};
+    uint64_t marginalization_constraint_candidates{0};
+    uint64_t marginalization_covariance_dim_before{0};
+    uint64_t marginalization_covariance_dim_after{0};
+    uint64_t marginalization_stale_references{0};
+    double marginalization_covariance_symmetry_error{0.0};
+    double marginalization_covariance_min_eigenvalue{0.0};
     uint64_t triangulation_attempts{0};
     uint64_t triangulation_successes{0};
     uint64_t triangulation_failures{0};
