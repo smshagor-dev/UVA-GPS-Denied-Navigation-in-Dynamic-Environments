@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - 'include/vio/MsckfMarginalization.hpp'
+      - 'include/vio/MsckfRetirementTransaction.hpp'
       - 'tests/test_msckf_marginalization.cpp'
+      - 'tests/test_msckf_retirement_transaction.cpp'
       - 'tools/msckf_marginalization_smoke.cpp'
+      - 'tools/msckf_retirement_transaction_smoke.cpp'
       - '.github/workflows/msckf-marginalization.yml'
       - 'docs/msckf-camera-state-marginalization/**'
   workflow_dispatch:
@@ -15,7 +18,7 @@ permissions:
 
 jobs:
   smoke:
-    name: Principal Submatrix & Planning Smoke
+    name: Marginalization & Retirement Invariants
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -26,22 +29,34 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libeigen3-dev
 
-      - name: Compile smoke executable
+      - name: Compile GCC invariant executables
         run: |
           g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
             -Iinclude -I/usr/include/eigen3 \
             tools/msckf_marginalization_smoke.cpp \
             -o msckf_marginalization_smoke
+          g++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
+            -Iinclude -I/usr/include/eigen3 \
+            tools/msckf_retirement_transaction_smoke.cpp \
+            -o msckf_retirement_transaction_smoke
 
-      - name: Run smoke executable
-        run: ./msckf_marginalization_smoke
+      - name: Run GCC invariant executables
+        run: |
+          ./msckf_marginalization_smoke
+          ./msckf_retirement_transaction_smoke
 
-      - name: Compile header with Clang
+      - name: Compile Clang invariant executables
         run: |
           clang++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
             -Iinclude -I/usr/include/eigen3 \
             tools/msckf_marginalization_smoke.cpp \
             -o msckf_marginalization_smoke_clang
+          clang++ -std=c++20 -Wall -Wextra -Wpedantic -Werror \
+            -Iinclude -I/usr/include/eigen3 \
+            tools/msckf_retirement_transaction_smoke.cpp \
+            -o msckf_retirement_transaction_smoke_clang
 
-      - name: Run Clang build
-        run: ./msckf_marginalization_smoke_clang
+      - name: Run Clang invariant executables
+        run: |
+          ./msckf_marginalization_smoke_clang
+          ./msckf_retirement_transaction_smoke_clang
