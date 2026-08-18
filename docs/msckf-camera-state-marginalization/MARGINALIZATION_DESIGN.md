@@ -125,6 +125,8 @@ Each scenario must persist active equivalence, queue-drain evidence, retired clo
 
 Do not call this work complete until the estimator retirement boundary uses the new lifecycle, all focused tests and replay scenarios pass, and the full compiler/warnings/static-analysis/sanitizer/regression matrix is rerun with persisted evidence. Required lanes: MSVC, MSVC warnings-as-errors, Clang, Clang warnings-as-errors, GCC, GCC warnings-as-errors, clang-format, clang-tidy, ASan, UBSan, TSan, project-owned race validation, prior estimator regressions, and deterministic replay validation.
 
+The current smoke workflow is only a primitive-level gate. It is not completion evidence for estimator integration.
+
 ## Scope Boundary
 
 This work is limited to camera-state marginalization/retirement and the feature-information boundary required before clone removal. Do not add loop closure, pose graph optimization, bundle adjustment, global mapping, relocalization, or change active-estimator authority.
