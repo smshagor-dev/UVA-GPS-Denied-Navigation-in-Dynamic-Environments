@@ -1,22 +1,31 @@
-# Phase 23 Status
+# MSCKF Camera-State Marginalization & Feature-Track Retirement
 
-Status: **STARTED**
+Status: **IMPLEMENTATION IN PROGRESS**
 
-Phase 23 development has been initialized from the current Phase 22 validation head so estimator-hardening work can continue without losing the pending Phase 22 validation state.
+The current estimator-hardening work now focuses on explicit camera-state marginalization and feature-track retirement on top of the validated shadow MSCKF update path.
 
-## Baseline
+## Current Implementation
 
-- Parent phase: Phase 22 final validation closure
-- Baseline commit: `c566a7e1e1dab597e31b11dc22e3aeae252f1b14`
-- Working branch: `phase23-development`
+- deterministic marginalization planning primitives added
+- affected feature tracks ordered by track id
+- update-eligible retiring-clone tracks identified deterministically
+- retained covariance principal-submatrix extraction implemented
+- retained base/clone cross-covariance preservation covered by tests
+- covariance finiteness, symmetry, and PSD-tolerance health checks implemented
+- stale retired-state reference detection implemented
+- focused unit test source added
+- standalone 15D-base + 6D-clone invariant smoke executable added
+- GCC/Clang warnings-as-errors smoke workflow added
+
+## Next Integration Boundary
+
+The new primitives are intentionally not yet authoritative over clone eviction. The next code change must wire them into the shadow estimator so eligible constraints are processed before the oldest clone and its observations are retired.
 
 ## Guardrails
 
-- Preserve deterministic replay and regression coverage from Phases 15-22.
-- Do not weaken estimator safety checks, covariance consistency, timestamp validation, or fail-closed behavior.
-- Keep Phase 23 changes isolated from Phase 22 hosted-validation fixes unless a shared build/CI correction is required.
-- Any estimator behavior change must be backed by focused tests and replay evidence before promotion.
-
-## Current State
-
-Phase 23 is active. Detailed implementation scope and acceptance evidence will be committed on this branch as development proceeds.
+- active estimator authority remains unchanged
+- deterministic replay must remain preserved
+- no loop closure, bundle adjustment, pose graph, global mapping, or relocalization work is included
+- covariance retirement must remain fail-closed and transactional
+- retained cross-covariances must never be zeroed as a shortcut
+- completion requires focused replay plus compiler/static-analysis/sanitizer/race/regression evidence
