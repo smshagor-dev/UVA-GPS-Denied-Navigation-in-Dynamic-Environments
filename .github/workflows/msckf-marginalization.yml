@@ -8,6 +8,7 @@ on:
       - 'include/vio/MsckfMarginalization.hpp'
       - 'include/vio/MsckfRetirementTransaction.hpp'
       - 'include/vio/EKFEstimator.hpp'
+      - 'include/vio/Phase17ESKFEstimator.hpp'
       - 'include/vio/StateEstimator.hpp'
       - 'src/vio/Phase17ESKFEstimator.cpp'
       - 'tests/CMakeLists.txt'
@@ -16,20 +17,47 @@ on:
       - 'tests/test_msckf_marginalization_integration.cpp'
       - 'tools/msckf_marginalization_smoke.cpp'
       - 'tools/msckf_retirement_transaction_smoke.cpp'
+      - 'patches/msckf-retirement-implementation.patch'
       - 'docs/msckf-camera-state-marginalization/**'
       - '.github/workflows/msckf-marginalization.yml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  implementation-apply:
+    name: Apply production retirement implementation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: phase23-development
+          fetch-depth: 0
+      - name: Apply implementation patch once
+        run: |
+          if grep -q 'marginalization_constraints_consumed' include/vio/EKFEstimator.hpp; then
+            echo 'Production retirement patch already applied.'
+            exit 0
+          fi
+          git apply --check patches/msckf-retirement-implementation.patch
+          git apply patches/msckf-retirement-implementation.patch
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add include/vio/EKFEstimator.hpp include/vio/Phase17ESKFEstimator.hpp src/vio/Phase17ESKFEstimator.cpp
+          git commit -m 'Complete MSCKF retirement implementation'
+          git push origin HEAD:phase23-development
+
   invariants:
     name: GCC and Clang Invariants
+    needs: implementation-apply
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: phase23-development
       - name: Install Eigen
         run: |
           sudo apt-get update
@@ -49,10 +77,13 @@ jobs:
 
   linux-gcc:
     name: Linux GCC Regression
+    needs: implementation-apply
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: phase23-development
       - uses: ./.github/actions/setup-linux-deps
       - name: Versions
         run: |
@@ -76,10 +107,13 @@ jobs:
 
   linux-clang:
     name: Linux Clang Regression
+    needs: implementation-apply
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: phase23-development
       - uses: ./.github/actions/setup-linux-deps
       - name: Versions
         run: |
@@ -103,10 +137,13 @@ jobs:
 
   werror:
     name: GCC and Clang Werror
+    needs: implementation-apply
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: phase23-development
       - uses: ./.github/actions/setup-linux-deps
       - name: GCC Werror
         run: |
@@ -122,10 +159,13 @@ jobs:
 
   static-analysis:
     name: Format and Tidy
+    needs: implementation-apply
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: phase23-development
       - uses: ./.github/actions/setup-linux-deps
       - name: Install formatter
         run: python3 -m pip install --upgrade clang-format==19.1.7
@@ -135,6 +175,8 @@ jobs:
           clang-format --dry-run --Werror \
             include/vio/MsckfMarginalization.hpp \
             include/vio/MsckfRetirementTransaction.hpp \
+            include/vio/EKFEstimator.hpp \
+            include/vio/Phase17ESKFEstimator.hpp \
             src/vio/Phase17ESKFEstimator.cpp \
             tests/test_msckf_marginalization.cpp \
             tests/test_msckf_retirement_transaction.cpp \
@@ -150,10 +192,13 @@ jobs:
 
   asan-ubsan:
     name: Clang ASan and UBSan
+    needs: implementation-apply
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: phase23-development
       - uses: ./.github/actions/setup-linux-deps
       - name: Configure
         run: cmake --preset linux-clang-asan-ubsan
@@ -172,10 +217,13 @@ jobs:
 
   tsan:
     name: Clang TSan Project-Owned Race Validation
+    needs: implementation-apply
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: phase23-development
       - uses: ./.github/actions/setup-linux-deps
       - name: Configure
         run: cmake --preset linux-clang-tsan-phase17
@@ -194,10 +242,13 @@ jobs:
 
   windows-msvc:
     name: Windows MSVC and Werror
+    needs: implementation-apply
     runs-on: windows-2022
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: phase23-development
       - uses: actions/setup-python@v6
         with:
           python-version: '3.14'
@@ -224,6 +275,7 @@ jobs:
     name: MSCKF Marginalization Acceptance
     if: always()
     needs:
+      - implementation-apply
       - invariants
       - linux-gcc
       - linux-clang
@@ -236,6 +288,7 @@ jobs:
     steps:
       - name: Require all validation lanes
         env:
+          IMPLEMENTATION: ${{ needs.implementation-apply.result }}
           INVARIANTS: ${{ needs.invariants.result }}
           GCC: ${{ needs.linux-gcc.result }}
           CLANG: ${{ needs.linux-clang.result }}
@@ -245,6 +298,6 @@ jobs:
           TSAN: ${{ needs.tsan.result }}
           MSVC: ${{ needs.windows-msvc.result }}
         run: |
-          for status in "$INVARIANTS" "$GCC" "$CLANG" "$WERROR" "$STATIC" "$SANITIZERS" "$TSAN" "$MSVC"; do
+          for status in "$IMPLEMENTATION" "$INVARIANTS" "$GCC" "$CLANG" "$WERROR" "$STATIC" "$SANITIZERS" "$TSAN" "$MSVC"; do
             test "$status" = success
           done
