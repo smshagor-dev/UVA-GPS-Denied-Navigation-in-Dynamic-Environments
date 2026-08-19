@@ -31,21 +31,126 @@ jobs:
         with:
           ref: phase23-development
           fetch-depth: 0
-      - name: Apply implementation patch once
+
+      - name: Apply production implementation deterministically
         id: patch
+        shell: bash
         run: |
-          if grep -q 'marginalization_constraints_consumed' include/vio/EKFEstimator.hpp && \
-             grep -q 'marginalization_constraints_consumed' include/vio/StateEstimator.hpp && \
-             grep -q 'restore_pre_retirement' src/vio/Phase17ESKFEstimator.cpp; then
-            echo 'already_applied=true' >> "$GITHUB_OUTPUT"
-            echo 'Production retirement implementation is already present.'
-            exit 0
-          fi
-          git apply --check patches/msckf-retirement-implementation.patch
-          git apply patches/msckf-retirement-implementation.patch
-          echo 'already_applied=false' >> "$GITHUB_OUTPUT"
+          python3 <<'PY'
+          from pathlib import Path
+
+          changed = False
+
+          def replace_once(path: str, old: str, new: str, marker: str) -> None:
+              global changed
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if marker in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f"expected source block not found in {path}: {marker}")
+              text = text.replace(old, new, 1)
+              p.write_text(text, encoding='utf-8')
+              changed = True
+
+          replace_once(
+              'include/vio/EKFEstimator.hpp',
+              '''    uint64_t marginalization_affected_tracks{0};\n    uint64_t marginalization_constraint_candidates{0};\n    uint64_t marginalization_covariance_dim_before{0};''',
+              '''    uint64_t marginalization_affected_tracks{0};\n    uint64_t marginalization_constraint_candidates{0};\n    uint64_t marginalization_constraints_consumed{0};\n    uint64_t marginalization_constraint_failures{0};\n    uint64_t marginalization_covariance_dim_before{0};''',
+              'marginalization_constraints_consumed'
+          )
+
+          replace_once(
+              'include/vio/StateEstimator.hpp',
+              '''    uint64_t marginalization_affected_tracks{0};\n    uint64_t marginalization_constraint_candidates{0};\n    uint64_t marginalization_covariance_dim_before{0};''',
+              '''    uint64_t marginalization_affected_tracks{0};\n    uint64_t marginalization_constraint_candidates{0};\n    uint64_t marginalization_constraints_consumed{0};\n    uint64_t marginalization_constraint_failures{0};\n    uint64_t marginalization_covariance_dim_before{0};''',
+              'marginalization_constraints_consumed'
+          )
+
+          replace_once(
+              'include/vio/Phase17ESKFEstimator.hpp',
+              '''    uint64_t next_msckf_state_id_{1};\n    uint64_t next_feature_track_id_{1};\n    MsckfConfig msckf_cfg_{};\n    std::deque<StationaryWindowSample> stationary_window_{};''',
+              '''    uint64_t next_msckf_state_id_{1};\n    uint64_t next_feature_track_id_{1};\n    MsckfConfig msckf_cfg_{};\n    std::optional<Eigen::Matrix3d> last_msckf_intrinsics_{};\n    std::deque<StationaryWindowSample> stationary_window_{};''',
+              'last_msckf_intrinsics_'
+          )
+
+          source = Path('src/vio/Phase17ESKFEstimator.cpp')
+          text = source.read_text(encoding='utf-8')
+
+          def src_replace(old: str, new: str, marker: str) -> None:
+              global text, changed
+              if marker in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f"expected Phase17 source block not found: {marker}")
+              text = text.replace(old, new, 1)
+              changed = True
+
+          src_replace(
+              '''        if (state_id != 0u) {\n            record_feature_observations_locked(z_pixels, p_world, K, state_id);''',
+              '''        if (state_id != 0u) {\n            last_msckf_intrinsics_ = K;\n            record_feature_observations_locked(z_pixels, p_world, K, state_id);''',
+              'last_msckf_intrinsics_ = K;'
+          )
+
+          src_replace(
+              '''    diagnostics_.marginalization_affected_tracks = 0;\n    diagnostics_.marginalization_constraint_candidates = 0;\n    diagnostics_.marginalization_covariance_dim_before = 0;''',
+              '''    diagnostics_.marginalization_affected_tracks = 0;\n    diagnostics_.marginalization_constraint_candidates = 0;\n    diagnostics_.marginalization_constraints_consumed = 0;\n    diagnostics_.marginalization_constraint_failures = 0;\n    diagnostics_.marginalization_covariance_dim_before = 0;''',
+              'diagnostics_.marginalization_constraints_consumed = 0;'
+          )
+
+          src_replace(
+              '''    const auto prepared = MsckfRetirementTransaction::prepare(\n        request, ordered_clone_ids, augmented_covariance_);''',
+              '''    // Preserve the full pre-retirement estimator state so a failed retirement-time\n    // constraint or covariance transaction cannot leak a partial correction.\n    const NominalStateSnapshot nominal_before_retirement = snapshot_locked();\n    const Eigen::MatrixXd augmented_before_retirement = augmented_covariance_;\n    const auto camera_states_before_retirement = msckf_camera_states_;\n    const auto tracks_before_retirement = feature_tracks_;\n    const EKFDiagnostics diagnostics_before_retirement = diagnostics_;\n\n    const auto restore_pre_retirement = [&]() {\n        pos_ = nominal_before_retirement.pos;\n        vel_ = nominal_before_retirement.vel;\n        q_ = nominal_before_retirement.q;\n        ba_ = nominal_before_retirement.ba;\n        bg_ = nominal_before_retirement.bg;\n        P_ = nominal_before_retirement.P;\n        total_drift_ = nominal_before_retirement.total_drift;\n        augmented_covariance_ = augmented_before_retirement;\n        msckf_camera_states_ = camera_states_before_retirement;\n        feature_tracks_ = tracks_before_retirement;\n        diagnostics_ = diagnostics_before_retirement;\n    };\n\n    if (!plan.constraint_candidate_track_ids.empty()) {\n        if (!last_msckf_intrinsics_.has_value() ||\n            !last_msckf_intrinsics_->array().isFinite().all()) {\n            if (msckf_diagnostics_enabled_locked()) {\n                ++diagnostics_.marginalization_failures;\n                ++diagnostics_.marginalization_constraint_failures;\n            }\n            note_rejection_locked(EstimatorOperationResult::FailedNumericalValidation);\n            refresh_msckf_oldest_state_age_locked();\n            return;\n        }\n        const uint64_t applied_before = diagnostics_.feature_updates_applied;\n        const uint64_t rejected_before = diagnostics_.feature_updates_rejected;\n        try_apply_msckf_feature_updates_locked(*last_msckf_intrinsics_, oldest_id);\n        if (msckf_diagnostics_enabled_locked()) {\n            diagnostics_.marginalization_constraints_consumed +=\n                diagnostics_.feature_updates_applied - applied_before;\n            diagnostics_.marginalization_constraint_failures +=\n                diagnostics_.feature_updates_rejected - rejected_before;\n        }\n    }\n\n    const auto prepared = MsckfRetirementTransaction::prepare(\n        request, ordered_clone_ids, augmented_covariance_);''',
+              'const auto restore_pre_retirement = [&]()'
+          )
+
+          src_replace(
+              '''    if (!prepared.has_value() || !prepared->committed) {\n        if (msckf_diagnostics_enabled_locked()) {''',
+              '''    if (!prepared.has_value() || !prepared->committed) {\n        restore_pre_retirement();\n        if (msckf_diagnostics_enabled_locked()) {''',
+              'restore_pre_retirement();\n        if (msckf_diagnostics_enabled_locked())'
+          )
+
+          # The candidate-validation rollback has a distinct nearby signature; apply it if absent.
+          candidate_old = '''    if (!candidate_valid) {\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.marginalization_failures;'''
+          candidate_new = '''    if (!candidate_valid) {\n        restore_pre_retirement();\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.marginalization_failures;'''
+          if candidate_new not in text:
+              if candidate_old not in text:
+                  raise SystemExit('expected candidate rollback block not found')
+              text = text.replace(candidate_old, candidate_new, 1)
+              changed = True
+
+          src_replace(
+              '''        if (!track || !track->landmark_initialized || track->last_update_state_id == state_id) {''',
+              '''        if (!track || !track->landmark_initialized || track->last_update_state_id >= state_id) {''',
+              'track->last_update_state_id >= state_id'
+          )
+
+          src_replace(
+              '''        for (const auto& accepted : accepted_features) {\n            accepted.track->last_update_state_id = state_id;\n        }''',
+              '''        for (const auto& accepted : accepted_features) {\n            uint64_t newest_observation_state_id = 0;\n            for (const auto& observation : accepted.track->observations) {\n                newest_observation_state_id =\n                    std::max(newest_observation_state_id, observation.state_id);\n            }\n            accepted.track->last_update_state_id = newest_observation_state_id;\n        }''',
+              'newest_observation_state_id'
+          )
+
+          src_replace(
+              '''    next_msckf_state_id_ = 1;\n    next_feature_track_id_ = 1;\n    augmented_covariance_ = P_;''',
+              '''    next_msckf_state_id_ = 1;\n    next_feature_track_id_ = 1;\n    last_msckf_intrinsics_.reset();\n    augmented_covariance_ = P_;''',
+              'last_msckf_intrinsics_.reset();'
+          )
+
+          src_replace(
+              '''    out.marginalization_affected_tracks = diag.marginalization_affected_tracks;\n    out.marginalization_constraint_candidates = diag.marginalization_constraint_candidates;\n    out.marginalization_covariance_dim_before = diag.marginalization_covariance_dim_before;''',
+              '''    out.marginalization_affected_tracks = diag.marginalization_affected_tracks;\n    out.marginalization_constraint_candidates = diag.marginalization_constraint_candidates;\n    out.marginalization_constraints_consumed = diag.marginalization_constraints_consumed;\n    out.marginalization_constraint_failures = diag.marginalization_constraint_failures;\n    out.marginalization_covariance_dim_before = diag.marginalization_covariance_dim_before;''',
+              'out.marginalization_constraints_consumed = diag.marginalization_constraints_consumed;'
+          )
+
+          source.write_text(text, encoding='utf-8')
+          print(f'changed={str(changed).lower()}')
+          with open(Path(__import__('os').environ['GITHUB_OUTPUT']), 'a', encoding='utf-8') as out:
+              out.write(f"changed={str(changed).lower()}\n")
+          PY
+
       - name: Commit production implementation
-        if: steps.patch.outputs.already_applied == 'false'
+        if: steps.patch.outputs.changed == 'true'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -53,9 +158,11 @@ jobs:
           git commit -m 'Complete MSCKF camera-state retirement implementation'
           git pull --rebase origin phase23-development
           git push origin HEAD:phase23-development
+
       - name: Verify production markers
         run: |
           grep -q 'marginalization_constraints_consumed' include/vio/EKFEstimator.hpp
           grep -q 'marginalization_constraints_consumed' include/vio/StateEstimator.hpp
           grep -q 'last_msckf_intrinsics_' include/vio/Phase17ESKFEstimator.hpp
           grep -q 'restore_pre_retirement' src/vio/Phase17ESKFEstimator.cpp
+          grep -q 'newest_observation_state_id' src/vio/Phase17ESKFEstimator.cpp
