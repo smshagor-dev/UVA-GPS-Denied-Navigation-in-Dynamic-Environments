@@ -129,6 +129,14 @@ target_link_libraries(test_phase22_msckf_update PRIVATE
 )
 drone_register_gtest(test_phase22_msckf_update "unit;navigation;replay;phase22")
 
+add_executable(test_msckf_marginalization_integration test_msckf_marginalization_integration.cpp)
+target_link_libraries(test_msckf_marginalization_integration PRIVATE
+    drone_test_support
+    ${DRONE_PHASE17_TEST_CORE}
+    Eigen3::Eigen
+)
+drone_register_gtest(test_msckf_marginalization_integration "unit;navigation;replay;marginalization")
+
 add_executable(ekf_phase15_replay ekf_phase15_replay.cpp)
 target_link_libraries(ekf_phase15_replay PRIVATE
     sensor_fusion_core
