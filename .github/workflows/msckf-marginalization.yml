@@ -6,6 +6,7 @@ on:
       - phase22-final-validation
     paths:
       - 'include/vio/EKFEstimator.hpp'
+      - 'include/vio/StateEstimator.hpp'
       - 'include/vio/Phase17ESKFEstimator.hpp'
       - 'src/vio/Phase17ESKFEstimator.cpp'
       - 'tests/test_msckf_marginalization_integration.cpp'
@@ -33,7 +34,9 @@ jobs:
       - name: Apply implementation patch once
         id: patch
         run: |
-          if grep -q 'marginalization_constraints_consumed' include/vio/EKFEstimator.hpp; then
+          if grep -q 'marginalization_constraints_consumed' include/vio/EKFEstimator.hpp && \
+             grep -q 'marginalization_constraints_consumed' include/vio/StateEstimator.hpp && \
+             grep -q 'restore_pre_retirement' src/vio/Phase17ESKFEstimator.cpp; then
             echo 'already_applied=true' >> "$GITHUB_OUTPUT"
             echo 'Production retirement implementation is already present.'
             exit 0
@@ -46,12 +49,13 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add include/vio/EKFEstimator.hpp include/vio/Phase17ESKFEstimator.hpp src/vio/Phase17ESKFEstimator.cpp
+          git add include/vio/EKFEstimator.hpp include/vio/StateEstimator.hpp include/vio/Phase17ESKFEstimator.hpp src/vio/Phase17ESKFEstimator.cpp
           git commit -m 'Complete MSCKF camera-state retirement implementation'
           git pull --rebase origin phase23-development
           git push origin HEAD:phase23-development
       - name: Verify production markers
         run: |
           grep -q 'marginalization_constraints_consumed' include/vio/EKFEstimator.hpp
+          grep -q 'marginalization_constraints_consumed' include/vio/StateEstimator.hpp
           grep -q 'last_msckf_intrinsics_' include/vio/Phase17ESKFEstimator.hpp
           grep -q 'restore_pre_retirement' src/vio/Phase17ESKFEstimator.cpp
