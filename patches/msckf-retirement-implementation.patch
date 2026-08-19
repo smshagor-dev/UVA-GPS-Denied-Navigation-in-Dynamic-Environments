@@ -8,6 +8,16 @@ diff --git a/include/vio/EKFEstimator.hpp b/include/vio/EKFEstimator.hpp
 +    uint64_t marginalization_constraint_failures{0};
      uint64_t marginalization_covariance_dim_before{0};
      uint64_t marginalization_covariance_dim_after{0};
+diff --git a/include/vio/StateEstimator.hpp b/include/vio/StateEstimator.hpp
+--- a/include/vio/StateEstimator.hpp
++++ b/include/vio/StateEstimator.hpp
+@@
+     uint64_t marginalization_affected_tracks{0};
+     uint64_t marginalization_constraint_candidates{0};
++    uint64_t marginalization_constraints_consumed{0};
++    uint64_t marginalization_constraint_failures{0};
+     uint64_t marginalization_covariance_dim_before{0};
+     uint64_t marginalization_covariance_dim_after{0};
 diff --git a/include/vio/Phase17ESKFEstimator.hpp b/include/vio/Phase17ESKFEstimator.hpp
 --- a/include/vio/Phase17ESKFEstimator.hpp
 +++ b/include/vio/Phase17ESKFEstimator.hpp
@@ -44,10 +54,10 @@ diff --git a/src/vio/Phase17ESKFEstimator.cpp b/src/vio/Phase17ESKFEstimator.cpp
              static_cast<uint64_t>(augmented_covariance_.rows());
      }
 +
-+    // Final retirement-time constraint pass. Normal visual updates already consume
-+    // tracks before eviction; this pass catches a feature that disappeared before the
-+    // newest clone while still preventing duplicate reuse of tracks already consumed
-+    // at a newer state.
++    // Normal visual updates already consume feature information before clone retirement.
++    // This final retirement-time pass catches an eligible track that disappeared before
++    // the newest clone while preventing duplicate reuse of a track already consumed at a
++    // newer observation state.
 +    const NominalStateSnapshot nominal_before_retirement = snapshot_locked();
 +    const Eigen::MatrixXd augmented_before_retirement = augmented_covariance_;
 +    const auto camera_states_before_retirement = msckf_camera_states_;
@@ -129,3 +139,9 @@ diff --git a/src/vio/Phase17ESKFEstimator.cpp b/src/vio/Phase17ESKFEstimator.cpp
      next_feature_track_id_ = 1;
 +    last_msckf_intrinsics_.reset();
      augmented_covariance_ = P_;
+@@
+     out.marginalization_affected_tracks = diag.marginalization_affected_tracks;
+     out.marginalization_constraint_candidates = diag.marginalization_constraint_candidates;
++    out.marginalization_constraints_consumed = diag.marginalization_constraints_consumed;
++    out.marginalization_constraint_failures = diag.marginalization_constraint_failures;
+     out.marginalization_covariance_dim_before = diag.marginalization_covariance_dim_before;
