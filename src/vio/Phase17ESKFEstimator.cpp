@@ -273,6 +273,7 @@ void Phase17ESKFEstimator::update_vision(const std::vector<Eigen::Vector2d>& z_p
         const uint64_t state_id = capture_or_get_msckf_camera_state_locked(
             last_accepted_imu_timestamp_s_.value_or(timestamp_));
         if (state_id != 0u) {
+            last_msckf_intrinsics_ = K;
             record_feature_observations_locked(z_pixels, p_world, K, state_id);
             try_initialize_triangulated_landmarks_locked(K);
             try_apply_msckf_feature_updates_locked(K, state_id);
@@ -859,6 +860,8 @@ void Phase17ESKFEstimator::clear_msckf_diagnostics_locked() {
     diagnostics_.marginalization_retiring_state_id = 0;
     diagnostics_.marginalization_affected_tracks = 0;
     diagnostics_.marginalization_constraint_candidates = 0;
+    diagnostics_.marginalization_constraints_consumed = 0;
+    diagnostics_.marginalization_constraint_failures = 0;
     diagnostics_.marginalization_covariance_dim_before = 0;
     diagnostics_.marginalization_covariance_dim_after = 0;
     diagnostics_.marginalization_stale_references = 0;
@@ -1402,9 +1405,54 @@ void Phase17ESKFEstimator::evict_msckf_state_locked() {
             static_cast<uint64_t>(augmented_covariance_.rows());
     }
 
+    // Preserve the full pre-retirement estimator state so a failed retirement-time
+    // constraint or covariance transaction cannot leak a partial correction.
+    const NominalStateSnapshot nominal_before_retirement = snapshot_locked();
+    const Eigen::MatrixXd augmented_before_retirement = augmented_covariance_;
+    const auto camera_states_before_retirement = msckf_camera_states_;
+    const auto tracks_before_retirement = feature_tracks_;
+    const EKFDiagnostics diagnostics_before_retirement = diagnostics_;
+
+    const auto restore_pre_retirement = [&]() {
+        pos_ = nominal_before_retirement.pos;
+        vel_ = nominal_before_retirement.vel;
+        q_ = nominal_before_retirement.q;
+        ba_ = nominal_before_retirement.ba;
+        bg_ = nominal_before_retirement.bg;
+        P_ = nominal_before_retirement.P;
+        total_drift_ = nominal_before_retirement.total_drift;
+        augmented_covariance_ = augmented_before_retirement;
+        msckf_camera_states_ = camera_states_before_retirement;
+        feature_tracks_ = tracks_before_retirement;
+        diagnostics_ = diagnostics_before_retirement;
+    };
+
+    if (!plan.constraint_candidate_track_ids.empty()) {
+        if (!last_msckf_intrinsics_.has_value() ||
+            !last_msckf_intrinsics_->array().isFinite().all()) {
+            if (msckf_diagnostics_enabled_locked()) {
+                ++diagnostics_.marginalization_failures;
+                ++diagnostics_.marginalization_constraint_failures;
+            }
+            note_rejection_locked(EstimatorOperationResult::FailedNumericalValidation);
+            refresh_msckf_oldest_state_age_locked();
+            return;
+        }
+        const uint64_t applied_before = diagnostics_.feature_updates_applied;
+        const uint64_t rejected_before = diagnostics_.feature_updates_rejected;
+        try_apply_msckf_feature_updates_locked(*last_msckf_intrinsics_, oldest_id);
+        if (msckf_diagnostics_enabled_locked()) {
+            diagnostics_.marginalization_constraints_consumed +=
+                diagnostics_.feature_updates_applied - applied_before;
+            diagnostics_.marginalization_constraint_failures +=
+                diagnostics_.feature_updates_rejected - rejected_before;
+        }
+    }
+
     const auto prepared = MsckfRetirementTransaction::prepare(
         request, ordered_clone_ids, augmented_covariance_);
     if (!prepared.has_value() || !prepared->committed) {
+        restore_pre_retirement();
         if (msckf_diagnostics_enabled_locked()) {
             ++diagnostics_.marginalization_failures;
         }
@@ -1455,6 +1503,7 @@ void Phase17ESKFEstimator::evict_msckf_state_locked() {
         prepared->retained_covariance.cols() == static_cast<Eigen::Index>(expected_dim) &&
         stale_references == 0u;
     if (!candidate_valid) {
+        restore_pre_retirement();
         if (msckf_diagnostics_enabled_locked()) {
             ++diagnostics_.marginalization_failures;
         }
@@ -1689,7 +1738,7 @@ void Phase17ESKFEstimator::try_apply_msckf_feature_updates_locked(const Eigen::M
     uint64_t features_considered = 0;
 
     for (FeatureTrack* track : ordered_tracks) {
-        if (!track || !track->landmark_initialized || track->last_update_state_id == state_id) {
+        if (!track || !track->landmark_initialized || track->last_update_state_id >= state_id) {
             continue;
         }
         const auto has_latest_observation =
@@ -1833,7 +1882,12 @@ void Phase17ESKFEstimator::try_apply_msckf_feature_updates_locked(const Eigen::M
         true);
     if (result == EstimatorOperationResult::Accepted) {
         for (const auto& accepted : accepted_features) {
-            accepted.track->last_update_state_id = state_id;
+            uint64_t newest_observation_state_id = 0;
+            for (const auto& observation : accepted.track->observations) {
+                newest_observation_state_id =
+                    std::max(newest_observation_state_id, observation.state_id);
+            }
+            accepted.track->last_update_state_id = newest_observation_state_id;
         }
         if (msckf_update_diagnostics_enabled_locked()) {
             diagnostics_.feature_updates_applied += accepted_features.size();
@@ -2160,6 +2214,7 @@ void Phase17ESKFEstimator::reset_msckf_locked() {
     feature_tracks_.clear();
     next_msckf_state_id_ = 1;
     next_feature_track_id_ = 1;
+    last_msckf_intrinsics_.reset();
     augmented_covariance_ = P_;
     clear_msckf_diagnostics_locked();
     clear_triangulation_diagnostics_locked();
@@ -2772,6 +2827,8 @@ EstimatorStateSnapshot Phase17StateEstimatorAdapter::snapshot() const {
     out.marginalization_retiring_state_id = diag.marginalization_retiring_state_id;
     out.marginalization_affected_tracks = diag.marginalization_affected_tracks;
     out.marginalization_constraint_candidates = diag.marginalization_constraint_candidates;
+    out.marginalization_constraints_consumed = diag.marginalization_constraints_consumed;
+    out.marginalization_constraint_failures = diag.marginalization_constraint_failures;
     out.marginalization_covariance_dim_before = diag.marginalization_covariance_dim_before;
     out.marginalization_covariance_dim_after = diag.marginalization_covariance_dim_after;
     out.marginalization_stale_references = diag.marginalization_stale_references;

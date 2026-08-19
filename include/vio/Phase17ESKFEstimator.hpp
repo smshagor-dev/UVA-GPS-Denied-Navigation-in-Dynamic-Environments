@@ -389,6 +389,7 @@ private:
     uint64_t next_msckf_state_id_{1};
     uint64_t next_feature_track_id_{1};
     MsckfConfig msckf_cfg_{};
+    std::optional<Eigen::Matrix3d> last_msckf_intrinsics_{};
     std::deque<StationaryWindowSample> stationary_window_{};
     std::optional<double> stationary_candidate_start_timestamp_s_{};
     std::optional<double> stationary_start_timestamp_s_{};
