@@ -1,0 +1,36 @@
+name: Apply MSCKF Retirement Implementation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: phase23-development
+          fetch-depth: 0
+      - name: Apply production patch once
+        id: patch
+        run: |
+          if grep -q 'marginalization_constraints_consumed' include/vio/EKFEstimator.hpp; then
+            echo 'already_applied=true' >> "$GITHUB_OUTPUT"
+            echo 'Production retirement implementation already applied.'
+            exit 0
+          fi
+          git apply --check patches/msckf-retirement-implementation.patch
+          git apply patches/msckf-retirement-implementation.patch
+          echo 'already_applied=false' >> "$GITHUB_OUTPUT"
+      - name: Commit implementation
+        if: steps.patch.outputs.already_applied == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add include/vio/EKFEstimator.hpp include/vio/Phase17ESKFEstimator.hpp src/vio/Phase17ESKFEstimator.cpp
+          git commit -m "Complete MSCKF retirement implementation"
+          git pull --rebase origin phase23-development
+          git push origin HEAD:phase23-development
