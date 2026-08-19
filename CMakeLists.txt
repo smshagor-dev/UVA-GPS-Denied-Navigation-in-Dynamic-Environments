@@ -259,3 +259,34 @@ install(EXPORT DroneSwarmTargets
     NAMESPACE DroneSwarm::
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
 )
+
+install(FILES
+    "${PROJECT_BINARY_DIR}/DroneSwarmSensorFusionConfig.cmake"
+    "${PROJECT_BINARY_DIR}/DroneSwarmSensorFusionConfigVersion.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}"
+)
+
+if(DRONE_ENABLE_CPACK)
+    set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+    set(CPACK_PACKAGE_VENDOR "Md Shahanur Islam Shagor")
+    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+    set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
+    set(CPACK_RESOURCE_FILE_README "${PROJECT_SOURCE_DIR}/README.md")
+    if(WIN32)
+        set(CPACK_GENERATOR "ZIP")
+    else()
+        set(CPACK_GENERATOR "TGZ")
+    endif()
+    include(CPack)
+endif()
+
+message(STATUS "")
+message(STATUS "DroneSwarmSensorFusion configuration summary")
+message(STATUS "  Build type          : ${CMAKE_BUILD_TYPE}")
+message(STATUS "  Compiler            : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "  Tests               : ${DRONE_BUILD_TESTS}")
+message(STATUS "  Python bindings     : ${DRONE_PYTHON_BINDINGS_STATUS}")
+message(STATUS "  Fast-DDS transport  : ${DRONE_FASTDDS_STATUS}")
+message(STATUS "  TensorRT inference  : ${DRONE_TENSORRT_STATUS}")
+message(STATUS "  Install prefix      : ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "")
