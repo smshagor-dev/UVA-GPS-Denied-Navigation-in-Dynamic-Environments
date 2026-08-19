@@ -198,6 +198,7 @@ if(DRONE_BUILD_TESTS)
     drone_enable_googletest()
     enable_testing()
     add_subdirectory(tests)
+    include("${PROJECT_SOURCE_DIR}/tests/visual_feature_track_ingest.cmake")
 endif()
 
 install(TARGETS drone_node sensor_fusion_core
