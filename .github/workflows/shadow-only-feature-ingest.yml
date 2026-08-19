@@ -8,6 +8,7 @@ on:
       - '.github/workflows/shadow-only-feature-ingest.yml'
       - 'include/vio/VisualFeatureTrackManager.hpp'
       - 'include/vio/VIOPipeline.hpp'
+      - 'include/vio/EstimatorCoordinator.hpp'
       - 'src/vio/VIOPipeline.cpp'
       - 'tests/test_visual_feature_track_manager.cpp'
       - 'tests/test_visual_feature_track_ingest.cpp'
@@ -20,6 +21,7 @@ on:
     paths:
       - 'include/vio/VisualFeatureTrackManager.hpp'
       - 'include/vio/VIOPipeline.hpp'
+      - 'include/vio/EstimatorCoordinator.hpp'
       - 'src/vio/VIOPipeline.cpp'
       - 'tests/test_visual_feature_track_manager.cpp'
       - 'tests/test_visual_feature_track_ingest.cpp'
@@ -64,6 +66,23 @@ jobs:
           --output-on-failure
           -L 'visual-feature-tracking|shadow-only'
 
+  gcc-werror:
+    name: GCC Werror feature ingest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - run: cmake --preset linux-gcc-release-werror
+      - run: >-
+          cmake --build --preset linux-gcc-release-werror
+          --target test_visual_feature_track_manager test_visual_feature_track_ingest
+          test_shadow_only_measurement visual_feature_track_ingest_replay -- -j2
+      - run: >-
+          ctest --test-dir build/linux-gcc-release-werror
+          --output-on-failure
+          -L 'visual-feature-tracking|shadow-only'
+
   clang:
     name: Clang feature ingest
     runs-on: ubuntu-24.04
@@ -91,9 +110,125 @@ jobs:
           --output-on-failure
           -L 'visual-feature-tracking|shadow-only'
 
+  clang-werror:
+    name: Clang Werror feature ingest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Configure
+        run: >-
+          cmake -S . -B build/visual-feature-clang-werror -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=clang
+          -DCMAKE_CXX_COMPILER=clang++
+          -DDRONE_WARNINGS_AS_ERRORS=ON
+          -DDRONE_BUILD_TESTS=ON
+          -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
+      - name: Build focused targets
+        run: >-
+          cmake --build build/visual-feature-clang-werror
+          --target test_visual_feature_track_manager test_visual_feature_track_ingest
+          test_shadow_only_measurement visual_feature_track_ingest_replay -- -j2
+      - name: Run focused tests
+        run: >-
+          ctest --test-dir build/visual-feature-clang-werror
+          --output-on-failure
+          -L 'visual-feature-tracking|shadow-only'
+
+  formatting:
+    name: Feature ingest formatting
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - name: clang-format
+        run: |
+          set -euxo pipefail
+          clang-format --version
+          clang-format --dry-run --Werror \
+            include/vio/VisualFeatureTrackManager.hpp \
+            include/vio/VIOPipeline.hpp \
+            src/vio/VIOPipeline.cpp \
+            tests/test_visual_feature_track_manager.cpp \
+            tests/test_visual_feature_track_ingest.cpp \
+            tests/visual_feature_track_ingest_replay.cpp \
+            tests/test_shadow_only_measurement.cpp
+
+  static-analysis:
+    name: Feature ingest static analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Configure compile database
+        run: >-
+          cmake -S . -B build/visual-feature-analysis -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=clang
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          -DDRONE_BUILD_TESTS=ON
+          -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
+      - name: clang-tidy
+        run: |
+          set -euxo pipefail
+          clang-tidy --version
+          clang-tidy -p build/visual-feature-analysis \
+            src/vio/VIOPipeline.cpp \
+            --warnings-as-errors='*'
+
+  asan-ubsan:
+    name: ASan UBSan feature ingest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Configure
+        run: cmake --preset linux-clang-asan-ubsan
+      - name: Build focused targets
+        run: >-
+          cmake --build --preset linux-clang-asan-ubsan
+          --target test_visual_feature_track_manager test_visual_feature_track_ingest
+          test_shadow_only_measurement visual_feature_track_ingest_replay -- -j2
+      - name: Run focused tests
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: >-
+          ctest --test-dir build/linux-clang-asan-ubsan
+          --output-on-failure
+          -L 'visual-feature-tracking|shadow-only'
+
+  tsan:
+    name: TSan feature ingest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Configure
+        run: cmake --preset linux-clang-tsan-phase17
+      - name: Build focused targets
+        run: >-
+          cmake --build --preset linux-clang-tsan-phase17
+          --target test_visual_feature_track_manager test_visual_feature_track_ingest
+          test_shadow_only_measurement visual_feature_track_ingest_replay -- -j2
+      - name: Run focused tests without suppressions
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: >-
+          ctest --test-dir build/linux-clang-tsan-phase17
+          --output-on-failure
+          -L 'visual-feature-tracking|shadow-only'
+
   acceptance:
     name: Visual ingest acceptance
     runs-on: ubuntu-24.04
-    needs: [gcc, clang]
+    needs: [gcc, gcc-werror, clang, clang-werror, formatting, static-analysis, asan-ubsan, tsan]
     steps:
-      - run: echo 'Visual feature tracking, deterministic replay, and shadow-only authority tests passed.'
+      - run: echo 'Visual feature track ingest validation matrix passed.'
