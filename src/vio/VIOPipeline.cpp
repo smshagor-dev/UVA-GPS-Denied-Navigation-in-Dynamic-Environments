@@ -424,10 +424,20 @@ void VIOPipeline::handle(const sensors::CameraFrame& frame) {
             p_world.push_back(predicted_pose.position + forward * 5.0);
         }
         if (!z_pixels.empty()) {
+            // Preserve the production baseline authority: the simulation placeholder pose may
+            // update the active estimator, while feature tracks are published only to the shadow
+            // estimator. The queue preserves visual-pose-before-feature ordering for the shadow.
             (void)coordinator_->process_measurement(make_visual_pose_envelope(
                 VisualPoseMeasurementPayload{predicted_pose.position, predicted_pose.velocity, 0.35,
                                              0.45},
                 MeasurementStamp{frame.timestamp, measurement_sequence_++}));
+
+            VisualFeatureMeasurementPayload feature_payload;
+            feature_payload.z_pixels.assign(z_pixels.begin(), z_pixels.end());
+            feature_payload.p_world.assign(p_world.begin(), p_world.end());
+            feature_payload.K = K_;
+            (void)coordinator_->submit_shadow_measurement(make_visual_features_envelope(
+                feature_payload, MeasurementStamp{frame.timestamp, measurement_sequence_++}));
         }
     }
 

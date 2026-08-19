@@ -137,6 +137,14 @@ target_link_libraries(test_msckf_marginalization_integration PRIVATE
 )
 drone_register_gtest(test_msckf_marginalization_integration "unit;navigation;replay;marginalization")
 
+add_executable(test_shadow_only_measurement test_shadow_only_measurement.cpp)
+target_link_libraries(test_shadow_only_measurement PRIVATE
+    drone_test_support
+    ${DRONE_PHASE17_TEST_CORE}
+    Eigen3::Eigen
+)
+drone_register_gtest(test_shadow_only_measurement "unit;navigation;shadow-only;msckf")
+
 add_executable(ekf_phase15_replay ekf_phase15_replay.cpp)
 target_link_libraries(ekf_phase15_replay PRIVATE
     sensor_fusion_core
