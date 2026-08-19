@@ -11,6 +11,7 @@ on:
       - 'src/vio/VIOPipeline.cpp'
       - 'tests/test_visual_feature_track_manager.cpp'
       - 'tests/test_visual_feature_track_ingest.cpp'
+      - 'tests/visual_feature_track_ingest_replay.cpp'
       - 'tests/test_shadow_only_measurement.cpp'
       - 'tests/CMakeLists.txt'
   pull_request:
@@ -22,6 +23,7 @@ on:
       - 'src/vio/VIOPipeline.cpp'
       - 'tests/test_visual_feature_track_manager.cpp'
       - 'tests/test_visual_feature_track_ingest.cpp'
+      - 'tests/visual_feature_track_ingest_replay.cpp'
       - 'tests/test_shadow_only_measurement.cpp'
       - 'tests/CMakeLists.txt'
       - '.github/workflows/shadow-only-feature-ingest.yml'
@@ -53,8 +55,9 @@ jobs:
         run: cmake --preset linux-gcc-release-minimal
       - name: Build focused targets
         run: >-
-          cmake --build --preset linux-gcc-release-minimal --
-          -j2
+          cmake --build --preset linux-gcc-release-minimal
+          --target test_visual_feature_track_manager test_visual_feature_track_ingest
+          test_shadow_only_measurement visual_feature_track_ingest_replay -- -j2
       - name: Run focused tests
         run: >-
           ctest --test-dir build/linux-gcc-release-minimal
@@ -79,8 +82,9 @@ jobs:
         run: cmake --preset linux-clang-release
       - name: Build focused targets
         run: >-
-          cmake --build --preset linux-clang-release --
-          -j2
+          cmake --build --preset linux-clang-release
+          --target test_visual_feature_track_manager test_visual_feature_track_ingest
+          test_shadow_only_measurement visual_feature_track_ingest_replay -- -j2
       - name: Run focused tests
         run: >-
           ctest --test-dir build/linux-clang-release
@@ -92,4 +96,4 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [gcc, clang]
     steps:
-      - run: echo 'Visual feature track ingest compiler and authority tests passed.'
+      - run: echo 'Visual feature tracking, deterministic replay, and shadow-only authority tests passed.'
