@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Configure
         shell: bash
@@ -31,7 +31,7 @@ jobs:
         run: ctest --preset linux-gcc-release-werror --output-on-failure --output-junit "${RUNNER_TEMP}/gcc-werror-junit.xml"
       - name: Upload GCC werror reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: gcc-werror-${{ github.sha }}
           path: ${{ runner.temp }}/gcc-werror-junit.xml
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Configure
         shell: bash
@@ -55,7 +55,7 @@ jobs:
         run: ctest --preset linux-gcc-release-minimal --output-on-failure --output-junit "${RUNNER_TEMP}/gcc-minimal-junit.xml"
       - name: Upload GCC minimal reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: gcc-minimal-${{ github.sha }}
           path: ${{ runner.temp }}/gcc-minimal-junit.xml
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Configure
         shell: bash
@@ -79,7 +79,7 @@ jobs:
         run: ctest --preset linux-clang-debug --output-on-failure --output-junit "${RUNNER_TEMP}/clang-debug-junit.xml"
       - name: Upload Clang debug reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: clang-debug-${{ github.sha }}
           path: ${{ runner.temp }}/clang-debug-junit.xml
@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Configure
         shell: bash
@@ -107,7 +107,7 @@ jobs:
           ctest --preset linux-gcc-asan-ubsan --output-on-failure --output-junit "${RUNNER_TEMP}/gcc-asan-ubsan-junit.xml"
       - name: Upload GCC sanitizer reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: gcc-asan-ubsan-${{ github.sha }}
           path: ${{ runner.temp }}/gcc-asan-ubsan-junit.xml
@@ -118,7 +118,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Configure
         shell: bash
@@ -135,7 +135,7 @@ jobs:
           ctest --preset linux-clang-asan-ubsan --output-on-failure --output-junit "${RUNNER_TEMP}/clang-asan-ubsan-junit.xml"
       - name: Upload Clang sanitizer reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: clang-asan-ubsan-${{ github.sha }}
           path: ${{ runner.temp }}/clang-asan-ubsan-junit.xml
@@ -146,13 +146,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements.txt
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: false
@@ -198,7 +198,7 @@ jobs:
           go tool cover -func="${RUNNER_TEMP}/coverage/go/coverage.out" | tee "${RUNNER_TEMP}/coverage/go/coverage.txt"
       - name: Upload coverage artifacts
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ github.sha }}
           path: ${{ runner.temp }}/coverage
@@ -209,8 +209,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: false
@@ -258,7 +258,7 @@ jobs:
           )
       - name: Upload package validation artifacts
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: package-validation-${{ github.sha }}
           path: |
