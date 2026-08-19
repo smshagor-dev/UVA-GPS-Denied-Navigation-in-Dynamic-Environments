@@ -1,24 +1,13 @@
 name: Apply MSCKF Retirement Implementation
 
 on:
-  pull_request:
-    branches:
-      - phase22-final-validation
-    paths:
-      - 'patches/msckf-retirement-implementation.patch'
-      - '.github/workflows/apply-msckf-retirement-implementation.yml'
   workflow_dispatch:
-
-concurrency:
-  group: msckf-retirement-implementation-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
