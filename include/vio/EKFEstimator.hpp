@@ -201,6 +201,8 @@ struct EKFDiagnostics {
     uint64_t marginalization_retiring_state_id{0};
     uint64_t marginalization_affected_tracks{0};
     uint64_t marginalization_constraint_candidates{0};
+    uint64_t marginalization_constraints_consumed{0};
+    uint64_t marginalization_constraint_failures{0};
     uint64_t marginalization_covariance_dim_before{0};
     uint64_t marginalization_covariance_dim_after{0};
     uint64_t marginalization_stale_references{0};

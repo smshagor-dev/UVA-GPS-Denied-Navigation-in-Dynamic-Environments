@@ -26,6 +26,18 @@ MsckfConfig make_feature_retirement_config() {
     return cfg;
 }
 
+MsckfConfig make_feature_update_retirement_config(bool update_enabled) {
+    MsckfConfig cfg = make_feature_retirement_config();
+    cfg.update.enabled = update_enabled;
+    cfg.update.minimum_track_length = 2;
+    cfg.update.maximum_track_length = 8;
+    cfg.update.maximum_residual = 1.0;
+    cfg.update.chi_square_probability = 0.95;
+    cfg.update.validation_checks = true;
+    cfg.update.diagnostics_enabled = true;
+    return cfg;
+}
+
 Eigen::Matrix3d camera_intrinsics() {
     Eigen::Matrix3d K = Eigen::Matrix3d::Zero();
     K(0, 0) = 320.0;
@@ -34,6 +46,16 @@ Eigen::Matrix3d camera_intrinsics() {
     K(1, 2) = 240.0;
     K(2, 2) = 1.0;
     return K;
+}
+
+Eigen::Vector2d project_feature(const PoseEstimate& pose, const Eigen::Vector3d& feature,
+                                const Eigen::Matrix3d& K) {
+    const Eigen::Vector3d p_c = pose.R_wb().transpose() * (feature - pose.position);
+    EXPECT_GT(p_c.z(), 0.0);
+    return {
+        (K(0, 0) * p_c.x() / p_c.z()) + K(0, 2),
+        (K(1, 1) * p_c.y() / p_c.z()) + K(1, 2),
+    };
 }
 
 void drive_visual_pose_clones(Phase17ESKFEstimator& estimator, int clone_count) {
@@ -213,6 +235,98 @@ TEST(MsckfMarginalizationIntegration, ResetClearsRetirementWindowAndRestartsClon
     drive_visual_pose_clones(estimator, 1);
     EXPECT_EQ(estimator.msckf_state_ids_for_test(), (std::vector<uint64_t>{1u}));
     EXPECT_EQ(estimator.augmented_covariance_for_test().rows(), kErrorDim + 6);
+}
+
+TEST(MsckfMarginalizationIntegration, RetirementConsumesEligibleConstraintBeforeCloneRemoval) {
+    Phase17ESKFEstimator estimator;
+    estimator.reset();
+    estimator.configure_msckf(make_feature_update_retirement_config(false));
+
+    const Eigen::Matrix3d K = camera_intrinsics();
+    const Eigen::Vector3d feature{0.0, 0.0, 4.0};
+
+    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
+                                                Eigen::Vector3d::Zero(), 0.0),
+              EstimatorOperationResult::Accepted);
+    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
+                                                Eigen::Vector3d::Zero(), 0.01),
+              EstimatorOperationResult::Accepted);
+    auto pose = estimator.state();
+    estimator.update_vision({project_feature(pose, feature, K)}, {feature}, K);
+    ASSERT_EQ(estimator.msckf_state_ids_for_test(), (std::vector<uint64_t>{1u}));
+
+    ErrorVec motion = ErrorVec::Zero();
+    motion(0) = 0.20;
+    ASSERT_EQ(estimator.inject_error_for_test(motion), EstimatorOperationResult::Accepted);
+    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
+                                                Eigen::Vector3d::Zero(), 0.02),
+              EstimatorOperationResult::Accepted);
+    pose = estimator.state();
+    estimator.update_vision({project_feature(pose, feature, K)}, {feature}, K);
+
+    ASSERT_EQ(estimator.msckf_state_ids_for_test(), (std::vector<uint64_t>{1u, 2u}));
+    ASSERT_TRUE(estimator.triangulated_landmark_for_feature_for_test(feature).has_value());
+    ASSERT_EQ(estimator.feature_track_observation_count_for_feature_for_test(feature),
+              std::optional<size_t>{2u});
+
+    estimator.configure_msckf(make_feature_update_retirement_config(true));
+    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
+                                                Eigen::Vector3d::Zero(), 0.03),
+              EstimatorOperationResult::Accepted);
+    pose = estimator.state();
+    estimator.update_visual_pose(pose.position, pose.velocity, 0.35, 0.45);
+
+    const auto diagnostics = estimator.diagnostics();
+    EXPECT_EQ(estimator.msckf_state_ids_for_test(), (std::vector<uint64_t>{2u, 3u}));
+    EXPECT_EQ(diagnostics.marginalization_attempts, 1u);
+    EXPECT_EQ(diagnostics.marginalizations_completed, 1u);
+    EXPECT_EQ(diagnostics.marginalization_failures, 0u);
+    EXPECT_GE(diagnostics.marginalization_constraint_candidates, 1u);
+    EXPECT_GE(diagnostics.marginalization_constraints_consumed, 1u);
+    EXPECT_EQ(diagnostics.marginalization_constraint_failures, 0u);
+    EXPECT_EQ(diagnostics.marginalization_stale_references, 0u);
+    EXPECT_EQ(estimator.augmented_covariance_for_test().rows(), 27);
+}
+
+TEST(MsckfMarginalizationIntegration, RetirementConstraintPassDoesNotDuplicateConsumedTrack) {
+    Phase17ESKFEstimator estimator;
+    estimator.reset();
+    estimator.configure_msckf(make_feature_update_retirement_config(true));
+
+    const Eigen::Matrix3d K = camera_intrinsics();
+    const Eigen::Vector3d feature{0.0, 0.0, 4.0};
+
+    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
+                                                Eigen::Vector3d::Zero(), 0.0),
+              EstimatorOperationResult::Accepted);
+    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
+                                                Eigen::Vector3d::Zero(), 0.01),
+              EstimatorOperationResult::Accepted);
+    auto pose = estimator.state();
+    estimator.update_vision({project_feature(pose, feature, K)}, {feature}, K);
+
+    ErrorVec motion = ErrorVec::Zero();
+    motion(0) = 0.20;
+    ASSERT_EQ(estimator.inject_error_for_test(motion), EstimatorOperationResult::Accepted);
+    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
+                                                Eigen::Vector3d::Zero(), 0.02),
+              EstimatorOperationResult::Accepted);
+    pose = estimator.state();
+    estimator.update_vision({project_feature(pose, feature, K)}, {feature}, K);
+    const uint64_t applied_after_second_observation = estimator.diagnostics().feature_updates_applied;
+
+    ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
+                                                Eigen::Vector3d::Zero(), 0.03),
+              EstimatorOperationResult::Accepted);
+    pose = estimator.state();
+    estimator.update_visual_pose(pose.position, pose.velocity, 0.35, 0.45);
+
+    const auto diagnostics = estimator.diagnostics();
+    EXPECT_EQ(estimator.msckf_state_ids_for_test(), (std::vector<uint64_t>{2u, 3u}));
+    EXPECT_EQ(diagnostics.feature_updates_applied, applied_after_second_observation);
+    EXPECT_EQ(diagnostics.marginalization_constraints_consumed, 0u);
+    EXPECT_EQ(diagnostics.marginalization_constraint_failures, 0u);
+    EXPECT_EQ(diagnostics.marginalization_stale_references, 0u);
 }
 
 } // namespace

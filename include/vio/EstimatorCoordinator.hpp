@@ -74,6 +74,8 @@ struct CoordinatorDiagnostics {
     ShadowLifecycleState lifecycle_state{ShadowLifecycleState::Disabled};
     uint64_t active_processed_count{0};
     uint64_t shadow_processed_count{0};
+    uint64_t shadow_only_submission_count{0};
+    uint64_t shadow_only_rejected_count{0};
     uint64_t valid_comparison_count{0};
     uint64_t invalid_comparison_count{0};
     uint64_t shadow_restart_count{0};
@@ -100,6 +102,35 @@ public:
                     const Eigen::Quaterniond& q0 = Eigen::Quaterniond::Identity(),
                     const Eigen::Vector3d& v0 = Eigen::Vector3d::Zero());
     [[nodiscard]] EstimatorOperationResult process_measurement(const MeasurementEnvelope& envelope);
+
+    // Submit a measurement exclusively to the shadow estimator. This preserves active-estimator
+    // authority for experimental measurement families (for example MSCKF feature tracks) that the
+    // active baseline must never consume. Queue/drop policy remains identical to normal shadow
+    // publication and is observable through CoordinatorDiagnostics::queue.
+    [[nodiscard]] EstimatorOperationResult
+    submit_shadow_measurement(const MeasurementEnvelope& envelope) {
+        if (!is_measurement_envelope_valid(envelope)) {
+            std::lock_guard lock(mutex_);
+            ++diagnostics_.shadow_only_rejected_count;
+            return EstimatorOperationResult::RejectedNonFiniteInput;
+        }
+
+        uint64_t generation = 0;
+        {
+            std::lock_guard lock(mutex_);
+            if (!diagnostics_.shadow_enabled || !shadow_ || !worker_running_ ||
+                worker_stop_requested_) {
+                ++diagnostics_.shadow_only_rejected_count;
+                return EstimatorOperationResult::RejectedInvalidConfiguration;
+            }
+            generation = reset_generation_;
+            ++diagnostics_.shadow_only_submission_count;
+        }
+
+        publish_shadow_measurement(envelope, generation);
+        return EstimatorOperationResult::Accepted;
+    }
+
     void reset();
     bool start();
     void stop();
