@@ -1,84 +1,95 @@
-name: Shadow-Only Visual Feature Ingest
+name: Visual Feature Track Ingest Validation
 
 on:
   push:
     branches:
-      - phase23-development
+      - visual-feature-track-ingest
     paths:
       - '.github/workflows/shadow-only-feature-ingest.yml'
-      - 'include/vio/EstimatorCoordinator.hpp'
+      - 'include/vio/VisualFeatureTrackManager.hpp'
+      - 'include/vio/VIOPipeline.hpp'
+      - 'src/vio/VIOPipeline.cpp'
+      - 'tests/test_visual_feature_track_manager.cpp'
+      - 'tests/test_visual_feature_track_ingest.cpp'
       - 'tests/test_shadow_only_measurement.cpp'
+      - 'tests/CMakeLists.txt'
+  pull_request:
+    branches:
+      - msckf-camera-state-marginalization
+    paths:
+      - 'include/vio/VisualFeatureTrackManager.hpp'
+      - 'include/vio/VIOPipeline.hpp'
+      - 'src/vio/VIOPipeline.cpp'
+      - 'tests/test_visual_feature_track_manager.cpp'
+      - 'tests/test_visual_feature_track_ingest.cpp'
+      - 'tests/test_shadow_only_measurement.cpp'
+      - 'tests/CMakeLists.txt'
+      - '.github/workflows/shadow-only-feature-ingest.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: shadow-only-feature-ingest-${{ github.ref }}
+  group: visual-feature-track-ingest-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  wire:
+  gcc:
+    name: GCC feature ingest
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: phase23-development
-          fetch-depth: 0
-
-      - name: Wire shadow-only feature ingest and test target
-        id: wire
-        shell: bash
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Tool versions
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import os
+          set -euxo pipefail
+          gcc --version
+          g++ --version
+          cmake --version
+          ninja --version
+      - name: Configure
+        run: cmake --preset linux-gcc-release-minimal
+      - name: Build focused targets
+        run: >-
+          cmake --build --preset linux-gcc-release-minimal --
+          -j2
+      - name: Run focused tests
+        run: >-
+          ctest --test-dir build/linux-gcc-release-minimal
+          --output-on-failure
+          -L 'visual-feature-tracking|shadow-only'
 
-          changed = False
-
-          cmake = Path('tests/CMakeLists.txt')
-          text = cmake.read_text(encoding='utf-8-sig')
-          marker = 'add_executable(test_shadow_only_measurement test_shadow_only_measurement.cpp)'
-          if marker not in text:
-              anchor = '''drone_register_gtest(test_msckf_marginalization_integration "unit;navigation;replay;marginalization")\n'''
-              addition = anchor + '''\nadd_executable(test_shadow_only_measurement test_shadow_only_measurement.cpp)\ntarget_link_libraries(test_shadow_only_measurement PRIVATE\n    drone_test_support\n    ${DRONE_PHASE17_TEST_CORE}\n    Eigen3::Eigen\n)\ndrone_register_gtest(test_shadow_only_measurement "unit;navigation;shadow-only;msckf")\n'''
-              if anchor not in text:
-                  raise SystemExit('test CMake insertion anchor not found')
-              text = text.replace(anchor, addition, 1)
-              cmake.write_text(text, encoding='utf-8')
-              changed = True
-
-          vio = Path('src/vio/VIOPipeline.cpp')
-          text = vio.read_text(encoding='utf-8-sig')
-          feature_marker = 'submit_shadow_measurement(make_visual_features_envelope'
-          if feature_marker not in text:
-              old = '''        if (!z_pixels.empty()) {\n            (void)coordinator_->process_measurement(make_visual_pose_envelope(\n                VisualPoseMeasurementPayload{predicted_pose.position, predicted_pose.velocity, 0.35,\n                                             0.45},\n                MeasurementStamp{frame.timestamp, measurement_sequence_++}));\n        }'''
-              new = '''        if (!z_pixels.empty()) {\n            // Preserve the production baseline authority: the simulation placeholder pose may\n            // update the active estimator, while feature tracks are published only to the shadow\n            // estimator. The queue preserves visual-pose-before-feature ordering for the shadow.\n            (void)coordinator_->process_measurement(make_visual_pose_envelope(\n                VisualPoseMeasurementPayload{predicted_pose.position, predicted_pose.velocity, 0.35,\n                                             0.45},\n                MeasurementStamp{frame.timestamp, measurement_sequence_++}));\n\n            VisualFeatureMeasurementPayload feature_payload;\n            feature_payload.z_pixels.assign(z_pixels.begin(), z_pixels.end());\n            feature_payload.p_world.assign(p_world.begin(), p_world.end());\n            feature_payload.K = K_;\n            (void)coordinator_->submit_shadow_measurement(make_visual_features_envelope(\n                feature_payload, MeasurementStamp{frame.timestamp, measurement_sequence_++}));\n        }'''
-              if old not in text:
-                  raise SystemExit('VIO placeholder insertion anchor not found')
-              text = text.replace(old, new, 1)
-              vio.write_text(text, encoding='utf-8')
-              changed = True
-
-          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
-              out.write(f"changed={str(changed).lower()}\n")
-          print(f'changed={str(changed).lower()}')
-          PY
-
-      - name: Verify authority markers
+  clang:
+    name: Clang feature ingest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Tool versions
         run: |
-          grep -q 'submit_shadow_measurement' include/vio/EstimatorCoordinator.hpp
-          grep -q 'shadow_only_submission_count' include/vio/EstimatorCoordinator.hpp
-          grep -q 'submit_shadow_measurement(make_visual_features_envelope' src/vio/VIOPipeline.cpp
-          grep -q 'test_shadow_only_measurement' tests/CMakeLists.txt
+          set -euxo pipefail
+          clang --version
+          clang++ --version
+          cmake --version
+          ninja --version
+      - name: Configure
+        run: cmake --preset linux-clang-release
+      - name: Build focused targets
+        run: >-
+          cmake --build --preset linux-clang-release --
+          -j2
+      - name: Run focused tests
+        run: >-
+          ctest --test-dir build/linux-clang-release
+          --output-on-failure
+          -L 'visual-feature-tracking|shadow-only'
 
-      - name: Commit wired implementation
-        if: steps.wire.outputs.changed == 'true'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/vio/VIOPipeline.cpp tests/CMakeLists.txt
-          git commit -m 'Wire shadow-only visual feature ingest'
-          git pull --rebase origin phase23-development
-          git push origin HEAD:phase23-development
+  acceptance:
+    name: Visual ingest acceptance
+    runs-on: ubuntu-24.04
+    needs: [gcc, clang]
+    steps:
+      - run: echo 'Visual feature track ingest compiler and authority tests passed.'
