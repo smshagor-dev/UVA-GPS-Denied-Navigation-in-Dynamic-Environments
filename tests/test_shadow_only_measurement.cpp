@@ -3,6 +3,7 @@
 #include "vio/EKFStateEstimatorAdapter.hpp"
 #include "vio/EstimatorCoordinator.hpp"
 #include "vio/EstimatorPromotionReadiness.hpp"
+#include "vio/EstimatorPromotionSoakMonitor.hpp"
 
 #include <atomic>
 #include <limits>
@@ -216,4 +217,63 @@ TEST(ShadowPromotionReadiness, DoesNotTreatNegativeCovarianceDeltaAsUnbounded) {
     const auto result = assess_promotion_readiness(diagnostics);
     EXPECT_FALSE(result.ready);
     EXPECT_EQ(result.reason, PromotionBlockReason::CovarianceTraceDeltaExceeded);
+}
+
+TEST(ShadowPromotionSoak, RequiresConsecutiveReadySamples) {
+    PromotionSoakMonitor monitor(PromotionSoakConfig{3, 0, true});
+    const auto ready = assess_promotion_readiness(promotion_ready_diagnostics());
+
+    EXPECT_FALSE(monitor.observe(ready).sustained_ready);
+    EXPECT_FALSE(monitor.observe(ready).sustained_ready);
+    const auto& state = monitor.observe(ready);
+    EXPECT_TRUE(state.sustained_ready);
+    EXPECT_EQ(state.consecutive_ready_samples, 3u);
+    EXPECT_EQ(state.ready_samples, 3u);
+}
+
+TEST(ShadowPromotionSoak, BlockedSampleResetsReadinessProgress) {
+    PromotionSoakMonitor monitor(PromotionSoakConfig{3, 0, true});
+    const auto ready = assess_promotion_readiness(promotion_ready_diagnostics());
+    auto blocked_diagnostics = promotion_ready_diagnostics();
+    blocked_diagnostics.queue.dropped_count = 1;
+    const auto blocked = assess_promotion_readiness(blocked_diagnostics);
+
+    monitor.observe(ready);
+    monitor.observe(ready);
+    const auto& blocked_state = monitor.observe(blocked);
+    EXPECT_FALSE(blocked_state.sustained_ready);
+    EXPECT_EQ(blocked_state.consecutive_ready_samples, 0u);
+    EXPECT_EQ(blocked_state.reset_count, 1u);
+    EXPECT_EQ(blocked_state.last_block_reason, PromotionBlockReason::QueueDropsObserved);
+
+    EXPECT_FALSE(monitor.observe(ready).sustained_ready);
+    EXPECT_FALSE(monitor.observe(ready).sustained_ready);
+    EXPECT_TRUE(monitor.observe(ready).sustained_ready);
+}
+
+TEST(ShadowPromotionSoak, DiagnosticsPathUsesExistingFailClosedReadinessRules) {
+    PromotionSoakMonitor monitor(PromotionSoakConfig{2, 0, true});
+    auto diagnostics = promotion_ready_diagnostics();
+
+    EXPECT_FALSE(monitor.observe(diagnostics).sustained_ready);
+    EXPECT_TRUE(monitor.observe(diagnostics).sustained_ready);
+
+    diagnostics.shadow_health = EstimatorHealth::Degraded;
+    const auto& state = monitor.observe(diagnostics);
+    EXPECT_FALSE(state.sustained_ready);
+    EXPECT_EQ(state.last_block_reason, PromotionBlockReason::ShadowUnhealthy);
+}
+
+TEST(ShadowPromotionSoak, ResetClearsAllAccumulatedEvidence) {
+    PromotionSoakMonitor monitor(PromotionSoakConfig{2, 0, true});
+    const auto ready = assess_promotion_readiness(promotion_ready_diagnostics());
+    monitor.observe(ready);
+    monitor.observe(ready);
+    ASSERT_TRUE(monitor.state().sustained_ready);
+
+    monitor.reset();
+    EXPECT_EQ(monitor.state().total_samples, 0u);
+    EXPECT_EQ(monitor.state().ready_samples, 0u);
+    EXPECT_EQ(monitor.state().consecutive_ready_samples, 0u);
+    EXPECT_FALSE(monitor.state().sustained_ready);
 }
