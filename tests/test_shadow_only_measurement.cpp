@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "vio/EKFStateEstimatorAdapter.hpp"
+#include "vio/EstimatorAuthorityController.hpp"
 #include "vio/EstimatorCoordinator.hpp"
 #include "vio/EstimatorPromotionReadiness.hpp"
 
@@ -216,4 +217,79 @@ TEST(ShadowPromotionReadiness, DoesNotTreatNegativeCovarianceDeltaAsUnbounded) {
     const auto result = assess_promotion_readiness(diagnostics);
     EXPECT_FALSE(result.ready);
     EXPECT_EQ(result.reason, PromotionBlockReason::CovarianceTraceDeltaExceeded);
+}
+
+TEST(EstimatorAuthorityController, PromotionRequiresReadyEvidenceAndMatchingGeneration) {
+    EstimatorAuthorityController controller;
+    controller.reset(7u);
+
+    auto diagnostics = promotion_ready_diagnostics();
+    diagnostics.reset_generation = 7u;
+    const auto result = controller.request_promotion(diagnostics);
+
+    EXPECT_EQ(result.status, AuthorityTransitionStatus::Promoted);
+    EXPECT_EQ(result.previous, EstimatorAuthority::Baseline);
+    EXPECT_EQ(result.current, EstimatorAuthority::AdvancedShadow);
+    EXPECT_EQ(controller.authority(), EstimatorAuthority::AdvancedShadow);
+    EXPECT_EQ(controller.promotion_count(), 1u);
+}
+
+TEST(EstimatorAuthorityController, NotReadyEvidenceCannotChangeAuthority) {
+    EstimatorAuthorityController controller;
+    controller.reset(3u);
+
+    auto diagnostics = promotion_ready_diagnostics();
+    diagnostics.reset_generation = 3u;
+    diagnostics.queue.dropped_count = 1u;
+    const auto result = controller.request_promotion(diagnostics);
+
+    EXPECT_EQ(result.status, AuthorityTransitionStatus::RejectedNotReady);
+    EXPECT_EQ(result.readiness_reason, PromotionBlockReason::QueueDropsObserved);
+    EXPECT_EQ(controller.authority(), EstimatorAuthority::Baseline);
+    EXPECT_EQ(controller.promotion_count(), 0u);
+}
+
+TEST(EstimatorAuthorityController, GenerationMismatchFailsClosed) {
+    EstimatorAuthorityController controller;
+    controller.reset(10u);
+
+    auto diagnostics = promotion_ready_diagnostics();
+    diagnostics.reset_generation = 11u;
+    const auto result = controller.request_promotion(diagnostics);
+
+    EXPECT_EQ(result.status, AuthorityTransitionStatus::RejectedGenerationMismatch);
+    EXPECT_EQ(controller.authority(), EstimatorAuthority::Baseline);
+}
+
+TEST(EstimatorAuthorityController, RollbackIsExplicitAndIdempotent) {
+    EstimatorAuthorityController controller;
+    controller.reset(5u);
+    auto diagnostics = promotion_ready_diagnostics();
+    diagnostics.reset_generation = 5u;
+    ASSERT_EQ(controller.request_promotion(diagnostics).status,
+              AuthorityTransitionStatus::Promoted);
+
+    const auto first = controller.rollback_to_baseline(5u);
+    const auto second = controller.rollback_to_baseline(5u);
+
+    EXPECT_EQ(first.status, AuthorityTransitionStatus::RolledBack);
+    EXPECT_EQ(second.status, AuthorityTransitionStatus::NoOp);
+    EXPECT_EQ(controller.authority(), EstimatorAuthority::Baseline);
+    EXPECT_EQ(controller.rollback_count(), 1u);
+}
+
+TEST(EstimatorAuthorityController, ResetAlwaysRestoresBaselineAuthority) {
+    EstimatorAuthorityController controller;
+    controller.reset(1u);
+    auto diagnostics = promotion_ready_diagnostics();
+    diagnostics.reset_generation = 1u;
+    ASSERT_EQ(controller.request_promotion(diagnostics).status,
+              AuthorityTransitionStatus::Promoted);
+
+    controller.reset(2u);
+
+    EXPECT_EQ(controller.authority(), EstimatorAuthority::Baseline);
+    EXPECT_EQ(controller.generation(), 2u);
+    EXPECT_EQ(controller.rollback_to_baseline(1u).status,
+              AuthorityTransitionStatus::RejectedGenerationMismatch);
 }
