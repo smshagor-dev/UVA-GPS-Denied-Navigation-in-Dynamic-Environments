@@ -238,8 +238,8 @@ TEST(ShadowPromotionSoak, BlockedSampleResetsReadinessProgress) {
     blocked_diagnostics.queue.dropped_count = 1;
     const auto blocked = assess_promotion_readiness(blocked_diagnostics);
 
-    monitor.observe(ready);
-    monitor.observe(ready);
+    EXPECT_FALSE(monitor.observe(ready).sustained_ready);
+    EXPECT_FALSE(monitor.observe(ready).sustained_ready);
     const auto& blocked_state = monitor.observe(blocked);
     EXPECT_FALSE(blocked_state.sustained_ready);
     EXPECT_EQ(blocked_state.consecutive_ready_samples, 0u);
@@ -267,8 +267,8 @@ TEST(ShadowPromotionSoak, DiagnosticsPathUsesExistingFailClosedReadinessRules) {
 TEST(ShadowPromotionSoak, ResetClearsAllAccumulatedEvidence) {
     PromotionSoakMonitor monitor(PromotionSoakConfig{2, 0, true});
     const auto ready = assess_promotion_readiness(promotion_ready_diagnostics());
-    monitor.observe(ready);
-    monitor.observe(ready);
+    EXPECT_FALSE(monitor.observe(ready).sustained_ready);
+    EXPECT_TRUE(monitor.observe(ready).sustained_ready);
     ASSERT_TRUE(monitor.state().sustained_ready);
 
     monitor.reset();
