@@ -2,6 +2,7 @@
 
 #include "vio/EKFStateEstimatorAdapter.hpp"
 #include "vio/EstimatorCoordinator.hpp"
+#include "vio/EstimatorPromotionReadiness.hpp"
 
 #include <atomic>
 #include <limits>
@@ -89,6 +90,22 @@ MeasurementEnvelope valid_feature_envelope() {
     return make_visual_features_envelope(payload, MeasurementStamp{0.01, 1u});
 }
 
+CoordinatorDiagnostics promotion_ready_diagnostics() {
+    CoordinatorDiagnostics diagnostics;
+    diagnostics.shadow_enabled = true;
+    diagnostics.worker_running = true;
+    diagnostics.lifecycle_state = ShadowLifecycleState::Running;
+    diagnostics.active_health = EstimatorHealth::Healthy;
+    diagnostics.shadow_health = EstimatorHealth::Healthy;
+    diagnostics.valid_comparison_count = 250;
+    diagnostics.last_comparison.valid = true;
+    diagnostics.last_comparison.position_delta_norm_m = 0.05;
+    diagnostics.last_comparison.velocity_delta_norm_mps = 0.06;
+    diagnostics.last_comparison.orientation_delta_deg = 0.5;
+    diagnostics.last_comparison.covariance_trace_delta = 0.1;
+    return diagnostics;
+}
+
 } // namespace
 
 TEST(ShadowOnlyMeasurement, FeatureSubmissionNeverTouchesActiveEstimator) {
@@ -156,4 +173,47 @@ TEST(ShadowOnlyMeasurement, DisabledShadowFailsClosedWithoutActiveMutation) {
     EXPECT_EQ(diagnostics.shadow_only_rejected_count, 1u);
     EXPECT_EQ(diagnostics.active_processed_count, 0u);
     EXPECT_NEAR((active_after.position_m - active_before.position_m).norm(), 0.0, 1.0e-15);
+}
+
+TEST(ShadowPromotionReadiness, HealthyBoundedComparisonWindowCanBecomeReady) {
+    const auto result = assess_promotion_readiness(promotion_ready_diagnostics());
+    EXPECT_TRUE(result.ready);
+    EXPECT_EQ(result.reason, PromotionBlockReason::None);
+    EXPECT_EQ(to_string(result.reason), "ready");
+}
+
+TEST(ShadowPromotionReadiness, FailsClosedWhenEvidenceIsInsufficient) {
+    auto diagnostics = promotion_ready_diagnostics();
+    diagnostics.valid_comparison_count = 99;
+
+    const auto result = assess_promotion_readiness(diagnostics);
+    EXPECT_FALSE(result.ready);
+    EXPECT_EQ(result.reason, PromotionBlockReason::InsufficientComparisons);
+}
+
+TEST(ShadowPromotionReadiness, FailsClosedOnQueueDrop) {
+    auto diagnostics = promotion_ready_diagnostics();
+    diagnostics.queue.dropped_count = 1;
+
+    const auto result = assess_promotion_readiness(diagnostics);
+    EXPECT_FALSE(result.ready);
+    EXPECT_EQ(result.reason, PromotionBlockReason::QueueDropsObserved);
+}
+
+TEST(ShadowPromotionReadiness, FailsClosedWhenComparisonExceedsConfiguredBound) {
+    auto diagnostics = promotion_ready_diagnostics();
+    diagnostics.last_comparison.position_delta_norm_m = 0.30;
+
+    const auto result = assess_promotion_readiness(diagnostics);
+    EXPECT_FALSE(result.ready);
+    EXPECT_EQ(result.reason, PromotionBlockReason::PositionDeltaExceeded);
+}
+
+TEST(ShadowPromotionReadiness, DoesNotTreatNegativeCovarianceDeltaAsUnbounded) {
+    auto diagnostics = promotion_ready_diagnostics();
+    diagnostics.last_comparison.covariance_trace_delta = -1.5;
+
+    const auto result = assess_promotion_readiness(diagnostics);
+    EXPECT_FALSE(result.ready);
+    EXPECT_EQ(result.reason, PromotionBlockReason::CovarianceTraceDeltaExceeded);
 }
