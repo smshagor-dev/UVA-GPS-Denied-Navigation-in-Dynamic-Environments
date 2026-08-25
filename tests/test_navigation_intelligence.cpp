@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <limits>
 
 #include <opencv2/imgproc.hpp>
 
@@ -131,6 +132,56 @@ TEST(LocalizationFusion, PrefersTdoaWhenVioDriftIsHigh) {
     EXPECT_GT(output.tdoa_weight, 0.35);
     EXPECT_EQ(output.source, "vio-tdoa-fused");
     EXPECT_GT(output.confidence, 0.5);
+}
+
+TEST(LocalizationFusion, InvalidTdoaPositionCannotRaiseConfidence) {
+    localization::LocalizationFusion fusion;
+    localization::LocalizationFusionInput input;
+    input.vio_pose.position = Eigen::Vector3d(1.0, 2.0, 3.0);
+    input.vio_pose.drift_m = 2.0;
+    input.vio_pose.localization_confidence = 0.20;
+    input.camera_available = false;
+    input.anchor_visibility_ratio = 1.0;
+    input.time_sync.confidence = 1.0;
+    input.time_sync.synchronized = true;
+
+    localization::TDOALocalizer::Solution tdoa_solution;
+    tdoa_solution.position = Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0);
+    tdoa_solution.confidence = 1.0;
+    input.tdoa_solution = tdoa_solution;
+
+    const auto output = fusion.update(input);
+    EXPECT_DOUBLE_EQ(output.tdoa_weight, 0.0);
+    EXPECT_TRUE(output.fused_position.isApprox(input.vio_pose.position));
+    EXPECT_TRUE(output.lost);
+    EXPECT_LT(output.confidence, 0.22);
+    EXPECT_NE(output.source, "tdoa-recovery");
+    EXPECT_NE(output.source, "vio-tdoa-fused");
+}
+
+TEST(LocalizationFusion, InvalidTdoaConfidenceCannotRaiseConfidence) {
+    localization::LocalizationFusion fusion;
+    localization::LocalizationFusionInput input;
+    input.vio_pose.position = Eigen::Vector3d(1.0, 2.0, 3.0);
+    input.vio_pose.drift_m = 2.0;
+    input.vio_pose.localization_confidence = 0.20;
+    input.camera_available = false;
+    input.anchor_visibility_ratio = 1.0;
+    input.time_sync.confidence = 1.0;
+    input.time_sync.synchronized = true;
+
+    localization::TDOALocalizer::Solution tdoa_solution;
+    tdoa_solution.position = Eigen::Vector3d(2.0, 0.0, 3.0);
+    tdoa_solution.confidence = std::numeric_limits<double>::infinity();
+    input.tdoa_solution = tdoa_solution;
+
+    const auto output = fusion.update(input);
+    EXPECT_DOUBLE_EQ(output.tdoa_weight, 0.0);
+    EXPECT_TRUE(output.fused_position.isApprox(input.vio_pose.position));
+    EXPECT_TRUE(output.lost);
+    EXPECT_LT(output.confidence, 0.22);
+    EXPECT_NE(output.source, "tdoa-recovery");
+    EXPECT_NE(output.source, "vio-tdoa-fused");
 }
 
 TEST(LocalizationFusion, MarksLocalizationLostWhenCameraAndSyncCollapse) {
