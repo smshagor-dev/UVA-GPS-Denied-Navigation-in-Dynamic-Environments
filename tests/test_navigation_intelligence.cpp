@@ -146,7 +146,8 @@ TEST(LocalizationFusion, InvalidTdoaPositionCannotRaiseConfidence) {
     input.time_sync.synchronized = true;
 
     localization::TDOALocalizer::Solution tdoa_solution;
-    tdoa_solution.position = Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0);
+    tdoa_solution.position =
+        Eigen::Vector3d(std::numeric_limits<double>::quiet_NaN(), 0.0, 0.0);
     tdoa_solution.confidence = 1.0;
     input.tdoa_solution = tdoa_solution;
 

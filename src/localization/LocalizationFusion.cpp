@@ -52,7 +52,8 @@ LocalizationFusionOutput LocalizationFusion::update(const LocalizationFusionInpu
         confidence *= std::clamp(input.time_sync.confidence, 0.35, 1.0);
     }
     confidence *= std::clamp(0.65 + input.anchor_visibility_ratio * 0.35, 0.65, 1.0);
-    if (tdoa_valid && input.time_sync.confidence >= 0.8 && input.anchor_visibility_ratio >= 0.5) {
+    if (tdoa_valid && input.time_sync.confidence >= 0.8 &&
+        input.anchor_visibility_ratio >= 0.5) {
         const double tdoa_floor = (tdoa_conf * 0.55) +
                                   (std::clamp(input.anchor_visibility_ratio, 0.0, 1.0) * 0.25) +
                                   (std::clamp(input.time_sync.confidence, 0.0, 1.0) * 0.20);
