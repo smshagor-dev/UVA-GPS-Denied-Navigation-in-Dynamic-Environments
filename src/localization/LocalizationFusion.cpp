@@ -22,13 +22,16 @@ LocalizationFusionOutput LocalizationFusion::update(const LocalizationFusionInpu
 
     double confidence = std::clamp(input.vio_pose.localization_confidence, 0.0, 1.0);
     double tdoa_weight = 0.0;
+    double tdoa_conf = 0.0;
+    bool tdoa_valid = false;
 
     if (input.tdoa_solution.has_value()) {
         if (!input.tdoa_solution->position.array().isFinite().all() ||
             !std::isfinite(input.tdoa_solution->confidence)) {
             out.source = "invalid-tdoa-input";
         } else {
-            const double tdoa_conf = std::clamp(input.tdoa_solution->confidence, 0.0, 1.0);
+            tdoa_valid = true;
+            tdoa_conf = std::clamp(input.tdoa_solution->confidence, 0.0, 1.0);
             const double drift_bias = std::clamp(input.vio_pose.drift_m / 2.0, 0.0, 1.0);
             tdoa_weight = std::clamp((tdoa_conf * 0.55) + (drift_bias * 0.45), 0.0, 0.85);
             out.fused_position = (input.vio_pose.position * (1.0 - tdoa_weight)) +
@@ -49,9 +52,8 @@ LocalizationFusionOutput LocalizationFusion::update(const LocalizationFusionInpu
         confidence *= std::clamp(input.time_sync.confidence, 0.35, 1.0);
     }
     confidence *= std::clamp(0.65 + input.anchor_visibility_ratio * 0.35, 0.65, 1.0);
-    if (input.tdoa_solution.has_value() && input.time_sync.confidence >= 0.8 &&
-        input.anchor_visibility_ratio >= 0.5) {
-        const double tdoa_floor = (input.tdoa_solution->confidence * 0.55) +
+    if (tdoa_valid && input.time_sync.confidence >= 0.8 && input.anchor_visibility_ratio >= 0.5) {
+        const double tdoa_floor = (tdoa_conf * 0.55) +
                                   (std::clamp(input.anchor_visibility_ratio, 0.0, 1.0) * 0.25) +
                                   (std::clamp(input.time_sync.confidence, 0.0, 1.0) * 0.20);
         confidence = std::max(confidence, tdoa_floor);
@@ -71,9 +73,9 @@ LocalizationFusionOutput LocalizationFusion::update(const LocalizationFusionInpu
         out.degraded = true;
     }
 
-    if (out.lost && input.tdoa_solution.has_value()) {
+    if (out.lost && tdoa_valid) {
         out.source = "tdoa-recovery";
-    } else if (tdoa_weight > 0.35 && input.tdoa_solution.has_value()) {
+    } else if (tdoa_weight > 0.35 && tdoa_valid) {
         out.source = "vio-tdoa-fused";
     } else if (!input.camera_available) {
         out.source = "imu-dead-reckoning";
