@@ -17,6 +17,7 @@ The platform combines a C++20 onboard runtime, a Go supervisory control plane, a
 - [Why this project exists](#why-this-project-exists)
 - [Architecture](#architecture)
 - [Platform overview](#platform-overview)
+- [Implementation details for reviewers](#implementation-details-for-reviewers)
 - [Onboard autonomy](#onboard-autonomy)
 - [Localization and state estimation](#localization-and-state-estimation)
 - [UWB and TDOA localization](#uwb-and-tdoa-localization)
@@ -150,6 +151,186 @@ The peer mesh is not intended to become a second flight controller. It provides 
 | Security | command policy, TLS/mTLS paths, trust state, stale/replay handling, firmware-state support | partial operational security model |
 | Post-quantum work | migration design and experiment direction around ML-KEM and ML-DSA families | research direction, not operational peer transport |
 | Deployment | CMake presets, containers, Kubernetes material, monitoring and release packaging | software/deployment tooling |
+
+## Implementation details for reviewers
+
+This section records concrete implementation choices visible in the source tree. The values below are code defaults, not universal flight constants, and they should be changed only after measurement on the target sensor, radio, compute, and airframe combination.
+
+### Estimator execution model
+
+`EstimatorCoordinator` keeps the baseline estimator and the experimental estimator isolated instead of running them as interchangeable objects on the flight path.
+
+- The active estimator is processed synchronously and remains authoritative.
+- The secondary estimator runs behind a worker thread and a bounded `std::deque`.
+- The default secondary queue capacity is `128` measurements.
+- Queue saturation is explicit: the policy can drop the oldest or newest measurement rather than allowing unbounded memory growth.
+- Secondary measurements older than `250 ms` are considered stale by default.
+- Active-versus-secondary comparisons are only accepted inside a default `250 ms` age window.
+- A reset generation is attached to queued measurements so data queued before a reset cannot silently contaminate the next estimator generation.
+- Shadow-only submission exists for measurement families such as MSCKF feature tracks so experimental updates can be evaluated without being consumed by the active baseline estimator.
+- Diagnostics expose queue depth, peak depth, dropped/stale counts, processing failures, worker lifecycle, restart/failure counters, and active-versus-secondary deltas for position, velocity, orientation, accelerometer bias, gyroscope bias, and covariance trace.
+
+Relevant code:
+
+```text
+include/vio/EstimatorCoordinator.hpp
+include/vio/StateEstimator.hpp
+include/vio/EKFStateEstimatorAdapter.hpp
+src/vio/EstimatorCoordinator.cpp
+```
+
+### Typed measurement boundary
+
+Estimator input is represented by `MeasurementEnvelope` rather than passing unrelated sensor structures directly through the estimator API. The current variant supports:
+
+```text
+IMU
+VisualPose
+VisualFeatures
+ManualZUPT
+LidarDepth
+DisabledLidarObservation
+```
+
+Each envelope carries a source ID, timestamp, sequence ID, coordinate frame, typed payload, optional covariance hint, sensor reference, and metadata. Finite-value validation is performed before the envelope is accepted. This makes replay, sensor substitution, secondary-estimator testing, and future middleware bridges easier to reason about because sensor identity and timing travel with the measurement.
+
+Relevant code:
+
+```text
+include/vio/MeasurementEnvelope.hpp
+src/vio/MeasurementEnvelope.cpp
+```
+
+### Peer wire contract and bounded swarm state
+
+The peer transport has an explicit packet contract rather than forwarding arbitrary JSON objects between vehicles. Every `EdgePeerPacket` carries:
+
+```text
+packet_type
+sender_id
+timestamp_ms
+sequence_number
+trust_epoch
+source
+ttl_ms
+auth_hook
+payload
+```
+
+Current packet families are heartbeat, pose, edge health, obstacle digest, threat digest, consensus state, emergency corridor, and peer goodbye.
+
+The validation path rejects zero sender IDs, zero TTL, expired packets, non-monotonic sequence numbers, payload/type mismatches, non-finite pose vectors, invalid emergency-corridor geometry, and packets above the configured size limit. The default size guard is `1400 bytes`, which keeps the application payload below a typical Ethernet MTU instead of relying on fragmentation as the normal path.
+
+The CBOR path uses a versioned fixed top-level array and rejects unsupported versions, trailing bytes, indefinite lengths, strings larger than `512 bytes`, and arrays larger than `64` elements. Serialization metrics record encoded size, JSON-equivalent size, encode/decode latency, and compression ratio.
+
+Peer state is bounded separately from the wire parser. `SwarmStateCache` defaults to:
+
+| Parameter | Default |
+|---|---:|
+| Maximum cached peers | `32` |
+| Mark peer stale after | `900 ms` |
+| Remove cached entry after | `2500 ms` |
+
+The cache tracks per-peer sequence number, trust epoch, pose, velocity, localization confidence, obstacle counts, link/health state, stale state, disconnected operation, and split-swarm isolation. Access is mutex-protected and stale/expired state is removed instead of being retained indefinitely.
+
+Relevant code:
+
+```text
+include/swarm/EdgePeerProtocol.hpp
+src/swarm/EdgePeerProtocol.cpp
+include/swarm/SwarmStateCache.hpp
+src/swarm/SwarmStateCache.cpp
+```
+
+### Time synchronization and TDOA solver
+
+`TimeSyncTracker` keeps separate rolling observations for IMU-camera timing, anchor clocks, and peer clocks. The default window holds `128` samples. The default synchronized threshold is `8 ms`, with a degraded threshold of `20 ms`; the tracker reports offsets, jitter, confidence, synchronization state, and the dominant timing issue.
+
+The TDOA solver requires at least four anchors and four measurements. It selects the earliest arrival as the reference measurement and solves the range-difference system iteratively. The current implementation forms a Jacobian and residual vector, applies damped normal equations, and solves the 3x3 update with Eigen LDLT.
+
+Default numerical settings are:
+
+| Parameter | Default |
+|---|---:|
+| Signal propagation speed | `299702547.0 m/s` |
+| Maximum iterations | `10` |
+| Convergence step norm | `1e-4 m` |
+| Damping | `1e-3` |
+
+If no initial position is supplied, the solver starts from the anchor centroid. The result carries the estimated position, convergence flag, RMS range-difference residual, and a bounded confidence value derived from that residual.
+
+Relevant code:
+
+```text
+include/localization/TimeSyncTracker.hpp
+include/localization/TDOALocalizer.hpp
+src/localization/TimeSyncTracker.cpp
+src/localization/TDOALocalizer.cpp
+```
+
+### Safety and security are command gates
+
+The local safety layer does more than report a status. `SafetyManager::evaluate()` produces an explicit command envelope containing arming permission, autonomous-flight permission, mission-command permission, remote-command permission, speed limit, and acceleration limit. `SafetyManager::enforce()` then constrains the generated autonomy command before it reaches the actuation-facing path.
+
+Selected software defaults include:
+
+| Parameter | Default |
+|---|---:|
+| Indoor maximum speed | `0.75 m/s` |
+| Indoor maximum acceleration | `0.60 m/s^2` |
+| Low-VIO confidence threshold | `0.55` |
+| Low-VIO maximum speed | `0.35 m/s` |
+| Low-VIO maximum acceleration | `0.40 m/s^2` |
+| Localization-lost descent | `0.18 m/s` |
+| Emergency descent | `0.85 m/s` |
+
+The security runtime monitor is also stateful. It distinguishes trusted, degraded-link, authentication-suspect, peer-spoof-suspect, replay-suspect, untrusted-control-plane, isolated-autonomy, safe-return, and immediate-land states. A security-state transition increments a `trust_epoch`. Replay, spoofing, authorization, backend identity, timing, geofence, localization, battery, and link signals can block remote commands while leaving local telemetry or local autonomy available according to the state.
+
+Relevant code:
+
+```text
+include/safety/SafetyManager.hpp
+src/safety/SafetyManager.cpp
+include/security/DroneSecurity.hpp
+src/security/
+```
+
+### Supervisory control-plane API
+
+The Go service uses an explicit HTTP API surface rather than coupling the dashboard to internal state objects. The current server registers:
+
+```text
+POST/GET  /api/v1/telemetry
+          /api/v1/fleet
+          /api/v1/commands
+          /api/v1/missions
+          /api/v1/health
+          /api/v1/ready
+          /api/v1/events
+          /api/v1/approvals
+          /api/v1/discovery
+          /metrics
+```
+
+The exact allowed methods are enforced by the individual handlers. At server level the default HTTP limits include a `3 s` header timeout, `5 s` read timeout, `5 s` write timeout, and `30 s` idle timeout. Fleet telemetry becomes stale after `5 s` by default. Simulation data is automatically enabled only in `simulation` mode; `production` and `edge_swarm` normalize to live-source operation without the digital-twin loop.
+
+TLS can be enabled at the Go server boundary, including a client-certificate requirement for stricter deployments. Command authorization and command-freshness validation are implemented separately from telemetry ingestion.
+
+Relevant code:
+
+```text
+internal/controlplane/server.go
+internal/controlplane/state.go
+internal/controlplane/security.go
+internal/controlplane/tls.go
+internal/controlplane/types.go
+```
+
+### Flight-controller and simulator integration boundary
+
+The current repository does **not** contain a MAVLink, PX4, or ArduPilot bridge. Swarm coordination uses the project peer protocol and supervisory communication uses the Go control plane. This is intentional to keep estimation, local safety, swarm state, and backend supervision independent from a specific autopilot transport.
+
+For a PX4/ArduPilot or PteroSim integration, the natural adapter boundary is between the onboard autonomy output and the flight-controller command interface, plus a sensor/state adapter that maps simulator or autopilot messages into the existing typed measurement structures. A MAVLink bridge should therefore be addable without replacing the estimator, peer cache, safety manager, or control-plane API. Until such a bridge exists and is tested, MAVLink support should not be inferred from the current architecture.
 
 ## Onboard autonomy
 
@@ -1069,7 +1250,8 @@ Current limitations are important and should stay visible:
 - simulation and replay do not establish real-world autonomy performance;
 - optional GPU inference depends on target hardware and runtime support;
 - UWB/TDOA performance depends on anchor geometry, synchronization, calibration, multipath, and radio conditions;
-- estimator development features need physical sensor/flight characterization before being treated as operational navigation authority.
+- estimator development features need physical sensor/flight characterization before being treated as operational navigation authority;
+- MAVLink/PX4/ArduPilot transport is not currently implemented and requires an explicit adapter/bridge.
 
 ## Roadmap
 
@@ -1090,6 +1272,7 @@ Planned engineering and research work includes:
 - calibrated UWB/TDOA deployments;
 - formalized safety invariants;
 - estimator cross-comparison against independent ground truth;
+- MAVLink flight-controller bridge for PX4/ArduPilot/SITL integrations;
 - long-duration sensor, thermal and timing characterization.
 
 ## Documentation
