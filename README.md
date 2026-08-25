@@ -329,11 +329,11 @@ r=\sqrt{x^2+y^2+z^2}
 $$
 
 $$
-\psi=\operatorname{atan2}(y,x)\frac{180}{\pi}
+\psi=\mathrm{atan2}(y,x)\frac{180}{\pi}
 $$
 
 $$
-\theta=\operatorname{atan2}\left(z,\sqrt{x^2+y^2}\right)\frac{180}{\pi}
+\theta=\mathrm{atan2}\left(z,\sqrt{x^2+y^2}\right)\frac{180}{\pi}
 $$
 
 Code: `src/sensors/LidarSensor.cpp`.
@@ -363,19 +363,19 @@ Code: `src/sensors/CameraSensor.cpp`.
 ## 6. Motor-health heuristic
 
 $$
-p_T=\operatorname{clamp}\left(\frac{T-55}{35},0,0.5\right)
+p_T=\mathrm{clamp}\left(\frac{T-55}{35},0,0.5\right)
 $$
 
 $$
-p_V=\operatorname{clamp}(1.5(V-0.25),0,0.4)
+p_V=\mathrm{clamp}(1.5(V-0.25),0,0.4)
 $$
 
 $$
-p_I=\operatorname{clamp}(0.15(I-6),0,0.2)
+p_I=\mathrm{clamp}(0.15(I-6),0,0.2)
 $$
 
 $$
-h_i=\operatorname{clamp}(1-p_T-p_V-p_I,0,1)
+h_i=\mathrm{clamp}(1-p_T-p_V-p_I,0,1)
 $$
 
 $$
@@ -399,7 +399,7 @@ Code: `src/sensors/BarometerSensor.cpp`, `src/sensors/OpticalFlowSensor.cpp`, `s
 ## 8. IMU noise model
 
 $$
-\mathbf Q_{imu}=\operatorname{diag}(\sigma_{na}^2\mathbf I_3,\sigma_{ng}^2\mathbf I_3,\sigma_{nba}^2\mathbf I_3,\sigma_{nbg}^2\mathbf I_3)
+\mathbf Q_{imu}=\mathrm{diag}(\sigma_{na}^2\mathbf I_3,\sigma_{ng}^2\mathbf I_3,\sigma_{nba}^2\mathbf I_3,\sigma_{nbg}^2\mathbf I_3)
 $$
 
 Current defaults: $\sigma_{na}=0.02$, $\sigma_{ng}=0.005$, $\sigma_{nba}=10^{-4}$, $\sigma_{nbg}=10^{-5}$.
@@ -407,7 +407,7 @@ Current defaults: $\sigma_{na}=0.02$, $\sigma_{ng}=0.005$, $\sigma_{nba}=10^{-4}
 ## 9. Initial covariance
 
 $$
-\mathbf P_0=\operatorname{diag}(\sigma_p^2\mathbf I_3,\sigma_v^2\mathbf I_3,\sigma_\theta^2\mathbf I_3,\sigma_{ba}^2\mathbf I_3,\sigma_{bg}^2\mathbf I_3)
+\mathbf P_0=\mathrm{diag}(\sigma_p^2\mathbf I_3,\sigma_v^2\mathbf I_3,\sigma_\theta^2\mathbf I_3,\sigma_{ba}^2\mathbf I_3,\sigma_{bg}^2\mathbf I_3)
 $$
 
 Defaults: 0.1 m position, 0.05 m/s velocity, 0.05 rad attitude-error representation, 0.01 accelerometer bias, 0.001 gyroscope bias.
@@ -425,7 +425,7 @@ $$
 ## 11. Midpoint attitude and world acceleration
 
 $$
-\mathbf q_{1/2}=\mathbf q_k\otimes\operatorname{Exp}\left(\frac12\boldsymbol\omega\Delta t\right)
+\mathbf q_{1/2}=\mathbf q_k\otimes\mathrm{Exp}\left(\frac12\boldsymbol\omega\Delta t\right)
 $$
 
 $$
@@ -443,7 +443,7 @@ $$
 $$
 
 $$
-\mathbf q_{k+1}=\operatorname{normalize}(\mathbf q_k\otimes\operatorname{Exp}(\boldsymbol\omega\Delta t))
+\mathbf q_{k+1}=\mathrm{normalize}(\mathbf q_k\otimes\mathrm{Exp}(\boldsymbol\omega\Delta t))
 $$
 
 Code for Sections 8–12: `include/vio/EKFEstimator.hpp`, `src/vio/EKFEstimator.cpp`.
@@ -539,7 +539,7 @@ $$
 $$
 
 $$
-\mathbf R_m=\operatorname{diag}(\sigma_p^2\mathbf I_3,\sigma_v^2\mathbf I_3)
+\mathbf R_m=\mathrm{diag}(\sigma_p^2\mathbf I_3,\sigma_v^2\mathbf I_3)
 $$
 
 ## 20. LiDAR depth correction
@@ -575,7 +575,7 @@ d_u=\|\boldsymbol\sigma_p\|_2
 $$
 
 $$
-c=\operatorname{clamp}\left(1-\frac{d_u}{2.5},0,1\right)
+c=\mathrm{clamp}\left(1-\frac{d_u}{2.5},0,1\right)
 $$
 
 Age adjustments: visual age >0.8 s gives $c\leftarrow0.78c$; >1.6 s applies $0.62$ again; depth age <0.6 s gives $c\leftarrow\min(1,c+0.08)$.
@@ -635,7 +635,7 @@ $$
 ## 26. Quaternion error injection and reset Jacobian
 
 $$
-\mathbf q^+=\operatorname{normalize}(\mathbf q\otimes\operatorname{Exp}(\delta\boldsymbol\theta))
+\mathbf q^+=\mathrm{normalize}(\mathbf q\otimes\mathrm{Exp}(\delta\boldsymbol\theta))
 $$
 
 $$
@@ -697,7 +697,7 @@ $$
 ## 31. Multi-view feature triangulation
 
 $$
-\mathbf d_i=\operatorname{normalize}(\mathbf R_i\mathbf b_i)
+\mathbf d_i=\mathrm{normalize}(\mathbf R_i\mathbf b_i)
 $$
 
 $$
@@ -805,7 +805,7 @@ $$
 $$
 
 $$
-e_{sym}=\max_{ij}|P_{ij}-P_{ji}|,\qquad \lambda_{min}=\min\operatorname{eig}(\mathbf P_{ret})
+e_{sym}=\max_{ij}|P_{ij}-P_{ji}|,\qquad \lambda_{min}=\min\mathrm{eig}(\mathbf P_{ret})
 $$
 
 Code for Sections 23–37: `src/vio/Phase17ESKFEstimator.cpp`, `include/vio/MsckfMarginalization.hpp`, `include/vio/MsckfRetirementTransaction.hpp`.
@@ -823,15 +823,15 @@ $$
 ## 39. Visual update confidence
 
 $$
-s_f=\operatorname{clamp}\left(\frac{N_{tracked}}{140},0,1\right)
+s_f=\mathrm{clamp}\left(\frac{N_{tracked}}{140},0,1\right)
 $$
 
 $$
-s_i=\operatorname{clamp}(r_{inlier},0,1)
+s_i=\mathrm{clamp}(r_{inlier},0,1)
 $$
 
 $$
-s_r=\operatorname{clamp}\left(1-\frac{e_{reproj}}8,0,1\right)
+s_r=\mathrm{clamp}\left(1-\frac{e_{reproj}}8,0,1\right)
 $$
 
 $$
@@ -877,15 +877,15 @@ $$
 $$
 
 $$
-\mathbf r_1=\operatorname{normalize}(\mathbf R_1\mathbf K^{-1}[u_1,v_1,1]^T)
+\mathbf r_1=\mathrm{normalize}(\mathbf R_1\mathbf K^{-1}[u_1,v_1,1]^T)
 $$
 
 $$
-\mathbf r_2=\operatorname{normalize}(\mathbf R_2\mathbf K^{-1}[u_2,v_2,1]^T)
+\mathbf r_2=\mathrm{normalize}(\mathbf R_2\mathbf K^{-1}[u_2,v_2,1]^T)
 $$
 
 $$
-\theta=\cos^{-1}(\operatorname{clamp}(\mathbf r_1^T\mathbf r_2,-1,1))\frac{180}{\pi}
+\theta=\cos^{-1}(\mathrm{clamp}(\mathbf r_1^T\mathbf r_2,-1,1))\frac{180}{\pi}
 $$
 
 Minimum parallax default: 1°.
@@ -941,7 +941,7 @@ o_{worst}=\max(|\mu_{ic}|,|\mu_a|,|\mu_p|)
 $$
 
 $$
-c_{sync}=\operatorname{clamp}\left(1-\frac{o_{worst}}{\max(T_{degraded},1)},0,1\right)
+c_{sync}=\mathrm{clamp}\left(1-\frac{o_{worst}}{\max(T_{degraded},1)},0,1\right)
 $$
 
 Current $T_{degraded}=20$ ms; synchronized threshold is 8 ms.
@@ -997,7 +997,7 @@ e_{rms}=\sqrt{\frac{\mathbf r^T\mathbf r}{\max(n,1)}}
 $$
 
 $$
-c_t=\operatorname{clamp}\left(1-\frac{e_{rms}}6,0,1\right)
+c_t=\mathrm{clamp}\left(1-\frac{e_{rms}}6,0,1\right)
 $$
 
 Code: `include/localization/TDOALocalizer.hpp`, `src/localization/TDOALocalizer.cpp`.
@@ -1015,11 +1015,11 @@ Code: `src/localization/TDOAIngestor.cpp`.
 ## 51. VIO/TDOA fusion weight
 
 $$
-b_d=\operatorname{clamp}\left(\frac{d_{vio}}2,0,1\right)
+b_d=\mathrm{clamp}\left(\frac{d_{vio}}2,0,1\right)
 $$
 
 $$
-w_t=\operatorname{clamp}(0.55c_t+0.45b_d,0,0.85)
+w_t=\mathrm{clamp}(0.55c_t+0.45b_d,0,0.85)
 $$
 
 $$
@@ -1043,17 +1043,17 @@ $$
 $$
 
 $$
-\text{unsynchronized}:\;c\leftarrow c\operatorname{clamp}(c_{sync},0.35,1)
+\text{unsynchronized}:\;c\leftarrow c\mathrm{clamp}(c_{sync},0.35,1)
 $$
 
 $$
-\text{anchor visibility}:\;c\leftarrow c\operatorname{clamp}(0.65+0.35r_a,0.65,1)
+\text{anchor visibility}:\;c\leftarrow c\mathrm{clamp}(0.65+0.35r_a,0.65,1)
 $$
 
 TDOA-supported floor when timing/visibility are strong:
 
 $$
-c_{floor}=0.55c_t+0.25\operatorname{clamp}(r_a,0,1)+0.20\operatorname{clamp}(c_{sync},0,1)
+c_{floor}=0.55c_t+0.25\mathrm{clamp}(r_a,0,1)+0.20\mathrm{clamp}(c_{sync},0,1)
 $$
 
 $$
@@ -1097,7 +1097,7 @@ $$
 ## 56. Occupancy-aware altitude and path cost
 
 $$
-p_{occ}=\operatorname{clamp}(r_{occ},0,1)
+p_{occ}=\mathrm{clamp}(r_{occ},0,1)
 $$
 
 $$
@@ -1159,7 +1159,7 @@ $$
 ## 61. Relocalization confidence and pose blending
 
 $$
-c_{reloc}=\operatorname{clamp}\left(\frac s{80},0,1\right)
+c_{reloc}=\mathrm{clamp}\left(\frac s{80},0,1\right)
 $$
 
 $$
@@ -1167,7 +1167,7 @@ $$
 $$
 
 $$
-\mathbf q_c=\operatorname{slerp}(\mathbf q_{matched},\mathbf q_{guess},0.3)
+\mathbf q_c=\mathrm{slerp}(\mathbf q_{matched},\mathbf q_{guess},0.3)
 $$
 
 Code for Sections 57–61: `include/slam/KeyframeManager.hpp`, `src/slam/KeyframeManager.cpp`.
@@ -1183,11 +1183,11 @@ $$
 $$
 
 $$
-A=\operatorname{clamp}(wh,0,1)
+A=\mathrm{clamp}(wh,0,1)
 $$
 
 $$
-s_c=\operatorname{clamp}(1-1.4\|\mathbf o\|,0,1)
+s_c=\mathrm{clamp}(1-1.4\|\mathbf o\|,0,1)
 $$
 
 $$
@@ -1205,11 +1205,11 @@ Current class multipliers: 1.25 hazard, 1.15 unknown, 1.0 target, 0.65 other.
 ## 64. Caution and localization speed scales
 
 $$
-s_{caution}=\operatorname{clamp}(1-0.18r_{risk},0.55,0.90)
+s_{caution}=\mathrm{clamp}(1-0.18r_{risk},0.55,0.90)
 $$
 
 $$
-s_{loc}=\operatorname{clamp}(c_{loc},0.35,1)
+s_{loc}=\mathrm{clamp}(c_{loc},0.35,1)
 $$
 
 $$
@@ -1237,7 +1237,7 @@ Used when TDOA confidence is at least 0.45.
 ## 67. Search command
 
 $$
-\mathbf v_{search}=\hat{\mathbf f}(v_{search,max}s_v)+\hat{\mathbf u}\operatorname{clamp}(0.18e_z,-0.5,0.5)
+\mathbf v_{search}=\hat{\mathbf f}(v_{search,max}s_v)+\hat{\mathbf u}\mathrm{clamp}(0.18e_z,-0.5,0.5)
 $$
 
 Yaw alternates between ±0.18 rad/s.
@@ -1249,17 +1249,17 @@ e_A=0.12-A
 $$
 
 $$
-\mathbf v=\hat{\mathbf f}\operatorname{clamp}(8e_A,-0.3,v_{track,max}s_v)+\hat{\mathbf r}\operatorname{clamp}(2.2o_x,-1,1)+\hat{\mathbf u}\operatorname{clamp}(-1.6o_y,-0.8,0.8)
+\mathbf v=\hat{\mathbf f}\mathrm{clamp}(8e_A,-0.3,v_{track,max}s_v)+\hat{\mathbf r}\mathrm{clamp}(2.2o_x,-1,1)+\hat{\mathbf u}\mathrm{clamp}(-1.6o_y,-0.8,0.8)
 $$
 
 $$
-\dot\psi=\operatorname{clamp}(1.8o_x,-0.9,0.9)
+\dot\psi=\mathrm{clamp}(1.8o_x,-0.9,0.9)
 $$
 
 ## 69. Camera-obstacle avoidance command
 
 $$
-\mathbf v=-\hat{\mathbf f}(0.9+2A)-\hat{\mathbf r}\operatorname{clamp}(3o_x,-1.2,1.2)+\hat{\mathbf u}\operatorname{clamp}(0.15e_z,0,0.9)
+\mathbf v=-\hat{\mathbf f}(0.9+2A)-\hat{\mathbf r}\mathrm{clamp}(3o_x,-1.2,1.2)+\hat{\mathbf u}\mathrm{clamp}(0.15e_z,0,0.9)
 $$
 
 ## 70. LiDAR-obstacle escape gain
@@ -1269,7 +1269,7 @@ d_s=\max(0.1,d)
 $$
 
 $$
-k_{escape}=\operatorname{clamp}\left(\frac{2.5}{d_s},0.8,2.4\right)
+k_{escape}=\mathrm{clamp}\left(\frac{2.5}{d_s},0.8,2.4\right)
 $$
 
 ## 71. Hold and localization-recovery damping
@@ -1307,7 +1307,7 @@ $$
 ## 74. Experience-memory risk score
 
 $$
-r=\operatorname{clamp}\Big(0.32f_{hazard}+0.85\max(0,s_{drift})+0.06\max(0,s_{battery})+0.70f_{dropout}+0.22f_{lowfeature}+0.55\max(0,0.70-\bar c_{loc}),0,1.5\Big)
+r=\mathrm{clamp}\Big(0.32f_{hazard}+0.85\max(0,s_{drift})+0.06\max(0,s_{battery})+0.70f_{dropout}+0.22f_{lowfeature}+0.55\max(0,0.70-\bar c_{loc}),0,1.5\Big)
 $$
 
 Code: `src/autonomy/ExperienceMemory.cpp`.
@@ -1337,13 +1337,13 @@ Current default $v_{emergency}=0.85$ m/s.
 ## 77. Link/sensor fault hold
 
 $$
-\mathbf v_{hold}=\operatorname{sat}(-0.55\mathbf v,v_{max})
+\mathbf v_{hold}=\mathrm{sat}(-0.55\mathbf v,v_{max})
 $$
 
 ## 78. Localization-lost safety command
 
 $$
-\mathbf v_{lost}=\operatorname{sat}(-0.60\mathbf v-\hat{\mathbf u}v_{lost\_descent},v_{max})
+\mathbf v_{lost}=\mathrm{sat}(-0.60\mathbf v-\hat{\mathbf u}v_{lost\_descent},v_{max})
 $$
 
 Current default $v_{lost\_descent}=0.18$ m/s.
@@ -1353,11 +1353,11 @@ Code for Sections 75–78: `include/safety/SafetyManager.hpp`, `src/safety/Safet
 ## 79. Leadership score
 
 $$
-b=\operatorname{clamp}\left(\frac{battery\_%}{100},0,1\right)
+b=\mathrm{clamp}\left(\frac{battery\_%}{100},0,1\right)
 $$
 
 $$
-L=\operatorname{clamp}(0.32b+0.28h_m+0.18q_l+0.12h_{cpu}+0.10h_{thermal},0,1)
+L=\mathrm{clamp}(0.32b+0.28h_m+0.18q_l+0.12h_{cpu}+0.10h_{thermal},0,1)
 $$
 
 Emergency-fault nodes receive zero score. Re-election policy also checks motor health <0.35, link quality <0.25, battery <18% or leadership score <0.40.
@@ -1415,7 +1415,7 @@ $$
 ## 83. Separation-field weight
 
 $$
-g=\operatorname{clamp}\left(\frac{R-d}{\max(R-d_{min},\epsilon)},0,1\right)
+g=\mathrm{clamp}\left(\frac{R-d}{\max(R-d_{min},\epsilon)},0,1\right)
 $$
 
 Peer base weight:
@@ -1621,11 +1621,11 @@ Code for Sections 94–98: `include/swarm/SwarmSecurity.hpp`, `src/swarm/SwarmSe
 ## 99. Onboard security health score
 
 $$
-t=\operatorname{clamp}\Big(t_{input}+0.20\mathbb1[N_{replay}>0]+0.25\mathbb1[N_{spoof}>0]+0.12\mathbb1[N_{control}>0]+0.10\mathbb1[N_{auth}>0],0,1\Big)
+t=\mathrm{clamp}\Big(t_{input}+0.20\mathbb1[N_{replay}>0]+0.25\mathbb1[N_{spoof}>0]+0.12\mathbb1[N_{control}>0]+0.10\mathbb1[N_{auth}>0],0,1\Big)
 $$
 
 $$
-L=\operatorname{clamp}(0.35q_{link}+0.25c_{sync}+0.15c_{loc}+0.15t_{issuer}+0.10p,0,1)
+L=\mathrm{clamp}(0.35q_{link}+0.25c_{sync}+0.15c_{loc}+0.15t_{issuer}+0.10p,0,1)
 $$
 
 $$
@@ -1713,13 +1713,13 @@ d_{bg}=\|\mathbf b_{g,a}-\mathbf b_{g,s}\|_2
 $$
 
 $$
-d_P=|\operatorname{tr}(P_a)-\operatorname{tr}(P_s)|
+d_P=|\mathrm{tr}(P_a)-\mathrm{tr}(P_s)|
 $$
 
 ## 107. Quaternion angular difference
 
 $$
-d_q=\operatorname{clamp}(|q_a^Tq_s|,0,1)
+d_q=\mathrm{clamp}(|q_a^Tq_s|,0,1)
 $$
 
 $$
