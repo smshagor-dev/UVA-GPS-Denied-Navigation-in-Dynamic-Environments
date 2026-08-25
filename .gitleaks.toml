@@ -1,0 +1,16 @@
+title = "Drone Swarm CI Secret Scan Rules"
+
+[allowlist]
+description = "Allow known-safe placeholders and example values"
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)config/.*\.example\.json$''',
+  '''(^|/)docs/phase[0-9]+/.*$'''
+]
+regexes = [
+  '''127\.0\.0\.1''',
+  '''192\.168\.[0-9]{1,3}\.[0-9]{1,3}''',
+  '''example''',
+  '''changeme''',
+  '''not-a-real-secret'''
+]

@@ -1,0 +1,298 @@
+{
+  "generated_at": "2026-07-17T07:35:37.609448Z",
+  "phase": "Phase 7",
+  "experiment_id": "phase7-20260717T073520Z",
+  "run_id": "phase7-20260717T073520Z",
+  "started_at": "2026-07-17T07:35:20.816400Z",
+  "completed_at": "2026-07-17T07:35:37.609448Z",
+  "backend": {
+    "mode": "production",
+    "simulation_enabled": false,
+    "stale_after_seconds": 2,
+    "startup_ms": 12796.515300055034,
+    "port": 53242,
+    "log_path": "results\\phase7\\phase7_backend.log",
+    "process_before": {
+      "cpu_seconds": 1.296875,
+      "working_set_mb": 26.390625,
+      "private_memory_mb": 59.94140625,
+      "handles": 411.0,
+      "thread_count": 24.0,
+      "open_file_descriptors": 411.0,
+      "uptime_s": 12.123258
+    },
+    "process_after": {
+      "cpu_seconds": 1.296875,
+      "working_set_mb": 26.390625,
+      "private_memory_mb": 59.94140625,
+      "handles": 411.0,
+      "thread_count": 24.0,
+      "open_file_descriptors": 411.0,
+      "uptime_s": 15.729555
+    }
+  },
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]",
+    "git_revision": "58daa36decd2f6a9e846acc0c60a09e863c88b4d"
+  },
+  "config_snapshots": [
+    {
+      "path": "config\\runtime.json",
+      "exists": true,
+      "sha256": "4ed6e827f513e42e8cbe401ba3e3bfd3f438d087bc70cb1ff0573f31349c9fea",
+      "bytes": 1280466,
+      "modified_at": "2026-07-13T19:02:11.945192Z"
+    },
+    {
+      "path": "config\\anchors.json",
+      "exists": true,
+      "sha256": "f45f70d65e47e1a1e303f259559c82c6ce7cf0bbe08b27979f7ce2fcf6fe27b8",
+      "bytes": 97564,
+      "modified_at": "2026-05-09T18:53:00.172254Z"
+    },
+    {
+      "path": "config\\lidar.json",
+      "exists": true,
+      "sha256": "f9189261a0388b9b5e392ef1be9600159e03c748b2f4ce4646de5b72ac69876b",
+      "bytes": 1313724,
+      "modified_at": "2026-05-09T18:55:36.855445Z"
+    },
+    {
+      "path": "config\\swarm_edge_protocol.json",
+      "exists": true,
+      "sha256": "7d7a0a342b090e293ae6c7f659a670d6d558e8cdab27f10acead29c844105fa7",
+      "bytes": 2904,
+      "modified_at": "2026-05-15T04:38:52.843710Z"
+    }
+  ],
+  "scenario_count": 5,
+  "pass_count": 5,
+  "fail_count": 0,
+  "scenarios": [
+    {
+      "name": "formation_maintenance",
+      "pass": true,
+      "latency_ms": {
+        "count": 5.0,
+        "average_ms": 1.300299959257245,
+        "p50_ms": 1.095099956728518,
+        "p95_ms": 1.7762999050319195,
+        "p99_ms": 1.7762999050319195,
+        "max_ms": 1.7762999050319195
+      },
+      "timeline": [
+        {
+          "event": "telemetry_posted",
+          "drone_id": 7101,
+          "latency_ms": 1.65350001771003
+        },
+        {
+          "event": "telemetry_posted",
+          "drone_id": 7102,
+          "latency_ms": 1.0476999450474977
+        },
+        {
+          "event": "telemetry_posted",
+          "drone_id": 7103,
+          "latency_ms": 1.095099956728518
+        }
+      ],
+      "observations": {
+        "cluster_id": "phase7-formation",
+        "cluster_state": {
+          "cluster_id": "phase7-formation",
+          "leader_id": 7101,
+          "drone_count": 3,
+          "formation": "DIAMOND",
+          "mission_state": "formation_maintenance",
+          "avg_battery": 87
+        },
+        "fleet_leader_id": 7101,
+        "online_drones": 3,
+        "critical_alerts": 0
+      },
+      "started_at": "2026-07-17T07:35:34.005407Z",
+      "duration_ms": 7.142100017517805
+    },
+    {
+      "name": "gps_denied_navigation",
+      "pass": true,
+      "latency_ms": {
+        "count": 3.0,
+        "average_ms": 7.746233333212634,
+        "p50_ms": 2.0052000181749463,
+        "p95_ms": 20.281299948692322,
+        "p99_ms": 20.281299948692322,
+        "max_ms": 20.281299948692322
+      },
+      "timeline": [
+        {
+          "event": "telemetry_posted",
+          "drone_id": 7201,
+          "latency_ms": 20.281299948692322
+        }
+      ],
+      "observations": {
+        "drone_id": 7201,
+        "localization_source": "vio-tdoa-fused",
+        "localization_confidence": 0.94,
+        "visible_anchor_count": 4,
+        "metrics_latency_ms": 0.9522000327706337
+      },
+      "started_at": "2026-07-17T07:35:34.029328Z",
+      "duration_ms": 23.62529991660267
+    },
+    {
+      "name": "communication_loss_recovery",
+      "pass": true,
+      "latency_ms": {
+        "count": 5.0,
+        "average_ms": 7.919180020689964,
+        "p50_ms": 1.1847000569105148,
+        "p95_ms": 23.85110000614077,
+        "p99_ms": 23.85110000614077,
+        "max_ms": 23.85110000614077
+      },
+      "timeline": [
+        {
+          "event": "telemetry_posted",
+          "stage": "initial",
+          "latency_ms": 1.117600011639297
+        },
+        {
+          "event": "stale_detected",
+          "latency_ms": 23.85110000614077
+        },
+        {
+          "event": "telemetry_posted",
+          "stage": "recovery",
+          "latency_ms": 1.1847000569105148
+        }
+      ],
+      "observations": {
+        "stale_detected": true,
+        "stale_drone_count": 5,
+        "recovered_ready_status": "ready",
+        "recovered_ready_reason": "control-plane operational"
+      },
+      "started_at": "2026-07-17T07:35:37.270362Z",
+      "duration_ms": 3240.6459000194445
+    },
+    {
+      "name": "obstacle_avoidance_degradation",
+      "pass": true,
+      "latency_ms": {
+        "count": 3.0,
+        "average_ms": 1.4646000151212017,
+        "p50_ms": 1.4448000583797693,
+        "p95_ms": 1.5610000118613243,
+        "p99_ms": 1.5610000118613243,
+        "max_ms": 1.5610000118613243
+      },
+      "timeline": [
+        {
+          "event": "telemetry_posted",
+          "drone_id": 7401,
+          "latency_ms": 1.4448000583797693
+        }
+      ],
+      "observations": {
+        "safety_state": "DEGRADED_LOCALIZATION",
+        "localization_confidence": 0.41,
+        "local_obstacle_count": 8,
+        "shared_obstacle_count": 11
+      },
+      "started_at": "2026-07-17T07:35:37.275590Z",
+      "duration_ms": 4.812099970877171
+    },
+    {
+      "name": "emergency_landing_behavior",
+      "pass": true,
+      "latency_ms": {
+        "count": 3.0,
+        "average_ms": 13.262866608177623,
+        "p50_ms": 13.79799994174391,
+        "p95_ms": 24.626199970953166,
+        "p99_ms": 24.626199970953166,
+        "max_ms": 24.626199970953166
+      },
+      "timeline": [
+        {
+          "event": "telemetry_posted",
+          "drone_id": 7501,
+          "latency_ms": 24.626199970953166
+        }
+      ],
+      "observations": {
+        "safety_state": "EMERGENCY_LAND",
+        "security_state": "LAND_IMMEDIATELY",
+        "remote_command_allowed": null,
+        "readiness_status": "ready",
+        "readiness_reason": "control-plane operational"
+      },
+      "started_at": "2026-07-17T07:35:37.316201Z",
+      "duration_ms": 40.14960001222789
+    }
+  ],
+  "latency_summary_ms": {
+    "count": 5.0,
+    "average_ms": 6.338635987291733,
+    "p50_ms": 7.746233333212634,
+    "p95_ms": 13.262866608177623,
+    "p99_ms": 13.262866608177623,
+    "max_ms": 13.262866608177623
+  },
+  "final_snapshot": {
+    "fleet": {
+      "leader_id": 7101,
+      "avg_latency_ms": 4,
+      "avg_peer_latency_ms": 7,
+      "avg_mesh_bandwidth_kbps": 130,
+      "packet_loss_pct": 0.5,
+      "critical_alerts": 5,
+      "real_drone_count": 4,
+      "stale_drone_count": 4,
+      "cluster_count": 5,
+      "fleet_latency_ms": 15.545999980531633
+    },
+    "health": {
+      "online_drones": 3,
+      "total_drones": 7,
+      "critical_alerts": 5,
+      "avg_battery_pct": 87,
+      "max_cpu_temp_c": 49,
+      "updated_at": "2026-07-17T07:35:37.3326794Z",
+      "backend_mode": "production",
+      "mesh_topology_mode": "adaptive_mesh",
+      "simulation_enabled": false,
+      "real_drone_count": 4,
+      "stale_drone_count": 4,
+      "_latency_ms": 1.0272999061271548
+    },
+    "readiness": {
+      "ready": true,
+      "status": "ready",
+      "reason": "control-plane operational",
+      "uptime_seconds": 3.8234334,
+      "updated_at": "2026-07-17T07:35:37.3337334Z",
+      "backend_mode": "production",
+      "simulation_enabled": false,
+      "total_drones": 7,
+      "real_drone_count": 4,
+      "stale_drone_count": 4,
+      "_latency_ms": 0.8143000304698944
+    },
+    "metrics": {
+      "status": 200,
+      "latency_ms": 0.8662999607622623,
+      "body_size_bytes": 1232
+    }
+  },
+  "limitations": [
+    "This artifact validates software-level mission state propagation through the Go control-plane backend, not actuator-level flight behavior.",
+    "No PX4, Gazebo, Ignition, or physical hardware interfaces were exercised in this run.",
+    "Failure injection is represented by synthetic telemetry/state transitions rather than real sensor or radio impairment hardware."
+  ],
+  "status": "PASS"
+}

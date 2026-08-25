@@ -1,0 +1,146 @@
+{
+  "generated_at": "2026-07-17T06:13:19.193479Z",
+  "backend_startup_ms": 1077.3481000214815,
+  "stress": {
+    "100_clients": {
+      "requests": 200,
+      "workers": 100,
+      "wall_elapsed_ms": 94.70989997498691,
+      "throughput_hz": 2111.7116590010173,
+      "latency": {
+        "name": "stress_post_latency",
+        "kind": "http-stress",
+        "iterations": 200,
+        "total_ms": 1958.128000725992,
+        "mean_ms": 9.79064000362996,
+        "median_ms": 9.675900044385344,
+        "p50_ms": 9.684200049377978,
+        "p95_ms": 17.723700031638145,
+        "p99_ms": 21.168600069358945,
+        "max_ms": 24.09540000371635,
+        "extra": {}
+      },
+      "failures": [],
+      "resource_before": {
+        "cpu_seconds": 0.90625,
+        "working_set_mb": 28.16015625,
+        "private_memory_mb": 61.59765625,
+        "handles": 399.0,
+        "thread_count": 22.0,
+        "open_file_descriptors": 399.0,
+        "uptime_s": 1.430614
+      },
+      "resource_after": {
+        "cpu_seconds": 0.90625,
+        "working_set_mb": 27.73828125,
+        "private_memory_mb": 61.15625,
+        "handles": 399.0,
+        "thread_count": 22.0,
+        "open_file_descriptors": 399.0,
+        "uptime_s": 1.771986
+      },
+      "cpu_seconds_delta": 0.0,
+      "working_set_mb_delta": -0.421875,
+      "private_memory_mb_delta": -0.44140625,
+      "thread_count_delta": 0.0,
+      "handle_delta": 0.0
+    },
+    "500_clients": {
+      "requests": 1000,
+      "workers": 500,
+      "wall_elapsed_ms": 496.8949999893084,
+      "throughput_hz": 2012.4976102023904,
+      "latency": {
+        "name": "stress_post_latency",
+        "kind": "http-stress",
+        "iterations": 1000,
+        "total_ms": 24048.303301096894,
+        "mean_ms": 24.048303301096894,
+        "median_ms": 24.123999988660216,
+        "p50_ms": 24.126100004650652,
+        "p95_ms": 41.98249999899417,
+        "p99_ms": 48.69419999886304,
+        "max_ms": 67.8294999524951,
+        "extra": {}
+      },
+      "failures": [],
+      "resource_before": {
+        "cpu_seconds": 0.90625,
+        "working_set_mb": 27.73828125,
+        "private_memory_mb": 61.15625,
+        "handles": 399.0,
+        "thread_count": 22.0,
+        "open_file_descriptors": 399.0,
+        "uptime_s": 2.013272
+      },
+      "resource_after": {
+        "cpu_seconds": 0.90625,
+        "working_set_mb": 26.74609375,
+        "private_memory_mb": 60.15625,
+        "handles": 399.0,
+        "thread_count": 22.0,
+        "open_file_descriptors": 399.0,
+        "uptime_s": 2.755312
+      },
+      "cpu_seconds_delta": 0.0,
+      "working_set_mb_delta": -0.9921875,
+      "private_memory_mb_delta": -1.0,
+      "thread_count_delta": 0.0,
+      "handle_delta": 0.0
+    },
+    "1000_clients": {
+      "requests": 2000,
+      "workers": 1000,
+      "wall_elapsed_ms": 920.7042000489309,
+      "throughput_hz": 2172.2503274055985,
+      "latency": {
+        "name": "stress_post_latency",
+        "kind": "http-stress",
+        "iterations": 2000,
+        "total_ms": 63969.15479854215,
+        "mean_ms": 31.984577399271075,
+        "median_ms": 31.32184996502474,
+        "p50_ms": 31.344500021077693,
+        "p95_ms": 57.1125999558717,
+        "p99_ms": 68.40709992684424,
+        "max_ms": 94.4943999638781,
+        "extra": {}
+      },
+      "failures": [],
+      "resource_before": {
+        "cpu_seconds": 0.90625,
+        "working_set_mb": 26.74609375,
+        "private_memory_mb": 60.15625,
+        "handles": 399.0,
+        "thread_count": 22.0,
+        "open_file_descriptors": 399.0,
+        "uptime_s": 2.981906
+      },
+      "resource_after": {
+        "cpu_seconds": 0.90625,
+        "working_set_mb": 26.74609375,
+        "private_memory_mb": 60.15625,
+        "handles": 399.0,
+        "thread_count": 22.0,
+        "open_file_descriptors": 399.0,
+        "uptime_s": 4.141522
+      },
+      "cpu_seconds_delta": 0.0,
+      "working_set_mb_delta": 0.0,
+      "private_memory_mb_delta": 0.0,
+      "thread_count_delta": 0.0,
+      "handle_delta": 0.0
+    }
+  },
+  "fleet_get_metric": {
+    "mean_ms": 105.56427499977872,
+    "p95_ms": 122.81380000058562,
+    "max_ms": 131.2592999311164
+  },
+  "large_swarm_snapshot": {
+    "total_drones": 2250,
+    "cluster_count": 14,
+    "real_drone_count": 2000
+  },
+  "status": "PASS"
+}

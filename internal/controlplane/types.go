@@ -261,3 +261,16 @@ type HealthReport struct {
 	RealDroneCount    int       `json:"real_drone_count"`
 	StaleDroneCount   int       `json:"stale_drone_count"`
 }
+
+type ReadinessReport struct {
+	Ready             bool      `json:"ready"`
+	Status            string    `json:"status"`
+	Reason            string    `json:"reason"`
+	UptimeSeconds     float64   `json:"uptime_seconds"`
+	UpdatedAt         time.Time `json:"updated_at"`
+	BackendMode       string    `json:"backend_mode"`
+	SimulationEnabled bool      `json:"simulation_enabled"`
+	TotalDrones       int       `json:"total_drones"`
+	RealDroneCount    int       `json:"real_drone_count"`
+	StaleDroneCount   int       `json:"stale_drone_count"`
+}

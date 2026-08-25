@@ -57,11 +57,13 @@ TEST(ExperienceMemory, SummarizesRiskFromHistory) {
     stats.battery_pct = 92.0f;
     pose.pos_std = Eigen::Vector3d(0.02, 0.02, 0.02);
 
-    memory.observe(7, pose, stats, make_frame("tree", 0.9f), 3, 0.92, "vision-inertial", false, 0.0);
+    memory.observe(7, pose, stats, make_frame("tree", 0.9f), 3, 0.92, "vision-inertial", false,
+                   0.0);
 
     pose.pos_std = Eigen::Vector3d(0.30, 0.25, 0.20);
     stats.battery_pct = 78.0f;
-    memory.observe(7, pose, stats, make_frame("tree", 0.92f), 4, 0.35, "imu-dead-reckoning", true, 60.0);
+    memory.observe(7, pose, stats, make_frame("tree", 0.92f), 4, 0.35, "imu-dead-reckoning", true,
+                   60.0);
 
     const auto prior = memory.summarize(7);
     EXPECT_TRUE(prior.recommend_caution);
@@ -74,10 +76,10 @@ TEST(TdoaLocalizer, SolvesKnownPosition) {
     localization::TDOALocalizer localizer;
     localizer.set_anchors({
         {1, Eigen::Vector3d{-10.0, -10.0, 0.0}},
-        {2, Eigen::Vector3d{ 10.0, -10.0, 0.0}},
-        {3, Eigen::Vector3d{ 10.0,  10.0, 0.0}},
-        {4, Eigen::Vector3d{-10.0,  10.0, 0.0}},
-        {5, Eigen::Vector3d{  0.0,   0.0, 15.0}},
+        {2, Eigen::Vector3d{10.0, -10.0, 0.0}},
+        {3, Eigen::Vector3d{10.0, 10.0, 0.0}},
+        {4, Eigen::Vector3d{-10.0, 10.0, 0.0}},
+        {5, Eigen::Vector3d{0.0, 0.0, 15.0}},
     });
 
     const Eigen::Vector3d target{2.0, -3.0, 4.5};
@@ -86,10 +88,8 @@ TEST(TdoaLocalizer, SolvesKnownPosition) {
 
     std::vector<localization::TDOALocalizer::Measurement> measurements;
     for (const auto& anchor : localizer.anchors()) {
-        measurements.push_back({
-            anchor.id,
-            kTxBiasS + ((target - anchor.position).norm() / kSignalSpeedMps)
-        });
+        measurements.push_back(
+            {anchor.id, kTxBiasS + ((target - anchor.position).norm() / kSignalSpeedMps)});
     }
 
     const auto solution = localizer.estimate(measurements, Eigen::Vector3d::Zero());
@@ -268,14 +268,33 @@ TEST(RuntimeMode, SimulationAllowsSyntheticFallbackWithoutAnchorConfig) {
         false,
     });
     EXPECT_TRUE(result.ok);
-    EXPECT_EQ(
-        runtime::determine_localization_data_source(
-            runtime::RuntimeMode::SIMULATION,
-            true,
-            false,
-            false,
-            true),
-        "simulation");
+    EXPECT_EQ(runtime::determine_localization_data_source(runtime::RuntimeMode::SIMULATION, true,
+                                                          false, false, true),
+              "simulation");
+}
+
+TEST(RuntimeMode, RuntimeFileLoadsEscapedPaths) {
+    const auto temp_path = std::filesystem::temp_directory_path() / "runtime_valid.json";
+    {
+        std::ofstream output(temp_path.string(), std::ios::trunc);
+        ASSERT_TRUE(output.is_open());
+        output << R"({
+  "runtime_mode": "edge_swarm",
+  "anchor_config_path": "config\/anchors.json",
+  "lidar_config_path": "config\/lidar.json",
+  "detector_labels_path": "config\/detector_labels.json"
+})";
+    }
+
+    const auto result = runtime::load_runtime_file(temp_path.string());
+    EXPECT_TRUE(result.loaded);
+    ASSERT_TRUE(result.runtime_mode.has_value());
+    EXPECT_EQ(*result.runtime_mode, runtime::RuntimeMode::EDGE_SWARM);
+    EXPECT_EQ(result.anchor_config_path, "config/anchors.json");
+    EXPECT_EQ(result.lidar_config_path, "config/lidar.json");
+    EXPECT_EQ(result.detector_labels_path, "config/detector_labels.json");
+
+    std::filesystem::remove(temp_path);
 }
 
 TEST(RuntimeMode, ValidAnchorJsonLoads) {
@@ -379,6 +398,30 @@ TEST(RuntimeMode, ValidLidarConfigLoads) {
     std::filesystem::remove(temp_path);
 }
 
+TEST(RuntimeMode, LidarConfigFalseRequiredLoads) {
+    const auto temp_path = std::filesystem::temp_directory_path() / "lidar_optional.json";
+    {
+        std::ofstream output(temp_path.string(), std::ios::trunc);
+        ASSERT_TRUE(output.is_open());
+        output << R"({
+  "host": "192.168.1.10",
+  "port": 2368,
+  "model": "generic_udp_cartesian_v1",
+  "frame_id": "lidar_rear",
+  "min_range_m": 0.4,
+  "max_range_m": 60.0,
+  "required": false
+})";
+    }
+
+    const auto result = runtime::load_lidar_config_json(temp_path.string());
+    EXPECT_TRUE(result.ok);
+    EXPECT_FALSE(result.required);
+    EXPECT_EQ(result.frame_id, "lidar_rear");
+
+    std::filesystem::remove(temp_path);
+}
+
 TEST(RuntimeMode, ProductionFailsIfRequiredLidarUnavailable) {
     const auto result = runtime::validate_lidar_runtime_configuration({
         runtime::RuntimeMode::PRODUCTION,
@@ -392,22 +435,15 @@ TEST(RuntimeMode, ProductionFailsIfRequiredLidarUnavailable) {
 
 TEST(VIOFrontend, LowFeatureCountLowersConfidence) {
     Eigen::Matrix3d K;
-    K << 800, 0, 160,
-         0, 800, 160,
-         0, 0, 1;
+    K << 800, 0, 160, 0, 800, 160, 0, 0, 1;
     vio::PoseEstimate previous_pose;
     vio::PoseEstimate predicted_pose;
     predicted_pose.position = Eigen::Vector3d(0.1, 0.0, 0.0);
     predicted_pose.velocity = Eigen::Vector3d(0.5, 0.0, 0.0);
 
     const cv::Mat blank(320, 320, CV_8UC1, cv::Scalar(0));
-    const auto result = vio::run_visual_frontend(
-        blank,
-        blank,
-        K,
-        previous_pose,
-        predicted_pose,
-        0.2);
+    const auto result =
+        vio::run_visual_frontend(blank, blank, K, previous_pose, predicted_pose, 0.2);
 
     EXPECT_LT(result.metrics.tracked_feature_count, 8u);
     EXPECT_LT(result.metrics.visual_update_confidence, 0.3);
@@ -416,9 +452,7 @@ TEST(VIOFrontend, LowFeatureCountLowersConfidence) {
 
 TEST(VIOFrontend, HighOutlierRatioRejectsUpdate) {
     Eigen::Matrix3d K;
-    K << 800, 0, 160,
-         0, 800, 160,
-         0, 0, 1;
+    K << 800, 0, 160, 0, 800, 160, 0, 0, 1;
     vio::PoseEstimate previous_pose;
     vio::PoseEstimate predicted_pose;
     predicted_pose.position = Eigen::Vector3d(0.2, 0.0, 0.0);
@@ -426,13 +460,8 @@ TEST(VIOFrontend, HighOutlierRatioRejectsUpdate) {
 
     const auto previous = make_feature_image(1);
     const auto unrelated = make_feature_image(99);
-    const auto result = vio::run_visual_frontend(
-        previous,
-        unrelated,
-        K,
-        previous_pose,
-        predicted_pose,
-        0.2);
+    const auto result =
+        vio::run_visual_frontend(previous, unrelated, K, previous_pose, predicted_pose, 0.2);
 
     EXPECT_FALSE(result.metrics.update_accepted);
     EXPECT_TRUE(result.metrics.inlier_ratio < 0.55 || result.metrics.reprojection_error > 3.5);
@@ -452,17 +481,12 @@ TEST(KeyframeManager, RelocalizesAgainstStoredKeyframe) {
     cv::circle(image, cv::Point(220, 90), 28, cv::Scalar(190), cv::FILLED);
     cv::line(image, cv::Point(30, 260), cv::Point(290, 250), cv::Scalar(220), 4);
 
-    const auto id = manager.try_add_frame(
-        image,
-        Eigen::Vector3d(4.0, -1.0, 8.0),
-        Eigen::Quaterniond::Identity(),
-        1.0);
+    const auto id = manager.try_add_frame(image, Eigen::Vector3d(4.0, -1.0, 8.0),
+                                          Eigen::Quaterniond::Identity(), 1.0);
     ASSERT_TRUE(id.has_value());
 
-    const auto relocalized = manager.attempt_relocalization(
-        image,
-        Eigen::Vector3d(7.0, -1.5, 8.2),
-        Eigen::Quaterniond::Identity());
+    const auto relocalized = manager.attempt_relocalization(image, Eigen::Vector3d(7.0, -1.5, 8.2),
+                                                            Eigen::Quaterniond::Identity());
     ASSERT_TRUE(relocalized.has_value());
     EXPECT_GT(relocalized->confidence, 0.45);
     EXPECT_NEAR(relocalized->corrected_position.x(), 4.9, 1.5);
@@ -478,10 +502,8 @@ TEST(MapPlanner, BuildsWaypointChainAcrossOccupancyMap) {
     map.mark_anchor({1, Eigen::Vector3d{3.0, 0.0, 0.0}}, true);
 
     slam::MapPlanner planner;
-    const auto plan = planner.plan(
-        map.status(),
-        Eigen::Vector3d(0.0, 0.0, 8.0),
-        Eigen::Vector3d(6.0, 0.0, 8.0));
+    const auto plan =
+        planner.plan(map.status(), Eigen::Vector3d(0.0, 0.0, 8.0), Eigen::Vector3d(6.0, 0.0, 8.0));
 
     ASSERT_TRUE(plan.has_value());
     EXPECT_FALSE(plan->waypoints.empty());

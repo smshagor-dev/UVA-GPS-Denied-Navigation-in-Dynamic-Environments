@@ -20,6 +20,8 @@ struct LocalizationFusionInput {
     double anchor_visibility_ratio{0.0};
     TimeSyncStatus time_sync{};
     double previous_confidence{1.0};
+    // Phase 15: this module remains a heuristic blend, not a covariance-consistent measurement
+    // fusion layer. Future phases can replace this with a measurement-adapter interface.
 };
 
 struct LocalizationFusionOutput {

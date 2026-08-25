@@ -1,0 +1,3 @@
+source_mount_ok
+/usr/local/go/bin/go
+/usr/bin/python3

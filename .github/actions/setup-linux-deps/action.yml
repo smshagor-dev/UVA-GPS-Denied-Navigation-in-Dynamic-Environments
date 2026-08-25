@@ -1,0 +1,30 @@
+name: Setup Linux Dependencies
+description: Install Linux build and analysis dependencies for DroneSwarm CI
+runs:
+  using: composite
+  steps:
+    - name: Install apt dependencies
+      shell: bash
+      run: |
+        set -euxo pipefail
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          clang \
+          clang-format \
+          clang-tidy \
+          cmake \
+          curl \
+          git \
+          golang-go \
+          libeigen3-dev \
+          libopencv-dev \
+          libpcl-dev \
+          libspdlog-dev \
+          libopenmpi-dev \
+          ninja-build \
+          openmpi-bin \
+          pkg-config \
+          python3-dev \
+          python3-pip \
+          python3-venv

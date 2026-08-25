@@ -3,17 +3,17 @@
 // Technology: C++, Python, Go, CMake
 
 #pragma once
- 
+
 // ThermalSensor.hpp    MLX90640 32Ã—24 IR thermal array
 // Drone Swarm Sensor Fusion  |  Phase 2
- 
+
 #include "sensors/SensorBase.hpp"
 #include <array>
 #include <optional>
 
 namespace drone::sensors {
 
-constexpr int kThermalWidth  = 32;
+constexpr int kThermalWidth = 32;
 constexpr int kThermalHeight = 24;
 constexpr int kThermalPixels = kThermalWidth * kThermalHeight;
 
@@ -23,8 +23,8 @@ struct ThermalFrame : SensorMeasurement {
     float ambient_temp_c{25.0f};
     float min_temp_c{0.0f};
     float max_temp_c{0.0f};
-    int   width{kThermalWidth};
-    int   height{kThermalHeight};
+    int width{kThermalWidth};
+    int height{kThermalHeight};
 
     [[nodiscard]] float at(int row, int col) const {
         return pixels[row * kThermalWidth + col];
@@ -33,13 +33,10 @@ struct ThermalFrame : SensorMeasurement {
 
 class ThermalSensor : public SensorBase {
 public:
-    explicit ThermalSensor(std::string id,
-                            std::string bus     = "/dev/i2c-1",
-                            uint8_t     addr    = 0x33,
-                            float       emissivity = 0.95f)
-        : SensorBase(std::move(id), "Thermal")
-        , bus_(std::move(bus)), addr_(addr)
-        , emissivity_(emissivity) {}
+    explicit ThermalSensor(std::string id, std::string bus = "/dev/i2c-1", uint8_t addr = 0x33,
+                           float emissivity = 0.95f)
+        : SensorBase(std::move(id), "Thermal"), bus_(std::move(bus)), addr_(addr),
+          emissivity_(emissivity) {}
 
     bool initialize() override;
     bool reconfigure(const std::string& config_json) override;
@@ -58,13 +55,13 @@ public:
 private:
     ThermalFrame read_mlx90640();
 
-    std::string  bus_;
-    uint8_t      addr_;
-    float        emissivity_;
-    int          fd_{-1};
+    std::string bus_;
+    uint8_t addr_;
+    float emissivity_;
+    int fd_{-1};
 
     std::optional<ThermalFrame> latest_;
-    DataCallback<ThermalFrame>  data_cb_;
+    DataCallback<ThermalFrame> data_cb_;
 
     // MLX90640 calibration data (loaded once at init)
     std::array<uint16_t, 832> eeprom_data_{};

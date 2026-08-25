@@ -26,19 +26,26 @@ public:
         size_t max_batch_size{32};
     };
 
-    explicit TDOAIngestor(Config cfg = {});
+    TDOAIngestor();
+    explicit TDOAIngestor(Config cfg);
     ~TDOAIngestor();
 
     bool start();
     void stop();
-    [[nodiscard]] bool running() const { return running_; }
-    [[nodiscard]] Mode mode() const { return cfg_.mode; }
+    [[nodiscard]] bool running() const {
+        return running_;
+    }
+    [[nodiscard]] Mode mode() const {
+        return cfg_.mode;
+    }
 
     [[nodiscard]] std::optional<std::vector<TDOALocalizer::Measurement>> poll();
     [[nodiscard]] size_t visible_anchor_count() const;
     [[nodiscard]] double visibility_ratio(size_t total_anchor_count) const;
     [[nodiscard]] std::vector<uint32_t> visible_anchor_ids() const;
-    [[nodiscard]] double last_batch_timestamp_s() const { return last_batch_timestamp_s_; }
+    [[nodiscard]] double last_batch_timestamp_s() const {
+        return last_batch_timestamp_s_;
+    }
 
 private:
     bool open_udp_socket();

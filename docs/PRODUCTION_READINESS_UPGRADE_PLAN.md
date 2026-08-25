@@ -1,4 +1,4 @@
-# Production Readiness Upgrade Plan
+﻿# Production Readiness Upgrade Plan
 
 ## Purpose
 
@@ -20,15 +20,15 @@ Make all simulation, demo, fallback, and digital-twin behaviors explicit, config
 
 **Exact files to change**
 
-- [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp)
-- [gui/dashboard.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/gui/dashboard.py)
-- [gui/backend_status.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/gui/backend_status.py)
-- [main.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/main.py)
-- [internal/controlplane/server.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/internal/controlplane/server.go)
-- [internal/controlplane/state.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/internal/controlplane/state.go)
-- [README.md](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/README.md)
-- [DEPLOYMENT.md](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/DEPLOYMENT.md)
-- [.env.example](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/.env.example)
+- [src/main.cpp](../src/main.cpp)
+- [gui/dashboard.py](../gui/dashboard.py)
+- [gui/backend_status.py](../gui/backend_status.py)
+- [main.py](../main.py)
+- [internal/controlplane/server.go](../internal/controlplane/server.go)
+- [internal/controlplane/state.go](../internal/controlplane/state.go)
+- [README.md](../README.md)
+- [DEPLOYMENT.md](../DEPLOYMENT.md)
+- [.env.example](../.env.example)
 
 **Implementation tasks**
 
@@ -72,16 +72,16 @@ Replace sensor stubs and loosely validated interfaces with real hardware ingesti
 
 **Exact files to change**
 
-- [src/sensors/IMUSensor.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/sensors/IMUSensor.cpp)
-- [include/sensors/IMUSensor.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/sensors/IMUSensor.hpp)
-- [src/sensors/CameraSensor.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/sensors/CameraSensor.cpp)
-- [include/sensors/CameraSensor.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/sensors/CameraSensor.hpp)
-- [src/sensors/LidarSensor.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/sensors/LidarSensor.cpp)
-- [include/sensors/LidarSensor.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/sensors/LidarSensor.hpp)
-- [src/hal/JetsonHAL.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/hal/JetsonHAL.cpp)
-- [include/hal/JetsonHAL.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/hal/JetsonHAL.hpp)
-- [tests/test_sensors.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_sensors.cpp)
-- [tests/CMakeLists.txt](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/CMakeLists.txt)
+- [src/sensors/IMUSensor.cpp](../src/sensors/IMUSensor.cpp)
+- [include/sensors/IMUSensor.hpp](../include/sensors/IMUSensor.hpp)
+- [src/sensors/CameraSensor.cpp](../src/sensors/CameraSensor.cpp)
+- [include/sensors/CameraSensor.hpp](../include/sensors/CameraSensor.hpp)
+- [src/sensors/LidarSensor.cpp](../src/sensors/LidarSensor.cpp)
+- [include/sensors/LidarSensor.hpp](../include/sensors/LidarSensor.hpp)
+- [src/hal/JetsonHAL.cpp](../src/hal/JetsonHAL.cpp)
+- [include/hal/JetsonHAL.hpp](../include/hal/JetsonHAL.hpp)
+- [tests/test_sensors.cpp](../tests/test_sensors.cpp)
+- [tests/CMakeLists.txt](../tests/CMakeLists.txt)
 
 **Implementation tasks**
 
@@ -102,7 +102,7 @@ Replace sensor stubs and loosely validated interfaces with real hardware ingesti
   - degraded
   - live
 - Remove or strongly gate non-hardware simulation behavior for bench/flight modes.
-- Ensure HAL battery and system stats report “unknown/unavailable” instead of believable fake values in non-sim modes.
+- Ensure HAL battery and system stats report â€œunknown/unavailableâ€ instead of believable fake values in non-sim modes.
 
 **Test tasks**
 
@@ -132,21 +132,21 @@ Replace placeholder localization with a real GPS-denied fusion stack using valid
 
 **Exact files to change**
 
-- [src/vio/VIOPipeline.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/vio/VIOPipeline.cpp)
-- [include/vio/VIOPipeline.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/vio/VIOPipeline.hpp)
-- [src/vio/EKFEstimator.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/vio/EKFEstimator.cpp)
-- [include/vio/EKFEstimator.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/vio/EKFEstimator.hpp)
-- [src/localization/LocalizationFusion.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/localization/LocalizationFusion.cpp)
-- [include/localization/LocalizationFusion.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/localization/LocalizationFusion.hpp)
-- [src/localization/TDOALocalizer.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/localization/TDOALocalizer.cpp)
-- [src/localization/TDOAIngestor.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/localization/TDOAIngestor.cpp)
-- [src/localization/UWBSerialDriver.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/localization/UWBSerialDriver.cpp)
-- [src/localization/TimeSyncTracker.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/localization/TimeSyncTracker.cpp)
-- [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp)
-- [src/slam/KeyframeManager.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/slam/KeyframeManager.cpp)
-- [src/slam/OccupancyGridMap.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/slam/OccupancyGridMap.cpp)
-- [tests/test_ekf.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_ekf.cpp)
-- [tests/test_navigation_intelligence.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_navigation_intelligence.cpp)
+- [src/vio/VIOPipeline.cpp](../src/vio/VIOPipeline.cpp)
+- [include/vio/VIOPipeline.hpp](../include/vio/VIOPipeline.hpp)
+- [src/vio/EKFEstimator.cpp](../src/vio/EKFEstimator.cpp)
+- [include/vio/EKFEstimator.hpp](../include/vio/EKFEstimator.hpp)
+- [src/localization/LocalizationFusion.cpp](../src/localization/LocalizationFusion.cpp)
+- [include/localization/LocalizationFusion.hpp](../include/localization/LocalizationFusion.hpp)
+- [src/localization/TDOALocalizer.cpp](../src/localization/TDOALocalizer.cpp)
+- [src/localization/TDOAIngestor.cpp](../src/localization/TDOAIngestor.cpp)
+- [src/localization/UWBSerialDriver.cpp](../src/localization/UWBSerialDriver.cpp)
+- [src/localization/TimeSyncTracker.cpp](../src/localization/TimeSyncTracker.cpp)
+- [src/main.cpp](../src/main.cpp)
+- [src/slam/KeyframeManager.cpp](../src/slam/KeyframeManager.cpp)
+- [src/slam/OccupancyGridMap.cpp](../src/slam/OccupancyGridMap.cpp)
+- [tests/test_ekf.cpp](../tests/test_ekf.cpp)
+- [tests/test_navigation_intelligence.cpp](../tests/test_navigation_intelligence.cpp)
 - `data/` replay fixtures to be added under versioned test assets
 
 **Implementation tasks**
@@ -200,15 +200,15 @@ Harden autonomy, security gating, and failure handling so the vehicle reacts con
 
 **Exact files to change**
 
-- [src/autonomy/DecisionEngine.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/autonomy/DecisionEngine.cpp)
-- [include/autonomy/DecisionEngine.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/autonomy/DecisionEngine.hpp)
-- [include/security/DroneSecurity.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/security/DroneSecurity.hpp)
-- [include/security/CommandPolicy.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/security/CommandPolicy.hpp)
-- [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp)
-- [src/swarm/SwarmSecurity.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/swarm/SwarmSecurity.cpp)
-- [include/swarm/SwarmSecurity.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/swarm/SwarmSecurity.hpp)
-- [tests/test_autonomy.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_autonomy.cpp)
-- [tests/test_swarm_security.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_swarm_security.cpp)
+- [src/autonomy/DecisionEngine.cpp](../src/autonomy/DecisionEngine.cpp)
+- [include/autonomy/DecisionEngine.hpp](../include/autonomy/DecisionEngine.hpp)
+- [include/security/DroneSecurity.hpp](../include/security/DroneSecurity.hpp)
+- [include/security/CommandPolicy.hpp](../include/security/CommandPolicy.hpp)
+- [src/main.cpp](../src/main.cpp)
+- [src/swarm/SwarmSecurity.cpp](../src/swarm/SwarmSecurity.cpp)
+- [include/swarm/SwarmSecurity.hpp](../include/swarm/SwarmSecurity.hpp)
+- [tests/test_autonomy.cpp](../tests/test_autonomy.cpp)
+- [tests/test_swarm_security.cpp](../tests/test_swarm_security.cpp)
 
 **Implementation tasks**
 
@@ -255,19 +255,19 @@ Make backend telemetry, fleet state, and operator UI production-safe, Linux-comp
 
 **Exact files to change**
 
-- [src/telemetry/ControlPlaneTelemetryClient.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/telemetry/ControlPlaneTelemetryClient.cpp)
-- [include/telemetry/ControlPlaneTelemetryClient.hpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/include/telemetry/ControlPlaneTelemetryClient.hpp)
-- [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp)
-- [cmd/control-plane/main.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/cmd/control-plane/main.go)
-- [internal/controlplane/server.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/internal/controlplane/server.go)
-- [internal/controlplane/state.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/internal/controlplane/state.go)
-- [internal/controlplane/types.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/internal/controlplane/types.go)
-- [internal/controlplane/server_test.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/internal/controlplane/server_test.go)
-- [internal/controlplane/server_api_test.go](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/internal/controlplane/server_api_test.go)
-- [gui/dashboard.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/gui/dashboard.py)
-- [gui/backend_status.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/gui/backend_status.py)
-- [tests/test_dashboard_backend_status.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_dashboard_backend_status.py)
-- [SECURITY_IMPLEMENTATION.md](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/SECURITY_IMPLEMENTATION.md)
+- [src/telemetry/ControlPlaneTelemetryClient.cpp](../src/telemetry/ControlPlaneTelemetryClient.cpp)
+- [include/telemetry/ControlPlaneTelemetryClient.hpp](../include/telemetry/ControlPlaneTelemetryClient.hpp)
+- [src/main.cpp](../src/main.cpp)
+- [cmd/control-plane/main.go](../cmd/control-plane/main.go)
+- [internal/controlplane/server.go](../internal/controlplane/server.go)
+- [internal/controlplane/state.go](../internal/controlplane/state.go)
+- [internal/controlplane/types.go](../internal/controlplane/types.go)
+- [internal/controlplane/server_test.go](../internal/controlplane/server_test.go)
+- [internal/controlplane/server_api_test.go](../internal/controlplane/server_api_test.go)
+- [gui/dashboard.py](../gui/dashboard.py)
+- [gui/backend_status.py](../gui/backend_status.py)
+- [tests/test_dashboard_backend_status.py](../tests/test_dashboard_backend_status.py)
+- [SECURITY_IMPLEMENTATION.md](../SECURITY_IMPLEMENTATION.md)
 
 **Implementation tasks**
 
@@ -313,12 +313,12 @@ Validate the fully integrated stack on physical hardware without flight, using r
 
 **Exact files to change**
 
-- [tests/test_sensors.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_sensors.cpp)
-- [tests/test_ekf.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_ekf.cpp)
-- [tests/test_navigation_intelligence.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_navigation_intelligence.cpp)
-- [tests/test_autonomy.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/tests/test_autonomy.cpp)
-- [scripts/drone_setup.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/scripts/drone_setup.py)
-- [main.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/main.py)
+- [tests/test_sensors.cpp](../tests/test_sensors.cpp)
+- [tests/test_ekf.cpp](../tests/test_ekf.cpp)
+- [tests/test_navigation_intelligence.cpp](../tests/test_navigation_intelligence.cpp)
+- [tests/test_autonomy.cpp](../tests/test_autonomy.cpp)
+- [scripts/drone_setup.py](../scripts/drone_setup.py)
+- [main.py](../main.py)
 - New bench procedures document under `docs/`
 - New replay/fixture assets under `data/`
 
@@ -370,10 +370,10 @@ Prove basic safe flight behavior indoors under controlled tethered conditions wi
 
 **Exact files to change**
 
-- [src/main.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/main.cpp)
-- [src/autonomy/DecisionEngine.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/autonomy/DecisionEngine.cpp)
-- [src/localization/LocalizationFusion.cpp](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/src/localization/LocalizationFusion.cpp)
-- [gui/dashboard.py](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/gui/dashboard.py)
+- [src/main.cpp](../src/main.cpp)
+- [src/autonomy/DecisionEngine.cpp](../src/autonomy/DecisionEngine.cpp)
+- [src/localization/LocalizationFusion.cpp](../src/localization/LocalizationFusion.cpp)
+- [gui/dashboard.py](../gui/dashboard.py)
 - New flight-test procedures and signoff docs under `docs/`
 
 **Implementation tasks**
@@ -418,7 +418,7 @@ Reach a disciplined, evidence-based go/no-go decision for limited indoor free-fl
 
 **Exact files to change**
 
-- [docs/PRODUCTION_READINESS_UPGRADE_PLAN.md](/d:/Public/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/docs/PRODUCTION_READINESS_UPGRADE_PLAN.md)
+- [docs/PRODUCTION_READINESS_UPGRADE_PLAN.md](../docs/PRODUCTION_READINESS_UPGRADE_PLAN.md)
 - New acceptance test procedure and readiness signoff docs under `docs/`
 - Any remaining config or threshold files introduced by earlier phases
 

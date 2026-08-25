@@ -1,0 +1,4 @@
+﻿{
+    "StatusCode":  202,
+    "Content":  "{\"message\":\"telemetry accepted\"}\n"
+}

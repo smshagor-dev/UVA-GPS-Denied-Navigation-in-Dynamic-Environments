@@ -1,0 +1,52 @@
+{
+  "experiment_name": "UVA_GPS_DENIED_SAMPLE_ANCHOR_LAYOUT",
+  "version": "1.0",
+  "coordinate_frame": "local_enu",
+  "units": "meters",
+  "environment": {
+    "type": "non_production_example",
+    "note": "Example anchor geometry for documentation and dry-run validation only."
+  },
+  "anchors": [
+    {
+      "id": "A0",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 2.5,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A1",
+      "x": 6.0,
+      "y": 0.0,
+      "z": 2.5,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A2",
+      "x": 0.0,
+      "y": 6.0,
+      "z": 2.5,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    },
+    {
+      "id": "A3",
+      "x": 6.0,
+      "y": 6.0,
+      "z": 2.5,
+      "status": "active",
+      "role": "tdoa_anchor",
+      "clock_sync": "enabled",
+      "frequency_channel": 5
+    }
+  ]
+}

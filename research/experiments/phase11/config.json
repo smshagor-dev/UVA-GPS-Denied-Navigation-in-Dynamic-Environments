@@ -1,0 +1,6 @@
+{
+  "mission": "phase11_digital_twin_validation",
+  "environment": "indoor_gps_denied",
+  "fault": "telemetry_delay",
+  "vehicle_count": 4
+}

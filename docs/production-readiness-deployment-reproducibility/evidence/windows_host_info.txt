@@ -1,0 +1,10 @@
+﻿
+
+WindowsProductName         : Windows 10 Pro
+WindowsVersion             : 2009
+OsHardwareAbstractionLayer : 10.0.26100.1
+OsName                     : Microsoft Windows 11 Pro
+OsVersion                  : 10.0.26200
+
+
+

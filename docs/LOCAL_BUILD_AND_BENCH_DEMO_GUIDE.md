@@ -1,4 +1,4 @@
-# Local Build And Bench Demo Guide
+﻿# Local Build And Bench Demo Guide
 
 ## Purpose
 
@@ -122,19 +122,19 @@ This project requires:
 
 ### Windows
 
-The top-level [CMakeLists.txt](/d:/Final%20Project/drone_swarm/CMakeLists.txt) is already prepared to use `vcpkg` on Windows when `VCPKG_ROOT` is set.
+The top-level [CMakeLists.txt](../CMakeLists.txt) is already prepared to use `vcpkg` on Windows when `VCPKG_ROOT` is set.
 
 1. Install `vcpkg`
 
 ```powershell
-git clone https://github.com/microsoft/vcpkg D:\tools\vcpkg-full
-D:\tools\vcpkg-full\bootstrap-vcpkg.bat
+git clone https://github.com/microsoft/vcpkg $env:USERPROFILE\vcpkg
+& "$env:USERPROFILE\vcpkg\bootstrap-vcpkg.bat"
 ```
 
 2. Set the environment variable:
 
 ```powershell
-$env:VCPKG_ROOT="D:\tools\vcpkg-full"
+$env:VCPKG_ROOT="$env:USERPROFILE\vcpkg"
 ```
 
 3. Install packages:
@@ -207,13 +207,13 @@ If you already unpacked Eigen manually instead of using a package manager, point
 Typical layout:
 
 ```text
-C:\deps\eigen-3.4.0\include\eigen3\Eigen\Core
+<path-to-eigen>\include\eigen3\Eigen\Core
 ```
 
 Windows PowerShell:
 
 ```powershell
-$env:EIGEN3_INCLUDE_DIR="C:\deps\eigen-3.4.0\include\eigen3"
+$env:EIGEN3_INCLUDE_DIR="<path-to-eigen>\\include\\eigen3"
 cmake -S . -B build-local -DBUILD_TESTS=ON
 ```
 
@@ -284,7 +284,7 @@ Linux:
 cmake --build build-local
 ```
 
-The C++ test executables are declared in [tests/CMakeLists.txt](/d:/Final%20Project/drone_swarm/tests/CMakeLists.txt).
+The C++ test executables are declared in [tests/CMakeLists.txt](../tests/CMakeLists.txt).
 
 ## 7. Run `ctest`
 
@@ -413,7 +413,7 @@ Fix:
 
 Symptom:
 
-- CMake is invoked with `D:\tools\vcpkg-full`, but the build tries to link libraries from `C:\tools\vcpkg-full`, for example `C:\tools\vcpkg-full\installed\x64-windows\lib\pcl_io.lib`
+- CMake is invoked with one `VCPKG_ROOT`, but the build tries to link libraries from a different cached vcpkg location
 
 Cause:
 
@@ -424,32 +424,32 @@ Fix from the repository root:
 ```powershell
 Remove-Item -Recurse -Force .\build-local-validate -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force .\build-edge -ErrorAction SilentlyContinue
-$env:VCPKG_ROOT="D:\tools\vcpkg-full"
+$env:VCPKG_ROOT="$env:USERPROFILE\vcpkg"
 ```
 
 Optional persistent user environment:
 
 ```powershell
-setx VCPKG_ROOT "D:\tools\vcpkg-full"
+setx VCPKG_ROOT "$env:USERPROFILE\vcpkg"
 ```
 
 Verify the expected files exist:
 
 ```powershell
-Test-Path "D:\tools\vcpkg-full\installed\x64-windows\lib\pcl_io.lib"
-Test-Path "D:\tools\vcpkg-full\installed\x64-windows\include\eigen3\Eigen\Core"
+Test-Path "$env:VCPKG_ROOT\installed\x64-windows\lib\pcl_io.lib"
+Test-Path "$env:VCPKG_ROOT\installed\x64-windows\include\eigen3\Eigen\Core"
 ```
 
 If dependencies are missing:
 
 ```powershell
-D:\tools\vcpkg-full\vcpkg.exe install pcl:x64-windows opencv:x64-windows eigen3:x64-windows spdlog:x64-windows fmt:x64-windows
+& "$env:VCPKG_ROOT\vcpkg.exe" install pcl:x64-windows opencv:x64-windows eigen3:x64-windows spdlog:x64-windows fmt:x64-windows
 ```
 
 Rerun with an explicit toolchain:
 
 ```powershell
-cmake -S . -B build-local-validate -DBUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake
+cmake -S . -B build-local-validate -DBUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
 cmake --build build-local-validate --config Release
 ctest --test-dir build-local-validate --output-on-failure -C Release
 ```
@@ -457,7 +457,7 @@ ctest --test-dir build-local-validate --output-on-failure -C Release
 The validator also checks for this mismatch:
 
 ```powershell
-python scripts/local_validate.py --toolchain "D:\tools\vcpkg-full\scripts\buildsystems\vcpkg.cmake"
+python scripts/local_validate.py --toolchain "$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
 ```
 
 ### `Could not find spdlog`

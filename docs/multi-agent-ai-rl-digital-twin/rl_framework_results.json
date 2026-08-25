@@ -1,0 +1,219 @@
+{
+  "generated_at": "2026-07-17T07:40:16.086271Z",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "scenario_count": 2,
+  "scenarios": [
+    {
+      "scenario": "swarm_route_selection",
+      "objective": "coordination-aware route selection",
+      "policies": [
+        {
+          "policy": "ppo",
+          "interface": {
+            "policy": "ppo",
+            "update_style": "on-policy",
+            "supports_continuous_actions": true
+          },
+          "metrics": {
+            "policy_stability": 0.759,
+            "sample_efficiency": 0.666,
+            "safety_alignment": 0.91
+          },
+          "training_contract": {
+            "observation_schema": "phase11/swarm_route_selection/observation_v1",
+            "action_schema": "phase11/swarm_route_selection/action_v1",
+            "reward_components": [
+              "mission_progress",
+              "safety_margin",
+              "coordination_quality"
+            ]
+          }
+        },
+        {
+          "policy": "dqn",
+          "interface": {
+            "policy": "dqn",
+            "update_style": "value-based",
+            "supports_discrete_actions": true
+          },
+          "metrics": {
+            "policy_stability": 0.654,
+            "sample_efficiency": 0.622,
+            "safety_alignment": 0.718
+          },
+          "training_contract": {
+            "observation_schema": "phase11/swarm_route_selection/observation_v1",
+            "action_schema": "phase11/swarm_route_selection/action_v1",
+            "reward_components": [
+              "mission_progress",
+              "safety_margin",
+              "coordination_quality"
+            ]
+          }
+        },
+        {
+          "policy": "sac",
+          "interface": {
+            "policy": "sac",
+            "update_style": "entropy-regularized",
+            "supports_continuous_actions": true
+          },
+          "metrics": {
+            "policy_stability": 0.702,
+            "sample_efficiency": 0.648,
+            "safety_alignment": 0.794
+          },
+          "training_contract": {
+            "observation_schema": "phase11/swarm_route_selection/observation_v1",
+            "action_schema": "phase11/swarm_route_selection/action_v1",
+            "reward_components": [
+              "mission_progress",
+              "safety_margin",
+              "coordination_quality"
+            ]
+          }
+        },
+        {
+          "policy": "custom",
+          "interface": {
+            "policy": "custom",
+            "update_style": "pluggable",
+            "supports_custom_observation_spaces": true
+          },
+          "metrics": {
+            "policy_stability": 0.607,
+            "sample_efficiency": 0.556,
+            "safety_alignment": 0.756
+          },
+          "training_contract": {
+            "observation_schema": "phase11/swarm_route_selection/observation_v1",
+            "action_schema": "phase11/swarm_route_selection/action_v1",
+            "reward_components": [
+              "mission_progress",
+              "safety_margin",
+              "coordination_quality"
+            ]
+          }
+        }
+      ],
+      "latency_ms": 1.173,
+      "status": "PASS"
+    },
+    {
+      "scenario": "fault_recovery_policy",
+      "objective": "adaptive recovery under estimator degradation",
+      "policies": [
+        {
+          "policy": "ppo",
+          "interface": {
+            "policy": "ppo",
+            "update_style": "on-policy",
+            "supports_continuous_actions": true
+          },
+          "metrics": {
+            "policy_stability": 0.738,
+            "sample_efficiency": 0.657,
+            "safety_alignment": 0.901
+          },
+          "training_contract": {
+            "observation_schema": "phase11/fault_recovery_policy/observation_v1",
+            "action_schema": "phase11/fault_recovery_policy/action_v1",
+            "reward_components": [
+              "mission_progress",
+              "safety_margin",
+              "coordination_quality"
+            ]
+          }
+        },
+        {
+          "policy": "dqn",
+          "interface": {
+            "policy": "dqn",
+            "update_style": "value-based",
+            "supports_discrete_actions": true
+          },
+          "metrics": {
+            "policy_stability": 0.661,
+            "sample_efficiency": 0.624,
+            "safety_alignment": 0.732
+          },
+          "training_contract": {
+            "observation_schema": "phase11/fault_recovery_policy/observation_v1",
+            "action_schema": "phase11/fault_recovery_policy/action_v1",
+            "reward_components": [
+              "mission_progress",
+              "safety_margin",
+              "coordination_quality"
+            ]
+          }
+        },
+        {
+          "policy": "sac",
+          "interface": {
+            "policy": "sac",
+            "update_style": "entropy-regularized",
+            "supports_continuous_actions": true
+          },
+          "metrics": {
+            "policy_stability": 0.694,
+            "sample_efficiency": 0.641,
+            "safety_alignment": 0.815
+          },
+          "training_contract": {
+            "observation_schema": "phase11/fault_recovery_policy/observation_v1",
+            "action_schema": "phase11/fault_recovery_policy/action_v1",
+            "reward_components": [
+              "mission_progress",
+              "safety_margin",
+              "coordination_quality"
+            ]
+          }
+        },
+        {
+          "policy": "custom",
+          "interface": {
+            "policy": "custom",
+            "update_style": "pluggable",
+            "supports_custom_observation_spaces": true
+          },
+          "metrics": {
+            "policy_stability": 0.613,
+            "sample_efficiency": 0.552,
+            "safety_alignment": 0.798
+          },
+          "training_contract": {
+            "observation_schema": "phase11/fault_recovery_policy/observation_v1",
+            "action_schema": "phase11/fault_recovery_policy/action_v1",
+            "reward_components": [
+              "mission_progress",
+              "safety_margin",
+              "coordination_quality"
+            ]
+          }
+        }
+      ],
+      "latency_ms": 1.198,
+      "status": "PASS"
+    }
+  ],
+  "summary": {
+    "registered_policies": [
+      "ppo",
+      "dqn",
+      "sac",
+      "custom"
+    ],
+    "latency_ms": {
+      "count": 2.0,
+      "average_ms": 1.1855,
+      "p50_ms": 1.173,
+      "p95_ms": 1.198,
+      "p99_ms": 1.198,
+      "max_ms": 1.198
+    }
+  },
+  "status": "PASS"
+}

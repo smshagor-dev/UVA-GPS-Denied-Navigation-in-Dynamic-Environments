@@ -17,14 +17,19 @@ public:
         size_t max_batch_size{32};
     };
 
-    explicit UWBSerialDriver(Config cfg = {});
+    UWBSerialDriver();
+    explicit UWBSerialDriver(Config cfg);
     ~UWBSerialDriver();
 
     bool start();
     void stop();
-    [[nodiscard]] bool running() const { return running_; }
+    [[nodiscard]] bool running() const {
+        return running_;
+    }
     [[nodiscard]] std::optional<std::vector<TDOALocalizer::Measurement>> poll();
-    [[nodiscard]] double last_batch_timestamp_s() const { return last_batch_timestamp_s_; }
+    [[nodiscard]] double last_batch_timestamp_s() const {
+        return last_batch_timestamp_s_;
+    }
 
 private:
     Config cfg_;

@@ -1,0 +1,186 @@
+{
+  "generated_at": "2026-07-17T07:40:16.033204Z",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "scenario_count": 3,
+  "scenarios": [
+    {
+      "name": "cooperative_mapping",
+      "objective": "allocate mapping and relay tasks under nominal mesh conditions",
+      "leader_id": 1101,
+      "requires_leader_rotation": false,
+      "consensus_score": 0.843,
+      "cooperation_score": 0.941,
+      "task_allocations": [
+        {
+          "drone_id": 1101,
+          "task": "leader",
+          "accepted": true,
+          "negotiation_margin": 0.878,
+          "workload": 0.18
+        },
+        {
+          "drone_id": 1104,
+          "task": "mapper",
+          "accepted": true,
+          "negotiation_margin": 0.764,
+          "workload": 0.21
+        },
+        {
+          "drone_id": 1102,
+          "task": "relay",
+          "accepted": true,
+          "negotiation_margin": 0.838,
+          "workload": 0.22
+        },
+        {
+          "drone_id": 1103,
+          "task": "observer",
+          "accepted": true,
+          "negotiation_margin": 0.8,
+          "workload": 0.27
+        }
+      ],
+      "conflict_resolution": {
+        "resolution_mode": "direct_commit",
+        "consensus_reached": true,
+        "mission_conflict_resolved": true,
+        "shared_state_updates": 11
+      },
+      "shared_world_state": {
+        "active_leader": 1101,
+        "team_size": 4,
+        "shared_confidence": 0.875,
+        "quorum_fraction": 1.0
+      },
+      "dynamic_leader_election": false,
+      "recovery_time_s": 1.18,
+      "latency_ms": 1.716,
+      "pass": true
+    },
+    {
+      "name": "leader_reselection",
+      "objective": "recover mission coordination during leader degradation",
+      "leader_id": 1113,
+      "requires_leader_rotation": true,
+      "consensus_score": 0.743,
+      "cooperation_score": 0.895,
+      "task_allocations": [
+        {
+          "drone_id": 1113,
+          "task": "leader",
+          "accepted": true,
+          "negotiation_margin": 0.809,
+          "workload": 0.24
+        },
+        {
+          "drone_id": 1114,
+          "task": "mapper",
+          "accepted": true,
+          "negotiation_margin": 0.769,
+          "workload": 0.19
+        },
+        {
+          "drone_id": 1112,
+          "task": "relay",
+          "accepted": true,
+          "negotiation_margin": 0.849,
+          "workload": 0.2
+        },
+        {
+          "drone_id": 1111,
+          "task": "observer",
+          "accepted": true,
+          "negotiation_margin": 0.601,
+          "workload": 0.42
+        }
+      ],
+      "conflict_resolution": {
+        "resolution_mode": "direct_commit",
+        "consensus_reached": true,
+        "mission_conflict_resolved": true,
+        "shared_state_updates": 12
+      },
+      "shared_world_state": {
+        "active_leader": 1113,
+        "team_size": 4,
+        "shared_confidence": 0.798,
+        "quorum_fraction": 1.0
+      },
+      "dynamic_leader_election": true,
+      "recovery_time_s": 1.616,
+      "latency_ms": 1.84,
+      "pass": true
+    },
+    {
+      "name": "conflict_resolution_under_delay",
+      "objective": "resolve mission intent conflicts under degraded communication",
+      "leader_id": 1121,
+      "requires_leader_rotation": false,
+      "consensus_score": 0.677,
+      "cooperation_score": 0.869,
+      "task_allocations": [
+        {
+          "drone_id": 1121,
+          "task": "leader",
+          "accepted": true,
+          "negotiation_margin": 0.8,
+          "workload": 0.25
+        },
+        {
+          "drone_id": 1123,
+          "task": "mapper",
+          "accepted": true,
+          "negotiation_margin": 0.694,
+          "workload": 0.22
+        },
+        {
+          "drone_id": 1124,
+          "task": "relay",
+          "accepted": true,
+          "negotiation_margin": 0.74,
+          "workload": 0.29
+        },
+        {
+          "drone_id": 1122,
+          "task": "observer",
+          "accepted": true,
+          "negotiation_margin": 0.728,
+          "workload": 0.31
+        }
+      ],
+      "conflict_resolution": {
+        "resolution_mode": "direct_commit",
+        "consensus_reached": true,
+        "mission_conflict_resolved": true,
+        "shared_state_updates": 12
+      },
+      "shared_world_state": {
+        "active_leader": 1121,
+        "team_size": 4,
+        "shared_confidence": 0.82,
+        "quorum_fraction": 1.0
+      },
+      "dynamic_leader_election": false,
+      "recovery_time_s": 2.09,
+      "latency_ms": 2.155,
+      "pass": true
+    }
+  ],
+  "summary": {
+    "pass_rate": 1.0,
+    "consensus_score_avg": 0.7543333333333333,
+    "cooperation_score_avg": 0.9016666666666667,
+    "latency_ms": {
+      "count": 3.0,
+      "average_ms": 1.9036666666666668,
+      "p50_ms": 1.84,
+      "p95_ms": 2.155,
+      "p99_ms": 2.155,
+      "max_ms": 2.155
+    }
+  },
+  "status": "PASS"
+}

@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "python"
+    open-pull-requests-limit: 5
+    groups:
+      python-runtime:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "main"
+    labels:
+      - "dependencies"
+      - "go"
+    open-pull-requests-limit: 5

@@ -43,14 +43,17 @@ public:
         double damping{1.0e-3};
     };
 
-    explicit TDOALocalizer(Config cfg = {});
+    TDOALocalizer();
+    explicit TDOALocalizer(Config cfg);
 
     void set_anchors(std::vector<Anchor> anchors);
-    [[nodiscard]] const std::vector<Anchor>& anchors() const { return anchors_; }
+    [[nodiscard]] const std::vector<Anchor>& anchors() const {
+        return anchors_;
+    }
 
-    [[nodiscard]] std::optional<Solution> estimate(
-        const std::vector<Measurement>& measurements,
-        std::optional<Eigen::Vector3d> seed = std::nullopt) const;
+    [[nodiscard]] std::optional<Solution>
+    estimate(const std::vector<Measurement>& measurements,
+             std::optional<Eigen::Vector3d> seed = std::nullopt) const;
 
 private:
     [[nodiscard]] const Anchor* find_anchor(uint32_t id) const;

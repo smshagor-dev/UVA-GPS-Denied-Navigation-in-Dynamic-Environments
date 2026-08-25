@@ -2,9 +2,8 @@
 // Project: UVA GPS Denied Navigation in Dynamic Environments
 // Technology: C++, Python, Go, CMake
 
- 
 // test_sensors.cpp    GoogleTest suite for sensor subsystem
- 
+
 #include <gtest/gtest.h>
 #include "sensors/SensorBase.hpp"
 #include "sensors/IMUSensor.hpp"
@@ -33,8 +32,7 @@ using namespace drone::sensors;
 //  Minimal concrete sensor for testing the base class â”€
 class MockSensor : public SensorBase {
 public:
-    explicit MockSensor(std::string id)
-        : SensorBase(std::move(id), "MOCK") {}
+    explicit MockSensor(std::string id) : SensorBase(std::move(id), "MOCK") {}
 
     bool initialize() override {
         poll_rate_hz_ = 100;
@@ -42,14 +40,18 @@ public:
         return true;
     }
 
-    bool reconfigure(const std::string&) override { return true; }
+    bool reconfigure(const std::string&) override {
+        return true;
+    }
 
-    void poll() override { ++poll_calls_; }
+    void poll() override {
+        ++poll_calls_;
+    }
 
     int poll_calls_{0};
 };
 
-//  SensorBase lifecycle 
+//  SensorBase lifecycle
 TEST(SensorBase, InitialStateIsUninitialized) {
     MockSensor s("test_sensor");
     EXPECT_EQ(s.state(), SensorState::UNINITIALIZED);
@@ -89,9 +91,15 @@ TEST(SensorBase, ErrorCallbackFires) {
     class ErrorSensor : public SensorBase {
     public:
         using SensorBase::SensorBase;
-        bool initialize() override { return true; }
-        bool reconfigure(const std::string&) override { return true; }
-        void poll() override { report_error("test error"); }
+        bool initialize() override {
+            return true;
+        }
+        bool reconfigure(const std::string&) override {
+            return true;
+        }
+        void poll() override {
+            report_error("test error");
+        }
     };
 
     ErrorSensor s("error_sensor", "ERROR");
@@ -107,7 +115,7 @@ TEST(SensorBase, ErrorCallbackFires) {
     EXPECT_TRUE(cb_fired);
 }
 
-//  IMUSensor construction 
+//  IMUSensor construction
 TEST(IMUSensor, ConstructWithDefaults) {
     auto imu = std::make_shared<IMUSensor>("imu0");
     EXPECT_EQ(imu->sensor_id(), "imu0");
@@ -178,8 +186,14 @@ TEST(LidarSensor, ValidSamplePacketParsed) {
     std::memcpy(packet.bytes.data() + 6, &point_count, sizeof(point_count));
 
     const std::array<float, 8> values{{
-        1.0f, 0.0f, 0.0f, 0.8f,
-        1.2f, 0.2f, 0.1f, 0.6f,
+        1.0f,
+        0.0f,
+        0.0f,
+        0.8f,
+        1.2f,
+        0.2f,
+        0.1f,
+        0.6f,
     }};
     std::memcpy(packet.bytes.data() + 8, values.data(), values.size() * sizeof(float));
 
@@ -203,9 +217,18 @@ TEST(LidarSensor, ObstacleListGeneratedFromValidScan) {
     std::memcpy(packet.bytes.data() + 6, &point_count, sizeof(point_count));
 
     const std::array<float, 12> values{{
-        1.0f, 0.0f, 0.0f, 0.9f,
-        1.3f, 0.1f, 0.0f, 0.7f,
-        1.6f, -0.1f, 0.1f, 0.5f,
+        1.0f,
+        0.0f,
+        0.0f,
+        0.9f,
+        1.3f,
+        0.1f,
+        0.0f,
+        0.7f,
+        1.6f,
+        -0.1f,
+        0.1f,
+        0.5f,
     }};
     std::memcpy(packet.bytes.data() + 8, values.data(), values.size() * sizeof(float));
 
@@ -221,10 +244,7 @@ TEST(LidarSensor, ObstacleListGeneratedFromValidScan) {
     measurement.num_points = static_cast<uint32_t>(measurement.cloud->size());
 
     const auto obstacles = drone::swarm::LeaderFollowerController::obstacles_from_lidar(
-        measurement,
-        Eigen::Vector3d(0.0, 0.0, 2.0),
-        1,
-        0.5f);
+        measurement, Eigen::Vector3d(0.0, 0.0, 2.0), 1, 0.5f);
     EXPECT_EQ(obstacles.size(), 3u);
     EXPECT_GT(obstacles.front().position.x(), 0.5);
 }
@@ -259,13 +279,12 @@ TEST(CameraSensor, UnknownClassBecomesUnknownClassId) {
 //  SensorState string conversion â”€
 TEST(SensorState, ToStringAllValues) {
     EXPECT_EQ(to_string(SensorState::UNINITIALIZED), "UNINITIALIZED");
-    EXPECT_EQ(to_string(SensorState::RUNNING),       "RUNNING");
-    EXPECT_EQ(to_string(SensorState::DEGRADED),      "DEGRADED");
-    EXPECT_EQ(to_string(SensorState::FAILED),        "FAILED");
-    EXPECT_EQ(to_string(SensorState::DISCONNECTED),  "DISCONNECTED");
+    EXPECT_EQ(to_string(SensorState::RUNNING), "RUNNING");
+    EXPECT_EQ(to_string(SensorState::DEGRADED), "DEGRADED");
+    EXPECT_EQ(to_string(SensorState::FAILED), "FAILED");
+    EXPECT_EQ(to_string(SensorState::DISCONNECTED), "DISCONNECTED");
 }
 
- 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();

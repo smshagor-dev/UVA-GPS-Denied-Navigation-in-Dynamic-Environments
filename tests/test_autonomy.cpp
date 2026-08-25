@@ -16,11 +16,7 @@ using namespace drone;
 
 namespace {
 
-sensors::Detection make_detection(std::string label,
-                                  float confidence,
-                                  float x,
-                                  float y,
-                                  float w,
+sensors::Detection make_detection(std::string label, float confidence, float x, float y, float w,
                                   float h) {
     sensors::Detection detection;
     detection.label = std::move(label);
@@ -82,13 +78,8 @@ TEST(DecisionEngine, ReceivesSemanticLabelFromDetectorMapping) {
     };
 
     sensors::CameraFrame frame;
-    frame.detections.push_back(make_detection(
-        sensors::resolve_detector_label(70, label_map),
-        0.92f,
-        0.40f,
-        0.35f,
-        0.18f,
-        0.18f));
+    frame.detections.push_back(make_detection(sensors::resolve_detector_label(70, label_map), 0.92f,
+                                              0.40f, 0.35f, 0.18f, 0.18f));
     ctx.frame = frame;
 
     const auto command = engine.update(ctx);
@@ -102,7 +93,8 @@ TEST(DecisionEngine, UnknownObjectTriggersSafeObstacleBehavior) {
     auto ctx = make_context();
 
     sensors::CameraFrame frame;
-    frame.detections.push_back(make_detection("unknown_class_99", 0.90f, 0.28f, 0.24f, 0.32f, 0.36f));
+    frame.detections.push_back(
+        make_detection("unknown_class_99", 0.90f, 0.28f, 0.24f, 0.32f, 0.36f));
     ctx.frame = frame;
 
     const auto command = engine.update(ctx);

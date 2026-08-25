@@ -26,7 +26,8 @@ public:
         double degraded_threshold_ms{20.0};
     };
 
-    explicit TimeSyncTracker(Config cfg = {});
+    TimeSyncTracker();
+    explicit TimeSyncTracker(Config cfg);
 
     void observe_imu(double timestamp_s);
     void observe_camera(double timestamp_s);

@@ -35,12 +35,8 @@ TelemetrySnapshot make_snapshot() {
 TEST(ControlPlaneTelemetryClient, SerializesTelemetryPayload) {
     std::string captured_body;
     ControlPlaneTelemetryClient client(
-        "http://127.0.0.1:8080/api/v1/telemetry",
-        "shared-secret",
-        1000,
-        500,
-        [&](const ControlPlaneTelemetryClient::ParsedEndpoint& endpoint,
-            std::string_view body,
+        "http://127.0.0.1:8080/api/v1/telemetry", "shared-secret", 1000, 500,
+        [&](const ControlPlaneTelemetryClient::ParsedEndpoint& endpoint, std::string_view body,
             const ControlPlaneTelemetryClient::HeaderList& headers,
             int timeout_ms) -> ControlPlaneTelemetryClient::HttpResponse {
             EXPECT_EQ(endpoint.host, "127.0.0.1");
@@ -115,14 +111,9 @@ TEST(ControlPlaneTelemetryClient, MissingSensorsSerializeAsUnavailable) {
 TEST(ControlPlaneTelemetryClient, FailedBackendDoesNotCrashDrone) {
     int attempts = 0;
     ControlPlaneTelemetryClient client(
-        "http://127.0.0.1:8080/api/v1/telemetry",
-        "shared-secret",
-        1000,
-        500,
-        [&](const ControlPlaneTelemetryClient::ParsedEndpoint&,
-            std::string_view,
-            const ControlPlaneTelemetryClient::HeaderList&,
-            int) {
+        "http://127.0.0.1:8080/api/v1/telemetry", "shared-secret", 1000, 500,
+        [&](const ControlPlaneTelemetryClient::ParsedEndpoint&, std::string_view,
+            const ControlPlaneTelemetryClient::HeaderList&, int) {
             ++attempts;
             return ControlPlaneTelemetryClient::HttpResponse{false, 0, "connection refused"};
         });
@@ -136,14 +127,9 @@ TEST(ControlPlaneTelemetryClient, FailedBackendDoesNotCrashDrone) {
 TEST(ControlPlaneTelemetryClient, RetryLogicBacksOffAfterFailure) {
     int attempts = 0;
     ControlPlaneTelemetryClient client(
-        "http://127.0.0.1:8080/api/v1/telemetry",
-        "shared-secret",
-        1000,
-        500,
-        [&](const ControlPlaneTelemetryClient::ParsedEndpoint&,
-            std::string_view,
-            const ControlPlaneTelemetryClient::HeaderList&,
-            int) {
+        "http://127.0.0.1:8080/api/v1/telemetry", "shared-secret", 1000, 500,
+        [&](const ControlPlaneTelemetryClient::ParsedEndpoint&, std::string_view,
+            const ControlPlaneTelemetryClient::HeaderList&, int) {
             ++attempts;
             if (attempts == 1) {
                 return ControlPlaneTelemetryClient::HttpResponse{false, 0, "timeout"};

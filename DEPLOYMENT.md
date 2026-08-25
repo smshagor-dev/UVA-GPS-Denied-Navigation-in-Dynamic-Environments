@@ -252,26 +252,55 @@ DRONE_SWARM_SECRET=replace-with-a-strong-shared-secret
 
 ### Windows
 
-For the C++ path, make sure CMake can locate:
+Verified Phase 2 native path:
+
+- export `VCPKG_ROOT`
+- use tracked presets from `CMakePresets.json`
+- let manifest mode resolve required dependencies
+
+Required dependencies:
 
 - `Eigen3`
 - `OpenCV`
 - `PCL`
 - `spdlog`
 
-Optional:
+Optional dependencies:
 
-- `pybind11` can now be fetched automatically during CMake configure
-- native `Fast-DDS` transport can be enabled from local package installation
-- `TensorRT` requires an NVIDIA GPU/runtime and is not expected on AMD-only machines
+- `pybind11`
+- `Fast-DDS`
+- `TensorRT`
 
-If packages are installed in nonstandard locations, set `CMAKE_PREFIX_PATH` or package-specific `*_DIR` variables before configuring.
+Recommended setup:
 
-Current verified Windows path in this workspace:
+```powershell
+git clone https://github.com/microsoft/vcpkg $env:USERPROFILE\vcpkg
+$env:VCPKG_ROOT="$env:USERPROFILE\vcpkg"
+& "$env:VCPKG_ROOT\bootstrap-vcpkg.bat"
+```
 
-- `vcpkg` packages under `C:\tools\vcpkg-full\installed\x64-windows`
-- native `Fast-DDS` installed and detected
-- `drone_bridge` built successfully through fetched `pybind11`
+Verified Windows commands on 2026-07-14:
+
+```powershell
+cmake --preset windows-msvc-release
+cmake --build --preset windows-msvc-release
+ctest --preset windows-msvc-release
+
+cmake --preset windows-msvc-debug
+cmake --build --preset windows-msvc-debug
+ctest --preset windows-msvc-debug
+```
+
+Observed results:
+
+- Release: `112/112` tests passed
+- Debug: `112/112` tests passed
+
+Behavior notes:
+
+- `pybind11`: fetched automatically when no package config is found
+- `Fast-DDS`: explicit `NOT FOUND - UDP transport fallback enabled` status when unavailable
+- `TensorRT`: disabled by default unless explicitly enabled
 
 ### Linux / Jetson
 
@@ -290,6 +319,12 @@ python3 scripts/drone_setup.py setup
 python3 scripts/drone_setup.py build --tests
 ```
 
+Phase 2 Linux runtime status:
+
+- `SUPPORTED BUT NOT VERIFIED`
+- WSL Ubuntu was present on 2026-07-14, but `cmake` was not installed there, so Linux preset execution was blocked before configure
+- Jetson-specific helper logic remains available through `cmake/jetson_toolchain.cmake`, now parameterized through cache or environment variables instead of fixed tracked paths
+
 ## Logs
 
 Current log locations:
@@ -307,14 +342,22 @@ Before packaging or collecting artifacts, clear old logs if you need a clean run
 Recommended checks:
 
 ```powershell
-python -m py_compile main.py gui/dashboard.py scripts/drone_setup.py
+$env:VCPKG_ROOT="$env:USERPROFILE\vcpkg"
+python scripts/local_validate.py
+python -m unittest tests.test_dashboard_backend_status
 go test ./...
-cmake -S . -B build-deploy -DBUILD_TESTS=ON
-cmake --build build-deploy --config Release
-ctest --test-dir build-deploy --output-on-failure -C Release
+cmake --preset windows-msvc-release
+cmake --build --preset windows-msvc-release
+ctest --preset windows-msvc-release
 ```
 
-Do not rely on older checked-in build directories such as `build-tests/` without regenerating them. They may contain machine-specific absolute paths.
+Install validation:
+
+```powershell
+cmake --install build\windows-msvc-release --config Release --prefix build\install-check
+```
+
+Do not rely on older checked-in build directories without regenerating them. They may contain stale caches or host-specific package state.
 
 ## Operational Notes
 

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Phase 7 Experiment Metadata",
+  "type": "object",
+  "required": [
+    "experiment_id",
+    "run_id",
+    "phase",
+    "started_at",
+    "completed_at",
+    "artifact",
+    "status",
+    "config_snapshots"
+  ],
+  "properties": {
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "type": "string",
+      "const": "Phase 7"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "artifact": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "config_snapshots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "exists"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "exists": {
+            "type": "boolean"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "modified_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

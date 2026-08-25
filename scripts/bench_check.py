@@ -37,7 +37,9 @@ class CheckResult:
 
 
 class BenchChecker:
-    def __init__(self, runtime_config_path: Path, backend_url: str, timeout_s: float) -> None:
+    def __init__(
+        self, runtime_config_path: Path, backend_url: str, timeout_s: float
+    ) -> None:
         self.runtime_config_path = runtime_config_path
         self.backend_url = backend_url.rstrip("/")
         self.timeout_s = timeout_s
@@ -70,7 +72,9 @@ class BenchChecker:
     def _check_runtime_config(self) -> None:
         name = "runtime_config"
         if not self.runtime_config_path.exists():
-            self._record(name, False, f"missing runtime config: {self.runtime_config_path}")
+            self._record(
+                name, False, f"missing runtime config: {self.runtime_config_path}"
+            )
             return
         try:
             self.runtime_config = self._load_json_file(self.runtime_config_path)
@@ -79,24 +83,36 @@ class BenchChecker:
             return
         anchor_value = str(self.runtime_config.get("anchor_config_path", "")).strip()
         lidar_value = str(self.runtime_config.get("lidar_config_path", "")).strip()
-        self.anchor_config_path = self._resolve_repo_path(anchor_value) if anchor_value else None
-        self.lidar_config_path = self._resolve_repo_path(lidar_value) if lidar_value else None
+        self.anchor_config_path = (
+            self._resolve_repo_path(anchor_value) if anchor_value else None
+        )
+        self.lidar_config_path = (
+            self._resolve_repo_path(lidar_value) if lidar_value else None
+        )
         self._record(name, True, f"loaded {self.runtime_config_path}")
 
     def _check_runtime_mode(self) -> None:
         mode = _normalize_mode(self.runtime_config.get("runtime_mode", "simulation"))
         if mode == "simulation":
-            self._record("runtime_mode", False, "runtime_mode is simulation; bench acceptance requires bench or production")
+            self._record(
+                "runtime_mode",
+                False,
+                "runtime_mode is simulation; bench acceptance requires bench or production",
+            )
             return
         self._record("runtime_mode", True, f"runtime_mode={mode}")
 
     def _check_anchor_config(self) -> None:
         name = "anchor_config"
         if self.anchor_config_path is None:
-            self._record(name, False, "runtime config does not define anchor_config_path")
+            self._record(
+                name, False, "runtime config does not define anchor_config_path"
+            )
             return
         if not self.anchor_config_path.exists():
-            self._record(name, False, f"missing anchor config: {self.anchor_config_path}")
+            self._record(
+                name, False, f"missing anchor config: {self.anchor_config_path}"
+            )
             return
         try:
             data = self._load_json_file(self.anchor_config_path)
@@ -106,12 +122,18 @@ class BenchChecker:
         except Exception as exc:  # noqa: BLE001
             self._record(name, False, f"invalid anchor config: {exc}")
             return
-        self._record(name, True, f"anchors loaded from {self.anchor_config_path} ({len(anchors)} anchors)")
+        self._record(
+            name,
+            True,
+            f"anchors loaded from {self.anchor_config_path} ({len(anchors)} anchors)",
+        )
 
     def _check_lidar_config(self) -> None:
         name = "lidar_config"
         if self.lidar_config_path is None:
-            self._record(name, False, "runtime config does not define lidar_config_path")
+            self._record(
+                name, False, "runtime config does not define lidar_config_path"
+            )
             return
         if not self.lidar_config_path.exists():
             self._record(name, False, f"missing LiDAR config: {self.lidar_config_path}")
@@ -123,11 +145,15 @@ class BenchChecker:
             model = str(data.get("model", "")).strip()
             frame_id = str(data.get("frame_id", "")).strip()
             if not host or port <= 0 or not model or not frame_id:
-                raise ValueError("LiDAR config must define host, port, model, and frame_id")
+                raise ValueError(
+                    "LiDAR config must define host, port, model, and frame_id"
+                )
         except Exception as exc:  # noqa: BLE001
             self._record(name, False, f"invalid LiDAR config: {exc}")
             return
-        self._record(name, True, f"LiDAR configured host={host} port={port} model={model}")
+        self._record(
+            name, True, f"LiDAR configured host={host} port={port} model={model}"
+        )
 
     def _check_camera_open(self) -> None:
         name = "camera_open"
@@ -150,7 +176,11 @@ class BenchChecker:
                 return
             ok, _frame = capture.read()
             if not ok:
-                self._record(name, False, f"camera stream opened but no frame received: {stream_url}")
+                self._record(
+                    name,
+                    False,
+                    f"camera stream opened but no frame received: {stream_url}",
+                )
                 return
         finally:
             capture.release()
@@ -181,17 +211,27 @@ class BenchChecker:
         try:
             self._fetch_backend_payload()
         except urllib.error.URLError as exc:
-            self._record(name, False, f"backend unreachable at {self.backend_url}/api/v1/fleet: {exc}")
+            self._record(
+                name,
+                False,
+                f"backend unreachable at {self.backend_url}/api/v1/fleet: {exc}",
+            )
             return
         except Exception as exc:  # noqa: BLE001
             self._record(name, False, f"backend response invalid: {exc}")
             return
-        self._record(name, True, f"backend reachable at {self.backend_url}/api/v1/fleet")
+        self._record(
+            name, True, f"backend reachable at {self.backend_url}/api/v1/fleet"
+        )
 
     def _check_dashboard_backend_mode_visible(self) -> None:
         name = "dashboard_backend_mode"
         if not self.backend_url:
-            self._record(name, False, "backend URL unavailable, cannot verify dashboard-visible backend mode")
+            self._record(
+                name,
+                False,
+                "backend URL unavailable, cannot verify dashboard-visible backend mode",
+            )
             return
         try:
             payload = self._fetch_backend_payload()
@@ -204,12 +244,24 @@ class BenchChecker:
             self._record(name, False, "fleet response is missing backend_mode field")
             return
         if backend_mode == "simulation":
-            self._record(name, False, "backend_mode is simulation; dashboard would not be in real-data mode")
+            self._record(
+                name,
+                False,
+                "backend_mode is simulation; dashboard would not be in real-data mode",
+            )
             return
         if simulation_enabled:
-            self._record(name, False, "simulation_enabled is true; dashboard would still show simulated backend")
+            self._record(
+                name,
+                False,
+                "simulation_enabled is true; dashboard would still show simulated backend",
+            )
             return
-        self._record(name, True, f"backend_mode visible as {backend_mode} with simulation disabled")
+        self._record(
+            name,
+            True,
+            f"backend_mode visible as {backend_mode} with simulation disabled",
+        )
 
     def _fetch_backend_payload(self) -> dict[str, Any]:
         fleet_url = f"{self.backend_url}/api/v1/fleet"
@@ -237,7 +289,9 @@ class BenchChecker:
             return 1
         print()
         print("BENCH VERDICT: PASS")
-        print("Bench gate passed. This is necessary before flight, but it is not by itself a flight-readiness claim.")
+        print(
+            "Bench gate passed. This is necessary before flight, but it is not by itself a flight-readiness claim."
+        )
         return 0
 
 

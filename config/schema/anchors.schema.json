@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/drone-swarm/config/anchors.schema.json",
+  "title": "Drone Swarm Anchor Layout",
+  "type": "object",
+  "required": ["coordinate_frame", "units", "anchors"],
+  "properties": {
+    "experiment_name": { "type": "string" },
+    "version": { "type": "string" },
+    "coordinate_frame": { "type": "string", "minLength": 1 },
+    "units": { "type": "string", "minLength": 1 },
+    "environment": { "type": "object" },
+    "anchors": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["id", "x", "y", "z"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "z": { "type": "number" },
+          "status": { "type": "string" },
+          "role": { "type": "string" },
+          "clock_sync": { "type": "string" },
+          "frequency_channel": { "type": "integer" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
+

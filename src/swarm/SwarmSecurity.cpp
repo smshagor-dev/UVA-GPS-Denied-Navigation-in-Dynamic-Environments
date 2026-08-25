@@ -25,6 +25,10 @@ extern "C" {
 #include <windows.h>
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
+#else
+#include <openssl/evp.h>
+#include <openssl/hmac.h>
+#include <openssl/sha.h>
 #endif
 
 namespace drone::swarm {
@@ -57,8 +61,7 @@ void append_u64(std::vector<uint8_t>& out, uint64_t value) {
 }
 
 uint32_t read_u32(const uint8_t* data, size_t offset) {
-    return static_cast<uint32_t>(data[offset]) |
-           (static_cast<uint32_t>(data[offset + 1]) << 8) |
+    return static_cast<uint32_t>(data[offset]) | (static_cast<uint32_t>(data[offset + 1]) << 8) |
            (static_cast<uint32_t>(data[offset + 2]) << 16) |
            (static_cast<uint32_t>(data[offset + 3]) << 24);
 }
@@ -86,13 +89,8 @@ std::vector<uint8_t> concat_bytes(std::initializer_list<std::pair<const uint8_t*
 
 #ifdef _WIN32
 
-std::vector<uint8_t> bcrypt_hash(LPCWSTR algorithm,
-                                 ULONG flags,
-                                 const uint8_t* key,
-                                 size_t key_len,
-                                 const uint8_t* data,
-                                 size_t len,
-                                 size_t out_len) {
+std::vector<uint8_t> bcrypt_hash(LPCWSTR algorithm, ULONG flags, const uint8_t* key, size_t key_len,
+                                 const uint8_t* data, size_t len, size_t out_len) {
     BCRYPT_ALG_HANDLE alg = nullptr;
     BCRYPT_HASH_HANDLE hash = nullptr;
     DWORD obj_len = 0;
@@ -108,8 +106,8 @@ std::vector<uint8_t> bcrypt_hash(LPCWSTR algorithm,
 
     std::vector<uint8_t> hash_object(obj_len);
     std::vector<uint8_t> out(out_len);
-    if (BCryptCreateHash(alg, &hash, hash_object.data(), obj_len,
-                         const_cast<PUCHAR>(key), static_cast<ULONG>(key_len), 0) < 0) {
+    if (BCryptCreateHash(alg, &hash, hash_object.data(), obj_len, const_cast<PUCHAR>(key),
+                         static_cast<ULONG>(key_len), 0) < 0) {
         BCryptCloseAlgorithmProvider(alg, 0);
         throw std::runtime_error("BCryptCreateHash failed");
     }
@@ -124,26 +122,18 @@ std::vector<uint8_t> bcrypt_hash(LPCWSTR algorithm,
     return out;
 }
 
-std::vector<uint8_t> pbkdf2_sha256(std::string_view passphrase,
-                                   const uint8_t* salt,
-                                   size_t salt_len,
-                                   uint32_t iterations,
-                                   size_t out_len) {
+std::vector<uint8_t> pbkdf2_sha256(std::string_view passphrase, const uint8_t* salt,
+                                   size_t salt_len, uint32_t iterations, size_t out_len) {
     BCRYPT_ALG_HANDLE alg = nullptr;
     if (BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, nullptr,
                                     BCRYPT_ALG_HANDLE_HMAC_FLAG) < 0) {
         throw std::runtime_error("BCryptOpenAlgorithmProvider PBKDF2 failed");
     }
     std::vector<uint8_t> out(out_len);
-    if (BCryptDeriveKeyPBKDF2(alg,
-                              reinterpret_cast<PUCHAR>(const_cast<char*>(passphrase.data())),
-                              static_cast<ULONG>(passphrase.size()),
-                              const_cast<PUCHAR>(salt),
-                              static_cast<ULONG>(salt_len),
-                              iterations,
-                              out.data(),
-                              static_cast<ULONG>(out.size()),
-                              0) < 0) {
+    if (BCryptDeriveKeyPBKDF2(alg, reinterpret_cast<PUCHAR>(const_cast<char*>(passphrase.data())),
+                              static_cast<ULONG>(passphrase.size()), const_cast<PUCHAR>(salt),
+                              static_cast<ULONG>(salt_len), iterations, out.data(),
+                              static_cast<ULONG>(out.size()), 0) < 0) {
         BCryptCloseAlgorithmProvider(alg, 0);
         throw std::runtime_error("BCryptDeriveKeyPBKDF2 failed");
     }
@@ -151,10 +141,8 @@ std::vector<uint8_t> pbkdf2_sha256(std::string_view passphrase,
     return out;
 }
 
-std::vector<uint8_t> aes256_crypt(bool encrypt,
-                                  const std::array<uint8_t, 32>& key_bytes,
-                                  const std::array<uint8_t, 16>& iv_bytes,
-                                  const uint8_t* input,
+std::vector<uint8_t> aes256_crypt(bool encrypt, const std::array<uint8_t, 32>& key_bytes,
+                                  const std::array<uint8_t, 16>& iv_bytes, const uint8_t* input,
                                   size_t input_len) {
     BCRYPT_ALG_HANDLE alg = nullptr;
     BCRYPT_KEY_HANDLE key = nullptr;
@@ -166,9 +154,10 @@ std::vector<uint8_t> aes256_crypt(bool encrypt,
         throw std::runtime_error("BCryptOpenAlgorithmProvider AES failed");
     }
     const auto* chain_mode = reinterpret_cast<const uint8_t*>(BCRYPT_CHAIN_MODE_CBC);
-    const ULONG chain_mode_len = static_cast<ULONG>((wcslen(BCRYPT_CHAIN_MODE_CBC) + 1) * sizeof(wchar_t));
-    if (BCryptSetProperty(alg, BCRYPT_CHAINING_MODE,
-                          const_cast<PUCHAR>(chain_mode), chain_mode_len, 0) < 0) {
+    const ULONG chain_mode_len =
+        static_cast<ULONG>((wcslen(BCRYPT_CHAIN_MODE_CBC) + 1) * sizeof(wchar_t));
+    if (BCryptSetProperty(alg, BCRYPT_CHAINING_MODE, const_cast<PUCHAR>(chain_mode), chain_mode_len,
+                          0) < 0) {
         BCryptCloseAlgorithmProvider(alg, 0);
         throw std::runtime_error("BCryptSetProperty CBC failed");
     }
@@ -188,11 +177,12 @@ std::vector<uint8_t> aes256_crypt(bool encrypt,
     }
 
     ULONG flags = BCRYPT_BLOCK_PADDING;
-    NTSTATUS status = encrypt
-        ? BCryptEncrypt(key, const_cast<PUCHAR>(input), static_cast<ULONG>(input_len), nullptr,
-                        iv.data(), static_cast<ULONG>(iv.size()), nullptr, 0, &out_len, flags)
-        : BCryptDecrypt(key, const_cast<PUCHAR>(input), static_cast<ULONG>(input_len), nullptr,
-                        iv.data(), static_cast<ULONG>(iv.size()), nullptr, 0, &out_len, flags);
+    NTSTATUS status =
+        encrypt
+            ? BCryptEncrypt(key, const_cast<PUCHAR>(input), static_cast<ULONG>(input_len), nullptr,
+                            iv.data(), static_cast<ULONG>(iv.size()), nullptr, 0, &out_len, flags)
+            : BCryptDecrypt(key, const_cast<PUCHAR>(input), static_cast<ULONG>(input_len), nullptr,
+                            iv.data(), static_cast<ULONG>(iv.size()), nullptr, 0, &out_len, flags);
     if (status < 0) {
         BCryptDestroyKey(key);
         BCryptCloseAlgorithmProvider(alg, 0);
@@ -200,13 +190,12 @@ std::vector<uint8_t> aes256_crypt(bool encrypt,
     }
 
     std::vector<uint8_t> out(out_len);
-    status = encrypt
-        ? BCryptEncrypt(key, const_cast<PUCHAR>(input), static_cast<ULONG>(input_len), nullptr,
-                        iv.data(), static_cast<ULONG>(iv.size()),
-                        out.data(), static_cast<ULONG>(out.size()), &out_len, flags)
-        : BCryptDecrypt(key, const_cast<PUCHAR>(input), static_cast<ULONG>(input_len), nullptr,
-                        iv.data(), static_cast<ULONG>(iv.size()),
-                        out.data(), static_cast<ULONG>(out.size()), &out_len, flags);
+    status = encrypt ? BCryptEncrypt(key, const_cast<PUCHAR>(input), static_cast<ULONG>(input_len),
+                                     nullptr, iv.data(), static_cast<ULONG>(iv.size()), out.data(),
+                                     static_cast<ULONG>(out.size()), &out_len, flags)
+                     : BCryptDecrypt(key, const_cast<PUCHAR>(input), static_cast<ULONG>(input_len),
+                                     nullptr, iv.data(), static_cast<ULONG>(iv.size()), out.data(),
+                                     static_cast<ULONG>(out.size()), &out_len, flags);
     BCryptDestroyKey(key);
     BCryptCloseAlgorithmProvider(alg, 0);
     if (status < 0) {
@@ -218,13 +207,96 @@ std::vector<uint8_t> aes256_crypt(bool encrypt,
 
 #endif
 
+#ifndef _WIN32
+
+std::vector<uint8_t> evp_digest(const EVP_MD* algorithm, const uint8_t* data, size_t len,
+                                size_t out_len) {
+    std::vector<uint8_t> out(out_len);
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (!ctx) {
+        throw std::runtime_error("EVP_MD_CTX_new failed");
+    }
+
+    unsigned int digest_len = 0;
+    if (EVP_DigestInit_ex(ctx, algorithm, nullptr) != 1 || EVP_DigestUpdate(ctx, data, len) != 1 ||
+        EVP_DigestFinal_ex(ctx, out.data(), &digest_len) != 1) {
+        EVP_MD_CTX_free(ctx);
+        throw std::runtime_error("EVP digest failed");
+    }
+    EVP_MD_CTX_free(ctx);
+    out.resize(digest_len);
+    return out;
+}
+
+std::vector<uint8_t> hmac_sha256_bytes(const uint8_t* key, size_t key_len, const uint8_t* data,
+                                       size_t len, size_t out_len) {
+    std::vector<uint8_t> out(out_len);
+    unsigned int digest_len = 0;
+    if (!HMAC(EVP_sha256(), key, static_cast<int>(key_len), data, len, out.data(), &digest_len)) {
+        throw std::runtime_error("HMAC failed");
+    }
+    out.resize(digest_len);
+    return out;
+}
+
+std::vector<uint8_t> pbkdf2_sha256(std::string_view passphrase, const uint8_t* salt,
+                                   size_t salt_len, uint32_t iterations, size_t out_len) {
+    std::vector<uint8_t> out(out_len);
+    if (PKCS5_PBKDF2_HMAC(passphrase.data(), static_cast<int>(passphrase.size()), salt,
+                          static_cast<int>(salt_len), static_cast<int>(iterations), EVP_sha256(),
+                          static_cast<int>(out.size()), out.data()) != 1) {
+        throw std::runtime_error("PKCS5_PBKDF2_HMAC failed");
+    }
+    return out;
+}
+
+std::vector<uint8_t> aes256_crypt(bool encrypt, const std::array<uint8_t, 32>& key_bytes,
+                                  const std::array<uint8_t, 16>& iv_bytes, const uint8_t* input,
+                                  size_t input_len) {
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        throw std::runtime_error("EVP_CIPHER_CTX_new failed");
+    }
+
+    const EVP_CIPHER* cipher = EVP_aes_256_cbc();
+    if ((encrypt
+             ? EVP_EncryptInit_ex(ctx, cipher, nullptr, key_bytes.data(), iv_bytes.data())
+             : EVP_DecryptInit_ex(ctx, cipher, nullptr, key_bytes.data(), iv_bytes.data())) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        throw std::runtime_error("EVP cipher init failed");
+    }
+
+    std::vector<uint8_t> out(input_len + EVP_CIPHER_block_size(cipher));
+    int chunk_len = 0;
+    int final_len = 0;
+    if ((encrypt
+             ? EVP_EncryptUpdate(ctx, out.data(), &chunk_len, input, static_cast<int>(input_len))
+             : EVP_DecryptUpdate(ctx, out.data(), &chunk_len, input,
+                                 static_cast<int>(input_len))) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        throw std::runtime_error("EVP cipher update failed");
+    }
+
+    if ((encrypt ? EVP_EncryptFinal_ex(ctx, out.data() + chunk_len, &final_len)
+                 : EVP_DecryptFinal_ex(ctx, out.data() + chunk_len, &final_len)) != 1) {
+        EVP_CIPHER_CTX_free(ctx);
+        throw std::runtime_error("EVP cipher final failed");
+    }
+
+    EVP_CIPHER_CTX_free(ctx);
+    out.resize(static_cast<size_t>(chunk_len + final_len));
+    return out;
+}
+
+#endif
+
 } // namespace
 
 SwarmSecurityContext::SwarmSecurityContext(uint32_t local_id, SwarmSecurityConfig cfg)
     : local_id_(local_id), cfg_(std::move(cfg)) {
-    drone::utils::get_or_create_logger("SECURITY")->info(
-        "SwarmSecurityContext initialized local_id={} enabled={} iterations={}",
-        local_id_, enabled(), cfg_.pbkdf2_iterations);
+    drone::utils::get_or_create_logger("SECURITY")
+        ->info("SwarmSecurityContext initialized local_id={} enabled={} iterations={}", local_id_,
+               enabled(), cfg_.pbkdf2_iterations);
 }
 
 void SwarmSecurityContext::reset() {
@@ -235,10 +307,8 @@ void SwarmSecurityContext::reset() {
 }
 
 bool SwarmSecurityContext::is_ledger_message(SwarmMessage::Type type) const {
-    return type == SwarmMessage::Type::FORMATION_CMD ||
-           type == SwarmMessage::Type::LEADER_ELECT ||
-           type == SwarmMessage::Type::MISSION_SYNC ||
-           type == SwarmMessage::Type::EMERGENCY_STOP;
+    return type == SwarmMessage::Type::FORMATION_CMD || type == SwarmMessage::Type::LEADER_ELECT ||
+           type == SwarmMessage::Type::MISSION_SYNC || type == SwarmMessage::Type::EMERGENCY_STOP;
 }
 
 const SwarmSecurityContext::KeyMaterial& SwarmSecurityContext::keys_for(uint32_t node_id) {
@@ -246,20 +316,16 @@ const SwarmSecurityContext::KeyMaterial& SwarmSecurityContext::keys_for(uint32_t
     if (it != key_cache_.end()) {
         return it->second;
     }
-    drone::utils::get_or_create_logger("SECURITY")->debug("Deriving security material for node={}", node_id);
+    drone::utils::get_or_create_logger("SECURITY")
+        ->debug("Deriving security material for node={}", node_id);
     return key_cache_.emplace(node_id, derive_key_material(node_id)).first->second;
 }
 
-std::vector<uint8_t> SwarmSecurityContext::build_header(uint32_t src_id,
-                                                        uint32_t seq_num,
-                                                        uint64_t issued_ns,
-                                                        uint8_t flags,
-                                                        const std::array<uint8_t, 16>& iv,
-                                                        const std::array<uint8_t, 20>& past_sha1,
-                                                        const std::array<uint8_t, 32>& present_sha256,
-                                                        const std::array<uint8_t, 32>& future_sha3,
-                                                        const std::array<uint8_t, 32>& chain_prev_hash,
-                                                        uint32_t cipher_len) const {
+std::vector<uint8_t> SwarmSecurityContext::build_header(
+    uint32_t src_id, uint32_t seq_num, uint64_t issued_ns, uint8_t flags,
+    const std::array<uint8_t, 16>& iv, const std::array<uint8_t, 20>& past_sha1,
+    const std::array<uint8_t, 32>& present_sha256, const std::array<uint8_t, 32>& future_sha3,
+    const std::array<uint8_t, 32>& chain_prev_hash, uint32_t cipher_len) const {
     std::vector<uint8_t> header;
     header.reserve(kHeaderSize);
     append_u32(header, kSecureMagic);
@@ -284,11 +350,15 @@ std::array<uint8_t, 20> SwarmSecurityContext::sha1_bytes(const uint8_t* data, si
 #ifdef _WIN32
     const auto digest = bcrypt_hash(BCRYPT_SHA1_ALGORITHM, 0, nullptr, 0, data, len, out.size());
     std::copy(digest.begin(), digest.end(), out.begin());
+#else
+    const auto digest = evp_digest(EVP_sha1(), data, len, out.size());
+    std::copy(digest.begin(), digest.end(), out.begin());
 #endif
     return out;
 }
 
-std::array<uint8_t, 32> SwarmSecurityContext::sha256_bytes(const std::vector<uint8_t>& bytes) const {
+std::array<uint8_t, 32>
+SwarmSecurityContext::sha256_bytes(const std::vector<uint8_t>& bytes) const {
     return sha256_bytes(bytes.data(), bytes.size());
 }
 
@@ -297,28 +367,29 @@ std::array<uint8_t, 32> SwarmSecurityContext::sha256_bytes(const uint8_t* data, 
 #ifdef _WIN32
     const auto digest = bcrypt_hash(BCRYPT_SHA256_ALGORITHM, 0, nullptr, 0, data, len, out.size());
     std::copy(digest.begin(), digest.end(), out.begin());
+#else
+    const auto digest = evp_digest(EVP_sha256(), data, len, out.size());
+    std::copy(digest.begin(), digest.end(), out.begin());
 #endif
     return out;
 }
 
-std::array<uint8_t, 32> SwarmSecurityContext::sha3_256_bytes(const uint8_t* data, size_t len) const {
+std::array<uint8_t, 32> SwarmSecurityContext::sha3_256_bytes(const uint8_t* data,
+                                                             size_t len) const {
     std::array<uint8_t, 32> out{};
     sha3(data, len, out.data(), static_cast<int>(out.size()));
     return out;
 }
 
 std::array<uint8_t, 32> SwarmSecurityContext::hmac_sha256(const std::array<uint8_t, 32>& key,
-                                                          const uint8_t* data,
-                                                          size_t len) const {
+                                                          const uint8_t* data, size_t len) const {
     std::array<uint8_t, 32> out{};
 #ifdef _WIN32
-    const auto digest = bcrypt_hash(BCRYPT_SHA256_ALGORITHM,
-                                    BCRYPT_ALG_HANDLE_HMAC_FLAG,
-                                    key.data(),
-                                    key.size(),
-                                    data,
-                                    len,
-                                    out.size());
+    const auto digest = bcrypt_hash(BCRYPT_SHA256_ALGORITHM, BCRYPT_ALG_HANDLE_HMAC_FLAG,
+                                    key.data(), key.size(), data, len, out.size());
+    std::copy(digest.begin(), digest.end(), out.begin());
+#else
+    const auto digest = hmac_sha256_bytes(key.data(), key.size(), data, len, out.size());
     std::copy(digest.begin(), digest.end(), out.begin());
 #endif
     return out;
@@ -330,40 +401,36 @@ std::vector<uint8_t> SwarmSecurityContext::aes256_encrypt(const std::array<uint8
 #ifdef _WIN32
     return aes256_crypt(true, key, iv, plain.data(), plain.size());
 #else
-    return plain;
+    return aes256_crypt(true, key, iv, plain.data(), plain.size());
 #endif
 }
 
-std::optional<std::vector<uint8_t>> SwarmSecurityContext::aes256_decrypt(
-        const std::array<uint8_t, 32>& key,
-        const std::array<uint8_t, 16>& iv,
-        const uint8_t* cipher,
-        size_t len) const {
+std::optional<std::vector<uint8_t>>
+SwarmSecurityContext::aes256_decrypt(const std::array<uint8_t, 32>& key,
+                                     const std::array<uint8_t, 16>& iv, const uint8_t* cipher,
+                                     size_t len) const {
     try {
 #ifdef _WIN32
         return aes256_crypt(false, key, iv, cipher, len);
 #else
-        return std::vector<uint8_t>(cipher, cipher + len);
+        return aes256_crypt(false, key, iv, cipher, len);
 #endif
     } catch (...) {
         return std::nullopt;
     }
 }
 
-SwarmSecurityContext::KeyMaterial SwarmSecurityContext::derive_key_material(uint32_t node_id) const {
+SwarmSecurityContext::KeyMaterial
+SwarmSecurityContext::derive_key_material(uint32_t node_id) const {
     KeyMaterial material;
-#ifdef _WIN32
     std::string salt = "swarm-node-" + std::to_string(node_id);
-    const auto derived = pbkdf2_sha256(cfg_.swarm_secret,
-                                       reinterpret_cast<const uint8_t*>(salt.data()),
-                                       salt.size(),
-                                       cfg_.pbkdf2_iterations,
-                                       128);
+    const auto derived =
+        pbkdf2_sha256(cfg_.swarm_secret, reinterpret_cast<const uint8_t*>(salt.data()), salt.size(),
+                      cfg_.pbkdf2_iterations, 128);
     std::memcpy(material.enc_key.data(), derived.data(), 32);
     std::memcpy(material.mac_key.data(), derived.data() + 32, 32);
     std::memcpy(material.eddsa_seed.data(), derived.data() + 64, 32);
     std::memcpy(material.future_key.data(), derived.data() + 96, 32);
-#endif
     std::array<uint8_t, 32> seed = material.eddsa_seed;
     crypto_eddsa_key_pair(material.secret_key.data(), material.public_key.data(), seed.data());
     crypto_wipe(seed.data(), seed.size());
@@ -421,22 +488,18 @@ std::vector<uint8_t> SwarmSecurityContext::seal(const SwarmMessage& msg) {
     }
 
     const auto cipher = aes256_encrypt(keys.enc_key, iv, plain);
-    const auto header = build_header(msg.src_id, msg.seq_num, issued_ns, flags, iv,
-                                     past_sha1, present_sha256, future_sha3,
-                                     chain_prev_hash, static_cast<uint32_t>(cipher.size()));
-    const auto mac_input = concat_bytes({
-        {header.data(), header.size()},
-        {cipher.data(), cipher.size()}
-    });
+    const auto header =
+        build_header(msg.src_id, msg.seq_num, issued_ns, flags, iv, past_sha1, present_sha256,
+                     future_sha3, chain_prev_hash, static_cast<uint32_t>(cipher.size()));
+    const auto mac_input =
+        concat_bytes({{header.data(), header.size()}, {cipher.data(), cipher.size()}});
     const auto mac = hmac_sha256(keys.mac_key, mac_input.data(), mac_input.size());
 
-    auto sign_input = concat_bytes({
-        {header.data(), header.size()},
-        {mac.data(), mac.size()},
-        {cipher.data(), cipher.size()}
-    });
+    auto sign_input = concat_bytes(
+        {{header.data(), header.size()}, {mac.data(), mac.size()}, {cipher.data(), cipher.size()}});
     std::array<uint8_t, 64> signature{};
-    crypto_eddsa_sign(signature.data(), keys.secret_key.data(), sign_input.data(), sign_input.size());
+    crypto_eddsa_sign(signature.data(), keys.secret_key.data(), sign_input.data(),
+                      sign_input.size());
 
     std::vector<uint8_t> frame;
     frame.reserve(header.size() + mac.size() + signature.size() + cipher.size());
@@ -515,22 +578,17 @@ std::optional<SwarmMessage> SwarmSecurityContext::open(const uint8_t* data, size
     }
 
     const auto& keys = keys_for(src_id);
-    const auto mac_input = concat_bytes({
-        {data, kHeaderSize},
-        {cipher_ptr, cipher_len}
-    });
+    const auto mac_input = concat_bytes({{data, kHeaderSize}, {cipher_ptr, cipher_len}});
     const auto mac = hmac_sha256(keys.mac_key, mac_input.data(), mac_input.size());
     if (!std::equal(mac.begin(), mac.end(), mac_ptr)) {
         set_error("mac mismatch");
         return std::nullopt;
     }
 
-    auto sign_input = concat_bytes({
-        {data, kHeaderSize},
-        {mac_ptr, kMacSize},
-        {cipher_ptr, cipher_len}
-    });
-    if (crypto_eddsa_check(sig_ptr, keys.public_key.data(), sign_input.data(), sign_input.size()) != 0) {
+    auto sign_input =
+        concat_bytes({{data, kHeaderSize}, {mac_ptr, kMacSize}, {cipher_ptr, cipher_len}});
+    if (crypto_eddsa_check(sig_ptr, keys.public_key.data(), sign_input.data(), sign_input.size()) !=
+        0) {
         set_error("signature mismatch");
         return std::nullopt;
     }

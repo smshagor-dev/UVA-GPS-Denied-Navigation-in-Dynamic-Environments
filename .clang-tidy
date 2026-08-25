@@ -1,0 +1,18 @@
+Checks: >-
+  clang-analyzer-*,
+  bugprone-*,
+  cert-err33-c,
+  cert-env33-c,
+  performance-*,
+  portability-*,
+  modernize-use-nullptr,
+  modernize-use-override,
+  readability-qualified-auto
+WarningsAsErrors: 'clang-analyzer-*,bugprone-*,cert-*'
+HeaderFilterRegex: '^(include|src|tests)/'
+FormatStyle: none
+CheckOptions:
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase

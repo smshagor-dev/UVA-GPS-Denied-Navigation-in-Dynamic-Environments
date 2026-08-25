@@ -1,0 +1,138 @@
+{
+  "generated_at": "2026-07-16T20:10:47.043907Z",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "scenario_count": 3,
+  "scenarios": [
+    {
+      "name": "formation_management",
+      "objective": "maintain distributed formation with stable leader coordination",
+      "leader_id": 9301,
+      "formation_stability": 0.7943024794336425,
+      "coordination_score": 0.8425,
+      "task_allocation": [
+        {
+          "drone_id": 9301,
+          "task": "scout",
+          "link_quality": 0.92,
+          "battery_pct": 88.0
+        },
+        {
+          "drone_id": 9303,
+          "task": "relay",
+          "link_quality": 0.83,
+          "battery_pct": 81.0
+        },
+        {
+          "drone_id": 9302,
+          "task": "mapper",
+          "link_quality": 0.89,
+          "battery_pct": 84.0
+        },
+        {
+          "drone_id": 9304,
+          "task": "reserve",
+          "link_quality": 0.8,
+          "battery_pct": 79.0
+        }
+      ],
+      "communication_fault": 0.05,
+      "leader_fault": false,
+      "recovery_time_s": 1.6,
+      "latency_ms": 1.0530999789386988,
+      "pass": true
+    },
+    {
+      "name": "leader_fault_recovery",
+      "objective": "replace leader and preserve cooperative task execution",
+      "leader_id": 9302,
+      "formation_stability": 0.7768024794336424,
+      "coordination_score": 0.698,
+      "task_allocation": [
+        {
+          "drone_id": 9301,
+          "task": "scout",
+          "link_quality": 0.92,
+          "battery_pct": 88.0
+        },
+        {
+          "drone_id": 9303,
+          "task": "relay",
+          "link_quality": 0.83,
+          "battery_pct": 81.0
+        },
+        {
+          "drone_id": 9302,
+          "task": "mapper",
+          "link_quality": 0.89,
+          "battery_pct": 84.0
+        },
+        {
+          "drone_id": 9304,
+          "task": "reserve",
+          "link_quality": 0.8,
+          "battery_pct": 79.0
+        }
+      ],
+      "communication_fault": 0.12,
+      "leader_fault": true,
+      "recovery_time_s": 2.74,
+      "latency_ms": 1.0593000305444003,
+      "pass": true
+    },
+    {
+      "name": "communication_aware_coordination",
+      "objective": "adapt task assignment under degraded mesh quality",
+      "leader_id": 9301,
+      "formation_stability": 0.7368024794336425,
+      "coordination_score": 0.762,
+      "task_allocation": [
+        {
+          "drone_id": 9301,
+          "task": "scout",
+          "link_quality": 0.92,
+          "battery_pct": 88.0
+        },
+        {
+          "drone_id": 9303,
+          "task": "relay",
+          "link_quality": 0.83,
+          "battery_pct": 81.0
+        },
+        {
+          "drone_id": 9302,
+          "task": "mapper",
+          "link_quality": 0.89,
+          "battery_pct": 84.0
+        },
+        {
+          "drone_id": 9304,
+          "task": "reserve",
+          "link_quality": 0.8,
+          "battery_pct": 79.0
+        }
+      ],
+      "communication_fault": 0.28,
+      "leader_fault": false,
+      "recovery_time_s": 2.06,
+      "latency_ms": 1.0640999604910613,
+      "pass": true
+    }
+  ],
+  "summary": {
+    "pass_rate": 1.0,
+    "formation_stability_avg": 0.7693024794336424,
+    "fault_recovery_avg_s": 2.1333333333333333,
+    "latency_ms": {
+      "count": 3.0,
+      "average_ms": 1.05883332332472,
+      "p50_ms": 1.0593000305444003,
+      "p95_ms": 1.0640999604910613,
+      "p99_ms": 1.0640999604910613,
+      "max_ms": 1.0640999604910613
+    }
+  },
+  "status": "PASS"
+}

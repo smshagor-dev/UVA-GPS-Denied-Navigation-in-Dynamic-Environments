@@ -12,7 +12,8 @@ using namespace drone::swarm;
 
 namespace {
 
-SwarmMessage make_message(uint32_t src, uint32_t seq, SwarmMessage::Type type = SwarmMessage::Type::MISSION_SYNC) {
+SwarmMessage make_message(uint32_t src, uint32_t seq,
+                          SwarmMessage::Type type = SwarmMessage::Type::MISSION_SYNC) {
     SwarmMessage msg;
     msg.src_id = src;
     msg.dst_id = 0xFFFFFFFF;
@@ -85,7 +86,8 @@ TEST(SwarmSecurity, LedgerChainRejectsBrokenLeaderCommandHistory) {
     ASSERT_TRUE(receiver.open(first.data(), first.size()).has_value());
 
     SwarmSecurityContext restarted_sender(1, secure_cfg());
-    const auto second = restarted_sender.seal(make_message(1, 6, SwarmMessage::Type::FORMATION_CMD));
+    const auto second =
+        restarted_sender.seal(make_message(1, 6, SwarmMessage::Type::FORMATION_CMD));
     EXPECT_FALSE(receiver.open(second.data(), second.size()).has_value());
 }
 

@@ -1,0 +1,10 @@
+uid=999(drone) gid=999(drone) groups=999(drone)
+drone
+/usr/bin/curl
+DRONE_BACKEND_MODE=production
+DRONE_BACKEND_SIMULATION_ENABLED=false
+DRONE_SWARM_ADDR=:8080
+HOME=/home/drone
+HOSTNAME=7df71ec7e37f
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+PWD=/app

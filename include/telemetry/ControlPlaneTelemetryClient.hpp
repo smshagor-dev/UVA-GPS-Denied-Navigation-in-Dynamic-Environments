@@ -192,16 +192,11 @@ public:
     };
 
     using HeaderList = std::vector<std::pair<std::string, std::string>>;
-    using TransportFn = std::function<HttpResponse(
-        const ParsedEndpoint&,
-        std::string_view,
-        const HeaderList&,
-        int)>;
+    using TransportFn = std::function<HttpResponse(const ParsedEndpoint&, std::string_view,
+                                                   const HeaderList&, int)>;
 
-    explicit ControlPlaneTelemetryClient(std::string backend_url,
-                                         std::string auth_token = {},
-                                         int interval_ms = 1000,
-                                         int timeout_ms = 1500,
+    explicit ControlPlaneTelemetryClient(std::string backend_url, std::string auth_token = {},
+                                         int interval_ms = 1000, int timeout_ms = 1500,
                                          TransportFn transport = {});
 
     [[nodiscard]] bool enabled() const;
@@ -216,8 +211,7 @@ private:
     [[nodiscard]] static HeaderList build_headers(std::string_view auth_token, uint32_t drone_id);
     [[nodiscard]] static HttpResponse default_transport(const ParsedEndpoint& endpoint,
                                                         std::string_view body,
-                                                        const HeaderList& headers,
-                                                        int timeout_ms);
+                                                        const HeaderList& headers, int timeout_ms);
     [[nodiscard]] std::chrono::milliseconds current_backoff() const;
     void mark_result(bool ok, std::string status, std::chrono::steady_clock::time_point now);
 

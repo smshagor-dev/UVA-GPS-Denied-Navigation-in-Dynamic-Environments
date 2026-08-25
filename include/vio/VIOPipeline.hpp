@@ -3,20 +3,20 @@
 // Technology: C++, Python, Go, CMake
 
 #pragma once
- 
-// VIOPipeline.hpp    Visual-Inertial Odometry orchestrator
-// Manages the EKF, feature tracking, and multi-sensor data flow
-// Drone Swarm Sensor Fusion  |  Phase 2
- 
-#include "vio/EKFEstimator.hpp"
-#include "sensors/IMUSensor.hpp"
-#include "sensors/CameraSensor.hpp"
-#include "sensors/LidarSensor.hpp"
+
 #include "runtime/RuntimeMode.hpp"
+#include "sensors/CameraSensor.hpp"
+#include "sensors/IMUSensor.hpp"
+#include "sensors/LidarSensor.hpp"
+#include "vio/EKFEstimator.hpp"
+#include "vio/EstimatorCoordinator.hpp"
+#include "vio/VisualFeatureTrackManager.hpp"
 
 #include <atomic>
 #include <condition_variable>
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <opencv2/core.hpp>
 #include <queue>
 #include <string>
@@ -26,12 +26,8 @@
 
 namespace drone::vio {
 
-//  Variant message for sensor event queue 
-using SensorEvent = std::variant<
-    sensors::ImuMeasurement,
-    sensors::CameraFrame,
-    sensors::LidarMeasurement
->;
+using SensorEvent =
+    std::variant<sensors::ImuMeasurement, sensors::CameraFrame, sensors::LidarMeasurement>;
 
 struct RuntimeTelemetry {
     double localization_confidence_trend{0.0};
@@ -90,6 +86,25 @@ struct RuntimeTelemetry {
     double visual_update_confidence{0.0};
     bool visual_frontend_valid{false};
     bool visual_placeholder_active{false};
+    uint64_t persistent_feature_tracks{0};
+    uint64_t initialized_feature_tracks{0};
+    uint64_t rejected_feature_geometry{0};
+    uint64_t shadow_feature_batches_submitted{0};
+    std::string active_estimator_name{"ekf_active"};
+    std::string shadow_estimator_name{"ekf_shadow"};
+    std::string active_estimator_health{"uninitialized"};
+    std::string shadow_estimator_health{"uninitialized"};
+    bool shadow_enabled{false};
+    double shadow_lag_ms{0.0};
+    size_t shadow_queue_depth{0};
+    size_t shadow_queue_high_water_mark{0};
+    uint64_t shadow_dropped_events{0};
+    double shadow_position_delta_m{0.0};
+    double shadow_velocity_delta_mps{0.0};
+    double shadow_orientation_delta_deg{0.0};
+    bool shadow_divergence_active{false};
+    std::string shadow_last_failure_reason{};
+    uint64_t shadow_comparable_snapshot_count{0};
 };
 
 struct VisualFrontendMetrics {
@@ -105,6 +120,8 @@ struct VisualFrontendResult {
     Eigen::Vector3d observed_position{Eigen::Vector3d::Zero()};
     Eigen::Vector3d observed_velocity{Eigen::Vector3d::Zero()};
     Eigen::Quaterniond relative_orientation{Eigen::Quaterniond::Identity()};
+    std::vector<Eigen::Vector2d> previous_inlier_pixels{};
+    std::vector<Eigen::Vector2d> current_inlier_pixels{};
     VisualFrontendMetrics metrics{};
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -112,51 +129,40 @@ struct VisualFrontendResult {
 
 [[nodiscard]] bool visual_placeholder_allowed(drone::runtime::RuntimeMode mode);
 [[nodiscard]] double compute_visual_update_confidence(const VisualFrontendMetrics& metrics);
-[[nodiscard]] VisualFrontendResult run_visual_frontend(
-    const cv::Mat& previous_gray,
-    const cv::Mat& current_gray,
-    const Eigen::Matrix3d& K,
-    const PoseEstimate& previous_pose,
-    const PoseEstimate& current_predicted_pose,
-    double dt_s);
-[[nodiscard]] VisualFrontendResult build_placeholder_visual_frontend_result(
-    const sensors::CameraFrame& frame,
-    const PoseEstimate& pose,
-    const Eigen::Matrix3d& K);
+[[nodiscard]] VisualFrontendResult
+run_visual_frontend(const cv::Mat& previous_gray, const cv::Mat& current_gray,
+                    const Eigen::Matrix3d& K, const PoseEstimate& previous_pose,
+                    const PoseEstimate& current_predicted_pose, double dt_s);
+[[nodiscard]] VisualFrontendResult
+build_placeholder_visual_frontend_result(const sensors::CameraFrame& frame,
+                                         const PoseEstimate& pose, const Eigen::Matrix3d& K);
 
- 
 class VIOPipeline {
 public:
     using PoseCallback = std::function<void(const PoseEstimate&)>;
 
-    explicit VIOPipeline(EKFConfig cfg = {})
-        : ekf_(cfg) {}
-
+    explicit VIOPipeline(EKFConfig cfg = EKFConfig{});
     ~VIOPipeline() { stop(); }
 
-    //  Sensor registration 
-    void attach_imu   (std::shared_ptr<sensors::IMUSensor>    imu);
+    void attach_imu(std::shared_ptr<sensors::IMUSensor> imu);
     void attach_camera(std::shared_ptr<sensors::CameraSensor> cam);
-    void attach_lidar (std::shared_ptr<sensors::LidarSensor>  lidar);
+    void attach_lidar(std::shared_ptr<sensors::LidarSensor> lidar);
 
-    //  Pipeline control 
     bool start();
     void stop();
     void reset();
     void set_runtime_mode(drone::runtime::RuntimeMode mode) { runtime_mode_ = mode; }
+    void set_estimator_validation_config(const EstimatorValidationConfig& cfg);
+    void set_shadow_msckf_config(const MsckfConfig& cfg);
 
-    //  State query â”€
-    [[nodiscard]] PoseEstimate  current_pose() const;
-    [[nodiscard]] double        drift_m()      const { return ekf_.total_drift_m(); }
+    [[nodiscard]] PoseEstimate current_pose() const;
+    [[nodiscard]] double drift_m() const;
     [[nodiscard]] RuntimeTelemetry runtime_telemetry() const {
         std::lock_guard lock(runtime_mutex_);
         return runtime_telemetry_;
     }
 
-    //  Output callback 
     void set_pose_callback(PoseCallback cb) { pose_cb_ = std::move(cb); }
-
-    //  Configuration 
     void set_camera_matrix(const Eigen::Matrix3d& K) { K_ = K; }
     void set_runtime_telemetry(RuntimeTelemetry telemetry) {
         std::lock_guard lock(runtime_mutex_);
@@ -166,6 +172,11 @@ public:
         telemetry.visual_update_confidence = runtime_telemetry_.visual_update_confidence;
         telemetry.visual_frontend_valid = runtime_telemetry_.visual_frontend_valid;
         telemetry.visual_placeholder_active = runtime_telemetry_.visual_placeholder_active;
+        telemetry.persistent_feature_tracks = runtime_telemetry_.persistent_feature_tracks;
+        telemetry.initialized_feature_tracks = runtime_telemetry_.initialized_feature_tracks;
+        telemetry.rejected_feature_geometry = runtime_telemetry_.rejected_feature_geometry;
+        telemetry.shadow_feature_batches_submitted =
+            runtime_telemetry_.shadow_feature_batches_submitted;
         runtime_telemetry_ = std::move(telemetry);
     }
 
@@ -174,45 +185,43 @@ public:
 private:
     void enqueue(SensorEvent evt);
     void processing_loop();
-
     void handle(const sensors::ImuMeasurement& imu);
     void handle(const sensors::CameraFrame& frame);
     void handle(const sensors::LidarMeasurement&);
+    void reconfigure_coordinator();
     void apply_visual_quality_to_pose(PoseEstimate& pose) const;
+    void refresh_runtime_telemetry_from_coordinator();
+    void submit_tracked_features_to_shadow(const VisualFrontendResult& frontend_result,
+                                           const PoseEstimate& previous_pose,
+                                           const PoseEstimate& current_pose, double timestamp_s);
 
-    EKFEstimator ekf_;
-
-    std::shared_ptr<sensors::IMUSensor>    imu_;
+    std::unique_ptr<EstimatorCoordinator> coordinator_;
+    EKFConfig ekf_cfg_{};
+    std::shared_ptr<sensors::IMUSensor> imu_;
     std::shared_ptr<sensors::CameraSensor> cam_;
-    std::shared_ptr<sensors::LidarSensor>  lidar_;
-
-    // Thread-safe event queue
-    std::queue<SensorEvent>  event_queue_;
-    mutable std::mutex       queue_mutex_;
-    std::condition_variable  queue_cv_;
-    std::thread              proc_thread_;
-    std::atomic<bool>        running_{false};
-
-    Eigen::Matrix3d  K_{Eigen::Matrix3d::Identity()};
-    PoseCallback     pose_cb_;
-    double           last_imu_ts_{-1.0};
-    double           last_camera_ts_{-1.0};
-    cv::Mat          previous_gray_frame_;
-    PoseEstimate     previous_camera_pose_{};
-    bool             previous_camera_pose_valid_{false};
+    std::shared_ptr<sensors::LidarSensor> lidar_;
+    std::queue<SensorEvent> event_queue_;
+    mutable std::mutex queue_mutex_;
+    std::condition_variable queue_cv_;
+    std::thread proc_thread_;
+    std::atomic<bool> running_{false};
+    Eigen::Matrix3d K_{Eigen::Matrix3d::Identity()};
+    PoseCallback pose_cb_;
+    double last_imu_ts_{-1.0};
+    double last_camera_ts_{-1.0};
+    uint64_t measurement_sequence_{0};
+    cv::Mat previous_gray_frame_;
+    PoseEstimate previous_camera_pose_{};
+    bool previous_camera_pose_valid_{false};
+    VisualFeatureTrackManager visual_feature_tracks_{};
     drone::runtime::RuntimeMode runtime_mode_{drone::runtime::RuntimeMode::SIMULATION};
+    EstimatorValidationConfig estimator_validation_cfg_{};
+    MsckfConfig shadow_msckf_cfg_{};
     mutable std::mutex visual_metrics_mutex_;
     VisualFrontendMetrics last_visual_metrics_{};
     mutable std::mutex runtime_mutex_;
     RuntimeTelemetry runtime_telemetry_{};
-
     std::shared_ptr<spdlog::logger> logger_{spdlog::get("VIO")};
 };
 
 } // namespace drone::vio
-// System Designer and Developer: Md Shahanur Islam Shagor
-// Project: UVA GPS Denied Navigation in Dynamic Environments
-// Technology: C++, Python, Go, CMake
-// System Designer and Developer: Md Shahanur Islam Shagor
-// Project: UVA GPS Denied Navigation in Dynamic Environments
-// Technology: C++, Python, Go, CMake

@@ -1,0 +1,9 @@
+{
+  "generated_at": "2026-07-17T07:40:16.241138Z",
+  "experiment": "phase11_digital_twin_validation",
+  "artifacts": [
+    "docs\\phase11\\digital_twin_results.json",
+    "docs\\phase11\\world_model_results.json",
+    "docs\\phase11\\digital_twin_benchmark_results.json"
+  ]
+}

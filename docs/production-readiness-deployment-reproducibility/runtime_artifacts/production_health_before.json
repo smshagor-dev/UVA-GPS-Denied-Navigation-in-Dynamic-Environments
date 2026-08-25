@@ -1,0 +1,4 @@
+﻿{
+    "StatusCode":  200,
+    "Content":  "{\"online_drones\":0,\"total_drones\":0,\"critical_alerts\":0,\"avg_battery_pct\":0,\"max_cpu_temp_c\":0,\"updated_at\":\"2026-07-16T14:23:37.305538783Z\",\"backend_mode\":\"production\",\"mesh_topology_mode\":\"adaptive_mesh\",\"simulation_enabled\":false,\"real_drone_count\":0,\"stale_drone_count\":0}\n"
+}

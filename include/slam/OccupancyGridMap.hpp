@@ -26,10 +26,12 @@ public:
         size_t visible_anchor_count{0};
     };
 
-    explicit OccupancyGridMap(Config cfg = {});
+    OccupancyGridMap();
+    explicit OccupancyGridMap(Config cfg);
 
     void clear();
-    void integrate_lidar(const drone::sensors::LidarMeasurement& scan, const Eigen::Vector3d& drone_position);
+    void integrate_lidar(const drone::sensors::LidarMeasurement& scan,
+                         const Eigen::Vector3d& drone_position);
     void mark_anchor(const drone::localization::TDOALocalizer::Anchor& anchor, bool visible);
 
     [[nodiscard]] Status status() const;

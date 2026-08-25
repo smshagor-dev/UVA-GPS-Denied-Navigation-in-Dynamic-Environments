@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/drone-swarm/config/lidar.schema.json",
+  "title": "Drone Swarm LiDAR Configuration",
+  "type": "object",
+  "required": ["host", "port", "model", "frame_id"],
+  "properties": {
+    "system_name": { "type": "string" },
+    "version": { "type": "string" },
+    "dataset_type": { "type": "string" },
+    "data_source": { "type": "string" },
+    "note": { "type": "string" },
+    "coordinate_frame": { "type": "string" },
+    "units": { "type": "string" },
+    "runtime_mode": { "type": "string" },
+    "host": { "type": "string", "minLength": 1 },
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "transport_protocol": { "type": "string" },
+    "model": { "type": "string", "minLength": 1 },
+    "frame_id": { "type": "string", "minLength": 1 },
+    "required": { "type": "boolean" },
+    "network": { "type": "object" },
+    "range": {
+      "type": "object",
+      "properties": {
+        "min_range_m": { "type": "number", "minimum": 0 },
+        "max_range_m": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "telemetry": { "type": "object" },
+    "validation": { "type": "object" }
+  },
+  "additionalProperties": true
+}
+

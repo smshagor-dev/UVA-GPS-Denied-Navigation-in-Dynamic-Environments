@@ -1,0 +1,25 @@
+{
+  "generated_at": "2026-07-17T06:07:34.894006Z",
+  "manifest_count": 8,
+  "manifests": [
+    "deployment\\kubernetes\\configmap.yaml",
+    "deployment\\kubernetes\\deployment.yaml",
+    "deployment\\kubernetes\\hpa.yaml",
+    "deployment\\kubernetes\\ingress.yaml",
+    "deployment\\kubernetes\\kustomization.yaml",
+    "deployment\\kubernetes\\namespace.yaml",
+    "deployment\\kubernetes\\secret.template.yaml",
+    "deployment\\kubernetes\\service.yaml"
+  ],
+  "render": {
+    "command": [
+      "kubectl",
+      "kustomize",
+      "deployment/kubernetes"
+    ],
+    "returncode": 0,
+    "stdout": "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: drone-swarm\n---\napiVersion: v1\ndata:\n  DRONE_BACKEND_DEMO_FLEET_SIZE: \"0\"\n  DRONE_BACKEND_MODE: production\n  DRONE_BACKEND_SIMULATION_ENABLED: \"false\"\n  DRONE_BACKEND_STALE_SEC: \"5\"\n  DRONE_DEVICE_REGISTRY_FILE: /app/config/device-registry.json\n  DRONE_REQUIRE_SIGNED_COMMANDS: \"true\"\n  DRONE_SECURITY_PROFILE: production\n  DRONE_SWARM_ADDR: :8080\n  DRONE_TLS_CA_FILE: /app/certs/ca.crt\n  DRONE_TLS_CERT_FILE: /app/certs/server.crt\n  DRONE_TLS_ENABLED: \"true\"\n  DRONE_TLS_KEY_FILE: /app/certs/server.key\n  DRONE_TLS_REQUIRE_CLIENT_CERT: \"true\"\nkind: ConfigMap\nmetadata:\n  name: control-plane-config\n  namespace: drone-swarm\n---\napiVersion: v1\nkind: Secret\nmetadata:\n  name: control-plane-secrets\n  namespace: drone-swarm\nstringData:\n  DRONE_OPERATOR_CREDENTIALS: operator-console-1:operator:replace-with-operator-secret;operator-console-2:commander:replace-with-second-secret\n  DRONE_OPERATOR_ID: replace-with-operator-id\n  DRONE_OPERATOR_ROLE: operator\n  DRONE_OPERATOR_SECRET: replace-with-operator-secret\n  DRONE_SWARM_SECRET: replace-with-strong-shared-secret\ntype: Opaque\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: control-plane\n  namespace: drone-swarm\nspec:\n  ports:\n  - name: http\n    port: 80\n    targetPort: 8080\n  selector:\n    app: control-plane\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: control-plane\n  namespace: drone-swarm\nspec:\n  replicas: 2\n  selector:\n    matchLabels:\n      app: control-plane\n  template:\n    metadata:\n      labels:\n        app: control-plane\n    spec:\n      containers:\n      - envFrom:\n        - configMapRef:\n            name: control-plane-config\n        - secretRef:\n            name: control-plane-secrets\n        image: drone-swarm/control-plane:production\n        imagePullPolicy: IfNotPresent\n        livenessProbe:\n          httpGet:\n            path: /api/v1/health\n            port: 8080\n          initialDelaySeconds: 15\n          periodSeconds: 20\n        name: control-plane\n        ports:\n        - containerPort: 8080\n          name: http\n        readinessProbe:\n          httpGet:\n            path: /api/v1/ready\n            port: 8080\n          initialDelaySeconds: 10\n          periodSeconds: 15\n        resources:\n          limits:\n            cpu: 500m\n            memory: 512Mi\n          requests:\n            cpu: 100m\n            memory: 128Mi\n        securityContext:\n          allowPrivilegeEscalation: false\n          capabilities:\n            drop:\n            - ALL\n          readOnlyRootFilesystem: true\n          runAsNonRoot: true\n        volumeMounts:\n        - mountPath: /app/certs\n          name: certs\n          readOnly: true\n        - mountPath: /app/config\n          name: config\n          readOnly: true\n      serviceAccountName: default\n      volumes:\n      - emptyDir: {}\n        name: certs\n      - emptyDir: {}\n        name: config\n---\napiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\nmetadata:\n  name: control-plane\n  namespace: drone-swarm\nspec:\n  maxReplicas: 5\n  metrics:\n  - resource:\n      name: cpu\n      target:\n        averageUtilization: 70\n        type: Utilization\n    type: Resource\n  minReplicas: 2\n  scaleTargetRef:\n    apiVersion: apps/v1\n    kind: Deployment\n    name: control-plane\n---\napiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  annotations:\n    nginx.ingress.kubernetes.io/ssl-redirect: \"true\"\n  name: control-plane\n  namespace: drone-swarm\nspec:\n  rules:\n  - host: drone-swarm.example.internal\n    http:\n      paths:\n      - backend:\n          service:\n            name: control-plane\n            port:\n              number: 80\n        path: /\n        pathType: Prefix\n",
+    "stderr": ""
+  },
+  "status": "PASS"
+}

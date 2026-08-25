@@ -1,0 +1,155 @@
+{
+  "generated_at": "2026-07-17T07:40:16.239654Z",
+  "world_model": {
+    "environment_graph": {
+      "nodes": [
+        {
+          "id": "drone-1131",
+          "cluster": "phase11-a",
+          "role": "LEADER"
+        },
+        {
+          "id": "drone-1132",
+          "cluster": "phase11-a",
+          "role": "FOLLOWER"
+        },
+        {
+          "id": "drone-1133",
+          "cluster": "phase11-b",
+          "role": "FOLLOWER"
+        },
+        {
+          "id": "drone-1134",
+          "cluster": "phase11-b",
+          "role": "FOLLOWER"
+        }
+      ],
+      "edges": [
+        {
+          "source": "drone-1131",
+          "target": "drone-1132",
+          "weight": 0.97
+        },
+        {
+          "source": "drone-1131",
+          "target": "drone-1133",
+          "weight": 0.97
+        },
+        {
+          "source": "drone-1131",
+          "target": "drone-1134",
+          "weight": 0.97
+        },
+        {
+          "source": "drone-1132",
+          "target": "drone-1133",
+          "weight": 0.97
+        },
+        {
+          "source": "drone-1132",
+          "target": "drone-1134",
+          "weight": 0.97
+        },
+        {
+          "source": "drone-1133",
+          "target": "drone-1134",
+          "weight": 0.97
+        }
+      ],
+      "environment": "indoor_gps_denied"
+    },
+    "dynamic_obstacle_map": [
+      {
+        "obstacle_id": "obs-1131",
+        "position": [
+          1.2,
+          0.8,
+          1.1
+        ],
+        "severity": 0.125,
+        "source_drone": 1131
+      },
+      {
+        "obstacle_id": "obs-1132",
+        "position": [
+          2.2,
+          1.2,
+          1.1
+        ],
+        "severity": 0.25,
+        "source_drone": 1132
+      },
+      {
+        "obstacle_id": "obs-1133",
+        "position": [
+          0.5,
+          1.4,
+          1.1
+        ],
+        "severity": 0.25,
+        "source_drone": 1133
+      },
+      {
+        "obstacle_id": "obs-1134",
+        "position": [
+          1.4,
+          -0.3,
+          1.1
+        ],
+        "severity": 0.0,
+        "source_drone": 1134
+      }
+    ],
+    "semantic_map": [
+      {
+        "region": "phase11-a",
+        "label": "gps-denied corridor",
+        "confidence": 0.92
+      },
+      {
+        "region": "phase11-a",
+        "label": "gps-denied corridor",
+        "confidence": 0.92
+      },
+      {
+        "region": "phase11-b",
+        "label": "gps-denied corridor",
+        "confidence": 0.92
+      },
+      {
+        "region": "phase11-b",
+        "label": "gps-denied corridor",
+        "confidence": 0.92
+      }
+    ],
+    "mission_state_graph": {
+      "mission": "phase11_digital_twin_validation",
+      "environment": "indoor_gps_denied",
+      "states": [
+        {
+          "id": "observe",
+          "next": "assign"
+        },
+        {
+          "id": "assign",
+          "next": "execute"
+        },
+        {
+          "id": "execute",
+          "next": "recover"
+        },
+        {
+          "id": "recover",
+          "next": "observe"
+        }
+      ]
+    },
+    "knowledge_base": {
+      "vehicle_count": 4,
+      "shared_confidence_avg": 0.92,
+      "max_stale_peers": 0,
+      "mission_health": "stable"
+    }
+  },
+  "status": "PASS"
+}

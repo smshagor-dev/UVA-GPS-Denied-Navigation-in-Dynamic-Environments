@@ -1,0 +1,4 @@
+  File "<string>", line 1
+    import jsonschema, numpy, cv2, PySide6; print( 
+                                                 ^
+SyntaxError: '(' was never closed

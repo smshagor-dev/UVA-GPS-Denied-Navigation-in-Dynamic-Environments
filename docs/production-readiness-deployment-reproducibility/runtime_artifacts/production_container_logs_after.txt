@@ -1,0 +1,34 @@
+﻿2026/07/16 14:23:29 control-plane logging initialized
+2026/07/16 14:23:29 control-plane security profile=lab signed_commands_required=false operator_id= operator_role=operator
+2026/07/16 14:23:29 control-plane transport tls_enabled=false client_cert_required=false cert=/app/certs/server.crt ca=/app/certs/ca.crt
+2026/07/16 14:23:29 control-plane runtime backend_mode=production simulation_enabled=false stale_after=5s demo_fleet_size=5
+2026/07/16 14:23:29 FleetState initialized backend_mode=production simulation_enabled=false stale_after=5s
+2026/07/16 14:23:29 control-plane backend mode=production simulation_enabled=false stale_after=5s
+2026/07/16 14:23:29 go control-plane listening on :8080
+2026/07/16 14:23:34 handleHealth method=GET remote=127.0.0.1:39494
+2026/07/16 14:23:34 FleetState.Health requested
+2026/07/16 14:23:34 FleetState.Snapshot requested
+2026/07/16 14:23:34 request complete method=GET path=/api/v1/health remote=127.0.0.1:39494 duration=1.165526ms
+2026/07/16 14:23:37 handleHealth method=GET remote=172.19.0.1:48700
+2026/07/16 14:23:37 FleetState.Health requested
+2026/07/16 14:23:37 FleetState.Snapshot requested
+2026/07/16 14:23:37 request complete method=GET path=/api/v1/health remote=172.19.0.1:48700 duration=1.752977ms
+2026/07/16 14:23:37 handleReadiness method=GET remote=172.19.0.1:48700
+2026/07/16 14:23:37 FleetState.Health requested
+2026/07/16 14:23:37 FleetState.Snapshot requested
+2026/07/16 14:23:37 request complete method=GET path=/api/v1/ready remote=172.19.0.1:48700 duration=1.618606ms
+2026/07/16 14:23:37 handleTelemetry method=POST remote=172.19.0.1:48700
+2026/07/16 14:23:37 FleetState.UpsertTelemetry drone=501 cluster=cluster-validation role=LEADER
+2026/07/16 14:23:37 FleetState.AddEvent type=telemetry message=drone 501 telemetry ingested
+2026/07/16 14:23:37 request complete method=POST path=/api/v1/telemetry remote=172.19.0.1:48700 duration=1.771858ms
+2026/07/16 14:23:37 handleReadiness method=GET remote=172.19.0.1:48700
+2026/07/16 14:23:37 FleetState.Health requested
+2026/07/16 14:23:37 FleetState.Snapshot requested
+2026/07/16 14:23:37 request complete method=GET path=/api/v1/ready remote=172.19.0.1:48700 duration=1.974062ms
+2026/07/16 14:23:37 handleMetrics method=GET remote=172.19.0.1:48700
+2026/07/16 14:23:37 FleetState.Health requested
+2026/07/16 14:23:37 FleetState.Snapshot requested
+2026/07/16 14:23:37 FleetState.Events requested
+2026/07/16 14:23:37 FleetState.Commands requested
+2026/07/16 14:23:37 FleetState.PendingApprovals requested
+2026/07/16 14:23:37 request complete method=GET path=/metrics remote=172.19.0.1:48700 duration=3.316929ms

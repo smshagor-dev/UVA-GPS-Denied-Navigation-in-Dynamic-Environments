@@ -15,9 +15,8 @@ constexpr double kMinOperationalSpeedMps = 0.10;
 
 std::string lowercase(std::string_view value) {
     std::string out(value.begin(), value.end());
-    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return out;
 }
 
@@ -29,19 +28,25 @@ Eigen::Vector3d body_up(const vio::PoseEstimate& pose) {
 
 std::string_view to_string(SafetyState state) {
     switch (state) {
-    case SafetyState::NORMAL: return "NORMAL";
-    case SafetyState::DEGRADED_LOCALIZATION: return "DEGRADED_LOCALIZATION";
-    case SafetyState::LOCALIZATION_LOST: return "LOCALIZATION_LOST";
-    case SafetyState::LINK_LOST: return "LINK_LOST";
-    case SafetyState::SENSOR_FAULT: return "SENSOR_FAULT";
-    case SafetyState::EMERGENCY_LAND: return "EMERGENCY_LAND";
-    case SafetyState::MOTOR_LOCKED: return "MOTOR_LOCKED";
+    case SafetyState::NORMAL:
+        return "NORMAL";
+    case SafetyState::DEGRADED_LOCALIZATION:
+        return "DEGRADED_LOCALIZATION";
+    case SafetyState::LOCALIZATION_LOST:
+        return "LOCALIZATION_LOST";
+    case SafetyState::LINK_LOST:
+        return "LINK_LOST";
+    case SafetyState::SENSOR_FAULT:
+        return "SENSOR_FAULT";
+    case SafetyState::EMERGENCY_LAND:
+        return "EMERGENCY_LAND";
+    case SafetyState::MOTOR_LOCKED:
+        return "MOTOR_LOCKED";
     }
     return "UNKNOWN";
 }
 
-SafetyManager::SafetyManager(SafetyConfig cfg)
-    : cfg_(cfg) {}
+SafetyManager::SafetyManager(SafetyConfig cfg) : cfg_(cfg) {}
 
 SafetyDecision SafetyManager::evaluate(const SafetyContext& ctx) const {
     SafetyDecision out;
@@ -55,9 +60,8 @@ SafetyDecision SafetyManager::evaluate(const SafetyContext& ctx) const {
 
     const bool production_requires_lidar =
         ctx.runtime_mode == runtime::RuntimeMode::PRODUCTION && ctx.lidar_required;
-    const bool low_vio_confidence =
-        uses_visual_localization(ctx.localization_source) &&
-        ctx.localization_confidence < cfg_.low_vio_confidence_threshold;
+    const bool low_vio_confidence = uses_visual_localization(ctx.localization_source) &&
+                                    ctx.localization_confidence < cfg_.low_vio_confidence_threshold;
 
     if (ctx.emergency_stop_requested ||
         ctx.security.state == security::DroneSecurityState::LAND_IMMEDIATELY) {
@@ -66,10 +70,11 @@ SafetyDecision SafetyManager::evaluate(const SafetyContext& ctx) const {
         out.autonomous_flight_allowed = false;
         out.mission_command_allowed = false;
         out.max_speed_mps = std::min(out.max_speed_mps, cfg_.emergency_descent_mps);
-        out.max_acceleration_mps2 = std::min(out.max_acceleration_mps2, cfg_.indoor_max_acceleration_mps2);
+        out.max_acceleration_mps2 =
+            std::min(out.max_acceleration_mps2, cfg_.indoor_max_acceleration_mps2);
         out.summary = ctx.emergency_stop_requested
-            ? "Emergency stop requested, immediate landing enforced"
-            : "Security state forced immediate landing";
+                          ? "Emergency stop requested, immediate landing enforced"
+                          : "Security state forced immediate landing";
         return out;
     }
 
@@ -92,9 +97,10 @@ SafetyDecision SafetyManager::evaluate(const SafetyContext& ctx) const {
         out.mission_command_allowed = false;
         out.max_speed_mps = kMinOperationalSpeedMps;
         out.max_acceleration_mps2 = cfg_.low_vio_max_acceleration_mps2;
-        out.summary = production_requires_lidar && !ctx.lidar_available
-            ? "Required LiDAR unavailable in production mode, autonomous flight blocked"
-            : "Required sensor path unavailable, arming blocked";
+        out.summary =
+            production_requires_lidar && !ctx.lidar_available
+                ? "Required LiDAR unavailable in production mode, autonomous flight blocked"
+                : "Required sensor path unavailable, arming blocked";
         return out;
     }
 
@@ -103,7 +109,8 @@ SafetyDecision SafetyManager::evaluate(const SafetyContext& ctx) const {
         out.autonomous_flight_allowed = false;
         out.mission_command_allowed = false;
         out.max_speed_mps = std::min(out.max_speed_mps, cfg_.low_vio_max_speed_mps);
-        out.max_acceleration_mps2 = std::min(out.max_acceleration_mps2, cfg_.low_vio_max_acceleration_mps2);
+        out.max_acceleration_mps2 =
+            std::min(out.max_acceleration_mps2, cfg_.low_vio_max_acceleration_mps2);
         out.summary = "Link lost or stale telemetry detected, holding until trust recovers";
         return out;
     }
@@ -113,7 +120,8 @@ SafetyDecision SafetyManager::evaluate(const SafetyContext& ctx) const {
         out.autonomous_flight_allowed = false;
         out.mission_command_allowed = false;
         out.max_speed_mps = std::min(out.max_speed_mps, cfg_.low_vio_max_speed_mps);
-        out.max_acceleration_mps2 = std::min(out.max_acceleration_mps2, cfg_.low_vio_max_acceleration_mps2);
+        out.max_acceleration_mps2 =
+            std::min(out.max_acceleration_mps2, cfg_.low_vio_max_acceleration_mps2);
         out.summary = "Localization lost, waypoint mission blocked and recovery posture enforced";
         return out;
     }
@@ -121,10 +129,11 @@ SafetyDecision SafetyManager::evaluate(const SafetyContext& ctx) const {
     if (ctx.localization_degraded || low_vio_confidence) {
         out.state = SafetyState::DEGRADED_LOCALIZATION;
         out.max_speed_mps = std::min(out.max_speed_mps, cfg_.low_vio_max_speed_mps);
-        out.max_acceleration_mps2 = std::min(out.max_acceleration_mps2, cfg_.low_vio_max_acceleration_mps2);
+        out.max_acceleration_mps2 =
+            std::min(out.max_acceleration_mps2, cfg_.low_vio_max_acceleration_mps2);
         out.summary = low_vio_confidence
-            ? "Visual localization confidence low, velocity constrained"
-            : "Localization degraded, slowing to recovery envelope";
+                          ? "Visual localization confidence low, velocity constrained"
+                          : "Localization degraded, slowing to recovery envelope";
     }
 
     if (ctx.telemetry_stale && out.summary.find("stale telemetry") == std::string::npos) {
@@ -133,8 +142,7 @@ SafetyDecision SafetyManager::evaluate(const SafetyContext& ctx) const {
     return out;
 }
 
-void SafetyManager::enforce(const SafetyDecision& safety,
-                            autonomy::DecisionCommand& command,
+void SafetyManager::enforce(const SafetyDecision& safety, autonomy::DecisionCommand& command,
                             const vio::PoseEstimate& pose) const {
     if (command.max_acceleration_mps2 <= 0.0) {
         command.max_acceleration_mps2 = safety.max_acceleration_mps2;
@@ -143,8 +151,7 @@ void SafetyManager::enforce(const SafetyDecision& safety,
             std::min(command.max_acceleration_mps2, safety.max_acceleration_mps2);
     }
 
-    const bool command_already_emergency =
-        command.mode == autonomy::BehaviorMode::EMERGENCY_LAND;
+    const bool command_already_emergency = command.mode == autonomy::BehaviorMode::EMERGENCY_LAND;
 
     switch (safety.state) {
     case SafetyState::EMERGENCY_LAND:
@@ -169,9 +176,9 @@ void SafetyManager::enforce(const SafetyDecision& safety,
         if (!command_already_emergency) {
             command.mode = autonomy::BehaviorMode::LOCALIZATION_LOST;
             command.requires_operator_attention = true;
-            command.desired_velocity =
-                clamp_speed((-pose.velocity * 0.60) - (body_up(pose) * cfg_.localization_lost_descent_mps),
-                            safety.max_speed_mps);
+            command.desired_velocity = clamp_speed(
+                (-pose.velocity * 0.60) - (body_up(pose) * cfg_.localization_lost_descent_mps),
+                safety.max_speed_mps);
             command.desired_yaw_rate_rads = 0.0;
             command.summary = safety.summary;
         }

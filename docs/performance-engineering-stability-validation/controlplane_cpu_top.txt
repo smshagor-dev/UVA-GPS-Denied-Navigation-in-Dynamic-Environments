@@ -1,0 +1,30 @@
+﻿File: controlplane.test.exe
+Build ID: C:\Users\smsha\AppData\Local\Temp\go-build4217643664\b001\controlplane.test.exe2026-07-16 19:17:56.3388079 +0300 MSK
+Type: cpu
+Time: 2026-07-16 19:17:57 MSK
+Duration: 24.23ms, Total samples = 20ms (82.55%)
+Showing nodes accounting for 20ms, 100% of 20ms total
+      flat  flat%   sum%        cum   cum%
+      20ms   100%   100%       20ms   100%  runtime.cgocall
+         0     0%   100%       20ms   100%  drone_swarm/controlplane/internal/controlplane.NewFleetState
+         0     0%   100%       20ms   100%  drone_swarm/controlplane/internal/controlplane.NewServer
+         0     0%   100%       20ms   100%  drone_swarm/controlplane/internal/controlplane.TestTelemetryIngestAndFleetSnapshotRoundTrip
+         0     0%   100%       20ms   100%  drone_swarm/controlplane/internal/controlplane.newTestServer (inline)
+         0     0%   100%       20ms   100%  internal/syscall/windows/registry.Key.GetMUIStringValue
+         0     0%   100%       20ms   100%  internal/syscall/windows/registry.regLoadMUIString
+         0     0%   100%       20ms   100%  log.(*Logger).output
+         0     0%   100%       20ms   100%  log.Printf (inline)
+         0     0%   100%       20ms   100%  log.formatHeader
+         0     0%   100%       20ms   100%  sync.(*Once).Do (inline)
+         0     0%   100%       20ms   100%  sync.(*Once).doSlow
+         0     0%   100%       20ms   100%  syscall.SyscallN
+         0     0%   100%       20ms   100%  syscall.syscalln
+         0     0%   100%       20ms   100%  testing.tRunner
+         0     0%   100%       20ms   100%  time.(*Location).get
+         0     0%   100%       20ms   100%  time.Time.Date
+         0     0%   100%       20ms   100%  time.Time.absSec
+         0     0%   100%       20ms   100%  time.abbrev
+         0     0%   100%       20ms   100%  time.initLocal
+         0     0%   100%       20ms   100%  time.initLocalFromTZI
+         0     0%   100%       20ms   100%  time.matchZoneKey
+         0     0%   100%       20ms   100%  time.toEnglishName

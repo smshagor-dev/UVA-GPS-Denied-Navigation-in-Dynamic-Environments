@@ -77,9 +77,8 @@ std::string socket_error_string(const std::string& prefix) {
 
 std::string lowercase(std::string_view value) {
     std::string out(value.begin(), value.end());
-    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return out;
 }
 
@@ -105,8 +104,7 @@ std::optional<double> extract_json_number(const std::string& content, const std:
     }
 }
 
-template <typename T>
-T read_packed(const std::vector<uint8_t>& bytes, size_t offset) {
+template <typename T> T read_packed(const std::vector<uint8_t>& bytes, size_t offset) {
     T value{};
     std::memcpy(&value, bytes.data() + offset, sizeof(T));
     return value;
@@ -114,8 +112,7 @@ T read_packed(const std::vector<uint8_t>& bytes, size_t offset) {
 
 class GenericCartesianLidarParser final : public ILidarParser {
 public:
-    explicit GenericCartesianLidarParser(std::string frame_id)
-        : frame_id_(std::move(frame_id)) {}
+    explicit GenericCartesianLidarParser(std::string frame_id) : frame_id_(std::move(frame_id)) {}
 
     [[nodiscard]] std::string_view model_name() const noexcept override {
         return "generic_udp_cartesian_v1";
@@ -127,7 +124,8 @@ public:
         if (packet.bytes.size() < kHeaderBytes) {
             return std::nullopt;
         }
-        if (!std::equal(kGenericPacketMagic.begin(), kGenericPacketMagic.end(), packet.bytes.begin())) {
+        if (!std::equal(kGenericPacketMagic.begin(), kGenericPacketMagic.end(),
+                        packet.bytes.begin())) {
             return std::nullopt;
         }
 
@@ -136,7 +134,8 @@ public:
         if (version != 1) {
             return std::nullopt;
         }
-        const size_t expected_size = kHeaderBytes + (static_cast<size_t>(point_count) * kPointStride);
+        const size_t expected_size =
+            kHeaderBytes + (static_cast<size_t>(point_count) * kPointStride);
         if (packet.bytes.size() != expected_size) {
             return std::nullopt;
         }
@@ -154,7 +153,8 @@ public:
             const float intensity = read_packed<float>(packet.bytes, offset + (sizeof(float) * 3));
             offset += kPointStride;
 
-            if (!(std::isfinite(x) && std::isfinite(y) && std::isfinite(z) && std::isfinite(intensity))) {
+            if (!(std::isfinite(x) && std::isfinite(y) && std::isfinite(z) &&
+                  std::isfinite(intensity))) {
                 return std::nullopt;
             }
 
@@ -193,7 +193,8 @@ public:
         if (packet.bytes.size() < kSimulationPacketMagic.size()) {
             return std::nullopt;
         }
-        if (!std::equal(kSimulationPacketMagic.begin(), kSimulationPacketMagic.end(), packet.bytes.begin())) {
+        if (!std::equal(kSimulationPacketMagic.begin(), kSimulationPacketMagic.end(),
+                        packet.bytes.begin())) {
             return std::nullopt;
         }
 
@@ -215,7 +216,8 @@ private:
 
 } // namespace
 
-std::optional<RawLidarPacket> receive_lidar_udp_packet(int socket_fd, size_t max_bytes, int timeout_ms) {
+std::optional<RawLidarPacket> receive_lidar_udp_packet(int socket_fd, size_t max_bytes,
+                                                       int timeout_ms) {
     if (socket_fd < 0) {
         return std::nullopt;
     }
@@ -236,13 +238,9 @@ std::optional<RawLidarPacket> receive_lidar_udp_packet(int socket_fd, size_t max
     std::vector<uint8_t> buffer(std::max<size_t>(1, max_bytes));
     sockaddr_in source_addr{};
     SocketLength source_len = sizeof(source_addr);
-    const int received = recvfrom(
-        socket_fd,
-        reinterpret_cast<char*>(buffer.data()),
-        static_cast<int>(buffer.size()),
-        0,
-        reinterpret_cast<sockaddr*>(&source_addr),
-        &source_len);
+    const int received =
+        recvfrom(socket_fd, reinterpret_cast<char*>(buffer.data()), static_cast<int>(buffer.size()),
+                 0, reinterpret_cast<sockaddr*>(&source_addr), &source_len);
     if (received <= 0) {
         return std::nullopt;
     }
@@ -250,7 +248,8 @@ std::optional<RawLidarPacket> receive_lidar_udp_packet(int socket_fd, size_t max
     buffer.resize(static_cast<size_t>(received));
 
     char host_buffer[INET_ADDRSTRLEN] = {};
-    const char* address = inet_ntop(AF_INET, &source_addr.sin_addr, host_buffer, sizeof(host_buffer));
+    const char* address =
+        inet_ntop(AF_INET, &source_addr.sin_addr, host_buffer, sizeof(host_buffer));
 
     RawLidarPacket packet;
     packet.bytes = std::move(buffer);
@@ -264,7 +263,8 @@ std::unique_ptr<ILidarParser> create_lidar_parser(std::string_view model,
                                                   const std::string& frame_id,
                                                   bool allow_placeholder_parser) {
     const auto normalized = lowercase(model);
-    if (normalized == "generic_udp_cartesian_v1" || normalized == "generic" || normalized == "udp_cartesian") {
+    if (normalized == "generic_udp_cartesian_v1" || normalized == "generic" ||
+        normalized == "udp_cartesian") {
         return std::make_unique<GenericCartesianLidarParser>(frame_id);
     }
     if (allow_placeholder_parser &&
@@ -278,8 +278,7 @@ PointCloudPtr point_cloud_from_scan(const LidarScan& scan, float min_range_m, fl
     auto cloud = PointCloudPtr(new PointCloud());
     cloud->reserve(scan.points.size());
     for (const auto& point : scan.points) {
-        if (!(std::isfinite(point.range_m) &&
-              point.range_m >= min_range_m &&
+        if (!(std::isfinite(point.range_m) && point.range_m >= min_range_m &&
               point.range_m <= max_range_m)) {
             continue;
         }
@@ -322,8 +321,10 @@ bool LidarSensor::initialize() {
         return false;
     }
 
-    if (bind(static_cast<int>(udp_sock_), reinterpret_cast<sockaddr*>(&bind_addr), sizeof(bind_addr)) < 0) {
-        const std::string error = socket_error_string("LiDAR UDP bind failed on " + bind_host + ":" + std::to_string(udp_port_));
+    if (bind(static_cast<int>(udp_sock_), reinterpret_cast<sockaddr*>(&bind_addr),
+             sizeof(bind_addr)) < 0) {
+        const std::string error = socket_error_string("LiDAR UDP bind failed on " + bind_host +
+                                                      ":" + std::to_string(udp_port_));
         close_socket_fd(udp_sock_);
         report_error(error);
         set_state(SensorState::FAILED);
@@ -331,10 +332,8 @@ bool LidarSensor::initialize() {
         return false;
     }
 
-    parser_ = create_lidar_parser(
-        model_,
-        frame_id_,
-        runtime_mode_ == drone::runtime::RuntimeMode::SIMULATION);
+    parser_ = create_lidar_parser(model_, frame_id_,
+                                  runtime_mode_ == drone::runtime::RuntimeMode::SIMULATION);
     if (!parser_) {
         close_socket_fd(udp_sock_);
         report_error("No LiDAR parser available for model \"" + model_ + "\" in " +
@@ -345,7 +344,8 @@ bool LidarSensor::initialize() {
     }
 
     if (logger_) {
-        logger_->info("[{}] initialize lidar endpoint={} model={} frame={} range=[{:.1f},{:.1f}] timeout={}ms",
+        logger_->info("[{}] initialize lidar endpoint={} model={} frame={} range=[{:.1f},{:.1f}] "
+                      "timeout={}ms",
                       id_, endpoint_, model_, frame_id_, range_min_, range_max_, udp_timeout_ms_);
     }
     poll_rate_hz_ = 10;
@@ -377,8 +377,9 @@ bool LidarSensor::reconfigure(const std::string& config_json) {
     }
     endpoint_ = bind_host_ + ":" + std::to_string(udp_port_);
     if (logger_) {
-        logger_->info("[{}] reconfigure requested endpoint={} model={} frame={} range=[{:.1f},{:.1f}]",
-                      id_, endpoint_, model_, frame_id_, range_min_, range_max_);
+        logger_->info(
+            "[{}] reconfigure requested endpoint={} model={} frame={} range=[{:.1f},{:.1f}]", id_,
+            endpoint_, model_, frame_id_, range_min_, range_max_);
     }
     return true;
 }
@@ -389,7 +390,8 @@ LidarSensor::TelemetryStats LidarSensor::telemetry_stats() const {
     stats.scan_active = state() == SensorState::RUNNING && latest_.has_value();
     stats.simulated = latest_.has_value() && latest_->simulated;
     stats.packet_rate_hz = packet_rate_estimate_hz_;
-    stats.scan_age_ms = latest_.has_value() ? std::max(0.0, (now_sec() - latest_->timestamp) * 1000.0) : 0.0;
+    stats.scan_age_ms =
+        latest_.has_value() ? std::max(0.0, (now_sec() - latest_->timestamp) * 1000.0) : 0.0;
     stats.point_count = latest_.has_value() ? latest_->num_points : 0u;
     stats.min_range_m = range_min_;
     stats.max_range_m = range_max_;
@@ -439,13 +441,12 @@ void LidarSensor::poll() {
         }
     }
     previous_packet_timestamp_ = measurement.timestamp;
-    set_status(scan->simulated
-        ? "simulation placeholder LiDAR scan parsed"
-        : "live LiDAR packet parsed");
+    set_status(scan->simulated ? "simulation placeholder LiDAR scan parsed"
+                               : "live LiDAR packet parsed");
 
     if (logger_) {
-        logger_->debug("[{}] cloud received points={} ts={:.3f} simulated={}",
-                       id_, measurement.num_points, measurement.timestamp, measurement.simulated);
+        logger_->debug("[{}] cloud received points={} ts={:.3f} simulated={}", id_,
+                       measurement.num_points, measurement.timestamp, measurement.simulated);
     }
 
     {
@@ -488,8 +489,8 @@ std::optional<LidarScan> LidarSensor::receive_udp_packet() {
     if (!parsed.has_value()) {
         set_status("invalid LiDAR packet rejected");
         if (logger_) {
-            logger_->warn("[{}] invalid LiDAR packet rejected model={} bytes={}",
-                          id_, parser_->model_name(), packet->bytes.size());
+            logger_->warn("[{}] invalid LiDAR packet rejected model={} bytes={}", id_,
+                          parser_->model_name(), packet->bytes.size());
         }
         return std::nullopt;
     }

@@ -14,8 +14,7 @@ struct BarometerMeasurement : SensorMeasurement {
 
 class BarometerSensor : public SensorBase {
 public:
-    explicit BarometerSensor(std::string id)
-        : SensorBase(std::move(id), "Barometer") {}
+    explicit BarometerSensor(std::string id) : SensorBase(std::move(id), "Barometer") {}
 
     bool initialize() override;
     bool reconfigure(const std::string& config_json) override;

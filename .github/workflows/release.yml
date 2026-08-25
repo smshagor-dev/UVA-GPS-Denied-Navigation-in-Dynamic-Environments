@@ -1,0 +1,240 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish a GitHub Release after validation"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-metadata:
+    name: Release Metadata Validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Validate project version and release metadata
+        env:
+          RELEASE_REF: ${{ github.ref }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          cmake = Path("CMakeLists.txt").read_text(encoding="utf-8")
+          match = re.search(
+              r"project\(DroneSwarmSensorFusion\s+VERSION\s+([0-9]+\.[0-9]+\.[0-9]+)\s+LANGUAGES",
+              cmake,
+          )
+          if match is None:
+              raise SystemExit("Could not determine project version from CMakeLists.txt")
+
+          version = match.group(1)
+          expected_tag = f"v{version}"
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          research_release = Path("RESEARCH_RELEASE.md").read_text(encoding="utf-8")
+          release_notes = Path("docs/releases") / f"{expected_tag}.md"
+
+          if f"## [{version}]" not in changelog:
+              raise SystemExit(f"CHANGELOG.md is missing the {version} release heading")
+          if expected_tag not in research_release:
+              raise SystemExit(f"RESEARCH_RELEASE.md is not aligned with {expected_tag}")
+          if not release_notes.is_file():
+              raise SystemExit(f"Missing versioned release notes: {release_notes}")
+
+          ref = os.environ.get("RELEASE_REF", "")
+          ref_name = os.environ.get("RELEASE_REF_NAME", "")
+          if ref.startswith("refs/tags/") and ref_name != expected_tag:
+              raise SystemExit(
+                  f"Release tag {ref_name!r} does not match project version {expected_tag!r}"
+              )
+
+          print(f"release_version={version}")
+          print(f"expected_tag={expected_tag}")
+          print(f"release_notes={release_notes}")
+          PY
+
+  linux-package:
+    name: Linux Release Package
+    needs: release-metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Print tool versions
+        shell: bash
+        run: |
+          set -euxo pipefail
+          uname -a
+          gcc --version | head -n 1
+          cmake --version
+          echo "preset=linux-gcc-release-package"
+          echo "commit_sha=${GITHUB_SHA}"
+      - name: Configure
+        shell: bash
+        run: cmake --preset linux-gcc-release-package
+      - name: Build
+        shell: bash
+        run: cmake --build --preset linux-gcc-release-package
+      - name: Test
+        shell: bash
+        run: ctest --preset linux-gcc-release-package --output-on-failure --output-junit "${RUNNER_TEMP}/linux-release-junit.xml"
+      - name: Install
+        shell: bash
+        run: cmake --install build/linux-gcc-release-package --prefix "${RUNNER_TEMP}/linux-install"
+      - name: Package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cpack --config build/linux-gcc-release-package/CPackConfig.cmake --verbose
+          mkdir -p "${RUNNER_TEMP}/release/linux"
+          find build/linux-gcc-release-package -maxdepth 1 \( -name "*.tgz" -o -name "*.zip" \) -exec cp {} "${RUNNER_TEMP}/release/linux/" \;
+      - name: Validate downstream consumer
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python3 scripts/package_consumer_smoke.py \
+            --install-prefix "${RUNNER_TEMP}/linux-install" \
+            --manifest-out "${RUNNER_TEMP}/release/linux/install-manifest.json"
+      - name: Install syft
+        shell: bash
+        run: |
+          set -euxo pipefail
+          go install github.com/anchore/syft/cmd/syft@v1.22.0
+          echo "${HOME}/go/bin" >> "${GITHUB_PATH}"
+      - name: Generate SBOM and checksums
+        shell: bash
+        run: |
+          set -euxo pipefail
+          syft "dir:${RUNNER_TEMP}/linux-install" -o cyclonedx-json="${RUNNER_TEMP}/release/linux/sbom.cdx.json"
+          (
+            cd "${RUNNER_TEMP}/release/linux"
+            sha256sum ./* > SHA256SUMS.txt
+          )
+      - name: Upload Linux release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-linux-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/release/linux
+            ${{ runner.temp }}/linux-release-junit.xml
+          retention-days: 30
+
+  windows-package:
+    name: Windows Release Package
+    needs: release-metadata
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-key-suffix: release-package
+      - name: Print tool versions
+        shell: pwsh
+        run: |
+          cmake --version
+          ctest --version
+          $cl = Get-Command cl.exe -ErrorAction SilentlyContinue
+          if ($cl) {
+            cmd /c cl 2>&1 | Select-Object -First 1
+          } else {
+            Write-Host "cl.exe not on PATH before configure; Visual Studio generator will resolve the toolchain during configure."
+          }
+          Write-Host "preset=windows-msvc-release-package"
+          Write-Host "commit_sha=$env:GITHUB_SHA"
+      - name: Configure
+        shell: pwsh
+        run: cmake --preset windows-msvc-release-package -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
+      - name: Build
+        shell: pwsh
+        run: cmake --build --preset windows-msvc-release-package --parallel
+      - name: Test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\release\windows" | Out-Null
+          ctest --preset windows-msvc-release-package --parallel 2 --output-on-failure --output-junit "$env:RUNNER_TEMP\release\windows\junit.xml"
+      - name: Install
+        shell: pwsh
+        run: cmake --install build/windows-msvc-release-package --config Release --prefix "$env:RUNNER_TEMP\windows-install"
+      - name: Package
+        shell: pwsh
+        run: |
+          cpack --config build/windows-msvc-release-package\CPackConfig.cmake --verbose
+          Get-ChildItem build\windows-msvc-release-package -Filter *.zip | Copy-Item -Destination "$env:RUNNER_TEMP\release\windows"
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          $artifacts = Get-ChildItem "$env:RUNNER_TEMP\release\windows" -File
+          $lines = foreach ($artifact in $artifacts) {
+            $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $artifact.FullName
+            "$($hash.Hash)  $($artifact.Name)"
+          }
+          $lines | Set-Content -LiteralPath "$env:RUNNER_TEMP\release\windows\SHA256SUMS.txt"
+      - name: Upload Windows release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-windows-${{ github.sha }}
+          path: ${{ runner.temp }}\release\windows
+          retention-days: 30
+
+  publish-release:
+    name: Publish Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - linux-package
+      - windows-package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/release-bundle
+
+      - name: Publish GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euxo pipefail
+          TAG_NAME="${GITHUB_REF_NAME}"
+          NOTES_FILE="docs/releases/${TAG_NAME}.md"
+          test -f "${NOTES_FILE}"
+          mapfile -t release_files < <(find "${RUNNER_TEMP}/release-bundle" -type f -print)
+          gh release create "${TAG_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${TAG_NAME}" \
+            --notes-file "${NOTES_FILE}" \
+            "${release_files[@]}"

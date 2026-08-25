@@ -17,7 +17,7 @@ This report does **not** mark the platform flight-ready.
 
 ## Installed Dependencies
 
-Installed on this Windows workstation with `vcpkg` rooted at `D:\tools\vcpkg-full`:
+Installed on the validating Windows workstation with `vcpkg` rooted at the active `VCPKG_ROOT`:
 
 - `eigen3:x64-windows`
 - `opencv:x64-windows`
@@ -39,7 +39,7 @@ Notable transitive/runtime dependencies installed by `vcpkg` included:
 Detected toolchain used for validation:
 
 ```text
-D:\tools\vcpkg-full\scripts\buildsystems\vcpkg.cmake
+%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake
 ```
 
 Environment status:
@@ -61,7 +61,7 @@ go test ./...
 CMake configure/build/test:
 
 ```powershell
-cmake -S . -B build-local-validate -DBUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=D:/tools/vcpkg-full/scripts/buildsystems/vcpkg.cmake
+cmake -S . -B build-local-validate -DBUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
 cmake --build build-local-validate --config Release
 ctest --test-dir build-local-validate --output-on-failure -C Release
 ```
@@ -69,7 +69,7 @@ ctest --test-dir build-local-validate --output-on-failure -C Release
 One-command validator:
 
 ```powershell
-python scripts/local_validate.py --toolchain "D:\tools\vcpkg-full\scripts\buildsystems\vcpkg.cmake"
+python scripts/local_validate.py --toolchain "$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake"
 ```
 
 Backend production-mode smoke validation:
@@ -162,7 +162,7 @@ Result:
 
 Dependency and validation setup:
 
-- installed and bootstrapped `vcpkg` in `D:\tools\vcpkg-full`
+- installed and bootstrapped `vcpkg` at the active `VCPKG_ROOT`
 - added explicit Eigen3 discovery help and toolchain support to `scripts/local_validate.py`
 - improved `CMakeLists.txt` Eigen discovery and fallback behavior
 - made the validator inject runtime DLL paths for Windows `ctest`

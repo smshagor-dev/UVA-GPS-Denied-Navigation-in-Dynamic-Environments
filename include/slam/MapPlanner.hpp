@@ -28,10 +28,9 @@ public:
 
     explicit MapPlanner(OccupancyGridMap::Config map_cfg = {});
 
-    [[nodiscard]] std::optional<Plan> plan(
-        const OccupancyGridMap::Status& status,
-        const Eigen::Vector3d& start,
-        const Eigen::Vector3d& goal) const;
+    [[nodiscard]] std::optional<Plan> plan(const OccupancyGridMap::Status& status,
+                                           const Eigen::Vector3d& start,
+                                           const Eigen::Vector3d& goal) const;
 
 private:
     [[nodiscard]] int to_grid(double coordinate) const;

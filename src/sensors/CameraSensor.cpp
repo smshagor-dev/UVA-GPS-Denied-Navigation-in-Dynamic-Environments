@@ -22,9 +22,8 @@ namespace {
 
 std::string lowercase(std::string_view value) {
     std::string out(value.begin(), value.end());
-    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-    });
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return out;
 }
 
@@ -64,7 +63,8 @@ std::unordered_map<int, std::string> load_detector_label_map_json(const std::str
 
 std::string resolve_detector_label(int class_id,
                                    const std::unordered_map<int, std::string>& label_map) {
-    if (const auto found = label_map.find(class_id); found != label_map.end() && !found->second.empty()) {
+    if (const auto found = label_map.find(class_id);
+        found != label_map.end() && !found->second.empty()) {
         return found->second;
     }
     return "unknown_class_" + std::to_string(class_id);
@@ -72,8 +72,8 @@ std::string resolve_detector_label(int class_id,
 
 bool CameraSensor::initialize() {
     if (logger_) {
-        logger_->info("[{}] initialize stream={} resolution={}x{}",
-                      id_, stream_url_, intrinsics_.width, intrinsics_.height);
+        logger_->info("[{}] initialize stream={} resolution={}x{}", id_, stream_url_,
+                      intrinsics_.width, intrinsics_.height);
     }
     precompute_undistort_maps();
     cap_.open(stream_url_);
@@ -102,7 +102,8 @@ CameraSensor::TelemetryStats CameraSensor::telemetry_stats() const {
     stats.stream_active = state() == SensorState::RUNNING && cap_.isOpened();
     stats.simulated = false;
     stats.fps = fps_estimate_hz_;
-    stats.frame_age_ms = latest_.has_value() ? std::max(0.0, (now_sec() - latest_->timestamp) * 1000.0) : 0.0;
+    stats.frame_age_ms =
+        latest_.has_value() ? std::max(0.0, (now_sec() - latest_->timestamp) * 1000.0) : 0.0;
     stats.dropped_frames = dropped_frames_;
     stats.width = latest_width_;
     stats.height = latest_height_;
@@ -138,8 +139,7 @@ void CameraSensor::poll() {
     frame.detections = run_inference(frame.image);
 
     if (logger_) {
-        logger_->debug("[{}] frame={} detections={}",
-                       id_, frame.frame_id, frame.detections.size());
+        logger_->debug("[{}] frame={} detections={}", id_, frame.frame_id, frame.detections.size());
     }
 
     {
@@ -163,12 +163,11 @@ void CameraSensor::poll() {
     }
 }
 
-bool CameraSensor::load_yolo_model(const std::string& engine_path,
-                                   float conf_thresh,
+bool CameraSensor::load_yolo_model(const std::string& engine_path, float conf_thresh,
                                    float nms_thresh) {
     if (logger_) {
-        logger_->info("[{}] load_yolo_model path={} conf={} nms={}",
-                      id_, engine_path, conf_thresh, nms_thresh);
+        logger_->info("[{}] load_yolo_model path={} conf={} nms={}", id_, engine_path, conf_thresh,
+                      nms_thresh);
     }
     conf_thresh_ = conf_thresh;
     nms_thresh_ = nms_thresh;
@@ -189,7 +188,8 @@ bool CameraSensor::load_yolo_model(const std::string& engine_path,
         dnn_net_ = cv::dnn::readNet(engine_path);
         inference_ready_ = !dnn_net_.empty();
         if (logger_) {
-            logger_->info("[{}] OpenCV DNN fallback model load {}", id_, inference_ready_ ? "succeeded" : "failed");
+            logger_->info("[{}] OpenCV DNN fallback model load {}", id_,
+                          inference_ready_ ? "succeeded" : "failed");
         }
     } catch (...) {
         inference_ready_ = false;
@@ -205,10 +205,8 @@ bool CameraSensor::load_detector_labels(const std::string& labels_path) {
     label_map_path_ = labels_path;
     label_map_ = load_detector_label_map_json(labels_path);
     if (logger_) {
-        logger_->info("[{}] detector label map path={} entries={}",
-                      id_,
-                      labels_path.empty() ? std::string("<none>") : labels_path,
-                      label_map_.size());
+        logger_->info("[{}] detector label map path={} entries={}", id_,
+                      labels_path.empty() ? std::string("<none>") : labels_path, label_map_.size());
     }
     return !label_map_.empty();
 }
@@ -217,20 +215,16 @@ void CameraSensor::precompute_undistort_maps() {
     if (logger_) {
         logger_->debug("[{}] precompute undistort maps", id_);
     }
-    cv::Mat K = (cv::Mat_<double>(3, 3) <<
-        intrinsics_.fx, 0.0, intrinsics_.cx,
-        0.0, intrinsics_.fy, intrinsics_.cy,
-        0.0, 0.0, 1.0);
+    cv::Mat K = (cv::Mat_<double>(3, 3) << intrinsics_.fx, 0.0, intrinsics_.cx, 0.0, intrinsics_.fy,
+                 intrinsics_.cy, 0.0, 0.0, 1.0);
 
     cv::Mat D(1, 5, CV_64F);
     for (int i = 0; i < 5; ++i) {
         D.at<double>(0, i) = intrinsics_.dist_coeffs[static_cast<size_t>(i)];
     }
 
-    cv::initUndistortRectifyMap(
-        K, D, cv::Mat(), K,
-        cv::Size(intrinsics_.width, intrinsics_.height),
-        CV_32FC1, map1_, map2_);
+    cv::initUndistortRectifyMap(K, D, cv::Mat(), K, cv::Size(intrinsics_.width, intrinsics_.height),
+                                CV_32FC1, map1_, map2_);
 }
 
 cv::Mat CameraSensor::undistort(const cv::Mat& raw) const {
@@ -263,13 +257,8 @@ std::vector<Detection> CameraSensor::run_inference_dnn_fallback(const cv::Mat& f
         return {};
     }
 
-    cv::Mat blob = cv::dnn::blobFromImage(
-        frame,
-        1.0 / 255.0,
-        cv::Size(640, 640),
-        cv::Scalar(),
-        true,
-        false);
+    cv::Mat blob =
+        cv::dnn::blobFromImage(frame, 1.0 / 255.0, cv::Size(640, 640), cv::Scalar(), true, false);
 
     if (blob.empty()) {
         return {};
@@ -336,10 +325,14 @@ std::vector<Detection> CameraSensor::run_inference_dnn_fallback(const cv::Mat& f
         detection.confidence = confidences[static_cast<size_t>(index)];
         detection.label = resolve_detector_label(detection.class_id, label_map_);
         detection.bbox = cv::Rect2f(
-            std::clamp(static_cast<float>(box.x) / static_cast<float>(intrinsics_.width), 0.0f, 1.0f),
-            std::clamp(static_cast<float>(box.y) / static_cast<float>(intrinsics_.height), 0.0f, 1.0f),
-            std::clamp(static_cast<float>(box.width) / static_cast<float>(intrinsics_.width), 0.0f, 1.0f),
-            std::clamp(static_cast<float>(box.height) / static_cast<float>(intrinsics_.height), 0.0f, 1.0f));
+            std::clamp(static_cast<float>(box.x) / static_cast<float>(intrinsics_.width), 0.0f,
+                       1.0f),
+            std::clamp(static_cast<float>(box.y) / static_cast<float>(intrinsics_.height), 0.0f,
+                       1.0f),
+            std::clamp(static_cast<float>(box.width) / static_cast<float>(intrinsics_.width), 0.0f,
+                       1.0f),
+            std::clamp(static_cast<float>(box.height) / static_cast<float>(intrinsics_.height),
+                       0.0f, 1.0f));
         detections.push_back(std::move(detection));
     }
 

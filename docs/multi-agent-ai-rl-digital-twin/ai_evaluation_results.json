@@ -1,0 +1,42 @@
+{
+  "generated_at": "2026-07-17T07:40:16.777392Z",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "scores": {
+    "planning_quality": 0.772,
+    "coordination_quality": 0.902,
+    "decision_latency_ms": {
+      "count": 3.0,
+      "average_ms": 1.6913888888888888,
+      "p50_ms": 1.9036666666666668,
+      "p95_ms": 1.985,
+      "p99_ms": 1.985,
+      "max_ms": 1.985
+    },
+    "mission_completion": 0.906,
+    "adaptation_score": 0.606,
+    "recovery_score": 0.8,
+    "safety_score": 0.834
+  },
+  "benchmark": {
+    "twin_synchronization_ms": {
+      "average": 1.985,
+      "maximum": 2.11
+    },
+    "event_latency_ms": {
+      "average": 3.48,
+      "maximum": 3.48
+    },
+    "state_consistency": 1.0,
+    "sensor_synchronization": 0.891,
+    "swarm_consistency": 0.92,
+    "status": "PASS"
+  },
+  "resource_usage": {
+    "cpu_seconds_delta": 0.015625,
+    "working_set_mb_delta": 0.1015625
+  },
+  "status": "PASS"
+}

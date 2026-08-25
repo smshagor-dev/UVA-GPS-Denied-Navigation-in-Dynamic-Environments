@@ -1,0 +1,58 @@
+﻿2026/07/16 14:24:04 control-plane logging initialized
+2026/07/16 14:24:04 control-plane security profile=lab signed_commands_required=false operator_id= operator_role=operator
+2026/07/16 14:24:04 control-plane transport tls_enabled=false client_cert_required=false cert= ca=
+2026/07/16 14:24:04 control-plane runtime backend_mode=simulation simulation_enabled=true stale_after=5s demo_fleet_size=5
+2026/07/16 14:24:04 FleetState initialized backend_mode=simulation simulation_enabled=true stale_after=5s
+2026/07/16 14:24:04 control-plane backend mode=simulation simulation_enabled=true stale_after=5s
+2026/07/16 14:24:04 FleetState.UpsertTelemetry drone=1 cluster=cluster-01 role=LEADER
+2026/07/16 14:24:04 FleetState.UpsertTelemetry drone=2 cluster=cluster-01 role=FOLLOWER
+2026/07/16 14:24:04 FleetState.UpsertTelemetry drone=3 cluster=cluster-01 role=FOLLOWER
+2026/07/16 14:24:04 FleetState.UpsertTelemetry drone=4 cluster=cluster-01 role=FOLLOWER
+2026/07/16 14:24:04 FleetState.UpsertTelemetry drone=5 cluster=cluster-01 role=FOLLOWER
+2026/07/16 14:24:04 FleetState.RegisterMission mission=mission-bootstrap cluster=cluster-01 formation=DIAMOND
+2026/07/16 14:24:04 FleetState.AddEvent type=bootstrap message=digital twin seeded
+2026/07/16 14:24:04 go control-plane listening on :8080
+2026/07/16 14:24:09 handleReadiness method=GET remote=127.0.0.1:53748
+2026/07/16 14:24:09 FleetState.Health requested
+2026/07/16 14:24:09 FleetState.Snapshot requested
+2026/07/16 14:24:09 request complete method=GET path=/api/v1/ready remote=127.0.0.1:53748 duration=1.31724ms
+2026/07/16 14:24:12 handleReadiness method=GET remote=172.19.0.1:36490
+2026/07/16 14:24:12 FleetState.Health requested
+2026/07/16 14:24:12 FleetState.Snapshot requested
+2026/07/16 14:24:12 request complete method=GET path=/api/v1/ready remote=172.19.0.1:36490 duration=1.292185ms
+2026/07/16 14:24:12 handleFleet method=GET remote=172.19.0.1:36490
+2026/07/16 14:24:12 FleetState.Snapshot requested
+2026/07/16 14:24:12 request complete method=GET path=/api/v1/fleet remote=172.19.0.1:36490 duration=1.411937ms
+2026/07/16 14:24:12 handleMetrics method=GET remote=172.19.0.1:36490
+2026/07/16 14:24:12 FleetState.Health requested
+2026/07/16 14:24:12 FleetState.Snapshot requested
+2026/07/16 14:24:12 FleetState.Events requested
+2026/07/16 14:24:12 FleetState.Commands requested
+2026/07/16 14:24:12 FleetState.PendingApprovals requested
+2026/07/16 14:24:12 request complete method=GET path=/metrics remote=172.19.0.1:36490 duration=2.947937ms
+2026/07/16 14:24:12 shutting down control-plane after terminated
+2026/07/16 14:24:13 control-plane logging initialized
+2026/07/16 14:24:13 control-plane security profile=lab signed_commands_required=false operator_id= operator_role=operator
+2026/07/16 14:24:13 control-plane transport tls_enabled=false client_cert_required=false cert= ca=
+2026/07/16 14:24:13 control-plane runtime backend_mode=simulation simulation_enabled=true stale_after=5s demo_fleet_size=5
+2026/07/16 14:24:13 FleetState initialized backend_mode=simulation simulation_enabled=true stale_after=5s
+2026/07/16 14:24:13 control-plane backend mode=simulation simulation_enabled=true stale_after=5s
+2026/07/16 14:24:13 FleetState.UpsertTelemetry drone=1 cluster=cluster-01 role=LEADER
+2026/07/16 14:24:13 FleetState.UpsertTelemetry drone=2 cluster=cluster-01 role=FOLLOWER
+2026/07/16 14:24:13 FleetState.UpsertTelemetry drone=3 cluster=cluster-01 role=FOLLOWER
+2026/07/16 14:24:13 FleetState.UpsertTelemetry drone=4 cluster=cluster-01 role=FOLLOWER
+2026/07/16 14:24:13 FleetState.UpsertTelemetry drone=5 cluster=cluster-01 role=FOLLOWER
+2026/07/16 14:24:13 FleetState.RegisterMission mission=mission-bootstrap cluster=cluster-01 formation=DIAMOND
+2026/07/16 14:24:13 FleetState.AddEvent type=bootstrap message=digital twin seeded
+2026/07/16 14:24:13 go control-plane listening on :8080
+2026/07/16 14:24:18 handleReadiness method=GET remote=127.0.0.1:44778
+2026/07/16 14:24:18 FleetState.Health requested
+2026/07/16 14:24:18 FleetState.Snapshot requested
+2026/07/16 14:24:18 request complete method=GET path=/api/v1/ready remote=127.0.0.1:44778 duration=1.491501ms
+2026/07/16 14:24:19 handleReadiness method=GET remote=172.19.0.1:36500
+2026/07/16 14:24:19 FleetState.Health requested
+2026/07/16 14:24:19 FleetState.Snapshot requested
+2026/07/16 14:24:19 request complete method=GET path=/api/v1/ready remote=172.19.0.1:36500 duration=1.300066ms
+2026/07/16 14:24:19 handleFleet method=GET remote=172.19.0.1:36500
+2026/07/16 14:24:19 FleetState.Snapshot requested
+2026/07/16 14:24:19 request complete method=GET path=/api/v1/fleet remote=172.19.0.1:36500 duration=2.133563ms

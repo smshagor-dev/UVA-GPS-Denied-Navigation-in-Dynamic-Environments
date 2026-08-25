@@ -1,0 +1,42 @@
+name: Setup vcpkg
+description: Provision a deterministic vcpkg checkout for Windows CI
+inputs:
+  cache-key-suffix:
+    description: Additional cache key suffix
+    required: false
+    default: default
+runs:
+  using: composite
+  steps:
+    - name: Resolve vcpkg baseline
+      id: baseline
+      shell: pwsh
+      run: |
+        $baseline = python -c "import json, pathlib; print(json.loads(pathlib.Path('vcpkg.json').read_text(encoding='utf-8'))['builtin-baseline'])"
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "baseline=$baseline"
+
+    - name: Cache vcpkg binary archives
+      uses: actions/cache@v6
+      with:
+        path: |
+          ${{ github.workspace }}\vcpkg-cache
+        key: vcpkg-${{ runner.os }}-${{ steps.baseline.outputs.baseline }}-${{ inputs.cache-key-suffix }}
+
+    - name: Clone vcpkg
+      shell: pwsh
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git $env:GITHUB_WORKSPACE\vcpkg
+        git -C $env:GITHUB_WORKSPACE\vcpkg checkout ${{ steps.baseline.outputs.baseline }}
+
+    - name: Bootstrap vcpkg
+      shell: pwsh
+      run: |
+        & "$env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+
+    - name: Export vcpkg environment
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\vcpkg-cache" | Out-Null
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg"
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_DEFAULT_BINARY_CACHE=$env:GITHUB_WORKSPACE\vcpkg-cache"
+        Add-Content -Path $env:GITHUB_ENV -Value "VCPKG_BINARY_SOURCES=clear;files,$env:GITHUB_WORKSPACE\vcpkg-cache,readwrite"

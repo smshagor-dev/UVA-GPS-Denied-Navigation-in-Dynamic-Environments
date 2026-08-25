@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/drone-swarm/config/detector_labels.schema.json",
+  "title": "Drone Swarm Detector Labels",
+  "type": "object",
+  "required": ["labels"],
+  "properties": {
+    "dataset_name": { "type": "string" },
+    "version": { "type": "string" },
+    "dataset_type": { "type": "string" },
+    "data_source": { "type": "string" },
+    "note": { "type": "string" },
+    "model": { "type": "string" },
+    "coordinate_frame": { "type": "string" },
+    "units": { "type": "string" },
+    "flight": { "type": "object" },
+    "camera": { "type": "object" },
+    "labels": {
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[0-9]+$": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}
+

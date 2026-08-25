@@ -1,0 +1,4 @@
+﻿{
+    "StatusCode":  200,
+    "Content":  "{\"ready\":true,\"status\":\"ready\",\"reason\":\"control-plane operational\",\"uptime_seconds\":6.2159298960000005,\"updated_at\":\"2026-07-16T14:24:19.24726334Z\",\"backend_mode\":\"simulation\",\"simulation_enabled\":true,\"total_drones\":5,\"real_drone_count\":0,\"stale_drone_count\":0}\n"
+}

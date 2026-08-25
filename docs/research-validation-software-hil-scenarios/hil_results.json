@@ -1,0 +1,3978 @@
+{
+  "generated_at": "2026-07-17T06:34:18.401940Z",
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.5 (tags/v3.14.5:5607950, May 10 2026, 10:43:50) [MSC v.1944 64 bit (AMD64)]"
+  },
+  "backend": {
+    "mode": "production",
+    "simulation_enabled": false,
+    "startup_ms": 1598.6264999955893,
+    "log_path": "results\\phase7\\phase7_hil_backend.log"
+  },
+  "scenario_count": 5,
+  "scenarios": [
+    {
+      "name": "hil_gps_denied_navigation",
+      "description": "Software HIL navigation loop with GPS denied and VIO/TDOA fallback.",
+      "steps": 8,
+      "dt_s": 0.5,
+      "timeline": [
+        {
+          "step": 0,
+          "timestamp": "2026-07-17T06:34:17.424631Z",
+          "active_fault": "none",
+          "input_state": {
+            "position": [
+              0.1,
+              0.025,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.05,
+                "y": 0.0,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.1,
+                "y": 0.025,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "hold",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 1,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 14.823599951341748,
+            "fleet": 1.4702000189572573,
+            "health": 13.287900015711784,
+            "ready": 1.5664000529795885,
+            "total": 31.14810003899038
+          }
+        },
+        {
+          "step": 1,
+          "timestamp": "2026-07-17T06:34:17.924631Z",
+          "active_fault": "none",
+          "input_state": {
+            "position": [
+              0.2,
+              0.05,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.04387912809451864,
+                "y": 0.007422118777635688,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.01438276615812609
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.2,
+                "y": 0.05,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "hold",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 1,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.9925999222323298,
+            "fleet": 1.2435000389814377,
+            "health": 0.987200066447258,
+            "ready": 1.032399944961071,
+            "total": 5.2556999726220965
+          }
+        },
+        {
+          "step": 2,
+          "event": "fault_applied",
+          "fault": "gps_denied",
+          "timestamp": "2026-07-17T06:34:18.424631Z"
+        },
+        {
+          "step": 2,
+          "timestamp": "2026-07-17T06:34:18.424631Z",
+          "active_fault": "gps_denied",
+          "input_state": {
+            "position": [
+              0.30000000000000004,
+              0.07500000000000001,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "denied",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.02701511529340699,
+                "y": 0.01438276615812609,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.025244129544236896
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "denied",
+              "position": {
+                "x": 0.30000000000000004,
+                "y": 0.07500000000000001,
+                "z": 1.5
+              },
+              "fix_type": "unavailable",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "gps_denied_navigation",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 1,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.2598000466823578,
+            "fleet": 1.082399976439774,
+            "health": 1.0279000271111727,
+            "ready": 20.94239997677505,
+            "total": 24.312500027008355
+          }
+        },
+        {
+          "step": 3,
+          "timestamp": "2026-07-17T06:34:18.924631Z",
+          "active_fault": "gps_denied",
+          "input_state": {
+            "position": [
+              0.4,
+              0.1,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "denied",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.0035368600833851453,
+                "y": 0.020449162800700024,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.029924849598121632
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "denied",
+              "position": {
+                "x": 0.4,
+                "y": 0.1,
+                "z": 1.5
+              },
+              "fix_type": "unavailable",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "gps_denied_navigation",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 1,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.2505999766290188,
+            "fleet": 15.07530000526458,
+            "health": 2.0179999992251396,
+            "ready": 1.0718000121414661,
+            "total": 19.415699993260205
+          }
+        },
+        {
+          "step": 4,
+          "timestamp": "2026-07-17T06:34:19.424631Z",
+          "active_fault": "gps_denied",
+          "input_state": {
+            "position": [
+              0.5,
+              0.125,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "denied",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.02080734182735712,
+                "y": 0.025244129544236896,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.02727892280477045
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "denied",
+              "position": {
+                "x": 0.5,
+                "y": 0.125,
+                "z": 1.5
+              },
+              "fix_type": "unavailable",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "gps_denied_navigation",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 1,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.6938999760895967,
+            "fleet": 1.3099999632686377,
+            "health": 1.1885999701917171,
+            "ready": 1.0714000090956688,
+            "total": 5.26389991864562
+          }
+        },
+        {
+          "step": 5,
+          "event": "fault_applied",
+          "fault": "recovery",
+          "timestamp": "2026-07-17T06:34:19.924631Z"
+        },
+        {
+          "step": 5,
+          "timestamp": "2026-07-17T06:34:19.924631Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.6,
+              0.15,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.040057180777346685,
+                "y": 0.028469538580667586,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.017954164323118693
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.6,
+                "y": 0.15,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 1,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.2889000354334712,
+            "fleet": 1.103400019928813,
+            "health": 0.7834000280126929,
+            "ready": 0.7938999915495515,
+            "total": 3.9696000749245286
+          }
+        },
+        {
+          "step": 6,
+          "timestamp": "2026-07-17T06:34:20.424631Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.7,
+              0.175,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.04949962483002227,
+                "y": 0.029924849598121632,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.004233600241796016
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.7,
+                "y": 0.175,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 1,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 27.657900005578995,
+            "fleet": 2.5406000204384327,
+            "health": 17.495799926109612,
+            "ready": 1.2877000262960792,
+            "total": 48.98199997842312
+          }
+        },
+        {
+          "step": 7,
+          "timestamp": "2026-07-17T06:34:20.924631Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.7999999999999999,
+              0.19999999999999998,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.04682283436453982,
+                "y": 0.029519578406218105,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": -0.010523496830688595
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.7999999999999999,
+                "y": 0.19999999999999998,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 1,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.1168000055477023,
+            "fleet": 0.8270000107586384,
+            "health": 12.059999979101121,
+            "ready": 1.0777999414131045,
+            "total": 15.081599936820567
+          }
+        }
+      ],
+      "safety_state_transitions": [],
+      "detection_time_s": 0.0,
+      "recovery_time_s": 0.0,
+      "latency_ms": {
+        "average": 19.17863749258686,
+        "max": 48.98199997842312
+      },
+      "final_state": {
+        "fleet_safety_state": "NORMAL",
+        "fleet_mission_state": "recovered",
+        "fleet_localization_state": "nominal",
+        "readiness_status": "ready",
+        "readiness_http_status": 200,
+        "health_online_drones": 1,
+        "fleet_stale_drones": 0
+      },
+      "pass": true
+    },
+    {
+      "name": "hil_sensor_dropout",
+      "description": "Software HIL sensor dropout with degraded localization and recovery.",
+      "steps": 8,
+      "dt_s": 0.5,
+      "timeline": [
+        {
+          "step": 0,
+          "timestamp": "2026-07-17T06:34:17.579381Z",
+          "active_fault": "none",
+          "input_state": {
+            "position": [
+              0.05,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.05,
+                "y": 0.0,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.05,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "hold",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 2,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.1480998946353793,
+            "fleet": 1.0674999793991446,
+            "health": 0.7572000613436103,
+            "ready": 0.8049999596551061,
+            "total": 3.7777998950332403
+          }
+        },
+        {
+          "step": 1,
+          "timestamp": "2026-07-17T06:34:18.079381Z",
+          "active_fault": "none",
+          "input_state": {
+            "position": [
+              0.1,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.04387912809451864,
+                "y": 0.007422118777635688,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.01438276615812609
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.1,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "hold",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 2,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 13.096200069412589,
+            "fleet": 1.0571000166237354,
+            "health": 0.7475999882444739,
+            "ready": 10.975999990478158,
+            "total": 25.876900064758956
+          }
+        },
+        {
+          "step": 2,
+          "event": "fault_applied",
+          "fault": "camera_dropout",
+          "timestamp": "2026-07-17T06:34:18.579381Z"
+        },
+        {
+          "step": 2,
+          "timestamp": "2026-07-17T06:34:18.579381Z",
+          "active_fault": "camera_dropout",
+          "input_state": {
+            "position": [
+              0.15000000000000002,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.44,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "dropout",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.02701511529340699,
+                "y": 0.01438276615812609,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.025244129544236896
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.15000000000000002,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "dropout",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 12
+            },
+            "vio": {
+              "status": "degraded",
+              "track_count": 22,
+              "confidence": 0.44
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "DEGRADED_LOCALIZATION",
+            "fleet_mission_state": "sensor_dropout",
+            "fleet_localization_state": "degraded",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 2,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 15.283100074157119,
+            "fleet": 1.3093000743538141,
+            "health": 0.8372999727725983,
+            "ready": 1.0003999341279268,
+            "total": 18.430100055411458
+          }
+        },
+        {
+          "step": 3,
+          "timestamp": "2026-07-17T06:34:19.079381Z",
+          "active_fault": "camera_dropout",
+          "input_state": {
+            "position": [
+              0.2,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.44,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "dropout",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.0035368600833851453,
+                "y": 0.020449162800700024,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.029924849598121632
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.2,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "dropout",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 12
+            },
+            "vio": {
+              "status": "degraded",
+              "track_count": 22,
+              "confidence": 0.44
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "DEGRADED_LOCALIZATION",
+            "fleet_mission_state": "sensor_dropout",
+            "fleet_localization_state": "degraded",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 2,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.2304000556468964,
+            "fleet": 26.421200018376112,
+            "health": 15.035999938845634,
+            "ready": 15.501099987886846,
+            "total": 58.18870000075549
+          }
+        },
+        {
+          "step": 4,
+          "timestamp": "2026-07-17T06:34:19.579381Z",
+          "active_fault": "camera_dropout",
+          "input_state": {
+            "position": [
+              0.25,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.44,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "dropout",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.02080734182735712,
+                "y": 0.025244129544236896,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.02727892280477045
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.25,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "dropout",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 12
+            },
+            "vio": {
+              "status": "degraded",
+              "track_count": 22,
+              "confidence": 0.44
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "DEGRADED_LOCALIZATION",
+            "fleet_mission_state": "sensor_dropout",
+            "fleet_localization_state": "degraded",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 2,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.040400005877018,
+            "fleet": 14.813599991612136,
+            "health": 0.7927999831736088,
+            "ready": 14.630999998189509,
+            "total": 31.277799978852272
+          }
+        },
+        {
+          "step": 5,
+          "event": "fault_applied",
+          "fault": "recovery",
+          "timestamp": "2026-07-17T06:34:20.079381Z"
+        },
+        {
+          "step": 5,
+          "timestamp": "2026-07-17T06:34:20.079381Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.3,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.040057180777346685,
+                "y": 0.028469538580667586,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.017954164323118693
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.3,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 2,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 15.355899930000305,
+            "fleet": 15.601800056174397,
+            "health": 15.133999986574054,
+            "ready": 1.0393999982625246,
+            "total": 47.13109997101128
+          }
+        },
+        {
+          "step": 6,
+          "timestamp": "2026-07-17T06:34:20.579381Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.35,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.04949962483002227,
+                "y": 0.029924849598121632,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.004233600241796016
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.35,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 2,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.1845000553876162,
+            "fleet": 13.459899928420782,
+            "health": 14.214300084859133,
+            "ready": 1.0267000179737806,
+            "total": 29.88540008664131
+          }
+        },
+        {
+          "step": 7,
+          "timestamp": "2026-07-17T06:34:21.079381Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.39999999999999997,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.04682283436453982,
+                "y": 0.029519578406218105,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": -0.010523496830688595
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.39999999999999997,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 2,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 0.9552999399602413,
+            "fleet": 13.711999985389411,
+            "health": 0.9939000010490417,
+            "ready": 1.0414000134915113,
+            "total": 16.702599939890206
+          }
+        }
+      ],
+      "safety_state_transitions": [
+        {
+          "step": 2,
+          "from": "NORMAL",
+          "to": "DEGRADED_LOCALIZATION",
+          "timestamp": "2026-07-17T06:34:18.579381Z"
+        },
+        {
+          "step": 5,
+          "from": "DEGRADED_LOCALIZATION",
+          "to": "NORMAL",
+          "timestamp": "2026-07-17T06:34:20.079381Z"
+        }
+      ],
+      "detection_time_s": 0.5,
+      "recovery_time_s": 1.5,
+      "latency_ms": {
+        "average": 28.908799999044277,
+        "max": 58.18870000075549
+      },
+      "final_state": {
+        "fleet_safety_state": "NORMAL",
+        "fleet_mission_state": "recovered",
+        "fleet_localization_state": "nominal",
+        "readiness_status": "ready",
+        "readiness_http_status": 200,
+        "health_online_drones": 2,
+        "fleet_stale_drones": 0
+      },
+      "pass": true
+    },
+    {
+      "name": "hil_telemetry_delay",
+      "description": "Software HIL delayed telemetry link with recovery to nominal backend state.",
+      "steps": 8,
+      "dt_s": 0.5,
+      "timeline": [
+        {
+          "step": 0,
+          "timestamp": "2026-07-17T06:34:17.811719Z",
+          "active_fault": "none",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.05,
+                "y": 0.0,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "hold",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 3,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.733899931423366,
+            "fleet": 1.1226000497117639,
+            "health": 1.0853999992832541,
+            "ready": 24.372000014409423,
+            "total": 28.313899994827807
+          }
+        },
+        {
+          "step": 1,
+          "timestamp": "2026-07-17T06:34:18.311719Z",
+          "active_fault": "none",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.04387912809451864,
+                "y": 0.007422118777635688,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.01438276615812609
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "hold",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 3,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.0733000235632062,
+            "fleet": 0.9085999336093664,
+            "health": 0.6571999983862042,
+            "ready": 11.105900048278272,
+            "total": 13.745000003837049
+          }
+        },
+        {
+          "step": 2,
+          "event": "fault_applied",
+          "fault": "telemetry_delay",
+          "timestamp": "2026-07-17T06:34:18.811719Z"
+        },
+        {
+          "step": 2,
+          "timestamp": "2026-07-17T06:34:18.811719Z",
+          "active_fault": "telemetry_delay",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 450.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "delayed",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.02701511529340699,
+                "y": 0.01438276615812609,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.025244129544236896
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "delayed",
+              "delay_ms": 450.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "LINK_LOST",
+            "fleet_mission_state": "telemetry_delay",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 3,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.6758000710979104,
+            "fleet": 14.719299972057343,
+            "health": 0.9724999545142055,
+            "ready": 0.8159999269992113,
+            "total": 18.18359992466867
+          }
+        },
+        {
+          "step": 3,
+          "timestamp": "2026-07-17T06:34:19.311719Z",
+          "active_fault": "telemetry_delay",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 450.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "delayed",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.0035368600833851453,
+                "y": 0.020449162800700024,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.029924849598121632
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "delayed",
+              "delay_ms": 450.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "LINK_LOST",
+            "fleet_mission_state": "telemetry_delay",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 3,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 13.640599907375872,
+            "fleet": 1.6573000466451049,
+            "health": 0.9129000827670097,
+            "ready": 11.548400041647255,
+            "total": 27.759200078435242
+          }
+        },
+        {
+          "step": 4,
+          "timestamp": "2026-07-17T06:34:19.811719Z",
+          "active_fault": "telemetry_delay",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 450.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "delayed",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.02080734182735712,
+                "y": 0.025244129544236896,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.02727892280477045
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "delayed",
+              "delay_ms": 450.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "LINK_LOST",
+            "fleet_mission_state": "telemetry_delay",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 3,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.2876000255346298,
+            "fleet": 15.939999953843653,
+            "health": 0.8420000085607171,
+            "ready": 0.6070000817999244,
+            "total": 18.676600069738925
+          }
+        },
+        {
+          "step": 5,
+          "event": "fault_applied",
+          "fault": "recovery",
+          "timestamp": "2026-07-17T06:34:20.311719Z"
+        },
+        {
+          "step": 5,
+          "timestamp": "2026-07-17T06:34:20.311719Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.040057180777346685,
+                "y": 0.028469538580667586,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.017954164323118693
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 3,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 0.8997999830171466,
+            "fleet": 0.7951000006869435,
+            "health": 11.295400094240904,
+            "ready": 15.118000097572803,
+            "total": 28.108300175517797
+          }
+        },
+        {
+          "step": 6,
+          "timestamp": "2026-07-17T06:34:20.811719Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.04949962483002227,
+                "y": 0.029924849598121632,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.004233600241796016
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 3,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 15.299599966965616,
+            "fleet": 1.1816000333055854,
+            "health": 14.085599919781089,
+            "ready": 15.96129999961704,
+            "total": 46.52809991966933
+          }
+        },
+        {
+          "step": 7,
+          "timestamp": "2026-07-17T06:34:21.311719Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.04682283436453982,
+                "y": 0.029519578406218105,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": -0.010523496830688595
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 3,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 15.557200065813959,
+            "fleet": 15.776999993249774,
+            "health": 0.7541999220848083,
+            "ready": 14.189700013957918,
+            "total": 46.27809999510646
+          }
+        }
+      ],
+      "safety_state_transitions": [
+        {
+          "step": 2,
+          "from": "NORMAL",
+          "to": "LINK_LOST",
+          "timestamp": "2026-07-17T06:34:18.811719Z"
+        },
+        {
+          "step": 5,
+          "from": "LINK_LOST",
+          "to": "NORMAL",
+          "timestamp": "2026-07-17T06:34:20.311719Z"
+        }
+      ],
+      "detection_time_s": 0.5,
+      "recovery_time_s": 1.5,
+      "latency_ms": {
+        "average": 28.44910002022516,
+        "max": 46.52809991966933
+      },
+      "final_state": {
+        "fleet_safety_state": "NORMAL",
+        "fleet_mission_state": "recovered",
+        "fleet_localization_state": "nominal",
+        "readiness_status": "ready",
+        "readiness_http_status": 200,
+        "health_online_drones": 3,
+        "fleet_stale_drones": 0
+      },
+      "pass": true
+    },
+    {
+      "name": "hil_packet_loss",
+      "description": "Software HIL packet loss forcing degraded then recovered communication state.",
+      "steps": 8,
+      "dt_s": 0.5,
+      "timeline": [
+        {
+          "step": 0,
+          "timestamp": "2026-07-17T06:34:18.040725Z",
+          "active_fault": "none",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.05,
+                "y": 0.0,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "hold",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 4,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.4831000007689,
+            "fleet": 13.704000040888786,
+            "health": 0.8407999994233251,
+            "ready": 0.660100020468235,
+            "total": 16.688000061549246
+          }
+        },
+        {
+          "step": 1,
+          "timestamp": "2026-07-17T06:34:18.540725Z",
+          "active_fault": "none",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.04387912809451864,
+                "y": 0.007422118777635688,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.01438276615812609
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "hold",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 4,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 0.7217000238597393,
+            "fleet": 0.7968000136315823,
+            "health": 12.362799956463277,
+            "ready": 1.1000999948009849,
+            "total": 14.981399988755584
+          }
+        },
+        {
+          "step": 2,
+          "event": "fault_applied",
+          "fault": "packet_loss",
+          "timestamp": "2026-07-17T06:34:19.040725Z"
+        },
+        {
+          "step": 2,
+          "timestamp": "2026-07-17T06:34:19.040725Z",
+          "active_fault": "packet_loss",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 45.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "lossy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.02701511529340699,
+                "y": 0.01438276615812609,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.025244129544236896
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "lossy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 45.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "LINK_LOST",
+            "fleet_mission_state": "packet_loss",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 4,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.2843000004068017,
+            "fleet": 12.432999908924103,
+            "health": 0.8453000336885452,
+            "ready": 15.072899986989796,
+            "total": 29.635499930009246
+          }
+        },
+        {
+          "step": 3,
+          "timestamp": "2026-07-17T06:34:19.540725Z",
+          "active_fault": "packet_loss",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 45.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "lossy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.0035368600833851453,
+                "y": 0.020449162800700024,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.029924849598121632
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "lossy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 45.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "LINK_LOST",
+            "fleet_mission_state": "packet_loss",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 4,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 15.131199965253472,
+            "fleet": 0.9532000403851271,
+            "health": 13.80109996534884,
+            "ready": 0.8581000147387385,
+            "total": 30.743599985726178
+          }
+        },
+        {
+          "step": 4,
+          "timestamp": "2026-07-17T06:34:20.040725Z",
+          "active_fault": "packet_loss",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 45.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "lossy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.02080734182735712,
+                "y": 0.025244129544236896,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.02727892280477045
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "lossy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 45.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "LINK_LOST",
+            "fleet_mission_state": "packet_loss",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 4,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 14.78640001732856,
+            "fleet": 1.0109000140801072,
+            "health": 14.002099982462823,
+            "ready": 0.700899981893599,
+            "total": 30.50029999576509
+          }
+        },
+        {
+          "step": 5,
+          "event": "fault_applied",
+          "fault": "recovery",
+          "timestamp": "2026-07-17T06:34:20.540725Z"
+        },
+        {
+          "step": 5,
+          "timestamp": "2026-07-17T06:34:20.540725Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.040057180777346685,
+                "y": 0.028469538580667586,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.017954164323118693
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 4,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 14.438999933190644,
+            "fleet": 1.0912000434473157,
+            "health": 14.296700013801455,
+            "ready": 15.74489998165518,
+            "total": 45.571799972094595
+          }
+        },
+        {
+          "step": 6,
+          "timestamp": "2026-07-17T06:34:21.040725Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.04949962483002227,
+                "y": 0.029924849598121632,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.004233600241796016
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 4,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 15.636400086805224,
+            "fleet": 1.2231000000610948,
+            "health": 0.9405999444425106,
+            "ready": 0.7149999728426337,
+            "total": 18.515100004151464
+          }
+        },
+        {
+          "step": 7,
+          "timestamp": "2026-07-17T06:34:21.540725Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.0,
+              0.0,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.04682283436453982,
+                "y": 0.029519578406218105,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": -0.010523496830688595
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 4,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 0.9658000199124217,
+            "fleet": 0.9817000245675445,
+            "health": 0.7631999906152487,
+            "ready": 24.59579997230321,
+            "total": 27.306500007398427
+          }
+        }
+      ],
+      "safety_state_transitions": [
+        {
+          "step": 2,
+          "from": "NORMAL",
+          "to": "LINK_LOST",
+          "timestamp": "2026-07-17T06:34:19.040725Z"
+        },
+        {
+          "step": 5,
+          "from": "LINK_LOST",
+          "to": "NORMAL",
+          "timestamp": "2026-07-17T06:34:20.540725Z"
+        }
+      ],
+      "detection_time_s": 0.5,
+      "recovery_time_s": 1.5,
+      "latency_ms": {
+        "average": 26.74277499318123,
+        "max": 45.571799972094595
+      },
+      "final_state": {
+        "fleet_safety_state": "NORMAL",
+        "fleet_mission_state": "recovered",
+        "fleet_localization_state": "nominal",
+        "readiness_status": "ready",
+        "readiness_http_status": 200,
+        "health_online_drones": 4,
+        "fleet_stale_drones": 0
+      },
+      "pass": true
+    },
+    {
+      "name": "hil_estimator_degradation",
+      "description": "Software HIL estimator degradation with emergency fallback and recovery.",
+      "steps": 8,
+      "dt_s": 0.5,
+      "timeline": [
+        {
+          "step": 0,
+          "timestamp": "2026-07-17T06:34:18.255750Z",
+          "active_fault": "none",
+          "input_state": {
+            "position": [
+              0.04,
+              -0.02,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.05,
+                "y": 0.0,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.04,
+                "y": -0.02,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "hold",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 5,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.1008000001311302,
+            "fleet": 14.089400065131485,
+            "health": 0.966200022958219,
+            "ready": 0.9837000397965312,
+            "total": 17.140100128017366
+          }
+        },
+        {
+          "step": 1,
+          "timestamp": "2026-07-17T06:34:18.755750Z",
+          "active_fault": "none",
+          "input_state": {
+            "position": [
+              0.08,
+              -0.04,
+              1.5
+            ],
+            "localization_confidence": 0.92,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.04387912809451864,
+                "y": 0.007422118777635688,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.01438276615812609
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.08,
+                "y": -0.04,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.92
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "hold",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 5,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.0367999784648418,
+            "fleet": 12.514300062321126,
+            "health": 1.0442000348120928,
+            "ready": 0.8207999635487795,
+            "total": 15.41610003914684
+          }
+        },
+        {
+          "step": 2,
+          "event": "fault_applied",
+          "fault": "estimator_degradation",
+          "timestamp": "2026-07-17T06:34:19.255750Z"
+        },
+        {
+          "step": 2,
+          "timestamp": "2026-07-17T06:34:19.255750Z",
+          "active_fault": "estimator_degradation",
+          "input_state": {
+            "position": [
+              0.12,
+              -0.06,
+              1.5
+            ],
+            "localization_confidence": 0.18,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.02701511529340699,
+                "y": 0.01438276615812609,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.025244129544236896
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.12,
+                "y": -0.06,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.18
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": false
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "EMERGENCY_LAND",
+            "fleet_mission_state": "estimator_degradation",
+            "fleet_localization_state": "lost",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 5,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 0.9506000205874443,
+            "fleet": 0.894299941137433,
+            "health": 0.5794999888166785,
+            "ready": 0.5546000320464373,
+            "total": 2.978999982587993
+          }
+        },
+        {
+          "step": 3,
+          "timestamp": "2026-07-17T06:34:19.755750Z",
+          "active_fault": "estimator_degradation",
+          "input_state": {
+            "position": [
+              0.16,
+              -0.08,
+              1.5
+            ],
+            "localization_confidence": 0.18,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": 0.0035368600833851453,
+                "y": 0.020449162800700024,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.029924849598121632
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.16,
+                "y": -0.08,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.18
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": false
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "EMERGENCY_LAND",
+            "fleet_mission_state": "estimator_degradation",
+            "fleet_localization_state": "lost",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 5,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 25.377999991178513,
+            "fleet": 1.4161000726744533,
+            "health": 0.9125999640673399,
+            "ready": 0.7385999197140336,
+            "total": 28.44529994763434
+          }
+        },
+        {
+          "step": 4,
+          "timestamp": "2026-07-17T06:34:20.255750Z",
+          "active_fault": "estimator_degradation",
+          "input_state": {
+            "position": [
+              0.2,
+              -0.1,
+              1.5
+            ],
+            "localization_confidence": 0.18,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.02080734182735712,
+                "y": 0.025244129544236896,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.02727892280477045
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.2,
+                "y": -0.1,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.18
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": false
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "EMERGENCY_LAND",
+            "fleet_mission_state": "estimator_degradation",
+            "fleet_localization_state": "lost",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 5,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 0.9258000645786524,
+            "fleet": 0.9980000322684646,
+            "health": 25.59940004721284,
+            "ready": 1.1149999918416142,
+            "total": 28.63820013590157
+          }
+        },
+        {
+          "step": 5,
+          "timestamp": "2026-07-17T06:34:20.755750Z",
+          "active_fault": "estimator_degradation",
+          "input_state": {
+            "position": [
+              0.24000000000000002,
+              -0.12000000000000001,
+              1.5
+            ],
+            "localization_confidence": 0.18,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.040057180777346685,
+                "y": 0.028469538580667586,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.017954164323118693
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.24000000000000002,
+                "y": -0.12000000000000001,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.18
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": false
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "EMERGENCY_LAND",
+            "fleet_mission_state": "estimator_degradation",
+            "fleet_localization_state": "lost",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 5,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.0421000188216567,
+            "fleet": 1.0231999913230538,
+            "health": 0.7359000155702233,
+            "ready": 11.988099897280335,
+            "total": 14.78929992299527
+          }
+        },
+        {
+          "step": 6,
+          "event": "fault_applied",
+          "fault": "recovery",
+          "timestamp": "2026-07-17T06:34:21.255750Z"
+        },
+        {
+          "step": 6,
+          "timestamp": "2026-07-17T06:34:21.255750Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.28,
+              -0.14,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.04949962483002227,
+                "y": 0.029924849598121632,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.004233600241796016
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.28,
+                "y": -0.14,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 5,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 1.2558000162243843,
+            "fleet": 1.1475000064820051,
+            "health": 1.05489999987185,
+            "ready": 0.8724000072106719,
+            "total": 4.330600029788911
+          }
+        },
+        {
+          "step": 7,
+          "timestamp": "2026-07-17T06:34:21.755750Z",
+          "active_fault": "recovery",
+          "input_state": {
+            "position": [
+              0.32,
+              -0.16,
+              1.5
+            ],
+            "localization_confidence": 0.91,
+            "telemetry_delay_ms": 0.0,
+            "packet_loss_pct": 0.0,
+            "sensor_status": {
+              "imu": "live",
+              "gps": "live",
+              "camera": "live",
+              "lidar": "live",
+              "telemetry_link": "healthy",
+              "command_channel": "ready"
+            },
+            "command_channel_state": "ready"
+          },
+          "sensor_frame": {
+            "imu": {
+              "status": "live",
+              "sample_rate_hz": 200.0,
+              "accel": {
+                "x": -0.04682283436453982,
+                "y": 0.029519578406218105,
+                "z": 9.81
+              },
+              "gyro": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": -0.010523496830688595
+              },
+              "age_ms": 5.0
+            },
+            "gps": {
+              "status": "live",
+              "position": {
+                "x": 0.32,
+                "y": -0.16,
+                "z": 1.5
+              },
+              "fix_type": "3D",
+              "age_ms": 40.0
+            },
+            "camera": {
+              "status": "live",
+              "fps": 30.0,
+              "frame_age_ms": 18.0,
+              "dropped_frames": 0
+            },
+            "vio": {
+              "status": "active",
+              "track_count": 120,
+              "confidence": 0.91
+            },
+            "lidar": {
+              "status": "live",
+              "packet_rate_hz": 10.0,
+              "scan_age_ms": 12.0,
+              "point_count": 32
+            },
+            "telemetry_link": {
+              "status": "healthy",
+              "delay_ms": 0.0,
+              "packet_loss_pct": 0.0
+            },
+            "command_channel": {
+              "status": "ready",
+              "accepted": true
+            }
+          },
+          "system_response": {
+            "fleet_safety_state": "NORMAL",
+            "fleet_mission_state": "recovered",
+            "fleet_localization_state": "nominal",
+            "readiness_status": "ready",
+            "readiness_http_status": 200,
+            "health_online_drones": 5,
+            "fleet_stale_drones": 0
+          },
+          "latency_ms": {
+            "post": 0.8841999806463718,
+            "fleet": 25.786299956962466,
+            "health": 0.8205999620258808,
+            "ready": 0.6581000052392483,
+            "total": 28.149199904873967
+          }
+        }
+      ],
+      "safety_state_transitions": [
+        {
+          "step": 2,
+          "from": "NORMAL",
+          "to": "EMERGENCY_LAND",
+          "timestamp": "2026-07-17T06:34:19.255750Z"
+        },
+        {
+          "step": 6,
+          "from": "EMERGENCY_LAND",
+          "to": "NORMAL",
+          "timestamp": "2026-07-17T06:34:21.255750Z"
+        }
+      ],
+      "detection_time_s": 0.5,
+      "recovery_time_s": 2.0,
+      "latency_ms": {
+        "average": 17.485975011368282,
+        "max": 28.63820013590157
+      },
+      "final_state": {
+        "fleet_safety_state": "NORMAL",
+        "fleet_mission_state": "recovered",
+        "fleet_localization_state": "nominal",
+        "readiness_status": "ready",
+        "readiness_http_status": 200,
+        "health_online_drones": 5,
+        "fleet_stale_drones": 0
+      },
+      "pass": true
+    }
+  ],
+  "status": "PASS",
+  "notes": [
+    "Software HIL validation complete. Physical flight validation remains future work.",
+    "This harness simulates deterministic sensor, telemetry, and command behavior against the live Go control-plane backend."
+  ]
+}

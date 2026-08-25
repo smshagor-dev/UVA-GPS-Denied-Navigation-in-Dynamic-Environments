@@ -14,7 +14,9 @@ def compose_backend_mode(base_mode: str, fallback_reason: str = "") -> str:
 
 
 def summarize_localization_data_source(values: list[str]) -> str:
-    normalized = [str(value or "").strip().lower() for value in values if str(value or "").strip()]
+    normalized = [
+        str(value or "").strip().lower() for value in values if str(value or "").strip()
+    ]
     if "simulation" in normalized:
         return "simulation"
     if "playback" in normalized:
@@ -34,7 +36,9 @@ def compose_operator_status(
     real_drone_count: int = 0,
     stale_drone_count: int = 0,
 ) -> str:
-    source = str(localization_data_source or "unavailable").strip().lower() or "unavailable"
+    source = (
+        str(localization_data_source or "unavailable").strip().lower() or "unavailable"
+    )
     mode = str(backend_mode or "simulation").strip().lower() or "simulation"
     warnings: list[str] = []
     if mode == "edge_swarm":

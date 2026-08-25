@@ -95,7 +95,7 @@ Update the relevant document when you change:
 - build requirements
 - deployment assumptions
 
-At minimum, reflect those updates in [README.md](/d:/Final%20Project/drone_swarm/README.md).
+At minimum, reflect those updates in [README.md](README.md).
 
 ## Pull Request Checklist
 

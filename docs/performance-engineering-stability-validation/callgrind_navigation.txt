@@ -1,0 +1,120 @@
+﻿--------------------------------------------------------------------------------
+Profile data file 'docs/performance-engineering-stability-validation/callgrind_navigation.out' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 96672376
+Trigger: Program termination
+Profiled target:  ./build/linux-gcc-release/tests/Release/test_navigation_intelligence --gtest_filter=LocalizationFusion.PrefersTdoaWhenVioDriftIsHigh (PID 643, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                   
+--------------------------------------------------------------------------------
+547,028,272 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                    file:function
+--------------------------------------------------------------------------------
+241,421,396 (44.13%)  ???:0x0000000000a0e450 [/usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.32.so]
+171,560,779 (31.36%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+ 14,062,107 ( 2.57%)  ./string/../sysdeps/x86_64/multiarch/../multiarch/strcmp-sse2.S:strcmp [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  8,569,944 ( 1.57%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x
+  7,682,585 ( 1.40%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  7,399,134 ( 1.35%)  ./elf/../sysdeps/x86_64/dl-machine.h:_dl_relocate_object_no_relro
+  5,788,503 ( 1.06%)  ???:gdcm::Dict::LoadDefault() [/usr/lib/x86_64-linux-gnu/libgdcmDICT.so.3.0.24]
+  5,190,077 ( 0.95%)  ./elf/./elf/dl-lookup.c:_dl_lookup_symbol_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  5,006,502 ( 0.92%)  ???:0x000000000013c2a0 [/usr/lib/x86_64-linux-gnu/libgdcmDICT.so.3.0.24]
+  4,852,246 ( 0.89%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  4,719,344 ( 0.86%)  ???:gdcm::PrivateDict::LoadDefault() [/usr/lib/x86_64-linux-gnu/libgdcmDICT.so.3.0.24]
+  4,395,742 ( 0.80%)  ???:gdcm::DictEntry::CheckKeywordAgainstName(char const*, char const*) [/usr/lib/x86_64-linux-gnu/libgdcmDICT.so.3.0.24]
+  4,033,852 ( 0.74%)  ./elf/./elf/do-rel.h:_dl_relocate_object_no_relro
+  3,953,392 ( 0.72%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  3,628,343 ( 0.66%)  ./elf/./elf/dl-reloc.c:_dl_relocate_object_no_relro [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  3,292,455 ( 0.60%)  ./elf/./elf/dl-misc.c:_dl_name_match_p [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  3,272,946 ( 0.60%)  ./elf/./elf/dl-lookup.c:check_match [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  3,244,152 ( 0.59%)  ???:gdcm::PrivateTag::operator<(gdcm::PrivateTag const&) const [/usr/lib/x86_64-linux-gnu/libgdcmDSED.so.3.0.24]
+  3,082,450 ( 0.56%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  2,766,881 ( 0.51%)  ???:0x0000000000008fa0 [/usr/lib/x86_64-linux-gnu/libcharls.so.2.4.2]
+  2,168,878 ( 0.40%)  ./malloc/./malloc/malloc.c:__libc_malloc2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  2,127,734 ( 0.39%)  ./elf/./elf/dl-load.c:_dl_lookup_map [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+  2,000,131 ( 0.37%)  ./ctype/./ctype/ctype.c:isspace [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,967,419 ( 0.36%)  ./string/../sysdeps/x86_64/multiarch/strlen-avx2.S:__strlen_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,894,688 ( 0.35%)  ???:operator new(unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+  1,863,053 ( 0.34%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,821,178 ( 0.33%)  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,678,339 ( 0.31%)  ???:std::_Rb_tree_insert_and_rebalance(bool, std::_Rb_tree_node_base*, std::_Rb_tree_node_base*, std::_Rb_tree_node_base&) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+  1,661,154 ( 0.30%)  ???:0x000000000013bd60 [/usr/lib/x86_64-linux-gnu/libgdcmDICT.so.3.0.24]
+  1,578,944 ( 0.29%)  ./malloc/./malloc/malloc.c:_int_free_maybe_trim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,576,306 ( 0.29%)  ???:0x00000000001fde90 [/usr/lib/x86_64-linux-gnu/libopencv_imgproc.so.4.10.0]
+  1,272,382 ( 0.23%)  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  1,253,585 ( 0.23%)  ./string/../sysdeps/x86_64/multiarch/memchr-avx2.S:__memchr_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    894,794 ( 0.16%)  ./elf/./elf/dl-version.c:_dl_check_map_versions [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    860,915 ( 0.16%)  ./elf/../sysdeps/generic/ldsodefs.h:_dl_lookup_map
+    814,606 ( 0.15%)  ./stdlib/./stdlib/cxa_finalize.c:__cxa_finalize [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    809,335 ( 0.15%)  ./string/../sysdeps/x86_64/multiarch/strcmp-avx2.S:__strcmp_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    618,831 ( 0.11%)  ./string/../sysdeps/x86_64/multiarch/strcmp-avx2.S:__strcasecmp_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    571,466 ( 0.10%)  ???:0x0000000015f68380 [???]
+    388,115 ( 0.07%)  ./elf/./elf/dl-load.c:_dl_map_object_from_fd [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    387,660 ( 0.07%)  ???:0x0000000015f68490 [???]
+    363,490 ( 0.07%)  ???:0x000000000013ace0'2 [/usr/lib/x86_64-linux-gnu/libgdcmDICT.so.3.0.24]
+    331,729 ( 0.06%)  ./elf/./elf/dl-find_object.c:_dlfo_sort_mappings [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    282,682 ( 0.05%)  ???:0x0000000015f684a0 [???]
+    277,565 ( 0.05%)  ./elf/../sysdeps/generic/ldsodefs.h:do_lookup_x
+    276,601 ( 0.05%)  ./elf/./elf/dl-cache.c:_dl_cache_libcmp [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    257,059 ( 0.05%)  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S:__memset_avx2_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+    255,526 ( 0.05%)  ./elf/../sysdeps/generic/ldsodefs.h:_dl_relocate_object_no_relro
+    236,843 ( 0.04%)  ???:0x0000000006498320 [???]
+    236,361 ( 0.04%)  ???:0x0000000006498da0 [???]
+    236,356 ( 0.04%)  ???:operator delete(void*) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+    236,249 ( 0.04%)  ???:0x0000000006498540 [???]
+    235,942 ( 0.04%)  ???:operator delete(void*, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+    230,518 ( 0.04%)  ./elf/../sysdeps/generic/dl-protected.h:do_lookup_x
+    217,820 ( 0.04%)  ???:0x0000000015f68520 [???]
+    217,816 ( 0.04%)  ???:0x0000000015f68510 [???]
+    189,395 ( 0.03%)  ???:0x000000000013a830'2 [/usr/lib/x86_64-linux-gnu/libgdcmDICT.so.3.0.24]
+    189,093 ( 0.03%)  ./malloc/./malloc/arena.c:free
+    186,033 ( 0.03%)  ./malloc/./malloc/arena.c:__libc_malloc2
+    175,542 ( 0.03%)  ???:0x000000000013a830 [/usr/lib/x86_64-linux-gnu/libgdcmDICT.so.3.0.24]
+    172,831 ( 0.03%)  ???:google::protobuf::FieldDescriptorProto::_InternalParse(char const*, google::protobuf::internal::ParseContext*) [/usr/lib/x86_64-linux-gnu/libprotobuf.so.32.0.12]
+    172,452 ( 0.03%)  ./elf/./elf/dl-object.c:_dl_add_to_namespace_list [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+    166,448 ( 0.03%)  ./elf/../sysdeps/posix/dl-fileid.h:_dl_map_object_from_fd
+    150,220 ( 0.03%)  ???:0x0000000000171520 [/usr/lib/x86_64-linux-gnu/libavcodec.so.62.11.100]
+    146,222 ( 0.03%)  ???:0x00000000001bafa0 [/usr/lib/x86_64-linux-gnu/libprotobuf.so.32.0.12]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./ctype/./ctype/ctype.c
+  ./elf/../sysdeps/generic/dl-new-hash.h
+  ./elf/../sysdeps/generic/dl-protected.h
+  ./elf/../sysdeps/generic/ldsodefs.h
+  ./elf/../sysdeps/posix/dl-fileid.h
+  ./elf/../sysdeps/x86_64/dl-machine.h
+  ./elf/./elf/dl-cache.c
+  ./elf/./elf/dl-find_object.c
+  ./elf/./elf/dl-load.c
+  ./elf/./elf/dl-lookup.c
+  ./elf/./elf/dl-misc.c
+  ./elf/./elf/dl-object.c
+  ./elf/./elf/dl-reloc.c
+  ./elf/./elf/dl-version.c
+  ./elf/./elf/do-rel.h
+  ./malloc/./malloc/arena.c
+  ./malloc/./malloc/malloc.c
+  ./stdlib/./stdlib/cxa_finalize.c
+  ./string/../sysdeps/x86_64/multiarch/../multiarch/strcmp-sse2.S
+  ./string/../sysdeps/x86_64/multiarch/memchr-avx2.S
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/memset-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/strcmp-avx2.S
+  ./string/../sysdeps/x86_64/multiarch/strlen-avx2.S
+
+

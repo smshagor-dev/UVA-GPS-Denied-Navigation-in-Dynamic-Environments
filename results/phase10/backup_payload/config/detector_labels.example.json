@@ -1,0 +1,20 @@
+{
+  "dataset_name": "UVA_GPS_DENIED_SAMPLE_LABEL_MAP",
+  "version": "1.0",
+  "dataset_type": "non_production_example",
+  "data_source": "example",
+  "note": "Example semantic label map for documentation and conservative bench validation only.",
+  "model": "yolov8_example",
+  "labels": {
+    "0": "person",
+    "1": "bicycle",
+    "2": "car",
+    "3": "motorcycle",
+    "4": "airplane",
+    "5": "bus",
+    "6": "train",
+    "7": "truck",
+    "8": "boat",
+    "9": "obstacle_unknown"
+  }
+}

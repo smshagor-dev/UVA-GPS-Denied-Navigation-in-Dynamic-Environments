@@ -1,0 +1,88 @@
+{
+  "profile_name": "swarm_edge_protocol_v1_example",
+  "validated_state": "architecture_template_not_flight_validated",
+  "serialization": {
+    "serialization_mode": "cbor",
+    "supported_modes": [
+      "json",
+      "cbor",
+      "protobuf_placeholder"
+    ],
+    "current_development_format": "json",
+    "edge_runtime_preferred_format": "cbor",
+    "production_preferred_order": [
+      "cbor",
+      "protobuf_placeholder",
+      "flatbuffers_optional_future"
+    ],
+    "json_runtime_policy": "bench_debug_only",
+    "binary_transport_required_for_safety_critical_loops": true,
+    "schema_version": 1
+  },
+  "mesh_topology_mode": "adaptive_mesh",
+  "auth": {
+    "mode": "hmac_sha256",
+    "allow_unsigned_in_simulation": true,
+    "allow_unsigned_in_bench": false,
+    "trust_epoch": 1,
+    "max_clock_skew_ms": 2000,
+    "shared_secret_env": "DRONE_SWARM_SECRET",
+    "pqc_roadmap": {
+      "signature": "ML-DSA/Dilithium",
+      "key_establishment": "ML-KEM/Kyber",
+      "status": "planned"
+    }
+  },
+  "bandwidth_model": {
+    "formula": "Bandwidth_total ~= N * packet_size * update_rate",
+    "packet_size_bytes_target": {
+      "heartbeat_binary": 96,
+      "pose_state_binary": 128,
+      "edge_health_binary": 160,
+      "obstacle_digest_binary": 256,
+      "consensus_state_binary": 192,
+      "emergency_corridor_binary": 192
+    },
+    "json_debug_packet_size_warning_bytes": 900
+  },
+  "adaptive_rate_control": {
+    "enabled": true,
+    "degraded_mesh_link_quality_threshold": 0.35,
+    "queue_depth_throttle_threshold": 24,
+    "hazard_burst_window_ms": 750,
+    "post_burst_cooldown_ms": 1500,
+    "priority_classes": {
+      "emergency": {
+        "packet_types": ["emergency_corridor", "peer_goodbye", "collective_halt"],
+        "max_rate_hz": 20,
+        "allow_burst": true,
+        "drop_policy": "never_drop_fresh"
+      },
+      "high": {
+        "packet_types": ["pose_state", "obstacle_digest", "threat_digest", "consensus_state"],
+        "nominal_rate_hz": 10,
+        "degraded_rate_hz": 4,
+        "allow_burst": true,
+        "drop_policy": "drop_expired_first"
+      },
+      "background": {
+        "packet_types": ["heartbeat", "edge_health", "backend_summary"],
+        "nominal_rate_hz": 2,
+        "degraded_rate_hz": 1,
+        "allow_burst": false,
+        "drop_policy": "drop_oldest"
+      }
+    }
+  },
+  "bandwidth_caps": {
+    "per_peer_kbps": 48,
+    "swarm_awareness_kbps": 180,
+    "burst_kbps": 256
+  },
+  "migration_plan": {
+    "phase_1": "json_for_bench_debug_and_packet_visibility",
+    "phase_2": "protobuf_or_cbor_schema_for_hil_timing_validation",
+    "phase_3": "binary_transport_for_production_edge_swarm",
+    "phase_4": "optional_flatbuffers_evaluation_for_zero_copy_readers"
+  }
+}

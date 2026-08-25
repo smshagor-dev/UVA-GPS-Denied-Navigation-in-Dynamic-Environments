@@ -1,0 +1,274 @@
+﻿[
+    {
+        "Id": "cfcf51fe3e1579f9e45960c1b031e02002dd2c4d5c46b36f3e510d51c1a562e4",
+        "Created": "2026-07-16T14:24:04.485225993Z",
+        "Path": "/usr/local/bin/control-plane",
+        "Args": [],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 19781,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-07-16T14:24:04.576358092Z",
+            "FinishedAt": "0001-01-01T00:00:00Z",
+            "Health": {
+                "Status": "healthy",
+                "FailingStreak": 0,
+                "Log": [
+                    {
+                        "Start": "2026-07-16T14:24:09.699492957Z",
+                        "End": "2026-07-16T14:24:09.7573635Z",
+                        "ExitCode": 0,
+                        "Output": "  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current\n                                 Dload  Upload   Total   Spent    Left  Speed\n\r  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0\r100   258  100   258    0     0   109k      0 --:--:-- --:--:-- --:--:--  125k\n{\"ready\":true,\"status\":\"ready\",\"reason\":\"control-plane operational\",\"uptime_seconds\":5.056231298,\"updated_at\":\"2026-07-16T14:24:09.754944331Z\",\"backend_mode\":\"simulation\",\"simulation_enabled\":true,\"total_drones\":5,\"real_drone_count\":0,\"stale_drone_count\":0}\n"
+                    }
+                ]
+            }
+        },
+        "Image": "sha256:0b99434a89aa7adb5ec30f41b8a03bd557b1c7365dcae7d82362d03d1fe552d3",
+        "ResolvConfPath": "/var/lib/docker/containers/cfcf51fe3e1579f9e45960c1b031e02002dd2c4d5c46b36f3e510d51c1a562e4/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/cfcf51fe3e1579f9e45960c1b031e02002dd2c4d5c46b36f3e510d51c1a562e4/hostname",
+        "HostsPath": "/var/lib/docker/containers/cfcf51fe3e1579f9e45960c1b031e02002dd2c4d5c46b36f3e510d51c1a562e4/hosts",
+        "LogPath": "/var/lib/docker/containers/cfcf51fe3e1579f9e45960c1b031e02002dd2c4d5c46b36f3e510d51c1a562e4/cfcf51fe3e1579f9e45960c1b031e02002dd2c4d5c46b36f3e510d51c1a562e4-json.log",
+        "Name": "/drone_swarm-control-plane-1",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "E:\\Final Project\\drone_swarm\\logs\\control-plane:/app/logs/control-plane:rw"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "drone_swarm_default",
+            "PortBindings": {
+                "8080/tcp": [
+                    {
+                        "HostIp": "",
+                        "HostPort": "56802"
+                    }
+                ]
+            },
+            "RestartPolicy": {
+                "Name": "unless-stopped",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": null,
+            "DnsSearch": null,
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": null,
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": [
+                "/proc/acpi",
+                "/proc/asound",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/sys/devices/virtual/powercap",
+                "/sys/firmware"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "Storage": {
+            "RootFS": {
+                "Snapshot": {
+                    "Name": "overlayfs"
+                }
+            }
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "E:\\Final Project\\drone_swarm\\logs\\control-plane",
+                "Destination": "/app/logs/control-plane",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "cfcf51fe3e15",
+            "Domainname": "",
+            "User": "drone",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "8080/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "DRONE_REQUIRE_SIGNED_COMMANDS=false",
+                "DRONE_SWARM_ADDR=:8080",
+                "DRONE_TLS_ENABLED=false",
+                "DRONE_TLS_REQUIRE_CLIENT_CERT=false",
+                "DRONE_BACKEND_SIMULATION_ENABLED=true",
+                "DRONE_SECURITY_PROFILE=lab",
+                "DRONE_BACKEND_STALE_SEC=5",
+                "DRONE_BACKEND_DEMO_FLEET_SIZE=5",
+                "DRONE_BACKEND_MODE=simulation",
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            ],
+            "Cmd": null,
+            "Healthcheck": {
+                "Test": [
+                    "CMD",
+                    "curl",
+                    "--fail",
+                    "http://127.0.0.1:8080/api/v1/ready"
+                ],
+                "Interval": 30000000000,
+                "Timeout": 5000000000,
+                "StartPeriod": 10000000000,
+                "Retries": 3
+            },
+            "Image": "drone-swarm/control-plane:simulation",
+            "Volumes": null,
+            "WorkingDir": "/app",
+            "Entrypoint": [
+                "/usr/local/bin/control-plane"
+            ],
+            "Labels": {
+                "com.docker.compose.config-hash": "ef353b30c55d629d6426ddab213d5bc98ef78e0b20e2603de2b02747227a307c",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "",
+                "com.docker.compose.image": "sha256:0b99434a89aa7adb5ec30f41b8a03bd557b1c7365dcae7d82362d03d1fe552d3",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "drone_swarm",
+                "com.docker.compose.project.config_files": "E:\\Final Project\\drone_swarm\\docker-compose.simulation.yml",
+                "com.docker.compose.project.working_dir": "E:\\Final Project\\drone_swarm",
+                "com.docker.compose.service": "control-plane",
+                "com.docker.compose.version": "5.1.4"
+            },
+            "StopTimeout": 1
+        },
+        "NetworkSettings": {
+            "SandboxID": "5e35544c2938afca9af4e953638e9d54189a07e158ed1bbbeaa4ac9820b7fa01",
+            "SandboxKey": "/var/run/docker/netns/5e35544c2938",
+            "Ports": {
+                "8080/tcp": [
+                    {
+                        "HostIp": "0.0.0.0",
+                        "HostPort": "56802"
+                    },
+                    {
+                        "HostIp": "::",
+                        "HostPort": "56802"
+                    }
+                ]
+            },
+            "Networks": {
+                "drone_swarm_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "drone_swarm-control-plane-1",
+                        "control-plane"
+                    ],
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "c69b2e99abfe0da4f8c81bb9097099b836ceadd1d092be9113249bb26079b84e",
+                    "EndpointID": "ce7546f4653829fbbce4558ca94d4861cebaffd31020ba4fafe7f733df0159f7",
+                    "Gateway": "172.19.0.1",
+                    "IPAddress": "172.19.0.2",
+                    "MacAddress": "56:72:55:c4:0e:4c",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": [
+                        "drone_swarm-control-plane-1",
+                        "control-plane",
+                        "cfcf51fe3e15"
+                    ]
+                }
+            }
+        },
+        "ImageManifestDescriptor": {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:a3e0024e43728307e25f280173b737d6f4f2bda84e447b5a0eeb91a9b504dbf3",
+            "size": 1242,
+            "platform": {
+                "architecture": "amd64",
+                "os": "linux"
+            }
+        }
+    }
+]

@@ -1,0 +1,32 @@
+name: MSCKF Retirement Integrity Check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Verify integrated retirement implementation
+        shell: bash
+        run: |
+          set -euxo pipefail
+          test -f include/vio/MsckfMarginalization.hpp
+          test -f include/vio/MsckfRetirementTransaction.hpp
+          test -f tests/test_msckf_marginalization_integration.cpp
+          grep -q 'marginalization_attempts' include/vio/EKFEstimator.hpp
+          grep -q 'MsckfMarginalization' src/vio/Phase17ESKFEstimator.cpp
+          grep -q 'MsckfRetirementTransaction' src/vio/Phase17ESKFEstimator.cpp
+          grep -q 'test_msckf_marginalization_integration' tests/CMakeLists.txt
+
+      - name: Report
+        shell: bash
+        run: |
+          echo 'MSCKF camera-state retirement is integrated in source.'
+          echo 'This workflow is validation-only and does not mutate branches.'
