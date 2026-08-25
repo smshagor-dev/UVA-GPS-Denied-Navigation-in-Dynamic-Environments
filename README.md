@@ -1101,7 +1101,7 @@ p_{occ}=\mathrm{clamp}(r_{occ},0,1)
 $$
 
 $$
-z_i=\max(z_s,z_g)+2p_{occ}+0.5\,\mathbb1[N_{visible\ anchors}>0]
+z_i=\max(z_s,z_g)+2p_{occ}+0.5\,\mathbf{1}_{N_{visible}>0}
 $$
 
 $$
@@ -1353,8 +1353,10 @@ Code for Sections 75–78: `include/safety/SafetyManager.hpp`, `src/safety/Safet
 ## 79. Leadership score
 
 $$
-b=\mathrm{clamp}\left(\frac{battery\_%}{100},0,1\right)
+b=\mathrm{clamp}\left(\frac{B_{\mathrm{battery}}}{100},0,1\right)
 $$
+
+where $B_{\mathrm{battery}}$ is the battery percentage on a 0–100 scale.
 
 $$
 L=\mathrm{clamp}(0.32b+0.28h_m+0.18q_l+0.12h_{cpu}+0.10h_{thermal},0,1)
@@ -1621,7 +1623,7 @@ Code for Sections 94–98: `include/swarm/SwarmSecurity.hpp`, `src/swarm/SwarmSe
 ## 99. Onboard security health score
 
 $$
-t=\mathrm{clamp}\Big(t_{input}+0.20\mathbb1[N_{replay}>0]+0.25\mathbb1[N_{spoof}>0]+0.12\mathbb1[N_{control}>0]+0.10\mathbb1[N_{auth}>0],0,1\Big)
+t=\mathrm{clamp}\Big(t_{input}+0.20\mathbf{1}_{N_{replay}>0}+0.25\mathbf{1}_{N_{spoof}>0}+0.12\mathbf{1}_{N_{control}>0}+0.10\mathbf{1}_{N_{auth}>0},0,1\Big)
 $$
 
 $$
