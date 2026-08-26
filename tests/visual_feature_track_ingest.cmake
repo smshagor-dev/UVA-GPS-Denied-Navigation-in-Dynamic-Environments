@@ -13,6 +13,7 @@ add_executable(test_visual_feature_track_manager
 target_link_libraries(test_visual_feature_track_manager PRIVATE
     drone_test_support
     Eigen3::Eigen
+    spdlog::spdlog
 )
 drone_apply_project_warnings(test_visual_feature_track_manager)
 drone_enable_coverage(test_visual_feature_track_manager)
