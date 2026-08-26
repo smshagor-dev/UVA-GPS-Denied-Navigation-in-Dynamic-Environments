@@ -19,7 +19,12 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_PATH = REPO_ROOT / "docs" / "architecture-safety-validation-hardening" / "benchmark_results.json"
+OUTPUT_PATH = (
+    REPO_ROOT
+    / "docs"
+    / "architecture-safety-validation-hardening"
+    / "benchmark_results.json"
+)
 BUILD_ROOT = REPO_ROOT / "build" / "validation-msvc"
 TEST_ROOT = BUILD_ROOT / "tests" / "Release"
 BENCHMARK_BACKEND_PORT = 18080
@@ -286,7 +291,12 @@ def start_backend(port: int) -> tuple[subprocess.Popen[str], float]:
     env["DRONE_BACKEND_MODE"] = "production"
     env["DRONE_BACKEND_SIMULATION_ENABLED"] = "false"
     env["DRONE_SWARM_ADDR"] = f":{port}"
-    log_path = REPO_ROOT / "docs" / "architecture-safety-validation-hardening" / "backend_benchmark.log"
+    log_path = (
+        REPO_ROOT
+        / "docs"
+        / "architecture-safety-validation-hardening"
+        / "backend_benchmark.log"
+    )
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write("")

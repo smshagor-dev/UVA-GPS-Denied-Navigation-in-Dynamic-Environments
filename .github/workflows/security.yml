@@ -195,7 +195,7 @@ jobs:
         run: |
           set -euxo pipefail
           cmake --preset validation-linux-gcc
-          cmake --build --preset validation-linux-gcc
+          cmake --build --preset validation-linux-gcc --parallel 2
 
       - name: Build Go for CodeQL
         if: matrix.language == 'go'
