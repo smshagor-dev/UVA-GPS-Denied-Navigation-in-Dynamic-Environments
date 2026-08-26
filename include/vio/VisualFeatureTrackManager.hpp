@@ -59,12 +59,10 @@ public:
         return next_track_id_;
     }
 
-    [[nodiscard]] VisualFeatureTrackBatch update(
-        const std::vector<Eigen::Vector2d>& previous_pixels,
-        const std::vector<Eigen::Vector2d>& current_pixels,
-        const PoseEstimate& previous_pose,
-        const PoseEstimate& current_pose,
-        const Eigen::Matrix3d& K) {
+    [[nodiscard]] VisualFeatureTrackBatch
+    update(const std::vector<Eigen::Vector2d>& previous_pixels,
+           const std::vector<Eigen::Vector2d>& current_pixels, const PoseEstimate& previous_pose,
+           const PoseEstimate& current_pose, const Eigen::Matrix3d& K) {
         VisualFeatureTrackBatch batch;
         if (!inputs_valid(previous_pixels, current_pixels, previous_pose, current_pose, K)) {
             tracks_.clear();
@@ -148,8 +146,8 @@ private:
         }
         if (config_.association_radius_px <= 0.0 || config_.minimum_baseline_m < 0.0 ||
             config_.minimum_parallax_deg < 0.0 || config_.maximum_ray_gap_m <= 0.0 ||
-            config_.minimum_depth_m <= 0.0 ||
-            config_.maximum_depth_m <= config_.minimum_depth_m || config_.maximum_tracks == 0) {
+            config_.minimum_depth_m <= 0.0 || config_.maximum_depth_m <= config_.minimum_depth_m ||
+            config_.maximum_tracks == 0) {
             return false;
         }
         return previous_pose.position.array().isFinite().all() &&
@@ -162,7 +160,8 @@ private:
     [[nodiscard]] std::optional<uint64_t>
     match_track(const Eigen::Vector2d& previous_pixel, const std::vector<uint64_t>& ordered_ids,
                 const std::unordered_set<uint64_t>& claimed) const {
-        const double max_distance_sq = config_.association_radius_px * config_.association_radius_px;
+        const double max_distance_sq =
+            config_.association_radius_px * config_.association_radius_px;
         double best_distance_sq = max_distance_sq;
         std::optional<uint64_t> best_id;
         for (const uint64_t id : ordered_ids) {

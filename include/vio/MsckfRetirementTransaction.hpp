@@ -35,8 +35,7 @@ struct MsckfRetirementResult {
 class MsckfRetirementTransaction final {
 public:
     [[nodiscard]] static std::optional<MsckfRetirementResult>
-    prepare(const MsckfRetirementRequest& request,
-            const std::vector<uint64_t>& ordered_clone_ids,
+    prepare(const MsckfRetirementRequest& request, const std::vector<uint64_t>& ordered_clone_ids,
             const Eigen::MatrixXd& post_constraint_augmented_covariance) {
         if (request.retiring_state_id == 0u || request.base_error_dim == 0u ||
             request.clone_error_dim == 0u || request.symmetry_tolerance < 0.0 ||
@@ -52,8 +51,8 @@ public:
         }
 
         const auto retained = MsckfMarginalization::retained_principal_submatrix(
-            post_constraint_augmented_covariance, request.base_error_dim,
-            request.clone_error_dim, ordered_clone_ids, request.retiring_state_id);
+            post_constraint_augmented_covariance, request.base_error_dim, request.clone_error_dim,
+            ordered_clone_ids, request.retiring_state_id);
         if (!retained.has_value()) {
             return std::nullopt;
         }

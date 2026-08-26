@@ -70,7 +70,8 @@ TEST(VisualFeatureTrackManager, InvalidInputFailsClosedAndClearsTransientTracks)
     ASSERT_EQ(manager.track_count(), 1u);
 
     const std::vector<Eigen::Vector2d> mismatched{{312.0, 240.0}, {300.0, 220.0}};
-    const auto rejected = manager.update(previous, mismatched, pose_at(0.10), pose_at(0.20), intrinsics());
+    const auto rejected =
+        manager.update(previous, mismatched, pose_at(0.10), pose_at(0.20), intrinsics());
     EXPECT_TRUE(rejected.features.empty());
     EXPECT_EQ(manager.track_count(), 0u);
 }

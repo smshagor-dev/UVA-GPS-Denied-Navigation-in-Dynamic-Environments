@@ -84,8 +84,8 @@ ReplayResult run_once() {
         if (payload.z_pixels.empty()) {
             return false;
         }
-        return coordinator.submit_shadow_measurement(make_visual_features_envelope(
-                   payload, MeasurementStamp{timestamp, sequence})) ==
+        return coordinator.submit_shadow_measurement(
+                   make_visual_features_envelope(payload, MeasurementStamp{timestamp, sequence})) ==
                EstimatorOperationResult::Accepted;
     };
 

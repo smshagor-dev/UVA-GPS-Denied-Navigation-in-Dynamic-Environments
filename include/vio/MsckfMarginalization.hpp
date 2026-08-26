@@ -36,8 +36,7 @@ struct MarginalizationCovarianceHealth {
 class MsckfMarginalization final {
 public:
     [[nodiscard]] static MarginalizationPlan
-    build_plan(uint64_t retiring_state_id,
-               const std::vector<MarginalizationTrackSummary>& tracks,
+    build_plan(uint64_t retiring_state_id, const std::vector<MarginalizationTrackSummary>& tracks,
                uint32_t minimum_track_length) {
         MarginalizationPlan plan;
         plan.retiring_state_id = retiring_state_id;
@@ -47,17 +46,16 @@ public:
         for (const auto& track : tracks) {
             ordered.push_back(&track);
         }
-        std::sort(ordered.begin(), ordered.end(), [](const auto* lhs, const auto* rhs) {
-            return lhs->track_id < rhs->track_id;
-        });
+        std::sort(ordered.begin(), ordered.end(),
+                  [](const auto* lhs, const auto* rhs) { return lhs->track_id < rhs->track_id; });
 
         for (const auto* track : ordered) {
             if (track == nullptr || track->track_id == 0u) {
                 continue;
             }
-            const auto retiring_refs = static_cast<uint64_t>(std::count(
-                track->observation_state_ids.begin(), track->observation_state_ids.end(),
-                retiring_state_id));
+            const auto retiring_refs = static_cast<uint64_t>(
+                std::count(track->observation_state_ids.begin(), track->observation_state_ids.end(),
+                           retiring_state_id));
             if (retiring_refs == 0u) {
                 continue;
             }
@@ -87,8 +85,7 @@ public:
 
     [[nodiscard]] static std::optional<Eigen::MatrixXd>
     retained_principal_submatrix(const Eigen::MatrixXd& augmented_covariance,
-                                 std::size_t base_error_dim,
-                                 std::size_t clone_error_dim,
+                                 std::size_t base_error_dim, std::size_t clone_error_dim,
                                  const std::vector<uint64_t>& ordered_clone_ids,
                                  uint64_t retiring_state_id) {
         if (base_error_dim == 0u || clone_error_dim == 0u || retiring_state_id == 0u ||
@@ -111,8 +108,7 @@ public:
         const std::size_t remove_begin = base_error_dim + (clone_index * clone_error_dim);
         const std::size_t remove_end = remove_begin + clone_error_dim;
 
-        const Eigen::Index retained_dim =
-            static_cast<Eigen::Index>(expected_dim - clone_error_dim);
+        const Eigen::Index retained_dim = static_cast<Eigen::Index>(expected_dim - clone_error_dim);
         Eigen::MatrixXd retained = Eigen::MatrixXd::Zero(retained_dim, retained_dim);
 
         std::vector<Eigen::Index> retained_indices;
@@ -154,9 +150,8 @@ public:
             return health;
         }
         health.minimum_eigenvalue = solver.eigenvalues().minCoeff();
-        health.psd_within_tolerance =
-            std::isfinite(health.minimum_eigenvalue) &&
-            health.minimum_eigenvalue >= -negativity_tolerance;
+        health.psd_within_tolerance = std::isfinite(health.minimum_eigenvalue) &&
+                                      health.minimum_eigenvalue >= -negativity_tolerance;
         return health;
     }
 };
