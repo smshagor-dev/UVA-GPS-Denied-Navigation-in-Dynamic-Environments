@@ -1,0 +1,107 @@
+name: Localization Hardening Fix
+
+on:
+  push:
+    branches:
+      - fix/localization-nonfinite-metadata-fail-closed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: localization-hardening-fix-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apply-tests:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/localization-nonfinite-metadata-fail-closed
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Insert regression tests
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("tests/test_navigation_intelligence.cpp")
+          text = path.read_text(encoding="utf-8-sig")
+          marker = "TEST(LocalizationFusion, MarksLocalizationLostWhenCameraAndSyncCollapse) {"
+          if "InvalidAnchorVisibilityCannotRemainNominal" not in text:
+              tests = r'''TEST(LocalizationFusion, InvalidAnchorVisibilityCannotRemainNominal) {
+              localization::LocalizationFusion fusion;
+              localization::LocalizationFusionInput input;
+              input.vio_pose.position = Eigen::Vector3d(1.0, 2.0, 3.0);
+              input.vio_pose.drift_m = 0.2;
+              input.vio_pose.localization_confidence = 0.90;
+              input.camera_available = true;
+              input.anchor_visibility_ratio = std::numeric_limits<double>::quiet_NaN();
+              input.time_sync.confidence = 1.0;
+              input.time_sync.synchronized = true;
+
+              const auto output = fusion.update(input);
+              EXPECT_TRUE(output.fused_position.isApprox(input.vio_pose.position));
+              EXPECT_DOUBLE_EQ(output.tdoa_weight, 0.0);
+              EXPECT_DOUBLE_EQ(output.confidence, 0.0);
+              EXPECT_TRUE(output.lost);
+              EXPECT_TRUE(output.degraded);
+              EXPECT_EQ(output.state, "lost");
+              EXPECT_EQ(output.source, "invalid-localization-metadata");
+          }
+
+          TEST(LocalizationFusion, InvalidTimeSyncConfidenceCannotRemainNominal) {
+              localization::LocalizationFusion fusion;
+              localization::LocalizationFusionInput input;
+              input.vio_pose.position = Eigen::Vector3d(1.0, 2.0, 3.0);
+              input.vio_pose.drift_m = 0.2;
+              input.vio_pose.localization_confidence = 0.90;
+              input.camera_available = true;
+              input.anchor_visibility_ratio = 1.0;
+              input.time_sync.confidence = std::numeric_limits<double>::infinity();
+              input.time_sync.synchronized = false;
+
+              const auto output = fusion.update(input);
+              EXPECT_TRUE(output.fused_position.isApprox(input.vio_pose.position));
+              EXPECT_DOUBLE_EQ(output.tdoa_weight, 0.0);
+              EXPECT_DOUBLE_EQ(output.confidence, 0.0);
+              EXPECT_TRUE(output.lost);
+              EXPECT_TRUE(output.degraded);
+              EXPECT_EQ(output.state, "lost");
+              EXPECT_EQ(output.source, "invalid-localization-metadata");
+          }
+
+          '''
+              if marker not in text:
+                  raise SystemExit(f"marker not found: {marker}")
+              text = text.replace(marker, tests + marker, 1)
+              path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Apply repository C++ formatting
+        shell: bash
+        run: |
+          python3 -m pip install clang-format==19.1.7
+          clang-format -i src/localization/LocalizationFusion.cpp tests/test_navigation_intelligence.cpp
+
+      - name: Commit regression coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src/localization/LocalizationFusion.cpp tests/test_navigation_intelligence.cpp; then
+            echo "No source changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/localization/LocalizationFusion.cpp tests/test_navigation_intelligence.cpp
+          git commit -m "test(localization): cover non-finite fusion metadata"
+          git push origin HEAD:fix/localization-nonfinite-metadata-fail-closed
