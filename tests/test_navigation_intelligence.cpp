@@ -1,4 +1,4 @@
-﻿// System Designer and Developer: Md Shahanur Islam Shagor
+// System Designer and Developer: Md Shahanur Islam Shagor
 // Project: UVA GPS Denied Navigation in Dynamic Environments
 // Technology: C++, Python, Go, CMake
 
@@ -182,6 +182,48 @@ TEST(LocalizationFusion, InvalidTdoaConfidenceCannotRaiseConfidence) {
     EXPECT_LT(output.confidence, 0.22);
     EXPECT_NE(output.source, "tdoa-recovery");
     EXPECT_NE(output.source, "vio-tdoa-fused");
+}
+
+TEST(LocalizationFusion, InvalidAnchorVisibilityCannotRemainNominal) {
+    localization::LocalizationFusion fusion;
+    localization::LocalizationFusionInput input;
+    input.vio_pose.position = Eigen::Vector3d(1.0, 2.0, 3.0);
+    input.vio_pose.drift_m = 0.2;
+    input.vio_pose.localization_confidence = 0.90;
+    input.camera_available = true;
+    input.anchor_visibility_ratio = std::numeric_limits<double>::quiet_NaN();
+    input.time_sync.confidence = 1.0;
+    input.time_sync.synchronized = true;
+
+    const auto output = fusion.update(input);
+    EXPECT_TRUE(output.fused_position.isApprox(input.vio_pose.position));
+    EXPECT_DOUBLE_EQ(output.tdoa_weight, 0.0);
+    EXPECT_DOUBLE_EQ(output.confidence, 0.0);
+    EXPECT_TRUE(output.lost);
+    EXPECT_TRUE(output.degraded);
+    EXPECT_EQ(output.state, "lost");
+    EXPECT_EQ(output.source, "invalid-localization-metadata");
+}
+
+TEST(LocalizationFusion, InvalidTimeSyncConfidenceCannotRemainNominal) {
+    localization::LocalizationFusion fusion;
+    localization::LocalizationFusionInput input;
+    input.vio_pose.position = Eigen::Vector3d(1.0, 2.0, 3.0);
+    input.vio_pose.drift_m = 0.2;
+    input.vio_pose.localization_confidence = 0.90;
+    input.camera_available = true;
+    input.anchor_visibility_ratio = 1.0;
+    input.time_sync.confidence = std::numeric_limits<double>::infinity();
+    input.time_sync.synchronized = false;
+
+    const auto output = fusion.update(input);
+    EXPECT_TRUE(output.fused_position.isApprox(input.vio_pose.position));
+    EXPECT_DOUBLE_EQ(output.tdoa_weight, 0.0);
+    EXPECT_DOUBLE_EQ(output.confidence, 0.0);
+    EXPECT_TRUE(output.lost);
+    EXPECT_TRUE(output.degraded);
+    EXPECT_EQ(output.state, "lost");
+    EXPECT_EQ(output.source, "invalid-localization-metadata");
 }
 
 TEST(LocalizationFusion, MarksLocalizationLostWhenCameraAndSyncCollapse) {
