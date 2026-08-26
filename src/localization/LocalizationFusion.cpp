@@ -20,6 +20,17 @@ LocalizationFusionOutput LocalizationFusion::update(const LocalizationFusionInpu
     }
     out.fused_position = input.vio_pose.position;
 
+    if (!std::isfinite(input.anchor_visibility_ratio) ||
+        !std::isfinite(input.time_sync.confidence)) {
+        out.confidence = 0.0;
+        out.source = "invalid-localization-metadata";
+        out.state = "lost";
+        out.degraded = true;
+        out.lost = true;
+        last_confidence_ = out.confidence;
+        return out;
+    }
+
     double confidence = std::clamp(input.vio_pose.localization_confidence, 0.0, 1.0);
     double tdoa_weight = 0.0;
     double tdoa_conf = 0.0;
