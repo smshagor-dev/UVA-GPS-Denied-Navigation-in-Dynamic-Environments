@@ -19,6 +19,7 @@ runs:
           golang-go \
           libeigen3-dev \
           libopencv-dev \
+          libomp-dev \
           libpcl-dev \
           libspdlog-dev \
           libopenmpi-dev \
