@@ -1370,6 +1370,8 @@ void Phase17ESKFEstimator::evict_msckf_state_locked() {
         return;
     }
 
+    const int64_t retiring_timestamp_key = state_it->second.timestamp_key;
+
     std::vector<MarginalizationTrackSummary> summaries;
     summaries.reserve(feature_tracks_.size());
     for (const auto& [key, track] : feature_tracks_) {
@@ -1383,10 +1385,10 @@ void Phase17ESKFEstimator::evict_msckf_state_locked() {
         }
         summaries.push_back(std::move(summary));
     }
-    const auto plan = MsckfMarginalization::build_plan(
-        oldest_id, summaries, msckf_cfg_.update.minimum_track_length);
+    const auto plan = MsckfMarginalization::build_plan(oldest_id, summaries,
+                                                       msckf_cfg_.update.minimum_track_length);
     const std::vector<uint64_t> ordered_clone_ids(msckf_state_order_.begin(),
-                                                   msckf_state_order_.end());
+                                                  msckf_state_order_.end());
 
     MsckfRetirementRequest request;
     request.retiring_state_id = oldest_id;
@@ -1449,8 +1451,8 @@ void Phase17ESKFEstimator::evict_msckf_state_locked() {
         }
     }
 
-    const auto prepared = MsckfRetirementTransaction::prepare(
-        request, ordered_clone_ids, augmented_covariance_);
+    const auto prepared =
+        MsckfRetirementTransaction::prepare(request, ordered_clone_ids, augmented_covariance_);
     if (!prepared.has_value() || !prepared->committed) {
         restore_pre_retirement();
         if (msckf_diagnostics_enabled_locked()) {
@@ -1467,7 +1469,7 @@ void Phase17ESKFEstimator::evict_msckf_state_locked() {
     auto candidate_timestamp_map = msckf_timestamp_to_state_id_;
     auto candidate_tracks = feature_tracks_;
     candidate_order.pop_front();
-    candidate_timestamp_map.erase(state_it->second.timestamp_key);
+    candidate_timestamp_map.erase(retiring_timestamp_key);
     candidate_states.erase(oldest_id);
     for (auto track_it = candidate_tracks.begin(); track_it != candidate_tracks.end();) {
         auto& observations = track_it->second.observations;
@@ -1486,16 +1488,17 @@ void Phase17ESKFEstimator::evict_msckf_state_locked() {
     uint64_t stale_references = 0;
     for (const auto& [key, track] : candidate_tracks) {
         (void)key;
-        stale_references += static_cast<uint64_t>(std::count_if(
-            track.observations.begin(), track.observations.end(),
-            [oldest_id](const FeatureObservation& observation) {
-                return observation.state_id == oldest_id;
-            }));
+        stale_references += static_cast<uint64_t>(
+            std::count_if(track.observations.begin(), track.observations.end(),
+                          [oldest_id](const FeatureObservation& observation) {
+                              return observation.state_id == oldest_id;
+                          }));
     }
     const auto health = MsckfMarginalization::covariance_health(
         prepared->retained_covariance, validation_cfg_.covariance_symmetry_tolerance,
         validation_cfg_.variance_negativity_tolerance);
-    const std::size_t expected_dim = static_cast<std::size_t>(kErrorDim) +
+    const std::size_t expected_dim =
+        static_cast<std::size_t>(kErrorDim) +
         candidate_order.size() * static_cast<std::size_t>(AugmentedStateLayout::kCloneErrorDim);
     const bool candidate_valid =
         health.finite && health.symmetric && health.psd_within_tolerance &&
@@ -2832,10 +2835,8 @@ EstimatorStateSnapshot Phase17StateEstimatorAdapter::snapshot() const {
     out.marginalization_covariance_dim_before = diag.marginalization_covariance_dim_before;
     out.marginalization_covariance_dim_after = diag.marginalization_covariance_dim_after;
     out.marginalization_stale_references = diag.marginalization_stale_references;
-    out.marginalization_covariance_symmetry_error =
-        diag.marginalization_covariance_symmetry_error;
-    out.marginalization_covariance_min_eigenvalue =
-        diag.marginalization_covariance_min_eigenvalue;
+    out.marginalization_covariance_symmetry_error = diag.marginalization_covariance_symmetry_error;
+    out.marginalization_covariance_min_eigenvalue = diag.marginalization_covariance_min_eigenvalue;
     out.triangulation_attempts = diag.triangulation_attempts;
     out.triangulation_successes = diag.triangulation_successes;
     out.triangulation_failures = diag.triangulation_failures;

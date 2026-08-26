@@ -142,7 +142,9 @@ public:
     using PoseCallback = std::function<void(const PoseEstimate&)>;
 
     explicit VIOPipeline(EKFConfig cfg = EKFConfig{});
-    ~VIOPipeline() { stop(); }
+    ~VIOPipeline() {
+        stop();
+    }
 
     void attach_imu(std::shared_ptr<sensors::IMUSensor> imu);
     void attach_camera(std::shared_ptr<sensors::CameraSensor> cam);
@@ -151,7 +153,9 @@ public:
     bool start();
     void stop();
     void reset();
-    void set_runtime_mode(drone::runtime::RuntimeMode mode) { runtime_mode_ = mode; }
+    void set_runtime_mode(drone::runtime::RuntimeMode mode) {
+        runtime_mode_ = mode;
+    }
     void set_estimator_validation_config(const EstimatorValidationConfig& cfg);
     void set_shadow_msckf_config(const MsckfConfig& cfg);
 
@@ -162,8 +166,12 @@ public:
         return runtime_telemetry_;
     }
 
-    void set_pose_callback(PoseCallback cb) { pose_cb_ = std::move(cb); }
-    void set_camera_matrix(const Eigen::Matrix3d& K) { K_ = K; }
+    void set_pose_callback(PoseCallback cb) {
+        pose_cb_ = std::move(cb);
+    }
+    void set_camera_matrix(const Eigen::Matrix3d& K) {
+        K_ = K;
+    }
     void set_runtime_telemetry(RuntimeTelemetry telemetry) {
         std::lock_guard lock(runtime_mutex_);
         telemetry.tracked_feature_count = runtime_telemetry_.tracked_feature_count;

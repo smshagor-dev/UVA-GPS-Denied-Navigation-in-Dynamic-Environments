@@ -6,8 +6,8 @@ namespace drone::vio {
 namespace {
 
 Eigen::MatrixXd make_spd(std::size_t dim) {
-    Eigen::MatrixXd a = Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(dim),
-                                              static_cast<Eigen::Index>(dim));
+    Eigen::MatrixXd a =
+        Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(dim), static_cast<Eigen::Index>(dim));
     for (Eigen::Index i = 0; i < a.rows(); ++i) {
         a(i, i) = 2.0 + static_cast<double>(i) * 0.01;
         if (i + 1 < a.rows()) {
@@ -30,8 +30,8 @@ TEST(MsckfRetirementTransactionTest, RetiresOldestCloneAndPreservesPrincipalSubm
     EXPECT_EQ(result->retained_clone_ids, (std::vector<uint64_t>{12, 13}));
     ASSERT_EQ(result->retained_covariance.rows(), 27);
 
-    const auto expected = MsckfMarginalization::retained_principal_submatrix(
-        covariance, 15, 6, clones, 11);
+    const auto expected =
+        MsckfMarginalization::retained_principal_submatrix(covariance, 15, 6, clones, 11);
     ASSERT_TRUE(expected.has_value());
     EXPECT_LT((result->retained_covariance - *expected).norm(), 1.0e-12);
 }

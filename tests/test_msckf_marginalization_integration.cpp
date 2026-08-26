@@ -172,7 +172,8 @@ TEST(MsckfMarginalizationIntegration, RetiringClonePrunesOnlyItsFeatureObservati
     ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
                                                 Eigen::Vector3d::Zero(), 0.02),
               EstimatorOperationResult::Accepted);
-    const uint64_t second_id = Phase17ESKFEstimatorTestAccess::capture_msckf_camera_state(estimator);
+    const uint64_t second_id =
+        Phase17ESKFEstimatorTestAccess::capture_msckf_camera_state(estimator);
     ASSERT_EQ(second_id, 2u);
     ASSERT_TRUE(Phase17ESKFEstimatorTestAccess::process_msckf_observations(
         estimator, second_id, {pixel}, {feature}, camera_intrinsics()));
@@ -313,7 +314,8 @@ TEST(MsckfMarginalizationIntegration, RetirementConstraintPassDoesNotDuplicateCo
               EstimatorOperationResult::Accepted);
     pose = estimator.state();
     estimator.update_vision({project_feature(pose, feature, K)}, {feature}, K);
-    const uint64_t applied_after_second_observation = estimator.diagnostics().feature_updates_applied;
+    const uint64_t applied_after_second_observation =
+        estimator.diagnostics().feature_updates_applied;
 
     ASSERT_EQ(estimator.process_imu_measurement(Eigen::Vector3d{0.0, 0.0, 9.81},
                                                 Eigen::Vector3d::Zero(), 0.03),

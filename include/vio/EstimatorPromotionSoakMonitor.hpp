@@ -47,20 +47,27 @@ public:
 
         const bool blocked_limit_ok =
             state_.consecutive_blocked_samples <= cfg_.maximum_consecutive_blocked_samples;
-        state_.sustained_ready = blocked_limit_ok &&
-            state_.consecutive_ready_samples >= cfg_.minimum_ready_samples;
+        state_.sustained_ready =
+            blocked_limit_ok && state_.consecutive_ready_samples >= cfg_.minimum_ready_samples;
         return state_;
     }
 
-    [[nodiscard]] const PromotionSoakState& observe(const CoordinatorDiagnostics& diagnostics,
-                                                    const PromotionReadinessConfig& readiness_cfg = {}) {
+    [[nodiscard]] const PromotionSoakState&
+    observe(const CoordinatorDiagnostics& diagnostics,
+            const PromotionReadinessConfig& readiness_cfg = {}) {
         return observe(assess_promotion_readiness(diagnostics, readiness_cfg));
     }
 
-    void reset() { state_ = {}; }
+    void reset() {
+        state_ = {};
+    }
 
-    [[nodiscard]] const PromotionSoakState& state() const { return state_; }
-    [[nodiscard]] const PromotionSoakConfig& config() const { return cfg_; }
+    [[nodiscard]] const PromotionSoakState& state() const {
+        return state_;
+    }
+    [[nodiscard]] const PromotionSoakConfig& config() const {
+        return cfg_;
+    }
 
 private:
     PromotionSoakConfig cfg_{};

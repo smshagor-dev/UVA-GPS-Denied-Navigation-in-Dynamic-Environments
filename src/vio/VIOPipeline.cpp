@@ -37,13 +37,16 @@ bool thread_sanitizer_enabled() {
 
 void configure_opencv_threads_for_tsan() {
     static std::once_flag once;
-    if (!thread_sanitizer_enabled()) return;
+    if (!thread_sanitizer_enabled())
+        return;
     std::call_once(once, [] { cv::setNumThreads(1); });
 }
 
 cv::Mat to_gray(const cv::Mat& image) {
-    if (image.empty()) return {};
-    if (image.channels() == 1) return image.clone();
+    if (image.empty())
+        return {};
+    if (image.channels() == 1)
+        return image.clone();
     cv::Mat gray;
     cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
     return gray;
@@ -53,7 +56,8 @@ double mean_optical_flow_error(const std::vector<float>& errors, const std::vect
     double sum = 0.0;
     size_t count = 0;
     for (size_t i = 0; i < errors.size() && i < status.size(); ++i) {
-        if (!status[i]) continue;
+        if (!status[i])
+            continue;
         sum += static_cast<double>(errors[i]);
         ++count;
     }
@@ -65,7 +69,8 @@ VIOPipeline::VIOPipeline(EKFConfig cfg) : ekf_cfg_(cfg) {
     ShadowCoordinatorConfig shadow_cfg{};
     coordinator_ = std::make_unique<EstimatorCoordinator>(
         std::make_unique<EKFStateEstimatorAdapter>(ekf_cfg_, "ekf_active", "phase16"),
-        std::make_unique<Phase17StateEstimatorAdapter>(ekf_cfg_, "eskf_shadow", "phase17"), shadow_cfg);
+        std::make_unique<Phase17StateEstimatorAdapter>(ekf_cfg_, "eskf_shadow", "phase17"),
+        shadow_cfg);
 }
 
 bool visual_placeholder_allowed(drone::runtime::RuntimeMode mode) {
@@ -73,14 +78,17 @@ bool visual_placeholder_allowed(drone::runtime::RuntimeMode mode) {
 }
 
 double compute_visual_update_confidence(const VisualFrontendMetrics& metrics) {
-    if (metrics.tracked_feature_count == 0) return kDefaultVisualConfidenceOnFailure;
+    if (metrics.tracked_feature_count == 0)
+        return kDefaultVisualConfidenceOnFailure;
     const double feature_score =
         std::clamp(static_cast<double>(metrics.tracked_feature_count) / 140.0, 0.0, 1.0);
     const double inlier_score = std::clamp(metrics.inlier_ratio, 0.0, 1.0);
     const double reprojection_score = std::clamp(1.0 - metrics.reprojection_error / 8.0, 0.0, 1.0);
     double confidence = feature_score * 0.35 + inlier_score * 0.45 + reprojection_score * 0.20;
-    if (!metrics.update_accepted) confidence *= 0.45;
-    if (metrics.used_placeholder) confidence = std::min(confidence, kDefaultVisualConfidenceOnPlaceholder);
+    if (!metrics.update_accepted)
+        confidence *= 0.45;
+    if (metrics.used_placeholder)
+        confidence = std::min(confidence, kDefaultVisualConfidenceOnPlaceholder);
     return std::clamp(confidence, 0.0, 1.0);
 }
 
@@ -96,7 +104,8 @@ VisualFrontendResult run_visual_frontend(const cv::Mat& previous_gray, const cv:
     }
 
     std::vector<cv::Point2f> previous_points;
-    cv::goodFeaturesToTrack(previous_gray, previous_points, static_cast<int>(kMaxFeatures), 0.01, 8.0);
+    cv::goodFeaturesToTrack(previous_gray, previous_points, static_cast<int>(kMaxFeatures), 0.01,
+                            8.0);
     if (previous_points.size() < 8) {
         result.metrics.tracked_feature_count = previous_points.size();
         result.metrics.visual_update_confidence = kDefaultVisualConfidenceOnFailure;
@@ -114,7 +123,8 @@ VisualFrontendResult run_visual_frontend(const cv::Mat& previous_gray, const cv:
     tracked_prev.reserve(previous_points.size());
     tracked_curr.reserve(previous_points.size());
     for (size_t i = 0; i < previous_points.size() && i < status.size(); ++i) {
-        if (!status[i]) continue;
+        if (!status[i])
+            continue;
         tracked_prev.push_back(previous_points[i]);
         tracked_curr.push_back(current_points[i]);
     }
@@ -127,12 +137,13 @@ VisualFrontendResult run_visual_frontend(const cv::Mat& previous_gray, const cv:
 
     cv::Mat K_cv(3, 3, CV_64F);
     for (int r = 0; r < 3; ++r) {
-        for (int c = 0; c < 3; ++c) K_cv.at<double>(r, c) = K(r, c);
+        for (int c = 0; c < 3; ++c)
+            K_cv.at<double>(r, c) = K(r, c);
     }
 
     cv::Mat inlier_mask;
-    const cv::Mat essential = cv::findEssentialMat(tracked_prev, tracked_curr, K_cv, cv::RANSAC,
-                                                    0.999, 1.5, inlier_mask);
+    const cv::Mat essential =
+        cv::findEssentialMat(tracked_prev, tracked_curr, K_cv, cv::RANSAC, 0.999, 1.5, inlier_mask);
     if (essential.empty() || inlier_mask.empty()) {
         result.metrics.visual_update_confidence = compute_visual_update_confidence(result.metrics);
         return result;
@@ -140,18 +151,19 @@ VisualFrontendResult run_visual_frontend(const cv::Mat& previous_gray, const cv:
 
     int inlier_count = 0;
     for (int i = 0; i < inlier_mask.rows; ++i) {
-        if (inlier_mask.at<uchar>(i, 0) != 0) ++inlier_count;
+        if (inlier_mask.at<uchar>(i, 0) != 0)
+            ++inlier_count;
     }
-    result.metrics.inlier_ratio = tracked_curr.empty()
-                                      ? 0.0
-                                      : static_cast<double>(inlier_count) /
-                                            static_cast<double>(tracked_curr.size());
+    result.metrics.inlier_ratio =
+        tracked_curr.empty()
+            ? 0.0
+            : static_cast<double>(inlier_count) / static_cast<double>(tracked_curr.size());
 
     cv::Mat R_cv;
     cv::Mat t_cv;
     cv::Mat recover_mask;
-    const int recovered = cv::recoverPose(essential, tracked_prev, tracked_curr, K_cv, R_cv, t_cv,
-                                          recover_mask);
+    const int recovered =
+        cv::recoverPose(essential, tracked_prev, tracked_curr, K_cv, R_cv, t_cv, recover_mask);
     if (recovered < static_cast<int>(kMinTrackedFeatures / 2)) {
         result.metrics.visual_update_confidence = compute_visual_update_confidence(result.metrics);
         return result;
@@ -164,12 +176,14 @@ VisualFrontendResult run_visual_frontend(const cv::Mat& previous_gray, const cv:
                                       inlier_mask.at<uchar>(static_cast<int>(i), 0) != 0;
         const bool pose_inlier = i < static_cast<size_t>(recover_mask.rows) &&
                                  recover_mask.at<uchar>(static_cast<int>(i), 0) != 0;
-        if (!essential_inlier || !pose_inlier) continue;
+        if (!essential_inlier || !pose_inlier)
+            continue;
         result.previous_inlier_pixels.emplace_back(tracked_prev[i].x, tracked_prev[i].y);
         result.current_inlier_pixels.emplace_back(tracked_curr[i].x, tracked_curr[i].y);
     }
 
-    const Eigen::Vector3d predicted_delta = current_predicted_pose.position - previous_pose.position;
+    const Eigen::Vector3d predicted_delta =
+        current_predicted_pose.position - previous_pose.position;
     const double predicted_scale =
         std::max(predicted_delta.norm(), current_predicted_pose.velocity.norm() * dt_s);
     if (predicted_scale < 1.0e-4) {
@@ -179,7 +193,8 @@ VisualFrontendResult run_visual_frontend(const cv::Mat& previous_gray, const cv:
 
     Eigen::Matrix3d relative_rotation = Eigen::Matrix3d::Identity();
     for (int r = 0; r < 3; ++r) {
-        for (int c = 0; c < 3; ++c) relative_rotation(r, c) = R_cv.at<double>(r, c);
+        for (int c = 0; c < 3; ++c)
+            relative_rotation(r, c) = R_cv.at<double>(r, c);
     }
     Eigen::Vector3d translation_direction{t_cv.at<double>(0, 0), t_cv.at<double>(1, 0),
                                           t_cv.at<double>(2, 0)};
@@ -207,7 +222,8 @@ VisualFrontendResult build_placeholder_visual_frontend_result(const sensors::Cam
     result.metrics.used_placeholder = true;
     size_t accepted = 0;
     for (const auto& det : frame.detections) {
-        if (det.confidence >= 0.6f) ++accepted;
+        if (det.confidence >= 0.6f)
+            ++accepted;
     }
     result.metrics.tracked_feature_count = accepted;
     result.metrics.inlier_ratio = accepted == 0 ? 0.0 : 1.0;
@@ -236,28 +252,36 @@ void VIOPipeline::attach_lidar(std::shared_ptr<sensors::LidarSensor> lidar) {
 }
 
 bool VIOPipeline::start() {
-    if (running_.exchange(true)) return true;
+    if (running_.exchange(true))
+        return true;
     if (coordinator_) {
         coordinator_->initialize();
         (void)coordinator_->start();
     }
     proc_thread_ = std::thread([this] { processing_loop(); });
-    if (logger_) logger_->info("VIO pipeline started");
+    if (logger_)
+        logger_->info("VIO pipeline started");
     return true;
 }
 
 void VIOPipeline::stop() {
-    if (!running_.exchange(false)) return;
+    if (!running_.exchange(false))
+        return;
     queue_cv_.notify_all();
-    if (proc_thread_.joinable()) proc_thread_.join();
-    if (coordinator_) coordinator_->stop();
-    if (logger_) logger_->info("VIO pipeline stopped");
+    if (proc_thread_.joinable())
+        proc_thread_.join();
+    if (coordinator_)
+        coordinator_->stop();
+    if (logger_)
+        logger_->info("VIO pipeline stopped");
 }
 
 void VIOPipeline::reset() {
     std::lock_guard lock(queue_mutex_);
-    while (!event_queue_.empty()) event_queue_.pop();
-    if (coordinator_) coordinator_->reset();
+    while (!event_queue_.empty())
+        event_queue_.pop();
+    if (coordinator_)
+        coordinator_->reset();
     last_imu_ts_ = -1.0;
     last_camera_ts_ = -1.0;
     measurement_sequence_ = 0;
@@ -290,7 +314,8 @@ PoseEstimate VIOPipeline::current_pose() const {
 void VIOPipeline::enqueue(SensorEvent evt) {
     {
         std::lock_guard lock(queue_mutex_);
-        if (event_queue_.size() > 2000) event_queue_.pop();
+        if (event_queue_.size() > 2000)
+            event_queue_.pop();
         event_queue_.push(std::move(evt));
     }
     queue_cv_.notify_one();
@@ -302,27 +327,31 @@ void VIOPipeline::processing_loop() {
         {
             std::unique_lock lock(queue_mutex_);
             queue_cv_.wait(lock, [this] { return !event_queue_.empty() || !running_.load(); });
-            if (!running_.load() && event_queue_.empty()) return;
+            if (!running_.load() && event_queue_.empty())
+                return;
             evt = std::move(event_queue_.front());
             event_queue_.pop();
         }
         std::visit([this](auto&& e) { handle(e); }, evt);
-        if (pose_cb_) pose_cb_(current_pose());
+        if (pose_cb_)
+            pose_cb_(current_pose());
     }
 }
 
 void VIOPipeline::handle(const sensors::ImuMeasurement& imu) {
-    if (!coordinator_) return;
-    if (!coordinator_->active_snapshot().initialized) coordinator_->initialize();
+    if (!coordinator_)
+        return;
+    if (!coordinator_->active_snapshot().initialized)
+        coordinator_->initialize();
     last_imu_ts_ = imu.timestamp;
     (void)coordinator_->process_measurement(make_imu_envelope(imu, measurement_sequence_++));
     refresh_runtime_telemetry_from_coordinator();
 }
 
 void VIOPipeline::submit_tracked_features_to_shadow(const VisualFrontendResult& frontend_result,
-                                                     const PoseEstimate& previous_pose,
-                                                     const PoseEstimate& current_pose,
-                                                     double timestamp_s) {
+                                                    const PoseEstimate& previous_pose,
+                                                    const PoseEstimate& current_pose,
+                                                    double timestamp_s) {
     if (!coordinator_ || frontend_result.previous_inlier_pixels.empty() ||
         frontend_result.previous_inlier_pixels.size() !=
             frontend_result.current_inlier_pixels.size()) {
@@ -338,7 +367,8 @@ void VIOPipeline::submit_tracked_features_to_shadow(const VisualFrontendResult& 
         runtime_telemetry_.initialized_feature_tracks += batch.initialized_tracks;
         runtime_telemetry_.rejected_feature_geometry += batch.rejected_geometry;
     }
-    if (batch.features.empty()) return;
+    if (batch.features.empty())
+        return;
 
     VisualFeatureMeasurementPayload payload;
     payload.K = K_;
@@ -358,8 +388,10 @@ void VIOPipeline::submit_tracked_features_to_shadow(const VisualFrontendResult& 
 }
 
 void VIOPipeline::handle(const sensors::CameraFrame& frame) {
-    if (!coordinator_ || !coordinator_->active_snapshot().initialized) return;
-    if (frame.detections.empty() && frame.image.empty()) return;
+    if (!coordinator_ || !coordinator_->active_snapshot().initialized)
+        return;
+    if (frame.detections.empty() && frame.image.empty())
+        return;
 
     const auto predicted_pose = coordinator_->active_pose();
     VisualFrontendResult frontend_result;
@@ -377,10 +409,10 @@ void VIOPipeline::handle(const sensors::CameraFrame& frame) {
         VisualPoseMeasurementPayload payload;
         payload.position_m = frontend_result.observed_position;
         payload.velocity_mps = frontend_result.observed_velocity;
-        payload.sigma_position_m = std::clamp(
-            0.50 - frontend_result.metrics.visual_update_confidence * 0.28, 0.14, 0.50);
-        payload.sigma_velocity_mps = std::clamp(
-            0.65 - frontend_result.metrics.visual_update_confidence * 0.30, 0.18, 0.65);
+        payload.sigma_position_m =
+            std::clamp(0.50 - frontend_result.metrics.visual_update_confidence * 0.28, 0.14, 0.50);
+        payload.sigma_velocity_mps =
+            std::clamp(0.65 - frontend_result.metrics.visual_update_confidence * 0.30, 0.18, 0.65);
         (void)coordinator_->process_measurement(make_visual_pose_envelope(
             payload, MeasurementStamp{frame.timestamp, measurement_sequence_++}));
         submit_tracked_features_to_shadow(frontend_result, previous_camera_pose_, predicted_pose,
@@ -423,12 +455,15 @@ void VIOPipeline::handle(const sensors::LidarMeasurement& lidar) {
     std::vector<float> z_vals;
     z_vals.reserve(lidar.cloud->size());
     for (const auto& pt : *lidar.cloud) {
-        if (pt.z > -20.0f && pt.z < 0.5f) z_vals.push_back(pt.z);
+        if (pt.z > -20.0f && pt.z < 0.5f)
+            z_vals.push_back(pt.z);
     }
-    if (z_vals.empty()) return;
+    if (z_vals.empty())
+        return;
     const auto median_index = z_vals.size() / 2;
     std::nth_element(z_vals.begin(),
-                     z_vals.begin() + static_cast<std::vector<float>::difference_type>(median_index),
+                     z_vals.begin() +
+                         static_cast<std::vector<float>::difference_type>(median_index),
                      z_vals.end());
     const double ground_z = z_vals[median_index];
     const auto pose = coordinator_->active_pose();
@@ -447,7 +482,8 @@ void VIOPipeline::apply_visual_quality_to_pose(PoseEstimate& pose) const {
         std::lock_guard lock(visual_metrics_mutex_);
         metrics = last_visual_metrics_;
     }
-    if (metrics.visual_update_confidence <= 0.0) return;
+    if (metrics.visual_update_confidence <= 0.0)
+        return;
     pose.localization_confidence = std::clamp(
         pose.localization_confidence * std::clamp(metrics.visual_update_confidence, 0.18, 1.0), 0.0,
         1.0);
@@ -458,7 +494,8 @@ void VIOPipeline::apply_visual_quality_to_pose(PoseEstimate& pose) const {
         pose.localization_source =
             metrics.used_placeholder ? "simulation-placeholder-vision" : "low-visual-quality";
     }
-    if (pose.localization_confidence < 0.22) pose.localization_lost = true;
+    if (pose.localization_confidence < 0.22)
+        pose.localization_lost = true;
 }
 
 void VIOPipeline::set_estimator_validation_config(const EstimatorValidationConfig& cfg) {
@@ -472,13 +509,15 @@ void VIOPipeline::set_shadow_msckf_config(const MsckfConfig& cfg) {
 }
 
 void VIOPipeline::reconfigure_coordinator() {
-    if (!coordinator_) return;
+    if (!coordinator_)
+        return;
     coordinator_->configure_validation(estimator_validation_cfg_);
     coordinator_->configure_shadow_msckf(shadow_msckf_cfg_);
     coordinator_->stop();
     coordinator_->initialize();
     visual_feature_tracks_.reset();
-    if (running_.load()) (void)coordinator_->start();
+    if (running_.load())
+        (void)coordinator_->start();
 }
 
 double VIOPipeline::drift_m() const {
@@ -486,7 +525,8 @@ double VIOPipeline::drift_m() const {
 }
 
 void VIOPipeline::refresh_runtime_telemetry_from_coordinator() {
-    if (!coordinator_) return;
+    if (!coordinator_)
+        return;
     const auto diagnostics = coordinator_->diagnostics();
     std::lock_guard lock(runtime_mutex_);
     runtime_telemetry_.active_estimator_name = diagnostics.active_estimator_name;
@@ -499,8 +539,10 @@ void VIOPipeline::refresh_runtime_telemetry_from_coordinator() {
     runtime_telemetry_.shadow_queue_high_water_mark = diagnostics.queue.peak_depth;
     runtime_telemetry_.shadow_dropped_events = diagnostics.queue.dropped_count;
     runtime_telemetry_.shadow_position_delta_m = diagnostics.last_comparison.position_delta_norm_m;
-    runtime_telemetry_.shadow_velocity_delta_mps = diagnostics.last_comparison.velocity_delta_norm_mps;
-    runtime_telemetry_.shadow_orientation_delta_deg = diagnostics.last_comparison.orientation_delta_deg;
+    runtime_telemetry_.shadow_velocity_delta_mps =
+        diagnostics.last_comparison.velocity_delta_norm_mps;
+    runtime_telemetry_.shadow_orientation_delta_deg =
+        diagnostics.last_comparison.orientation_delta_deg;
     runtime_telemetry_.shadow_divergence_active =
         diagnostics.last_comparison.valid &&
         (diagnostics.last_comparison.position_delta_norm_m >

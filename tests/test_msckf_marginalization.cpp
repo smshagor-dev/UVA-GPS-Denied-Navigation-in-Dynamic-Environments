@@ -51,8 +51,8 @@ TEST(MsckfMarginalizationTest, RetainedCovarianceIsExactPrincipalSubmatrix) {
     }
     const Eigen::MatrixXd P = (A * A.transpose()) + Eigen::MatrixXd::Identity(kDim, kDim);
 
-    const auto retained = MsckfMarginalization::retained_principal_submatrix(
-        P, kBaseDim, kCloneDim, clone_ids, 20u);
+    const auto retained =
+        MsckfMarginalization::retained_principal_submatrix(P, kBaseDim, kCloneDim, clone_ids, 20u);
     ASSERT_TRUE(retained.has_value());
     ASSERT_EQ(retained->rows(), 7);
     ASSERT_EQ(retained->cols(), 7);
@@ -60,9 +60,8 @@ TEST(MsckfMarginalizationTest, RetainedCovarianceIsExactPrincipalSubmatrix) {
     const std::vector<Eigen::Index> kept{0, 1, 2, 3, 4, 7, 8};
     for (Eigen::Index row = 0; row < retained->rows(); ++row) {
         for (Eigen::Index col = 0; col < retained->cols(); ++col) {
-            EXPECT_DOUBLE_EQ((*retained)(row, col),
-                             P(kept[static_cast<std::size_t>(row)],
-                               kept[static_cast<std::size_t>(col)]));
+            EXPECT_DOUBLE_EQ((*retained)(row, col), P(kept[static_cast<std::size_t>(row)],
+                                                      kept[static_cast<std::size_t>(col)]));
         }
     }
 }
@@ -77,8 +76,8 @@ TEST(MsckfMarginalizationTest, RetainedCrossCovariancesArePreserved) {
     P(4, 8) = -0.21;
     P(8, 4) = -0.21;
 
-    const auto retained = MsckfMarginalization::retained_principal_submatrix(
-        P, kBaseDim, kCloneDim, clone_ids, 20u);
+    const auto retained =
+        MsckfMarginalization::retained_principal_submatrix(P, kBaseDim, kCloneDim, clone_ids, 20u);
     ASSERT_TRUE(retained.has_value());
 
     EXPECT_DOUBLE_EQ((*retained)(0, 5), 0.37);
@@ -90,17 +89,15 @@ TEST(MsckfMarginalizationTest, RetainedCrossCovariancesArePreserved) {
 TEST(MsckfMarginalizationTest, InvalidCovarianceDimensionsFailClosed) {
     const std::vector<uint64_t> clone_ids{10u, 20u};
     const Eigen::MatrixXd bad = Eigen::MatrixXd::Identity(6, 6);
-    EXPECT_FALSE(MsckfMarginalization::retained_principal_submatrix(
-                     bad, 3u, 2u, clone_ids, 10u)
+    EXPECT_FALSE(MsckfMarginalization::retained_principal_submatrix(bad, 3u, 2u, clone_ids, 10u)
                      .has_value());
 }
 
 TEST(MsckfMarginalizationTest, MissingRetiringCloneFailsClosed) {
     const std::vector<uint64_t> clone_ids{10u, 20u};
     const Eigen::MatrixXd P = Eigen::MatrixXd::Identity(7, 7);
-    EXPECT_FALSE(MsckfMarginalization::retained_principal_submatrix(
-                     P, 3u, 2u, clone_ids, 30u)
-                     .has_value());
+    EXPECT_FALSE(
+        MsckfMarginalization::retained_principal_submatrix(P, 3u, 2u, clone_ids, 30u).has_value());
 }
 
 TEST(MsckfMarginalizationTest, CovarianceHealthAcceptsFiniteSymmetricPsdMatrix) {

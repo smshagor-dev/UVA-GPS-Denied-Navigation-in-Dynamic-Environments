@@ -139,9 +139,8 @@ TEST(ShadowOnlyMeasurement, FeatureSubmissionNeverTouchesActiveEstimator) {
 }
 
 TEST(ShadowOnlyMeasurement, InvalidEnvelopeFailsBeforeQueuePublication) {
-    EstimatorCoordinator coordinator(
-        std::make_unique<EKFStateEstimatorAdapter>(),
-        std::make_unique<RecordingShadowEstimator>());
+    EstimatorCoordinator coordinator(std::make_unique<EKFStateEstimatorAdapter>(),
+                                     std::make_unique<RecordingShadowEstimator>());
     coordinator.configure_validation(shadow_cfg(true));
     coordinator.initialize();
     ASSERT_TRUE(coordinator.start());
@@ -159,9 +158,8 @@ TEST(ShadowOnlyMeasurement, InvalidEnvelopeFailsBeforeQueuePublication) {
 }
 
 TEST(ShadowOnlyMeasurement, DisabledShadowFailsClosedWithoutActiveMutation) {
-    EstimatorCoordinator coordinator(
-        std::make_unique<EKFStateEstimatorAdapter>(),
-        std::make_unique<RecordingShadowEstimator>());
+    EstimatorCoordinator coordinator(std::make_unique<EKFStateEstimatorAdapter>(),
+                                     std::make_unique<RecordingShadowEstimator>());
     coordinator.configure_validation(shadow_cfg(false));
     coordinator.initialize();
 
