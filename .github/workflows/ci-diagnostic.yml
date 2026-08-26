@@ -57,6 +57,32 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install clang-format==19.1.7
 
+      - name: Apply known source repairs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/vio/Phase17ESKFEstimator.cpp")
+          text = path.read_text(encoding="utf-8")
+
+          anchor = """    const auto state_it = msckf_camera_states_.find(oldest_id);\n    if (state_it == msckf_camera_states_.end()) {\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.marginalization_failures;\n        }\n        note_rejection_locked(EstimatorOperationResult::FailedNumericalValidation);\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n\n"""
+          replacement = anchor + "    const int64_t retiring_timestamp_key = state_it->second.timestamp_key;\n\n"
+          if "const int64_t retiring_timestamp_key = state_it->second.timestamp_key;" not in text:
+              if anchor not in text:
+                  raise SystemExit("retirement iterator anchor not found")
+              text = text.replace(anchor, replacement, 1)
+
+          stale = "candidate_timestamp_map.erase(state_it->second.timestamp_key);"
+          safe = "candidate_timestamp_map.erase(retiring_timestamp_key);"
+          if stale in text:
+              text = text.replace(stale, safe, 1)
+          elif safe not in text:
+              raise SystemExit("retirement timestamp erase anchor not found")
+
+          path.write_text(text, encoding="utf-8")
+          PY
+
       - name: Capture formatting violations
         shell: bash
         run: |
@@ -71,19 +97,19 @@ jobs:
           clang-format -i "${files[@]}"
           git diff --name-only -- "${files[@]}" > "${RUNNER_TEMP}/ci-diagnostic/formatted-files.txt"
 
-      - name: Commit formatting repair to fix branch
+      - name: Commit source repairs to fix branch
         if: github.event_name == 'pull_request' && github.head_ref == 'fix/ci-resolve' && github.event.pull_request.head.repo.full_name == github.repository
         shell: bash
         run: |
           set -euo pipefail
           if git diff --quiet -- include src tests apps; then
-            echo "No formatting changes required."
+            echo "No source repairs required."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- include src tests apps
-          git commit -m "Apply clang-format 19.1.7"
+          git commit -m "Fix CI formatting and MSVC retirement iterator"
           git push origin "HEAD:refs/heads/${{ github.head_ref }}"
 
       - name: Verify formatting after repair
