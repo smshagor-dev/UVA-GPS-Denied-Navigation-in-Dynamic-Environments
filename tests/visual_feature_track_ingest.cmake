@@ -62,3 +62,23 @@ add_test(NAME visual_feature_track_ingest_replay COMMAND $<TARGET_FILE:visual_fe
 set_tests_properties(visual_feature_track_ingest_replay PROPERTIES
     LABELS "integration;navigation;replay;shadow-only;visual-feature-tracking"
 )
+
+add_executable(test_localization_metadata_fail_closed
+    "${CMAKE_CURRENT_LIST_DIR}/test_localization_metadata_fail_closed.cpp"
+    "${PROJECT_SOURCE_DIR}/src/localization/LocalizationFusion.cpp"
+)
+target_link_libraries(test_localization_metadata_fail_closed PRIVATE
+    drone_test_support
+    Eigen3::Eigen
+)
+drone_apply_project_warnings(test_localization_metadata_fail_closed)
+drone_enable_coverage(test_localization_metadata_fail_closed)
+drone_enable_sanitizers(test_localization_metadata_fail_closed)
+drone_set_target_output_dirs(test_localization_metadata_fail_closed "tests" "tests" "tests")
+add_test(
+    NAME test_localization_metadata_fail_closed
+    COMMAND $<TARGET_FILE:test_localization_metadata_fail_closed>
+)
+set_tests_properties(test_localization_metadata_fail_closed PROPERTIES
+    LABELS "unit;navigation;localization;safety"
+)
