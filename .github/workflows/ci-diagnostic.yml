@@ -45,19 +45,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Install clang-format 15
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install CI clang-format
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-format-15
+          python3 -m pip install --upgrade pip
+          python3 -m pip install clang-format==19.1.7
 
       - name: Capture formatting violations
         shell: bash
         run: |
           set -o pipefail
           mkdir -p "${RUNNER_TEMP}/ci-diagnostic"
-          mapfile -t files < <(find include src tests apps -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.c' -o -name '*.cc' -o -name '*.cpp' \) -print | sort)
-          clang-format-15 --dry-run --Werror "${files[@]}" 2>&1 | tee "${RUNNER_TEMP}/ci-diagnostic/clang-format.log"
+          python3 scripts/check_clang_format.py 2>&1 | tee "${RUNNER_TEMP}/ci-diagnostic/clang-format.log"
 
       - name: Upload formatting diagnostic log
         if: always()
