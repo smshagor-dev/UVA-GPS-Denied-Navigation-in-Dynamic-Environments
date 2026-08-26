@@ -1,0 +1,42 @@
+name: CodeQL C++ Build Diagnostic
+
+on:
+  push:
+    branches:
+      - fix/ci-python-static-analysis
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-cpp-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql-cpp-build:
+    name: CodeQL C++ Build Diagnostic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Configure exactly like Security CodeQL
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --preset validation-linux-gcc
+      - name: Build exactly like Security CodeQL with verbose diagnostics
+        shell: bash
+        run: |
+          mkdir -p "${RUNNER_TEMP}/codeql-cpp-diagnostic"
+          set -o pipefail
+          cmake --build --preset validation-linux-gcc --verbose 2>&1 | tee "${RUNNER_TEMP}/codeql-cpp-diagnostic/build.log"
+      - name: Upload build diagnostic
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: codeql-cpp-build-${{ github.sha }}
+          path: ${{ runner.temp }}/codeql-cpp-diagnostic/build.log
+          if-no-files-found: error
+          retention-days: 3
