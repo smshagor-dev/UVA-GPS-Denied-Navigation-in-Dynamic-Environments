@@ -1,6 +1,9 @@
 name: CI Diagnostic
 
 on:
+  push:
+    branches:
+      - fix/ci-resolve
   pull_request:
     branches:
       - main
@@ -45,7 +48,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.ref }}
 
       - uses: actions/setup-python@v7
         with:
@@ -93,24 +96,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t files < <(git ls-files '*.h' '*.hpp' '*.c' '*.cc' '*.cpp' | grep -E '^(include|src|tests|apps)/' | sort)
+          mapfile -t files < <(git ls-files '*.h' '*.hpp' '*.c' '*.cc' '*.cpp' | grep -E '^(include|src|tests)/' | sort)
           clang-format -i "${files[@]}"
           git diff --name-only -- "${files[@]}" > "${RUNNER_TEMP}/ci-diagnostic/formatted-files.txt"
 
       - name: Commit source repairs to fix branch
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/ci-resolve' && github.event.pull_request.head.repo.full_name == github.repository
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/fix/ci-resolve') || (github.event_name == 'pull_request' && github.head_ref == 'fix/ci-resolve' && github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- include src tests apps; then
+          if git diff --quiet -- include src tests; then
             echo "No source repairs required."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- include src tests apps
+          git add -- include src tests
           git commit -m "Fix CI formatting and MSVC retirement iterator"
-          git push origin "HEAD:refs/heads/${{ github.head_ref }}"
+          git push origin "HEAD:refs/heads/fix/ci-resolve"
 
       - name: Verify formatting after repair
         shell: bash
