@@ -126,3 +126,29 @@ jobs:
             ${{ runner.temp }}/ci-diagnostic/formatted-files.txt
           if-no-files-found: warn
           retention-days: 3
+
+  windows-msvc-debug-diagnostic:
+    name: Windows MSVC Retirement Diagnostic
+    needs: formatting-diagnostic
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/ci-resolve
+
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-key-suffix: retirement-diagnostic
+
+      - name: Configure MSVC Debug
+        shell: pwsh
+        run: cmake --preset windows-msvc-debug -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
+
+      - name: Build retirement integration test
+        shell: pwsh
+        run: cmake --build --preset windows-msvc-debug --target test_msckf_marginalization_integration --parallel
+
+      - name: Run failing retirement regression
+        shell: pwsh
+        run: ctest --preset windows-msvc-debug -R "^MsckfMarginalizationIntegration.RetirementConsumesEligibleConstraintBeforeCloneRemoval$" --output-on-failure
