@@ -35,6 +35,7 @@ void expect_metadata_fail_closed(const localization::LocalizationFusionOutput& o
 
 } // namespace
 
+// Non-finite localization metadata must never leave the fused state nominal.
 TEST(LocalizationFusionMetadata, NonFiniteAnchorVisibilityFailsClosed) {
     localization::LocalizationFusion fusion;
     auto input = make_nominal_input();
