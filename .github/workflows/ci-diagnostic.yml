@@ -71,6 +71,36 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
 
+  static-analysis-diagnostic:
+    name: Static Analysis Diagnostic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup-linux-deps
+
+      - name: Configure compile commands
+        shell: bash
+        run: cmake --preset linux-gcc-release-minimal
+
+      - name: Run clang-tidy with captured output
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "${RUNNER_TEMP}/ci-diagnostic"
+          python3 scripts/run_clang_tidy.py --build-dir build/linux-gcc-release-minimal --changed-only 2>&1 | tee "${RUNNER_TEMP}/ci-diagnostic/clang-tidy.log"
+
+      - name: Upload clang-tidy diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: clang-tidy-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-diagnostic/clang-tidy.log
+          if-no-files-found: error
+          retention-days: 3
+
   windows-msvc-debug-diagnostic:
     name: Windows MSVC Retirement Diagnostic
     needs: formatting-diagnostic
