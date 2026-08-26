@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   gcc-release-diagnostic:
@@ -44,6 +44,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: actions/setup-python@v7
         with:
@@ -55,26 +57,64 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install clang-format==19.1.7
 
+      - name: Apply known source repairs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("src/vio/Phase17ESKFEstimator.cpp")
+          text = path.read_text(encoding="utf-8")
+
+          anchor = """    const auto state_it = msckf_camera_states_.find(oldest_id);\n    if (state_it == msckf_camera_states_.end()) {\n        if (msckf_diagnostics_enabled_locked()) {\n            ++diagnostics_.marginalization_failures;\n        }\n        note_rejection_locked(EstimatorOperationResult::FailedNumericalValidation);\n        refresh_msckf_oldest_state_age_locked();\n        return;\n    }\n\n"""
+          replacement = anchor + "    const int64_t retiring_timestamp_key = state_it->second.timestamp_key;\n\n"
+          if "const int64_t retiring_timestamp_key = state_it->second.timestamp_key;" not in text:
+              if anchor not in text:
+                  raise SystemExit("retirement iterator anchor not found")
+              text = text.replace(anchor, replacement, 1)
+
+          stale = "candidate_timestamp_map.erase(state_it->second.timestamp_key);"
+          safe = "candidate_timestamp_map.erase(retiring_timestamp_key);"
+          if stale in text:
+              text = text.replace(stale, safe, 1)
+          elif safe not in text:
+              raise SystemExit("retirement timestamp erase anchor not found")
+
+          path.write_text(text, encoding="utf-8")
+          PY
+
       - name: Capture formatting violations
         shell: bash
         run: |
           mkdir -p "${RUNNER_TEMP}/ci-diagnostic"
           python3 scripts/check_clang_format.py 2>&1 | tee "${RUNNER_TEMP}/ci-diagnostic/clang-format.log" || true
 
-      - name: Export exact formatted files
+      - name: Apply exact CI formatting
         shell: bash
         run: |
           set -euo pipefail
-          formatted_root="${RUNNER_TEMP}/ci-diagnostic/formatted"
-          mkdir -p "${formatted_root}"
           mapfile -t files < <(git ls-files '*.h' '*.hpp' '*.c' '*.cc' '*.cpp' | grep -E '^(include|src|tests|apps)/' | sort)
           clang-format -i "${files[@]}"
           git diff --name-only -- "${files[@]}" > "${RUNNER_TEMP}/ci-diagnostic/formatted-files.txt"
-          while IFS= read -r file; do
-            [ -n "${file}" ] || continue
-            mkdir -p "${formatted_root}/$(dirname "${file}")"
-            cp "${file}" "${formatted_root}/${file}"
-          done < "${RUNNER_TEMP}/ci-diagnostic/formatted-files.txt"
+
+      - name: Commit source repairs to fix branch
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/ci-resolve' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- include src tests apps; then
+            echo "No source repairs required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- include src tests apps
+          git commit -m "Fix CI formatting and MSVC retirement iterator"
+          git push origin "HEAD:refs/heads/${{ github.head_ref }}"
+
+      - name: Verify formatting after repair
+        shell: bash
+        run: python3 scripts/check_clang_format.py
 
       - name: Upload formatting diagnostic bundle
         if: always()
@@ -84,6 +124,31 @@ jobs:
           path: |
             ${{ runner.temp }}/ci-diagnostic/clang-format.log
             ${{ runner.temp }}/ci-diagnostic/formatted-files.txt
-            ${{ runner.temp }}/ci-diagnostic/formatted
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 3
+
+  windows-msvc-debug-diagnostic:
+    name: Windows MSVC Retirement Diagnostic
+    needs: formatting-diagnostic
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/ci-resolve
+
+      - uses: ./.github/actions/setup-vcpkg
+        with:
+          cache-key-suffix: retirement-diagnostic
+
+      - name: Configure MSVC Debug
+        shell: pwsh
+        run: cmake --preset windows-msvc-debug -DDRONE_ENABLE_PYTHON_BINDINGS=OFF
+
+      - name: Build retirement integration test
+        shell: pwsh
+        run: cmake --build --preset windows-msvc-debug --target test_msckf_marginalization_integration --parallel
+
+      - name: Run failing retirement regression
+        shell: pwsh
+        run: ctest --preset windows-msvc-debug -R "^MsckfMarginalizationIntegration.RetirementConsumesEligibleConstraintBeforeCloneRemoval$" --output-on-failure
