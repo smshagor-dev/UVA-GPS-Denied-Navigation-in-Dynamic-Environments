@@ -63,6 +63,8 @@ set_tests_properties(visual_feature_track_ingest_replay PROPERTIES
     LABELS "integration;navigation;replay;shadow-only;visual-feature-tracking"
 )
 
+# Link the localization regression through the production core target so every
+# compiler sees the same dependencies, definitions, and warning configuration.
 add_executable(test_localization_metadata_fail_closed
     "${CMAKE_CURRENT_LIST_DIR}/test_localization_metadata_fail_closed.cpp"
 )
