@@ -37,3 +37,33 @@ jobs:
           path: ${{ runner.temp }}/ci-diagnostic/gcc-release-build.log
           if-no-files-found: error
           retention-days: 3
+
+  formatting-diagnostic:
+    name: Formatting Diagnostic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install clang-format 15
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-15
+
+      - name: Capture formatting violations
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "${RUNNER_TEMP}/ci-diagnostic"
+          mapfile -t files < <(find include src tests apps -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.c' -o -name '*.cc' -o -name '*.cpp' \) -print | sort)
+          clang-format-15 --dry-run --Werror "${files[@]}" 2>&1 | tee "${RUNNER_TEMP}/ci-diagnostic/clang-format.log"
+
+      - name: Upload formatting diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: clang-format-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-diagnostic/clang-format.log
+          if-no-files-found: error
+          retention-days: 3
