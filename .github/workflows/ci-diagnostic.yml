@@ -1,0 +1,39 @@
+name: CI Diagnostic
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gcc-release-diagnostic:
+    name: GCC Release Diagnostic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-linux-deps
+
+      - name: Configure
+        shell: bash
+        run: cmake --preset linux-gcc-release
+
+      - name: Build with verbose diagnostics
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "${RUNNER_TEMP}/ci-diagnostic"
+          cmake --build --preset linux-gcc-release --verbose 2>&1 | tee "${RUNNER_TEMP}/ci-diagnostic/gcc-release-build.log"
+
+      - name: Upload diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gcc-release-build-${{ github.sha }}
+          path: ${{ runner.temp }}/ci-diagnostic/gcc-release-build.log
+          if-no-files-found: error
+          retention-days: 3
