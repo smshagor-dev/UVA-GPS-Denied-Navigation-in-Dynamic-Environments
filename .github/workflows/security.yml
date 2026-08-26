@@ -194,10 +194,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          # Unit tests are compiled and executed by CI. CodeQL instruments the
-          # production C/C++ targets here to avoid duplicating the large test
-          # build under instrumentation on hosted runners.
-          cmake --preset validation-linux-gcc -DDRONE_BUILD_TESTS=OFF
+          cmake --preset validation-linux-gcc
           cmake --build --preset validation-linux-gcc --parallel 2
 
       - name: Build Go for CodeQL
