@@ -105,3 +105,5 @@ jobs:
           git add src/localization/LocalizationFusion.cpp tests/test_navigation_intelligence.cpp
           git commit -m "test(localization): cover non-finite fusion metadata"
           git push origin HEAD:fix/localization-nonfinite-metadata-fail-closed
+
+      # Trigger commit exists only to ensure the branch-local workflow is registered before this push.
