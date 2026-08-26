@@ -65,10 +65,10 @@ set_tests_properties(visual_feature_track_ingest_replay PROPERTIES
 
 add_executable(test_localization_metadata_fail_closed
     "${CMAKE_CURRENT_LIST_DIR}/test_localization_metadata_fail_closed.cpp"
-    "${PROJECT_SOURCE_DIR}/src/localization/LocalizationFusion.cpp"
 )
 target_link_libraries(test_localization_metadata_fail_closed PRIVATE
     drone_test_support
+    sensor_fusion_core
     Eigen3::Eigen
 )
 drone_apply_project_warnings(test_localization_metadata_fail_closed)
