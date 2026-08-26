@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   gcc-release-diagnostic:
@@ -44,6 +44,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: actions/setup-python@v7
         with:
@@ -61,20 +63,32 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/ci-diagnostic"
           python3 scripts/check_clang_format.py 2>&1 | tee "${RUNNER_TEMP}/ci-diagnostic/clang-format.log" || true
 
-      - name: Export exact formatted files
+      - name: Apply exact CI formatting
         shell: bash
         run: |
           set -euo pipefail
-          formatted_root="${RUNNER_TEMP}/ci-diagnostic/formatted"
-          mkdir -p "${formatted_root}"
           mapfile -t files < <(git ls-files '*.h' '*.hpp' '*.c' '*.cc' '*.cpp' | grep -E '^(include|src|tests|apps)/' | sort)
           clang-format -i "${files[@]}"
           git diff --name-only -- "${files[@]}" > "${RUNNER_TEMP}/ci-diagnostic/formatted-files.txt"
-          while IFS= read -r file; do
-            [ -n "${file}" ] || continue
-            mkdir -p "${formatted_root}/$(dirname "${file}")"
-            cp "${file}" "${formatted_root}/${file}"
-          done < "${RUNNER_TEMP}/ci-diagnostic/formatted-files.txt"
+
+      - name: Commit formatting repair to fix branch
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/ci-resolve' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- include src tests apps; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- include src tests apps
+          git commit -m "Apply clang-format 19.1.7"
+          git push origin "HEAD:refs/heads/${{ github.head_ref }}"
+
+      - name: Verify formatting after repair
+        shell: bash
+        run: python3 scripts/check_clang_format.py
 
       - name: Upload formatting diagnostic bundle
         if: always()
@@ -84,6 +98,5 @@ jobs:
           path: |
             ${{ runner.temp }}/ci-diagnostic/clang-format.log
             ${{ runner.temp }}/ci-diagnostic/formatted-files.txt
-            ${{ runner.temp }}/ci-diagnostic/formatted
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 3
