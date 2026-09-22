@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Tool versions
         shell: bash
@@ -46,7 +46,7 @@ jobs:
           python3 scripts/validate_phase22_replay_artifact.py artifacts/phase22/ekf_phase22_replay_report.json
       - name: Upload Phase 22 GCC evidence
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: phase22-gcc-${{ github.sha }}
           path: artifacts/phase22/ekf_phase22_replay_report.json
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - run: cmake --preset linux-gcc-release-werror
       - run: cmake --build --preset linux-gcc-release-werror --target test_phase22_msckf_update ekf_phase22_replay -- -j2
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Tool versions
         shell: bash
@@ -87,7 +87,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - run: cmake --preset linux-clang-release -DDRONE_WARNINGS_AS_ERRORS=ON
       - run: cmake --build --preset linux-clang-release --target test_phase22_msckf_update ekf_phase22_replay -- -j2
@@ -98,8 +98,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
       - uses: ./.github/actions/setup-vcpkg
@@ -117,8 +117,8 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.14'
       - uses: ./.github/actions/setup-vcpkg
@@ -136,7 +136,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Format
         shell: bash
@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - run: cmake --preset linux-clang-asan-ubsan
       - run: cmake --build --preset linux-clang-asan-ubsan --target test_phase17_eskf test_phase20_msckf test_phase21_triangulation test_phase22_msckf_update ekf_phase17_replay ekf_phase21_replay ekf_phase22_replay -- -j2
@@ -168,7 +168,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
       - name: Configure TSan headless estimator lane
         run: cmake --preset linux-clang-tsan-phase17
