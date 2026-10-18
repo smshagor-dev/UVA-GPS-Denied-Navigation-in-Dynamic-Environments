@@ -11,8 +11,8 @@ namespace {
 namespace fs = std::filesystem;
 using drone::security::FirmwareManifest;
 using drone::security::FirmwareTrustPolicy;
-using drone::security::validate_firmware_trust;
 using drone::security::sign_firmware_manifest;
+using drone::security::validate_firmware_trust;
 
 FirmwareManifest baseline_manifest() {
     FirmwareManifest m;
@@ -48,10 +48,23 @@ void sign(FirmwareManifest& m, const FirmwareTrustPolicy& p) {
     m.signature = sign_firmware_manifest(m, p.signing_secret);
 }
 enum class Mutation {
-    VersionOnly, CounterOnly, BothRollback, Signer, Digest, SecureBoot,
-    Bootloader, EmptyMeasurement, UnsignedMeasurement, LabMeasurement, MissingToken
+    VersionOnly,
+    CounterOnly,
+    BothRollback,
+    Signer,
+    Digest,
+    SecureBoot,
+    Bootloader,
+    EmptyMeasurement,
+    UnsignedMeasurement,
+    LabMeasurement,
+    MissingToken
 };
-struct NegativeCase { const char* name; Mutation mutation; const char* outcome; };
+struct NegativeCase {
+    const char* name;
+    Mutation mutation;
+    const char* outcome;
+};
 
 class OnePredicateRejection : public ::testing::TestWithParam<NegativeCase> {};
 TEST_P(OnePredicateRejection, RejectsAndPreservesAcceptedState) {
@@ -68,20 +81,44 @@ TEST_P(OnePredicateRejection, RejectsAndPreservesAcceptedState) {
     auto candidate = baseline;
     bool should_resign = true;
     switch (scenario.mutation) {
-        case Mutation::VersionOnly: candidate.version = "2.0.5"; break;
-        case Mutation::CounterOnly: candidate.rollback_counter = 3; break;
-        case Mutation::BothRollback:
-            candidate.version = "2.0.5"; candidate.rollback_counter = 3; break;
-        case Mutation::Signer: candidate.signer = "untrusted-ca"; break;
-        case Mutation::Digest: candidate.signature = std::string(64, '0'); should_resign = false; break;
-        case Mutation::SecureBoot: candidate.secure_boot_attested = false; break;
-        case Mutation::Bootloader: candidate.bootloader_locked = false; break;
-        case Mutation::EmptyMeasurement: candidate.measurement.clear(); break;
-        case Mutation::UnsignedMeasurement: candidate.measurement = "unsigned-build"; break;
-        case Mutation::LabMeasurement: candidate.measurement = "lab-local-build"; break;
-        case Mutation::MissingToken: policy.maintenance_mode = true; break;
+    case Mutation::VersionOnly:
+        candidate.version = "2.0.5";
+        break;
+    case Mutation::CounterOnly:
+        candidate.rollback_counter = 3;
+        break;
+    case Mutation::BothRollback:
+        candidate.version = "2.0.5";
+        candidate.rollback_counter = 3;
+        break;
+    case Mutation::Signer:
+        candidate.signer = "untrusted-ca";
+        break;
+    case Mutation::Digest:
+        candidate.signature = std::string(64, '0');
+        should_resign = false;
+        break;
+    case Mutation::SecureBoot:
+        candidate.secure_boot_attested = false;
+        break;
+    case Mutation::Bootloader:
+        candidate.bootloader_locked = false;
+        break;
+    case Mutation::EmptyMeasurement:
+        candidate.measurement.clear();
+        break;
+    case Mutation::UnsignedMeasurement:
+        candidate.measurement = "unsigned-build";
+        break;
+    case Mutation::LabMeasurement:
+        candidate.measurement = "lab-local-build";
+        break;
+    case Mutation::MissingToken:
+        policy.maintenance_mode = true;
+        break;
     }
-    if (should_resign) sign(candidate, policy);
+    if (should_resign)
+        sign(candidate, policy);
     const auto rejected = validate_firmware_trust(candidate, policy);
     EXPECT_FALSE(rejected.accepted);
     EXPECT_EQ(rejected.boot_state, scenario.outcome);
@@ -100,8 +137,7 @@ INSTANTIATE_TEST_SUITE_P(
         NegativeCase{"EmptyMeasurement", Mutation::EmptyMeasurement, "MEASUREMENT_UNTRUSTED"},
         NegativeCase{"UnsignedMeasurement", Mutation::UnsignedMeasurement, "MEASUREMENT_UNTRUSTED"},
         NegativeCase{"LabMeasurement", Mutation::LabMeasurement, "MEASUREMENT_UNTRUSTED"},
-        NegativeCase{"MissingToken", Mutation::MissingToken, "MAINTENANCE_UNAUTHORIZED"}
-    ),
+        NegativeCase{"MissingToken", Mutation::MissingToken, "MAINTENANCE_UNAUTHORIZED"}),
     [](const ::testing::TestParamInfo<NegativeCase>& info) {
         return std::string(info.param.name);
     });
@@ -109,11 +145,16 @@ INSTANTIATE_TEST_SUITE_P(
 TEST(FirmwareReview, AcceptsVersionAndCounterAdvanceIndependently) {
     auto path = state_path("advance");
     auto policy = policy_for(path);
-    auto first = baseline_manifest(); sign(first, policy);
+    auto first = baseline_manifest();
+    sign(first, policy);
     ASSERT_TRUE(validate_firmware_trust(first, policy).accepted);
-    auto version_advance = first; version_advance.version = "2.2.0"; sign(version_advance, policy);
+    auto version_advance = first;
+    version_advance.version = "2.2.0";
+    sign(version_advance, policy);
     EXPECT_TRUE(validate_firmware_trust(version_advance, policy).accepted);
-    auto counter_advance = version_advance; counter_advance.rollback_counter = 5; sign(counter_advance, policy);
+    auto counter_advance = version_advance;
+    counter_advance.rollback_counter = 5;
+    sign(counter_advance, policy);
     EXPECT_TRUE(validate_firmware_trust(counter_advance, policy).accepted);
     const auto record = drone::security::load_firmware_trust_record(path);
     EXPECT_EQ(record.version, "2.2.0");
@@ -124,7 +165,8 @@ TEST(FirmwareReview, NonEmptyMaintenanceTokenIsOnlyPresenceChecked) {
     auto policy = policy_for(path, "field");
     policy.maintenance_mode = true;
     policy.maintenance_token = "arbitrary-nonempty-string";
-    auto manifest = baseline_manifest(); sign(manifest, policy);
+    auto manifest = baseline_manifest();
+    sign(manifest, policy);
     const auto result = validate_firmware_trust(manifest, policy);
     EXPECT_TRUE(result.accepted) << result.summary;
     EXPECT_EQ(result.boot_state, "MAINTENANCE_TRUSTED");
@@ -148,7 +190,8 @@ TEST(FirmwareReview, MissingSignerPolicyRejectsHardenedBoot) {
     auto path = state_path("no_allowlist");
     auto policy = policy_for(path);
     policy.allowed_signers.clear();
-    auto manifest = baseline_manifest(); sign(manifest, policy);
+    auto manifest = baseline_manifest();
+    sign(manifest, policy);
     const auto result = validate_firmware_trust(manifest, policy);
     EXPECT_FALSE(result.accepted);
     EXPECT_EQ(result.boot_state, "TRUST_CONFIGURATION_INVALID");
@@ -158,7 +201,8 @@ TEST(FirmwareReview, FailedPersistenceRejectsHardenedBoot) {
     auto path = state_path("directory_instead_of_file");
     fs::create_directories(path);
     auto policy = policy_for(path);
-    auto manifest = baseline_manifest(); sign(manifest, policy);
+    auto manifest = baseline_manifest();
+    sign(manifest, policy);
     const auto result = validate_firmware_trust(manifest, policy);
     EXPECT_FALSE(result.accepted);
     EXPECT_EQ(result.boot_state, "STATE_PERSISTENCE_FAILED");
@@ -170,10 +214,11 @@ TEST(FirmwareReview, LaboratoryModeIsNotAttestation) {
     auto policy = policy_for(path, "lab");
     policy.signing_secret.clear();
     policy.allowed_signers.clear();
-    auto manifest = baseline_manifest(); manifest.signature.clear();
+    auto manifest = baseline_manifest();
+    manifest.signature.clear();
     const auto result = validate_firmware_trust(manifest, policy);
     EXPECT_TRUE(result.accepted);
     EXPECT_EQ(result.boot_state, "LAB_BOOT");
     EXPECT_FALSE(fs::exists(path));
 }
-}  // namespace
+} // namespace

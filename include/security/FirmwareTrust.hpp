@@ -265,8 +265,8 @@ inline FirmwareTrustReport validate_firmware_trust(const FirmwareManifest& manif
                                              sign_firmware_manifest(manifest, policy.signing_secret)
                                        : !trim_copy(manifest.signature).empty();
 
-    report.signed_firmware_valid = signer_allowed &&
-                                   !trim_copy(policy.signing_secret).empty() && signature_matches;
+    report.signed_firmware_valid =
+        signer_allowed && !trim_copy(policy.signing_secret).empty() && signature_matches;
 
     if (policy.maintenance_mode) {
         report.update_state = "maintenance-window-open";
@@ -290,13 +290,14 @@ inline FirmwareTrustReport validate_firmware_trust(const FirmwareManifest& manif
     }
 
     // Hardened acceptance must not silently degrade to syntactic signature presence.
-    const bool valid_signer_policy = std::any_of(
-        policy.allowed_signers.begin(), policy.allowed_signers.end(),
-        [](const std::string& signer) { return !trim_copy(signer).empty(); });
+    const bool valid_signer_policy =
+        std::any_of(policy.allowed_signers.begin(), policy.allowed_signers.end(),
+                    [](const std::string& signer) { return !trim_copy(signer).empty(); });
     if (trim_copy(policy.signing_secret).empty() || !valid_signer_policy) {
         report.accepted = false;
         report.boot_state = "TRUST_CONFIGURATION_INVALID";
-        report.summary = "Hardened firmware trust requires a non-empty signing secret and signer allowlist";
+        report.summary =
+            "Hardened firmware trust requires a non-empty signing secret and signer allowlist";
         return report;
     }
 
@@ -337,7 +338,8 @@ inline FirmwareTrustReport validate_firmware_trust(const FirmwareManifest& manif
 
     report.boot_state = policy.maintenance_mode ? "MAINTENANCE_TRUSTED" : "SECURE_BOOT_TRUSTED";
     report.summary = policy.maintenance_mode
-                         ? "Hardened checks passed with a maintenance token present; external authorization unverified"
+                         ? "Hardened checks passed with a maintenance token present; external "
+                           "authorization unverified"
                          : "Software boot claims accepted and firmware keyed digest matched";
     if (!persist_firmware_trust_record(policy.state_file, report)) {
         report.accepted = false;
