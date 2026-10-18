@@ -241,10 +241,10 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cpack --config build/linux-gcc-release-package/CPackConfig.cmake --verbose
           mkdir -p "${RUNNER_TEMP}/packages"
-          find build/linux-gcc-release-package -maxdepth 1 \( -name "*.tgz" -o -name "*.zip" \) -exec cp {} "${RUNNER_TEMP}/packages/" \;
-          test -n "$(find "${RUNNER_TEMP}/packages" -maxdepth 1 -type f \( -name '*.tgz' -o -name '*.zip' \) -print -quit)"
+          cpack --config build/linux-gcc-release-package/CPackConfig.cmake --verbose -B "${RUNNER_TEMP}/packages"
+          # CPack TGZ emits .tar.gz rather than .tgz; fail if no distributable archive exists.
+          test -n "$(find "${RUNNER_TEMP}/packages" -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.tgz' -o -name '*.zip' \) -print -quit)"
       - name: Validate downstream consumer
         shell: bash
         run: |
