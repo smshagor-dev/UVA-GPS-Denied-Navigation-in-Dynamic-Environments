@@ -1,0 +1,46 @@
+name: C++ Style Update
+
+on:
+  push:
+    branches:
+      - review/firmware-trust-hardening-2026
+
+permissions:
+  contents: write
+
+jobs:
+  format-cpp:
+    name: Apply C++ formatting
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Format affected C++ files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install clang-format==19.1.7
+          clang-format -i \
+            include/security/FirmwareTrust.hpp \
+            tests/test_firmware_review.cpp \
+            src/swarm/EdgePeerProtocol.cpp \
+            src/telemetry/ControlPlaneTelemetryClient.cpp \
+            tests/ekf_phase16_replay.cpp
+          git diff --check
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add \
+              include/security/FirmwareTrust.hpp \
+              tests/test_firmware_review.cpp \
+              src/swarm/EdgePeerProtocol.cpp \
+              src/telemetry/ControlPlaneTelemetryClient.cpp \
+              tests/ekf_phase16_replay.cpp
+            git commit -m "style: normalize C++ formatting"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
