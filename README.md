@@ -261,7 +261,7 @@ The name `production` is a software configuration name, not a certification stat
 
 ## Security model
 
-Security work includes peer authentication hooks, stale/replay handling, trust epochs, command policy, TLS/mTLS paths, signed firmware manifests, rollback counters, firmware-trust telemetry and operator/device authorization. Post-quantum items are research/migration work, not a claim that the current peer transport is operationally post-quantum secure.
+Security work includes peer authentication hooks, stale/replay handling, trust epochs, command policy, TLS/mTLS paths, firmware-manifest admission checks, rollback counters, firmware-trust telemetry and operator/device authorization. The field/production firmware gate runs in the ordinary node process before mission initialization. It compares application-supplied manifest metadata against a configured signer allowlist, non-empty keyed SHA3-derived digest, externally supplied boot claims and a locally stored version/counter record; failure to persist accepted state denies startup. The digest is not a standardized MAC or a digital signature. This path does not independently measure installed firmware, authenticate maintenance-token issuers, protect the validator or its secrets from privileged modification, or provide hardware-backed rollback-resistant storage. Laboratory mode explicitly falls outside hardened admission guarantees. Post-quantum items are research/migration work, not a claim that the current peer transport is operationally post-quantum secure.
 
 # Academic mathematical formulation and implementation mapping
 
