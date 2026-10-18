@@ -138,9 +138,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-linux-deps
-      - name: Format
+      - name: Check C++ format
         shell: bash
-        run: python3 scripts/check_clang_format.py
+        run: |
+          python3 -m pip install clang-format==19.1.7
+          python3 scripts/check_clang_format.py
       - name: Configure compile database
         run: cmake --preset linux-gcc-release-minimal
       - name: Check estimator source
