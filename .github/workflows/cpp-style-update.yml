@@ -1,6 +1,9 @@
 name: C++ Style Update
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - review/firmware-trust-hardening-2026
@@ -11,12 +14,13 @@ permissions:
 jobs:
   format-cpp:
     name: Apply C++ formatting
+    if: github.head_ref == 'review/firmware-trust-hardening-2026' || github.ref_name == 'review/firmware-trust-hardening-2026'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.ref_name }}
+          ref: review/firmware-trust-hardening-2026
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
