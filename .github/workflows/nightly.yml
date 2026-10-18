@@ -274,9 +274,12 @@ jobs:
             cd "${RUNNER_TEMP}/packages"
             # CPack also creates _CPack_Packages/; checksum only regular output files.
             # Exclude the checksum manifest itself to prevent a self-referential digest.
+            # Write the list outside the directory being enumerated to avoid
+            # including an open output file in the checksum inputs (SC2094).
             find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
-              | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt
-            test -s SHA256SUMS.txt
+              | sort -z | xargs -0 -r sha256sum > "${RUNNER_TEMP}/package-sha256sums.txt"
+            test -s "${RUNNER_TEMP}/package-sha256sums.txt"
+            mv "${RUNNER_TEMP}/package-sha256sums.txt" SHA256SUMS.txt
             sha256sum --check SHA256SUMS.txt
           )
           python3 -c 'import json,os,pathlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"packages/sbom.cdx.json"; d=json.loads(p.read_text()); assert d.get("bomFormat")=="CycloneDX"; assert isinstance(d.get("components",[]),list); print("CycloneDX SBOM validated")'
