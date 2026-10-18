@@ -1,19 +1,50 @@
 # GPS-Denied Autonomous UAV Swarm Platform
 
-A research and engineering codebase for UAV navigation, local autonomy, and swarm coordination when GNSS is unavailable, degraded, or unreliable.
+---
 
-The platform combines a C++20 onboard runtime, a Go supervisory control plane, a Python/PySide6 operator dashboard, sensor-fusion and localization code, peer-to-peer swarm communication, replay and simulation tools, deployment assets, and experiment tooling in one repository.
+<p align="center">
+  <strong>A local-first research platform for autonomous UAV navigation and swarm coordination without reliable GPS.</strong>
+</p>
 
-[![CI](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/ci.yml)
-[![Security](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/security.yml)
-[![Nightly](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/nightly.yml)
+<p align="center">
+  A reproducible research workstation combining C++20 onboard autonomy, visual-inertial and UWB/TDOA sensor fusion, a Go control plane, a Python/PySide6 operator dashboard, peer coordination, and replay-based software validation. Core navigation and safety decisions remain onboard rather than depending on an always-connected supervisory service.
+</p>
+
+<p align="center">
+  <a href="https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/ci.yml"><img src="https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/security.yml"><img src="https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/security.yml/badge.svg?branch=main" alt="Security status"></a>
+  <a href="https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/nightly.yml"><img src="https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/nightly.yml/badge.svg?branch=main" alt="Nightly validation status"></a>
+  <a href="https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/navigation-validation.yml"><img src="https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/actions/workflows/navigation-validation.yml/badge.svg?branch=main" alt="Navigation regression validation status"></a>
+  <a href="https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/releases/latest"><img src="https://img.shields.io/github/v/release/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments?label=release&color=007ec6" alt="Latest published release"></a>
+  <img src="https://img.shields.io/badge/build-3.0.0-007ec6" alt="CMake build version 3.0.0">
+  <a href="https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-green" alt="GPL-3.0 license"></a>
+  <img src="https://img.shields.io/badge/desktop-Windows%20%7C%20Linux-007ec6" alt="Windows and Linux build targets">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/C%2B%2B-20-00599C?logo=cplusplus&logoColor=white" alt="C++20">
+  <img src="https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white" alt="Go 1.22 module">
+  <img src="https://img.shields.io/badge/Python-3-3776AB?logo=python&logoColor=white" alt="Python 3">
+  <img src="https://img.shields.io/badge/PySide6-dashboard-41CD52?logo=qt&logoColor=white" alt="PySide6 dashboard">
+  <img src="https://img.shields.io/badge/CMake-3.24%2B-064F8C?logo=cmake&logoColor=white" alt="CMake 3.24 or newer">
+  <img src="https://img.shields.io/badge/navigation-VIO%20%7C%20UWB%2FTDOA-555555" alt="VIO and UWB/TDOA navigation">
+</p>
 
 > **Safety note**
 >
 > This is research software, not a certified flight controller. The repository contains software tests, replay tooling, simulation support, bench-oriented workflows, and hardware-facing interfaces, but it does not claim completed free-flight validation, production-radio qualification, airworthiness approval, or regulatory certification. Hardware timing, sensor calibration, radio behavior, failsafe behavior, and physical flight safety must be validated independently before use on an aircraft.
 
+## Version 3.0.0 development snapshot
+
+The CMake project and package version is **3.0.0**. The published release badge above reflects the latest actual GitHub release; setting the build version does **not** publish a v3.0.0 tag or release.
+
+Compared with v2.0.1, this source snapshot adds stricter firmware-manifest admission for field/production profiles, independent firmware-version and rollback-counter regression cases, fail-closed localization metadata checks, estimator and visual-feature regression improvements, and hardened CI, release packaging, and SBOM generation.
+
+Firmware-trust validation is a **software policy gate**, not hardware-backed secure boot or cryptographically authenticated maintenance authorization. For experiment provenance, always record the exact commit and corresponding CI artifacts.
+
 ## Contents
 
+- [Version 3.0.0 development snapshot](#version-300-development-snapshot)
 - [Why this project exists](#why-this-project-exists)
 - [Architecture](#architecture)
 - [Platform overview](#platform-overview)
