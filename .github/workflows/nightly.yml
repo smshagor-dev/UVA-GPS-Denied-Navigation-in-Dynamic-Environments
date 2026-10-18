@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "30 2 * * *"
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/nightly.yml
   push:
     branches:
       - main
@@ -239,6 +244,7 @@ jobs:
           cpack --config build/linux-gcc-release-package/CPackConfig.cmake --verbose
           mkdir -p "${RUNNER_TEMP}/packages"
           find build/linux-gcc-release-package -maxdepth 1 \( -name "*.tgz" -o -name "*.zip" \) -exec cp {} "${RUNNER_TEMP}/packages/" \;
+          test -n "$(find "${RUNNER_TEMP}/packages" -maxdepth 1 -type f \( -name '*.tgz' -o -name '*.zip' \) -print -quit)"
       - name: Validate downstream consumer
         shell: bash
         run: |
@@ -267,7 +273,9 @@ jobs:
           (
             cd "${RUNNER_TEMP}/packages"
             sha256sum ./* > SHA256SUMS.txt
+            sha256sum --check SHA256SUMS.txt
           )
+          python3 -c 'import json,os,pathlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"packages/sbom.cdx.json"; d=json.loads(p.read_text()); assert d.get("bomFormat")=="CycloneDX"; assert isinstance(d.get("components",[]),list); print("CycloneDX SBOM validated")'
       - name: Upload package validation artifacts
         if: always()
         uses: actions/upload-artifact@v7
