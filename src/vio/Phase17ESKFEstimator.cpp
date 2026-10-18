@@ -1105,7 +1105,7 @@ bool Phase17ESKFEstimator::innovation_covariance_valid_locked(const Eigen::Matri
         return false;
     }
 
-    const auto eigenvalues = solver.eigenvalues();
+    const auto& eigenvalues = solver.eigenvalues();
     min_eigenvalue_out = eigenvalues.minCoeff();
     const double max_eigenvalue = eigenvalues.maxCoeff();
     if (!std::isfinite(min_eigenvalue_out) || !std::isfinite(max_eigenvalue) ||

@@ -360,6 +360,13 @@ add_executable(test_boot_trust
 target_link_libraries(test_boot_trust PRIVATE drone_test_support)
 drone_register_gtest(test_boot_trust "unit;security")
 
+add_executable(test_firmware_review
+    test_firmware_review.cpp
+    ../third_party/crypto/sha3.c
+)
+target_link_libraries(test_firmware_review PRIVATE drone_test_support)
+drone_register_gtest(test_firmware_review "unit;security;firmware-review")
+
 add_executable(test_telemetry test_telemetry.cpp)
 target_link_libraries(test_telemetry PRIVATE
     drone_test_support
