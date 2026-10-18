@@ -4,13 +4,15 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - main
+    paths:
+      - ".github/workflows/release.yml"
+      - "CMakeLists.txt"
+      - "CHANGELOG.md"
+      - "RESEARCH_RELEASE.md"
+      - "docs/releases/**"
   workflow_dispatch:
-    inputs:
-      publish:
-        description: "Publish a GitHub Release after validation"
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -111,9 +113,10 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          cpack --config build/linux-gcc-release-package/CPackConfig.cmake --verbose
           mkdir -p "${RUNNER_TEMP}/release/linux"
-          find build/linux-gcc-release-package -maxdepth 1 \( -name "*.tgz" -o -name "*.zip" \) -exec cp {} "${RUNNER_TEMP}/release/linux/" \;
+          cpack --config build/linux-gcc-release-package/CPackConfig.cmake --verbose -B "${RUNNER_TEMP}/release/linux"
+          test -n "$(find "${RUNNER_TEMP}/release/linux" -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.tgz' -o -name '*.zip' \) -print -quit)"
+          rm -rf "${RUNNER_TEMP}/release/linux/_CPack_Packages"
       - name: Validate downstream consumer
         shell: bash
         run: |
@@ -121,10 +124,17 @@ jobs:
           python3 scripts/package_consumer_smoke.py \
             --install-prefix "${RUNNER_TEMP}/linux-install" \
             --manifest-out "${RUNNER_TEMP}/release/linux/install-manifest.json"
+      # Syft v1.22.0 needs Go 1.24.1+; retain go.mod's older application requirement.
+      - name: Set up SBOM toolchain
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.24.1"
+          cache: false
       - name: Install syft
         shell: bash
         run: |
           set -euxo pipefail
+          go version
           go install github.com/anchore/syft/cmd/syft@v1.22.0
           echo "${HOME}/go/bin" >> "${GITHUB_PATH}"
       - name: Generate SBOM and checksums
@@ -134,8 +144,13 @@ jobs:
           syft "dir:${RUNNER_TEMP}/linux-install" -o cyclonedx-json="${RUNNER_TEMP}/release/linux/sbom.cdx.json"
           (
             cd "${RUNNER_TEMP}/release/linux"
-            sha256sum ./* > SHA256SUMS.txt
+            find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 \
+              | sort -z | xargs -0 -r sha256sum > "${RUNNER_TEMP}/release-linux-sha256.txt"
+            test -s "${RUNNER_TEMP}/release-linux-sha256.txt"
+            mv "${RUNNER_TEMP}/release-linux-sha256.txt" SHA256SUMS.txt
+            sha256sum --check SHA256SUMS.txt
           )
+          python3 -c 'import json,os,pathlib; p=pathlib.Path(os.environ["RUNNER_TEMP"])/"release/linux/sbom.cdx.json"; d=json.loads(p.read_text()); assert d.get("bomFormat")=="CycloneDX"; assert isinstance(d.get("components",[]),list); print("Release SBOM validated")'
       - name: Upload Linux release artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -188,17 +203,31 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          cpack --config build/windows-msvc-release-package\CPackConfig.cmake --verbose
-          Get-ChildItem build\windows-msvc-release-package -Filter *.zip | Copy-Item -Destination "$env:RUNNER_TEMP\release\windows"
+          $out = "$env:RUNNER_TEMP\release\windows"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          cpack --config build/windows-msvc-release-package\CPackConfig.cmake --verbose -B $out
+          if ($LASTEXITCODE -ne 0) { throw "CPack Windows release failed" }
+          $archives = @(Get-ChildItem -LiteralPath $out -File -Filter "*.zip")
+          if ($archives.Count -eq 0) { throw "CPack produced no Windows ZIP package" }
+          $staging = Join-Path $out "_CPack_Packages"
+          if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }
       - name: Generate checksums
         shell: pwsh
         run: |
-          $artifacts = Get-ChildItem "$env:RUNNER_TEMP\release\windows" -File
+          $out = "$env:RUNNER_TEMP\release\windows"
+          $artifacts = @(Get-ChildItem -LiteralPath $out -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" })
+          if ($artifacts.Count -eq 0) { throw "Windows release artifacts are missing" }
           $lines = foreach ($artifact in $artifacts) {
             $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $artifact.FullName
             "$($hash.Hash)  $($artifact.Name)"
           }
-          $lines | Set-Content -LiteralPath "$env:RUNNER_TEMP\release\windows\SHA256SUMS.txt"
+          $lines | Set-Content -LiteralPath (Join-Path $out "SHA256SUMS.txt") -Encoding ascii
+          foreach ($artifact in $artifacts) {
+            $expected = (Get-FileHash -Algorithm SHA256 -LiteralPath $artifact.FullName).Hash
+            if (-not ($lines | Where-Object { $_ -eq "$expected  $($artifact.Name)" })) {
+              throw "Checksum verification failed: $($artifact.Name)"
+            }
+          }
       - name: Upload Windows release artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -232,9 +261,24 @@ jobs:
           TAG_NAME="${GITHUB_REF_NAME}"
           NOTES_FILE="docs/releases/${TAG_NAME}.md"
           test -f "${NOTES_FILE}"
-          mapfile -t release_files < <(find "${RUNNER_TEMP}/release-bundle" -type f -print)
-          gh release create "${TAG_NAME}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --title "${TAG_NAME}" \
-            --notes-file "${NOTES_FILE}" \
-            "${release_files[@]}"
+          mkdir -p "${RUNNER_TEMP}/release-upload"
+          while IFS= read -r -d '' source_file; do
+            relative="${source_file#${RUNNER_TEMP}/release-bundle/}"
+            case "${relative}" in
+              release-linux-*) prefix=linux ;;
+              release-windows-*) prefix=windows ;;
+              *) echo "Unexpected release artifact: ${relative}" >&2; exit 1 ;;
+            esac
+            cp -- "${source_file}" "${RUNNER_TEMP}/release-upload/${prefix}-${source_file##*/}"
+          done < <(find "${RUNNER_TEMP}/release-bundle" -type f -print0)
+          mapfile -d '' -t release_files < <(find "${RUNNER_TEMP}/release-upload" -maxdepth 1 -type f -print0)
+          test "${#release_files[@]}" -gt 0
+          if gh release view "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" --clobber "${release_files[@]}"
+          else
+            gh release create "${TAG_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "${TAG_NAME}" \
+              --notes-file "${NOTES_FILE}" \
+              "${release_files[@]}"
+          fi

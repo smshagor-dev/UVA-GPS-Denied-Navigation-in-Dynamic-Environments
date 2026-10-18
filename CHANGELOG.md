@@ -4,7 +4,33 @@ All notable repository-level changes should be documented in this file.
 
 ## Unreleased
 
-No unreleased changes are currently queued. New development after the v2.0.0 release should be documented here.
+Post-v3.0.0 release metadata and packaging-workflow corrections are tracked on `main`. These corrections are not part of the immutable v3.0.0 source tag.
+
+## [3.0.0] - 2026-10-18
+
+### Added
+
+- Expanded firmware-admission regression coverage with 17 reviewer-focused cases for independent version/counter rollback, signer and digest rejection, boot claims, measurement policy, maintenance-token presence, and state persistence.
+- Added fail-closed localization metadata regression tests and additional MSCKF, covariance, visual-feature, and deterministic replay validation.
+
+### Fixed
+
+- Rejected unsafe field/production trust settings with missing signing secret or trusted signer allowlist, and denied admission when accepted-state persistence fails.
+- Protected localization confidence/state from non-finite input metadata.
+- Repaired cross-platform CI, linker, formatting, static analysis, CodeQL, Nightly GCC strict builds, CPack artifact handling, CycloneDX SBOM generation, and checksum verification.
+
+### Changed
+
+- Set CMake/CPack project version to 3.0.0 and refreshed the README landing section.
+- Preserved software-only evidence boundaries: no hardware-secure-boot, protected rollback state, authenticated maintenance authority, free-flight qualification, or operational airworthiness claims.
+
+### Validation and merged PRs
+
+- Exact release source: `d5c30268ceceec62f169e6a6fa20ef4351e1d722`.
+- GitHub Actions CI, Security, and Nightly Deep Validation PASS; Linux native CTest 273/273 PASS; release-package and SBOM checks PASS in Nightly validation.
+- Merged PRs: [#26](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/26), [#27](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/27), [#28](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/28), [#29](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/29), [#30](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/30), [#31](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/31), [#32](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/32), [#33](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/33), [#34](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/34), [#35](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/35), [#36](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/36), [#38](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/38), [#39](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/39), [#40](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/40), [#41](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/41), [#47](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/47), and [#48](https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/pull/48).
+
+See [the versioned release notes](docs/releases/v3.0.0.md) for per-PR details and scientific scope.
 
 ## [2.0.0] - 2026-08-20
 

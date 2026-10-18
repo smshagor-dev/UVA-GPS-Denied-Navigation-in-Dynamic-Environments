@@ -1,12 +1,38 @@
-# Research Release — v2.0.0
+# Research Release — v3.0.0
 
-## Release Scope
+## Research scope
+
+Version **v3.0.0** is a software and bench-validation research release of the GPS-denied autonomous UAV swarm platform. It builds on the v2.0.1 published baseline with hardened firmware-admission policy, fail-closed localization metadata handling, deterministic estimator regression improvements, cross-platform build repairs, and SBOM/release-package verification.
+
+**Release source:** `d5c30268ceceec62f169e6a6fa20ef4351e1d722`  
+**Published release:** https://github.com/smshagor-dev/UVA-GPS-Denied-Navigation-in-Dynamic-Environments/releases/tag/v3.0.0  
+**Versioned release notes:** [docs/releases/v3.0.0.md](docs/releases/v3.0.0.md)
+
+## Validation evidence and scientific boundaries
+
+- The CI, Security, and Nightly Deep Validation workflows passed for the exact v3.0.0 source commit.
+- Linux GCC's native test suite recorded 273/273 successful CTest cases in Nightly; package-consumer validation, CycloneDX SBOM generation, and SHA-256 checksum verification also passed.
+- Firmware-admission tests cover independent rollback predicates, signer/digest/boot-claim/measurement rejection, accepted-state invariants, and hardened configuration/persistence errors.
+- Application-supplied boot claims and a keyed digest are **not** hardware-rooted secure boot, authenticated executable measurements, or standardized digital-signature verification.
+- Maintenance tokens are checked for presence only; persistent accepted-state storage is not hardware-protected or crash-atomic.
+- No independent hardware-HIL, field-flight, multi-UAV airborne, production-radio, or airworthiness validation is claimed.
+- All archived experimental citations must identify the exact source commit and distinguish simulation/replay/CI outcomes from physical measurements.
+
+## Release automation note
+
+The v3.0.0 tag is already published and remains immutable. Corrections to release metadata and binary packaging on `main` after that tag do not retroactively change its archived source. The Release workflow supports a nonpublishing validation run on `main`; publication of later binaries must use a separately validated tagged release, or separately documented provenance for any retroactive assets.
+
+---
+
+## Historical v2.0.0 research baseline
+
+### Release Scope
 
 v2.0.0 packages the repository as a publication-ready software research framework for GPS-denied UAV swarm experimentation, deterministic validation, open collaboration, and external software review.
 
 This document describes the intended v2.0.0 release scope. Publication of the `v2.0.0` tag remains gated on the repository's release-validation and packaging workflows.
 
-## Validated Software Capabilities
+### Validated Software Capabilities
 
 The repository contains software and reproducibility evidence for:
 
@@ -29,7 +55,7 @@ The repository contains software and reproducibility evidence for:
 - shadow-only MSCKF feature constraint updates with statistical gating
 - sustained estimator-readiness soak monitoring with fail-closed progress reset
 
-## v2.0.0 Maturity Status
+### v2.0.0 Maturity Status
 
 The software lifecycle through Stage 22 is complete in repository scope.
 
@@ -48,7 +74,7 @@ Release classification:
 - tethered/free-flight readiness: NOT VALIDATED
 - operational airworthiness/certification: NOT CLAIMED
 
-## Complete Stage History
+### Complete Stage History
 
 - Stage 1: foundation, repository hygiene, and baseline validation
 - Stage 2: build system, dependencies, and cross-platform validation
@@ -75,7 +101,7 @@ Release classification:
 
 Post-Stage-22 release hardening also includes sustained estimator-readiness soak validation. This observes promotion readiness over consecutive healthy samples but does not switch estimator authority.
 
-## Estimator Safety Boundary
+### Estimator Safety Boundary
 
 v2.0.0 intentionally keeps the validated visual estimator in shadow/readiness-observation scope.
 
@@ -88,7 +114,7 @@ The release does not introduce:
 
 Readiness progress resets when the underlying point-in-time readiness gate regresses, including stale or dropped measurements, estimator health degradation, processing failures, or divergence conditions represented by the existing readiness contract.
 
-## Release Validation Contract
+### Release Validation Contract
 
 Before the final v2.0.0 tag is considered release-ready, applicable hosted gates should pass for the release candidate:
 
@@ -105,7 +131,7 @@ Before the final v2.0.0 tag is considered release-ready, applicable hosted gates
 
 GitHub Actions and software validation are repository-quality evidence only. They are not evidence of flight certification or physical deployment clearance.
 
-## Known Limitations
+### Known Limitations
 
 - no physical free-flight validation is claimed
 - no hardware qualification is claimed
@@ -118,7 +144,7 @@ GitHub Actions and software validation are repository-quality evidence only. The
 - workstation-local or CI benchmark evidence must not be represented as field performance
 - deployment manifests and production-oriented packaging exist, but no live customer or operational flight deployment is claimed
 
-## Planned Follow-On Work
+### Planned Follow-On Work
 
 Post-v2.0.0 work should remain separated from this release baseline. Candidate directions include:
 
@@ -130,7 +156,7 @@ Post-v2.0.0 work should remain separated from this release baseline. Candidate d
 - packet signing, replay-nonce hardening, and post-quantum authentication experiments
 - formal safety-invariant verification
 
-## Citation Instructions
+### Citation Instructions
 
 When referencing v2.0.0 in academic or research packaging:
 
@@ -139,7 +165,7 @@ When referencing v2.0.0 in academic or research packaging:
 - identify whether evidence came from replay, simulation, software HIL, benchmark, or regression artifacts
 - do not describe software-only evidence as physical flight validation
 
-## Collaboration Instructions
+### Collaboration Instructions
 
 - read `README.md`
 - read `CONTRIBUTING.md`
@@ -149,7 +175,7 @@ When referencing v2.0.0 in academic or research packaging:
 - contribute new experiments with reproducible scripts and machine-readable outputs
 - keep future estimator-authority work isolated from the v2.0.0 release baseline until separately validated
 
-## Reproducibility Expectations
+### Reproducibility Expectations
 
 - use tracked example configurations where possible
 - validate configuration shape with repository-provided schema tooling
