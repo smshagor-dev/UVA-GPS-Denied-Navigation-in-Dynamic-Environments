@@ -25,7 +25,9 @@ jobs:
       - uses: ./.github/actions/setup-linux-deps
       - name: Configure
         shell: bash
-        run: cmake --preset linux-gcc-release-werror
+        # GCC 13 emits a libfmt 9 system-header array-bounds diagnostic in optimized builds.
+        # Keep every warning strict except this dependency-originated diagnostic.
+        run: cmake --preset linux-gcc-release-werror -DCMAKE_CXX_FLAGS=-Wno-error=array-bounds
       - name: Build
         shell: bash
         run: cmake --build --preset linux-gcc-release-werror
@@ -244,10 +246,17 @@ jobs:
           python3 scripts/package_consumer_smoke.py \
             --install-prefix "${RUNNER_TEMP}/package-install" \
             --manifest-out "${RUNNER_TEMP}/packages/install-manifest.json"
+      # The project module targets Go 1.22; Syft v1.22.0 requires Go 1.24.1+.
+      - name: Set up SBOM toolchain
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.24.1"
+          cache: false
       - name: Install syft
         shell: bash
         run: |
           set -euxo pipefail
+          go version
           go install github.com/anchore/syft/cmd/syft@v1.22.0
           echo "${HOME}/go/bin" >> "${GITHUB_PATH}"
       - name: Generate SBOM and checksums
