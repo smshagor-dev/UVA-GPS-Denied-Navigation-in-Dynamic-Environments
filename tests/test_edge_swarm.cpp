@@ -417,6 +417,28 @@ TEST(EdgePeerProtocol, ExpirationArithmeticDoesNotWrap) {
 
 
 
+TEST(SwarmStateCache, AuthenticatedClockSkewMatchesFreshnessWindow) {
+    SwarmStateCache cache({8, 100, 5000});
+    cache.configure_freshness(2000, 5000);
+    const auto packet = heartbeat(7, 1000, 10);
+    EXPECT_TRUE(cache.observe_packet(packet, 4000).accepted);
+    SwarmStateCache stale_cache({8, 100, 5000});
+    stale_cache.configure_freshness(2000, 5000);
+    EXPECT_FALSE(stale_cache.observe_packet(packet, 4001).accepted);
+}
+
+TEST(SwarmStateCache, ReplayMemorySurvivesShortPeerExpiry) {
+    SwarmStateCache cache({8, 100, 500});
+    cache.configure_freshness(2000, 1000);
+    ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 10), 1000).accepted);
+    cache.expire(2500);
+    ASSERT_TRUE(cache.last_sequence_number(7).has_value());
+    EXPECT_EQ(*cache.last_sequence_number(7), 10u);
+    const auto replay = cache.observe_packet(heartbeat(7, 1000, 10), 2500);
+    EXPECT_FALSE(replay.accepted);
+    EXPECT_EQ(replay.reason, "stale sequence number");
+}
+
 TEST(PeerPacketAuth, SyntheticPacketReorderingAndLossStudy) {
     // Deterministic delivery traces, not measurements from a physical FANET radio.
     struct Trace {
