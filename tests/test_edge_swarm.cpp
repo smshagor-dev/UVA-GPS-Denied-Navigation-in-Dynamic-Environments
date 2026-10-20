@@ -371,8 +371,8 @@ TEST(PeerPacketAuth, PerNodeHmacRejectsUnknownAndWrongKeys) {
     const auto unknown_sender = verifyPacket(packet, receiver, 1000);
     EXPECT_EQ(unknown_sender.result, PacketAuthResult::UNTRUSTED_SENDER);
     receiver.trusted_node_secrets.emplace(7u, std::string(32, 'B'));
-    EXPECT_EQ(verifyPacket(packet, receiver, 1000).result,
-              PacketAuthResult::INVALID_SIGNATURE);
+    const auto wrong_key = verifyPacket(packet, receiver, 1000);
+    EXPECT_EQ(wrong_key.result, PacketAuthResult::INVALID_SIGNATURE);
     receiver.trusted_node_secrets.at(7u) = std::string(32, 'A');
     EXPECT_EQ(verifyPacket(packet, receiver, 1000).result, PacketAuthResult::ACCEPTED);
 }
