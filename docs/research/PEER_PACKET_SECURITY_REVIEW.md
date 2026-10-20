@@ -39,6 +39,7 @@ Relevant cases in `tests/test_edge_swarm.cpp` cover:
 - rejection of zero and oversized TTL, stale timestamp and zero-skew boundary;
 - verified replay rejection and rejection of legitimate packets arriving out of sequence;
 - verifying authenticity before classifying a packet as a replay;
+- deterministic packet-delivery traces with adjacent reordering, sparse reordering, and synthetic packet loss; outputs include delivered count, strict-monotonic false rejection count, and observed out-of-order arrival rate; these **are not** radio-channel measurements;
 - CBOR 64-bit header values that would otherwise narrow to 32 bits;
 - non-wrapping timestamp expiry arithmetic;
 - a **counterexample** to per-node attribution: a group-key holder can sign another sender ID;
