@@ -12,22 +12,55 @@ SwarmStateCacheObservation SwarmStateCache::observe_packet(const EdgePeerPacket&
     SwarmStateCacheObservation result;
     std::lock_guard lock(mutex_);
 
-    const auto existing = peers_.find(packet.sender_id);
+    // Perform non-replay packet validation first; replay bits are committed atomically
+    // under the cache mutex only after the candidate has passed all basic checks.
     const auto validation = validate_edge_packet(
-        packet, {
-                    now_ms,
-                    existing != peers_.end() ? existing->second.last_sequence_number : 0u,
-                    existing != peers_.end(),
-                    1400u,
-                    0u,
-                    config_.accepted_clock_skew_ms,
-                });
+        packet, {now_ms, 0u, false, 1400u, 0u, config_.accepted_clock_skew_ms});
     if (!validation.ok) {
         result.reason = validation.error;
         return result;
     }
 
+    constexpr uint32_t replay_window_size = 64u;
+    const auto existing = peers_.find(packet.sender_id);
+    uint64_t next_replay_bitmap = 1u;
+    bool reordered = false;
+    if (existing != peers_.end()) {
+        const auto& previous = existing->second;
+        if (packet.trust_epoch < previous.trust_epoch) {
+            result.reason = "stale trust epoch";
+            return result;
+        }
+        if (packet.trust_epoch == previous.trust_epoch) {
+            if (packet.sequence_number > previous.last_sequence_number) {
+                const uint32_t advance = packet.sequence_number - previous.last_sequence_number;
+                next_replay_bitmap = advance >= replay_window_size
+                                         ? uint64_t{1}
+                                         : (previous.replay_window_bitmap << advance) | uint64_t{1};
+            } else {
+                const uint32_t distance = previous.last_sequence_number - packet.sequence_number;
+                if (distance >= replay_window_size) {
+                    result.reason = "sequence outside replay window";
+                    return result;
+                }
+                const uint64_t mask = uint64_t{1} << distance;
+                if ((previous.replay_window_bitmap & mask) != 0u) {
+                    result.reason = "stale sequence number";
+                    return result;
+                }
+                next_replay_bitmap = previous.replay_window_bitmap | mask;
+                reordered = true;
+            }
+        }
+    }
+
     auto& peer = peers_[packet.sender_id];
+    peer.replay_window_bitmap = next_replay_bitmap;
+    if (reordered) {
+        // Deliver a distinct in-window packet, but never roll back latest peer state.
+        result.accepted = true;
+        return result;
+    }
     peer.peer_id = packet.sender_id;
     peer.last_packet_timestamp_ms = packet.timestamp_ms;
     peer.last_sequence_number = packet.sequence_number;

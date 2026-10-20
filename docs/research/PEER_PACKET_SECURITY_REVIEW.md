@@ -11,7 +11,7 @@ For the HMAC edge-swarm profile, a packet must satisfy all of the following:
 - Its sender timestamp is no more than `ttl_ms + max_clock_skew_ms` **behind** receiver time. Subtraction-based comparisons avoid unsigned timestamp addition overflow.
 - Its trust epoch exactly matches the locally configured trust epoch.
 - Its canonical CBOR payload and packet metadata verify against a full HMAC-SHA256 tag under the configured group secret.
-- Its sequence number exceeds the last accepted sequence number for the claimed peer.
+- Its sequence number is not a duplicate and falls within a 64-sequence sliding replay window for the claimed peer (or advances the highest accepted sequence number).
 
 In symbols, with receiver time `T`, sender time `t`, skew budget `delta`, packet lifetime `ttl`, and configured maximum lifetime `ttl_max`:
 
@@ -20,7 +20,7 @@ In symbols, with receiver time `T`, sender time `t`, skew budget `delta`, packet
 -delta <= T - t <= ttl + delta
 epoch == receiver_epoch
 valid HMAC(group_key, canonical_cbor(packet with cleared auth_hook))
-sequence > last_accepted_sequence_for_sender
+sequence is new and within the 64-sequence replay window, or advances its watermark
 ```
 
 All gates must pass. HMAC verification now precedes reporting a valid-looking packet as a replay. An unauthenticated packet with an old sequence should not be treated as verified replay evidence. The receiver reports distinct `invalid_ttl`, `future_timestamp`, `stale_timestamp`, `invalid_signature`, `stale_epoch`, and `replay_detected` outcomes. A packet that fails authentication does not reach the state cache or peer actions.
@@ -38,9 +38,9 @@ Relevant cases in `tests/test_edge_swarm.cpp` cover:
 - acceptance and rejection at the *future* skew boundary, regardless of sender TTL;
 - rejection of zero and oversized TTL, stale timestamp and zero-skew boundary;
 - acceptance at the cache's TTL-plus-skew boundary, rejection beyond it, and persistence of the in-memory high-watermark across short peer expiry;
-- verified replay rejection and rejection of legitimate packets arriving out of sequence;
+- verified duplicate/too-old rejection and acceptance of previously unseen reordered packets within the 64-sequence sliding window;
 - verifying authenticity before classifying a packet as a replay;
-- deterministic packet-delivery traces with adjacent reordering, sparse reordering, and synthetic packet loss; outputs include delivered count, strict-monotonic false rejection count, and observed out-of-order arrival rate; these **are not** radio-channel measurements;
+- deterministic packet-delivery traces with adjacent reordering, sparse reordering, and synthetic packet loss; outputs include delivered count, sliding-window false rejection count, and observed out-of-order arrival rate; these **are not** radio-channel measurements;
 - CBOR 64-bit header values that would otherwise narrow to 32 bits;
 - non-wrapping timestamp expiry arithmetic;
 - a **counterexample** to per-node attribution: a group-key holder can sign another sender ID;
@@ -61,7 +61,7 @@ The second command is an example and may require using the executable produced b
 
 1. **Group secret and node capture.** All members still share a signing secret. Anyone holding that secret can generate a valid HMAC with another sender identifier. There is no implemented per-node identity, key-provisioning or distributed revocation protocol. A trust epoch is an integer gate; incrementing it does not itself distribute a new secret.
 2. **Receiver restart and cache eviction.** Last accepted sequences live in `SwarmStateCache` memory. No crash-atomic replay watermark checkpoint, persistent session binding, or authenticated reboot handshake exists in this change. The cache now retains an in-memory sequence watermark through the maximum configured TTL plus skew after an ordinary expiry, but capacity-driven eviction, explicit cache clearing, or a process restart can still erase that watermark. Reusing the same secret and epoch after such events may admit an old still-fresh signed packet.
-3. **Reordering.** The current receiver deliberately rejects any authenticated sequence less than or equal to the highest accepted one. A sliding anti-replay bitmap in the manuscript is a *proposed* protocol, not implemented here. A benign out-of-order rejection must not be labeled proof of hostile replay.
+3. **Reordering.** The receiver now uses a 64-sequence in-memory sliding bitmap and admits authenticated, unseen out-of-order packets within that bound. Duplicates and packets 64 or more positions behind the watermark remain rejected. An accepted reordered packet is delivered to downstream consumers, but does not overwrite the latest cached peer state. Out-of-window legitimate reordering can still be rejected, and the in-memory window is not durable across restart or eviction.
 4. **Key and epoch changes.** No synchronized distributed group-rekey handshake, quorum transition, rollback protection, or seamless 32-bit rollover protocol is implemented.
 5. **Radio and flight experiments.** No physical FANET, RF packet-loss/reordering distribution, multi-UAV flight, GNSS-denied clock-sync characterization, or hardware side-channel measurement is established by repository software tests. The benchmark does not establish timing or power side-channel resistance.
 6. **Authentication scope.** The changed admission gate applies to the edge peer packet path; it should not be generalized to every message or control channel without separately checking their call sites.
@@ -71,7 +71,7 @@ The second command is an example and may require using the executable produced b
 - Update the timestamp predicate in Methods to the asymmetric condition above and disclose the trusted-clock/skew assumption.
 - Describe CBOR field-length encoding, integer-overflow checks, authenticated bytes and validation order explicitly.
 - Separate `INVALID_SIGNATURE` from the policy-based `REPLAY_DETECTED` classification in telemetry and threat discussion.
-- Include a concrete packet-reordering example: if authenticated sequence 11 arrives before sequence 10, the later arrival of 10 is rejected without proving an attack.
+- Include a concrete packet-reordering example: if authenticated sequence 11 arrives before sequence 10, the later distinct sequence 10 is admitted when it remains in the 64-sequence window; a repeated sequence 10 is rejected. Avoid labeling out-of-window rejection proof of hostile intent.
 - Describe group HMAC as group-key possession, not physical-node attribution.
 - Present the in-process component benchmark only after running it on documented hardware; do not reuse process-launch timing as primitive HMAC latency.
 - Preserve restart-state, reordering, clock synchronization, per-node keys, rekey and hardware testing as explicit limitations unless additional experiments and code are delivered.
