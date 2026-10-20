@@ -4,13 +4,13 @@ This document records what can be reproduced in the current software and what st
 
 ## Receiver acceptance
 
-For the HMAC edge-swarm profile, a packet must satisfy all of the following:
+For the legacy group-HMAC or opt-in per-node HMAC edge-swarm profile, a packet must satisfy all of the following:
 
 - The packet parses as a complete, bounded CBOR message with representable integer fields and a positive TTL no greater than the receiver-configured `max_packet_ttl_ms` (default 5000 ms).
 - Its sender timestamp is no more than `max_clock_skew_ms` (default 2000 ms) **ahead** of receiver time. The TTL does not increase this future bound.
 - Its sender timestamp is no more than `ttl_ms + max_clock_skew_ms` **behind** receiver time. Subtraction-based comparisons avoid unsigned timestamp addition overflow.
 - Its trust epoch exactly matches the locally configured trust epoch.
-- Its canonical CBOR payload and packet metadata verify against a full HMAC-SHA256 tag under the configured group secret.
+- Its canonical CBOR payload and packet metadata verify against a full HMAC-SHA256 tag using the configured group secret **or** the exact claimed sender's provisioned node key, depending on the selected mode; there is no cross-mode fallback.
 - Its sequence number is not a duplicate and falls within a 64-sequence sliding replay window for the claimed peer (or advances the highest accepted sequence number).
 
 In symbols, with receiver time `T`, sender time `t`, skew budget `delta`, packet lifetime `ttl`, and configured maximum lifetime `ttl_max`:
@@ -19,7 +19,8 @@ In symbols, with receiver time `T`, sender time `t`, skew budget `delta`, packet
 0 < ttl <= ttl_max
 -delta <= T - t <= ttl + delta
 epoch == receiver_epoch
-valid HMAC(group_key, canonical_cbor(packet with cleared auth_hook))
+valid HMAC(configured group key OR claimed sender's node key,
+           canonical_cbor(packet with cleared auth_hook))
 sequence is new and within the 64-sequence replay window, or advances its watermark
 ```
 
@@ -59,7 +60,7 @@ The second command is an example and may require using the executable produced b
 
 ## Claims not established by this change
 
-1. **Group secret and node capture.** All members still share a signing secret. Anyone holding that secret can generate a valid HMAC with another sender identifier. There is no implemented per-node identity, key-provisioning or distributed revocation protocol. A trust epoch is an integer gate; incrementing it does not itself distribute a new secret.
+1. **Group secret and node capture.** Legacy `hmac_sha256` remains supported and uses one shared group secret. The opt-in `hmac_sha256_per_node` mode accepts only sender-specific MACs from provisioned peer IDs and signs only with the matching local ID. A peer holding just its own signing secret cannot impersonate another peer whose key remains secret. **However, each verifying receiver holds other peers' symmetric keys**; compromising that receiver or its key database can therefore enable impersonation of those peers. This is not asymmetric physical-node identity, distributed enrollment, authenticated key provisioning, hardware-backed key isolation or revocation. A trust epoch integer does not distribute new secrets.
 2. **Receiver restart and cache eviction.** Replay-window state can now be written to an opt-in append-only journal before a packet is admitted and recovered on process restart. If the journal is configured, missing, malformed or unwriteable state fails closed; cache clearing or expiry does not remove journal history. The default remains memory-only, and therefore restart/eviction replay risks remain when durable storage is not explicitly configured. The journal is **not** tamper-resistant: deletion, offline truncation, rollback, replacement, concurrent writers, or a compromised storage account are outside its security guarantees. No authenticated reboot handshake or trusted hardware counter is established.
 3. **Reordering.** The receiver now uses a 64-sequence in-memory sliding bitmap and admits authenticated, unseen out-of-order packets within that bound. Duplicates and packets 64 or more positions behind the watermark remain rejected. An accepted reordered packet is delivered to downstream consumers, but does not overwrite the latest cached peer state. Out-of-window legitimate reordering can still be rejected, and the in-memory window is not durable across restart or eviction.
 4. **Key and epoch changes.** No synchronized distributed group-rekey handshake, quorum transition, rollback protection, or seamless 32-bit rollover protocol is implemented.
@@ -72,7 +73,7 @@ The second command is an example and may require using the executable produced b
 - Describe CBOR field-length encoding, integer-overflow checks, authenticated bytes and validation order explicitly.
 - Separate `INVALID_SIGNATURE` from the policy-based `REPLAY_DETECTED` classification in telemetry and threat discussion.
 - Include a concrete packet-reordering example: if authenticated sequence 11 arrives before sequence 10, the later distinct sequence 10 is admitted when it remains in the 64-sequence window; a repeated sequence 10 is rejected. Avoid labeling out-of-window rejection proof of hostile intent.
-- Describe group HMAC as group-key possession, not physical-node attribution.
+- Describe legacy group HMAC as group-key possession. Distinguish opt-in sender-specific HMAC from asymmetric or hardware-rooted physical-node identity; receivers with all symmetric peer keys still have signing capability.
 - Present the in-process component benchmark only after running it on documented hardware; do not reuse process-launch timing as primitive HMAC latency.
 - Distinguish an explicitly configured durable journal from the default memory-only receiver, and preserve journal tampering, clock synchronization, per-node keys, rekey and hardware testing as limitations.
 - Pin all reported results to one exact Git commit and archive corresponding source, inputs, configurations, test outputs, and reproducibility instructions in a DOI-assigning repository.
@@ -86,3 +87,11 @@ Set `PacketAuthConfig::replay_ledger_path` to a private, per-UAV local file path
 Each accepted peer-packet admission appends its sender ID, trust epoch, highest sequence and 64-bit replay bitmap, then flushes and synchronizes the file before the receiver updates state or dispatches the packet. Startup rejects malformed records and unterminated writes. Recovery reconstructs the last replay bitmap for each sender. Epochs are still externally configured and do **not** imply real key distribution.
 
 This journal assumes a trusted local filesystem. It has no authenticated rollback proof against privileged disk modification, deletion followed by reprovisioning, or a copied older but syntactically valid journal. It does not implement file locking across processes or journal compaction. The file grows for every admitted packet; disk synchronization can add significant latency and flash wear. It is not yet tested for system power loss, filesystem durability, storage exhaustion, malicious file edits, or actual UAV-hardware timing. Do not state certified restart security in a paper on the basis of these software tests.
+
+## Opt-in sender-specific HMAC
+
+Select `AuthMode::PER_NODE_HMAC_SHA256` (text mode `hmac_sha256_per_node`). Each sending UAV must configure `PacketAuthConfig::local_node_id` equal to its actual V2X local ID and `local_signing_secret` with at least 32 bytes of independently generated secret material. Each receiver must provision `trusted_node_secrets` entries keyed by trusted sender ID, containing the corresponding 32-byte-or-longer secrets. **Do not use one secret for multiple UAVs.** Provision keys out of band and protect the receiver's complete key database.
+
+The on-wire tag is `hmac_sha256_node:<64 hex chars>`, distinct from the legacy `hmac_sha256:` tag. Packet `sender_id`, epoch, sequence, timestamps, type and payload remain authenticated as part of canonical CBOR. Unknown IDs, insufficient keys, mismatched signatures, missing tags, and legacy group-HMAC tags in this mode fail closed; no shared-secret/environment fallback is permitted. An HMAC from sender A with its own key cannot validate as sender B unless B's secret is compromised or both were incorrectly provisioned with the same key.
+
+This is **symmetric-key sender separation**, not Ed25519 signatures or a guarantee against receiver compromise. Any recipient with sender B's verification secret can also generate B's HMAC; the implementation lacks key attestation, secure provisioning, authenticated rotation, per-recipient key derivation, physical-UAV identity verification and compromise-resistant storage. Keep the original legacy group-key spoofing counterexample and report which mode each experiment used.

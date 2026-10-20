@@ -278,6 +278,117 @@ TEST(EdgePeerProtocol, StaleSequenceRejected) {
     EXPECT_EQ(observed.reason, "stale sequence number");
 }
 
+TEST(PeerPacketAuth, PerNodeModeParsesAndDisplaysCorrectly) {
+    EXPECT_EQ(to_string(AuthMode::PER_NODE_HMAC_SHA256), "hmac_sha256_per_node");
+    const auto mode = parse_auth_mode("hmac_sha256_per_node");
+    ASSERT_TRUE(mode.has_value());
+    EXPECT_EQ(mode.value_or(AuthMode::NONE), AuthMode::PER_NODE_HMAC_SHA256);
+    EXPECT_EQ(to_string(PacketAuthResult::UNTRUSTED_SENDER), "untrusted_sender");
+}
+
+TEST(PeerPacketAuth, PerNodeHmacAcceptsProvisionedIndependentSenders) {
+    auto first_sender = auth_config();
+    first_sender.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    first_sender.local_node_id = 7;
+    first_sender.local_signing_secret = std::string(32, 'A');
+
+    auto second_sender = first_sender;
+    second_sender.local_node_id = 8;
+    second_sender.local_signing_secret = std::string(32, 'B');
+
+    auto receiver = auth_config();
+    receiver.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    receiver.trusted_node_secrets.emplace(7u, std::string(32, 'A'));
+    receiver.trusted_node_secrets.emplace(8u, std::string(32, 'B'));
+
+    auto first = heartbeat(7, 1000, 1);
+    auto second = heartbeat(8, 1000, 1);
+    ASSERT_TRUE(signPacket(first, first_sender).accepted());
+    ASSERT_TRUE(signPacket(second, second_sender).accepted());
+    EXPECT_EQ(verifyPacket(first, receiver, 1000).result, PacketAuthResult::ACCEPTED);
+    EXPECT_EQ(verifyPacket(second, receiver, 1000).result, PacketAuthResult::ACCEPTED);
+    const auto replay = verifyPacket(first, receiver, 1000, 1);
+    EXPECT_EQ(replay.result, PacketAuthResult::REPLAY_DETECTED);
+}
+
+TEST(PeerPacketAuth, PerNodeHmacRejectsInsiderSenderSubstitution) {
+    auto attacker = auth_config();
+    attacker.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    attacker.local_node_id = 7;
+    attacker.local_signing_secret = std::string(32, 'A');
+
+    auto receiver = auth_config();
+    receiver.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    receiver.trusted_node_secrets.emplace(7u, std::string(32, 'A'));
+    receiver.trusted_node_secrets.emplace(8u, std::string(32, 'B'));
+
+    auto claimed_peer = heartbeat(8, 1000, 1);
+    EXPECT_EQ(signPacket(claimed_peer, attacker).result, PacketAuthResult::UNTRUSTED_SENDER);
+
+    auto signed_as_attacker = heartbeat(7, 1000, 2);
+    ASSERT_TRUE(signPacket(signed_as_attacker, attacker).accepted());
+    signed_as_attacker.sender_id = 8;
+    EXPECT_EQ(verifyPacket(signed_as_attacker, receiver, 1000).result,
+              PacketAuthResult::INVALID_SIGNATURE);
+}
+
+TEST(PeerPacketAuth, PerNodeHmacHasNoSharedKeyOrUnsignedFallback) {
+    auto sender = auth_config();
+    sender.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    sender.local_node_id = 7;
+    sender.local_signing_secret = std::string(32, 'A');
+
+    auto receiver = auth_config("simulation");
+    receiver.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    receiver.trusted_node_secrets.emplace(7u, std::string(32, 'A'));
+    receiver.allow_unsigned_in_simulation = true;
+    auto packet = heartbeat(7, 1000, 1);
+    packet.source = "simulation";
+    const auto unsigned_result = verifyPacket(packet, receiver, 1000);
+    EXPECT_EQ(unsigned_result.result, PacketAuthResult::INVALID_SIGNATURE);
+    ASSERT_TRUE(signPacket(packet, sender).accepted());
+    EXPECT_EQ(verifyPacket(packet, receiver, 1000).result, PacketAuthResult::ACCEPTED);
+
+    auto legacy = auth_config();
+    auto legacy_packet = heartbeat(7, 1000, 2);
+    ASSERT_TRUE(signPacket(legacy_packet, legacy).accepted());
+    const auto downgrade = verifyPacket(legacy_packet, receiver, 1000);
+    EXPECT_EQ(downgrade.result, PacketAuthResult::INVALID_SIGNATURE);
+    const auto legacy_verification = verifyPacket(packet, legacy, 1000);
+    EXPECT_EQ(legacy_verification.result, PacketAuthResult::INVALID_SIGNATURE);
+}
+
+TEST(PeerPacketAuth, PerNodeHmacRejectsUnknownAndWrongKeys) {
+    auto sender = auth_config();
+    sender.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    sender.local_node_id = 7;
+    sender.local_signing_secret = std::string(32, 'A');
+
+    auto receiver = auth_config();
+    receiver.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    auto packet = heartbeat(7, 1000, 1);
+    ASSERT_TRUE(signPacket(packet, sender).accepted());
+    const auto unknown_sender = verifyPacket(packet, receiver, 1000);
+    EXPECT_EQ(unknown_sender.result, PacketAuthResult::UNTRUSTED_SENDER);
+    receiver.trusted_node_secrets.emplace(7u, std::string(32, 'B'));
+    const auto wrong_key = verifyPacket(packet, receiver, 1000);
+    EXPECT_EQ(wrong_key.result, PacketAuthResult::INVALID_SIGNATURE);
+    receiver.trusted_node_secrets.at(7u) = std::string(32, 'A');
+    EXPECT_EQ(verifyPacket(packet, receiver, 1000).result, PacketAuthResult::ACCEPTED);
+}
+
+TEST(PeerPacketAuth, PerNodeHmacRejectsMissingOrWeakSigningKey) {
+    auto sender = auth_config();
+    sender.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    sender.local_node_id = 7;
+    auto packet = heartbeat(7, 1000, 1);
+    EXPECT_EQ(signPacket(packet, sender).result, PacketAuthResult::MISSING_SIGNATURE);
+    sender.local_signing_secret = "short";
+    EXPECT_EQ(signPacket(packet, sender).result, PacketAuthResult::MISSING_SIGNATURE);
+    sender.local_signing_secret = std::string(32, 'A');
+    EXPECT_EQ(signPacket(packet, sender).result, PacketAuthResult::ACCEPTED);
+}
+
 TEST(PeerPacketAuth, HmacSignedPacketVerifies) {
     auto packet = heartbeat(7, 1000, 1);
     auto cfg = auth_config();
