@@ -356,8 +356,7 @@ std::string_view to_string(PacketAuthResult result) {
     return "unknown";
 }
 
-std::array<uint8_t, 32>
-monocypherPublicKeyFromSeed(std::array<uint8_t, 32> secret_seed) {
+std::array<uint8_t, 32> monocypherPublicKeyFromSeed(std::array<uint8_t, 32> secret_seed) {
     std::array<uint8_t, 64> signing_key{};
     std::array<uint8_t, 32> public_key{};
     crypto_eddsa_key_pair(signing_key.data(), public_key.data(), secret_seed.data());
@@ -519,8 +518,7 @@ PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
         const auto bytes = canonical_bytes(packet);
         const auto* signature = provided->data();
         const auto* public_key = peer->second.data();
-        const int verified =
-            crypto_eddsa_check(signature, public_key, bytes.data(), bytes.size());
+        const int verified = crypto_eddsa_check(signature, public_key, bytes.data(), bytes.size());
         if (verified != 0) {
             return outcome(PacketAuthResult::INVALID_SIGNATURE,
                            "Monocypher signature verification failed");
