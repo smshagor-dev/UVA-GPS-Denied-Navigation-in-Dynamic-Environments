@@ -713,7 +713,8 @@ bool packet_is_expired(const EdgePeerPacket& packet, uint64_t now_ms) {
     if (packet.ttl_ms == 0) {
         return true;
     }
-    return now_ms > (packet.timestamp_ms + packet.ttl_ms);
+    return now_ms >= packet.timestamp_ms &&
+           now_ms - packet.timestamp_ms > packet.ttl_ms;
 }
 
 std::string serialize_edge_packet_json(const EdgePeerPacket& packet) {
@@ -1006,6 +1007,12 @@ EdgePacketParseResult parse_edge_packet_cbor(std::span<const uint8_t> wire) {
     }
     if (*type_value > static_cast<uint8_t>(EdgePacketType::PEER_GOODBYE)) {
         result.error = "unknown packet_type";
+        return result;
+    }
+    if (*sender_id > std::numeric_limits<uint32_t>::max() ||
+        *sequence_number > std::numeric_limits<uint32_t>::max() ||
+        *ttl_ms > std::numeric_limits<uint32_t>::max()) {
+        result.error = "cbor integer field exceeds uint32 range";
         return result;
     }
 
