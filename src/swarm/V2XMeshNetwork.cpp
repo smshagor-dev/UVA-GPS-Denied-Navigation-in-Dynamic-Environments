@@ -1230,8 +1230,8 @@ Eigen::Vector3d LeaderFollowerController::compute_target(const Eigen::Vector3d& 
         const double angle = 30.0 * kDegToRad;
         const double side = (follower_index % 2 == 0) ? 1.0 : -1.0;
         // Two followers share each formation row; retain intentional integer grouping.
-        const int row_index = follower_index / 2;
-        const double row = static_cast<double>(row_index + 1);
+        const uint32_t row_index = follower_index / 2u;
+        const double row = static_cast<double>(row_index) + 1.0;
         const double spacing = static_cast<double>(s);
         offset = Eigen::Vector3d(side * row * spacing * std::sin(angle),
                                  -row * spacing * std::cos(angle), 0.0);
