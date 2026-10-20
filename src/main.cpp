@@ -37,6 +37,7 @@
 #include "swarm/SwarmSecurity.hpp"
 #include "utils/RuntimeLogging.hpp"
 
+#include <limits>
 #include <csignal>
 #include <algorithm>
 #include <cctype>
@@ -187,6 +188,11 @@ void apply_edge_protocol_config(NodeConfig& cfg) {
     }
     if (const auto skew = drone::utils::simple_json::extract_u64(content, "max_clock_skew_ms")) {
         cfg.edge_auth.max_clock_skew_ms = *skew;
+    }
+    if (const auto ttl = drone::utils::simple_json::extract_u64(content, "max_packet_ttl_ms")) {
+        if (*ttl > 0 && *ttl <= std::numeric_limits<uint32_t>::max()) {
+            cfg.edge_auth.max_packet_ttl_ms = static_cast<uint32_t>(*ttl);
+        }
     }
     if (const auto env = drone::utils::simple_json::extract_string(content, "shared_secret_env")) {
         cfg.edge_auth.shared_secret_env = *env;
