@@ -18,6 +18,7 @@ enum class AuthMode : uint8_t {
     ED25519_PLACEHOLDER,
     PQC_HYBRID_PLACEHOLDER,
     PER_NODE_HMAC_SHA256,
+    MONOCYPHER_EDDSA_BLAKE2B,
 };
 
 enum class PacketAuthResult : uint8_t {
@@ -48,6 +49,9 @@ struct PacketAuthConfig {
     uint32_t local_node_id{0};
     std::string local_signing_secret{};
     std::unordered_map<uint32_t, std::string> trusted_node_secrets{};
+    // Monocypher curve25519 EdDSA+BLAKE2b, NOT standard Ed25519.
+    std::optional<std::array<uint8_t, 32>> local_eddsa_seed{};
+    std::unordered_map<uint32_t, std::array<uint8_t, 32>> trusted_node_public_keys{};
     std::string runtime_profile{"edge_swarm"};
     // Optional durable replay state on trusted, single-writer local storage.
     std::string replay_ledger_path{};
@@ -69,6 +73,9 @@ struct PacketAuthOutcome {
 
 // Exposed for reproducible, in-process measurements of the HMAC primitive.
 using HmacDigest = std::array<uint8_t, 32>;
+// For out-of-band key provisioning; do not derive production seeds from IDs.
+[[nodiscard]] std::array<uint8_t, 32>
+monocypherPublicKeyFromSeed(std::array<uint8_t, 32> secret_seed);
 [[nodiscard]] HmacDigest hmacSha256Digest(std::string_view secret,
                                           const std::vector<uint8_t>& data);
 [[nodiscard]] std::array<uint8_t, 32>

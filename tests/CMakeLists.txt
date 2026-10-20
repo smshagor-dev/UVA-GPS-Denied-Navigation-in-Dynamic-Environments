@@ -376,6 +376,7 @@ drone_register_gtest(test_telemetry "unit;telemetry")
 
 add_executable(test_edge_swarm
     test_edge_swarm.cpp
+    ../third_party/crypto/monocypher.c
     ../src/security/PeerPacketAuth.cpp
     ../src/swarm/EdgeConsensusManager.cpp
     ../src/swarm/EdgePeerProtocol.cpp

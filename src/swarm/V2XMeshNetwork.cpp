@@ -1123,7 +1123,8 @@ void V2XMeshNetwork::configure_security(SwarmSecurityConfig cfg) {
     security_ = std::make_unique<SwarmSecurityContext>(local_id_, std::move(cfg));
 }
 void V2XMeshNetwork::configure_packet_auth(drone::security::PacketAuthConfig cfg) {
-    if (cfg.mode == drone::security::AuthMode::PER_NODE_HMAC_SHA256 &&
+    if ((cfg.mode == drone::security::AuthMode::PER_NODE_HMAC_SHA256 ||
+         cfg.mode == drone::security::AuthMode::MONOCYPHER_EDDSA_BLAKE2B) &&
         cfg.local_node_id != local_id_) {
         throw std::invalid_argument("per-node signing identity must match local UAV ID");
     }
