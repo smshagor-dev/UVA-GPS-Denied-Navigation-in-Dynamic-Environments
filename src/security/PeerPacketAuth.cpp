@@ -411,20 +411,23 @@ PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
     }
     if (packet.timestamp_ms > now_ms) {
         if (packet.timestamp_ms - now_ms > config.max_clock_skew_ms) {
-            return outcome(PacketAuthResult::FUTURE_TIMESTAMP, "packet timestamp exceeds future clock skew");
+            return outcome(PacketAuthResult::FUTURE_TIMESTAMP,
+                           "packet timestamp exceeds future clock skew");
         }
     } else {
         const auto elapsed = now_ms - packet.timestamp_ms;
         if (elapsed > config.max_clock_skew_ms &&
             elapsed - config.max_clock_skew_ms > packet.ttl_ms) {
-            return outcome(PacketAuthResult::STALE_TIMESTAMP, "packet timestamp exceeds TTL and clock skew");
+            return outcome(PacketAuthResult::STALE_TIMESTAMP,
+                           "packet timestamp exceeds TTL and clock skew");
         }
     }
     if (auto epoch = validateTrustEpoch(packet, config); !epoch.accepted()) {
         return epoch;
     }
     if (config.mode == AuthMode::NONE) {
-        if (auto replay = validateNonceOrSequence(packet, last_sequence_number); !replay.accepted()) {
+        if (auto replay = validateNonceOrSequence(packet, last_sequence_number);
+            !replay.accepted()) {
             return replay;
         }
         if (unsigned_allowed_for_profile(packet, config)) {
