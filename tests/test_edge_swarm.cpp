@@ -18,6 +18,8 @@ using namespace drone::security;
 
 namespace {
 
+// Test fixtures use fixed positional packet fields for readability.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 EdgePeerPacket heartbeat(uint32_t sender_id, uint64_t timestamp_ms, uint32_t sequence_number) {
     EdgePeerPacket packet;
     packet.packet_type = EdgePacketType::HEARTBEAT;
@@ -34,6 +36,8 @@ EdgePeerPacket heartbeat(uint32_t sender_id, uint64_t timestamp_ms, uint32_t seq
     return packet;
 }
 
+// Test fixtures use fixed positional packet fields for readability.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 EdgePeerPacket consensus(uint32_t sender_id, uint64_t timestamp_ms, uint32_t sequence_number,
                          uint64_t epoch, ConsensusProposalType proposal) {
     EdgePeerPacket packet;
@@ -51,6 +55,8 @@ EdgePeerPacket consensus(uint32_t sender_id, uint64_t timestamp_ms, uint32_t seq
     return packet;
 }
 
+// Test fixtures use fixed positional packet fields for readability.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 EdgePeerPacket emergency_corridor(uint32_t sender_id, uint64_t timestamp_ms,
                                   uint32_t sequence_number) {
     EdgePeerPacket packet;
@@ -71,6 +77,8 @@ EdgePeerPacket emergency_corridor(uint32_t sender_id, uint64_t timestamp_ms,
     return packet;
 }
 
+// Test fixtures use fixed positional packet fields for readability.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 EdgePeerPacket obstacle_digest(uint32_t sender_id, uint64_t timestamp_ms,
                                uint32_t sequence_number) {
     EdgePeerPacket packet;
@@ -138,7 +146,10 @@ TEST(EdgePeerProtocol, CborEncodeDecodeHeartbeat) {
 
     ASSERT_TRUE(parsed.ok) << parsed.error;
     EXPECT_TRUE(equivalent_header(input, parsed.packet));
-    ASSERT_TRUE(parsed.packet.heartbeat.has_value());
+    if (!parsed.packet.heartbeat.has_value()) {
+        ADD_FAILURE() << "Missing parsed heartbeat payload";
+        return;
+    }
     EXPECT_EQ(parsed.packet.heartbeat->peer_count, 2);
     EXPECT_LT(wire.size(), serialize_edge_packet_json(input).size());
     EXPECT_EQ(metrics.mode, EdgeSerializationMode::CBOR);
@@ -158,7 +169,10 @@ TEST(EdgePeerProtocol, CborPacketEquivalenceObstacleDigest) {
 
     ASSERT_TRUE(parsed.ok) << parsed.error;
     EXPECT_TRUE(equivalent_header(input, parsed.packet));
-    ASSERT_TRUE(parsed.packet.obstacle_digest.has_value());
+    if (!parsed.packet.obstacle_digest.has_value()) {
+        ADD_FAILURE() << "Missing parsed obstacle digest";
+        return;
+    }
     EXPECT_EQ(parsed.packet.obstacle_digest->local_obstacle_count, 4);
     EXPECT_EQ(parsed.packet.obstacle_digest->digest_id, "digest-a1");
 }
@@ -275,6 +289,10 @@ TEST(PeerPacketAuth, TamperedPayloadRejected) {
     auto packet = heartbeat(7, 1000, 1);
     auto cfg = auth_config();
     ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    if (!packet.heartbeat.has_value()) {
+        ADD_FAILURE() << "Missing heartbeat fixture payload";
+        return;
+    }
     packet.heartbeat->battery_pct = 12.0;
 
     const auto verified = verifyPacket(packet, cfg, 1000);
@@ -416,21 +434,21 @@ TEST(EdgePeerProtocol, ExpirationArithmeticDoesNotWrap) {
 
 TEST(SwarmStateCache, AuthenticatedClockSkewMatchesFreshnessWindow) {
     SwarmStateCache cache({8, 100, 5000});
-    cache.configure_freshness(2000, 5000);
+    cache.configure_freshness({2000, 5000});
     const auto packet = heartbeat(7, 1000, 10);
     EXPECT_TRUE(cache.observe_packet(packet, 4000).accepted);
     SwarmStateCache stale_cache({8, 100, 5000});
-    stale_cache.configure_freshness(2000, 5000);
+    stale_cache.configure_freshness({2000, 5000});
     EXPECT_FALSE(stale_cache.observe_packet(packet, 4001).accepted);
 }
 
 TEST(SwarmStateCache, ReplayMemorySurvivesShortPeerExpiry) {
     SwarmStateCache cache({8, 100, 500});
-    cache.configure_freshness(2000, 1000);
+    cache.configure_freshness({2000, 1000});
     ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 10), 1000).accepted);
     cache.expire(2500);
     ASSERT_TRUE(cache.last_sequence_number(7).has_value());
-    EXPECT_EQ(*cache.last_sequence_number(7), 10u);
+    EXPECT_EQ(cache.last_sequence_number(7).value_or(0), 10u);
     const auto replay = cache.observe_packet(heartbeat(7, 1000, 10), 2500);
     EXPECT_FALSE(replay.accepted);
     EXPECT_EQ(replay.reason, "stale sequence number");
@@ -490,7 +508,7 @@ TEST(PeerPacketAuth, SyntheticPacketReorderingAndLossStudy) {
         std::cout << "[peer-auth-synthetic-delivery] name=" << trace.name;
         std::cout << " transmitted=128 delivered=" << packets.size();
         std::cout << " accepted=" << accepted << " false_rejected=" << rejected;
-        std::cout << " out_of_order_rate=" << static_cast<double>(out_of_order) / packets.size();
+        std::cout << " out_of_order_rate=" << static_cast<double>(out_of_order) / static_cast<double>(packets.size());
         std::cout << '\n';
     }
 }
