@@ -33,7 +33,9 @@ RUN python3 - <<'PY'
 from pathlib import Path
 
 requirements = Path("/tmp/requirements.txt").read_text(encoding="utf-8")
-requirements = requirements.replace("numpy>=2.5.1", "numpy>=2.4.6")
+# Debian bookworm's Python 3.11 cannot install NumPy 2.5.x (Python >=3.12).
+# Keep the developer image's NumPy constraint compatible with this interpreter.
+requirements = requirements.replace("numpy>=2.5.2", "numpy>=2.2,<2.5")
 requirements = requirements.replace("opencv-python>=5.0.0.93", "opencv-python>=4.10.0.84")
 Path("/tmp/requirements.container.txt").write_text(requirements, encoding="utf-8")
 PY
