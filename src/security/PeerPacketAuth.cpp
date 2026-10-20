@@ -345,6 +345,11 @@ std::string_view to_string(PacketAuthResult result) {
     return "unknown";
 }
 
+std::array<uint8_t, 32> hmacSha256Digest(std::string_view secret,
+                                         const std::vector<uint8_t>& data) {
+    return hmac_sha256_bytes(secret, data);
+}
+
 std::array<uint8_t, 32> canonicalPayloadHash(const drone::swarm::EdgePeerPacket& packet) {
     return sha256_bytes(canonical_bytes(packet));
 }
