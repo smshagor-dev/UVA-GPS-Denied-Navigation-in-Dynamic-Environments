@@ -61,6 +61,8 @@ std::string format_double(double value) {
     return oss.str();
 }
 
+// Both string arguments have distinct roles (JSON document and field name).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<std::string> extract_string(const std::string& content, const std::string& key) {
     const std::regex pattern("\"" + key + "\"\\s*:\\s*\"([^\"]*)\"", std::regex::icase);
     std::smatch match;
@@ -70,6 +72,8 @@ std::optional<std::string> extract_string(const std::string& content, const std:
     return std::nullopt;
 }
 
+// Both string arguments have distinct roles (JSON document and field name).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<double> extract_number(const std::string& content, const std::string& key) {
     const std::regex pattern("\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)", std::regex::icase);
     std::smatch match;
@@ -83,6 +87,8 @@ std::optional<double> extract_number(const std::string& content, const std::stri
     return std::nullopt;
 }
 
+// Both string arguments have distinct roles (JSON document and field name).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<bool> extract_bool(const std::string& content, const std::string& key) {
     const std::regex pattern("\"" + key + "\"\\s*:\\s*(true|false)", std::regex::icase);
     std::smatch match;
@@ -92,6 +98,8 @@ std::optional<bool> extract_bool(const std::string& content, const std::string& 
     return std::nullopt;
 }
 
+// Both string arguments have distinct roles (JSON document and field name).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<Eigen::Vector3d> extract_vec3(const std::string& content, const std::string& key) {
     const std::regex pattern("\"" + key +
                                  "\"\\s*:\\s*\\[\\s*(-?[0-9]+(?:\\.[0-9]+)?)\\s*,\\s*(-?[0-9]+(?:"
@@ -113,6 +121,8 @@ bool finite_vec3(const Eigen::Vector3d& value) {
     return std::isfinite(value.x()) && std::isfinite(value.y()) && std::isfinite(value.z());
 }
 
+// CBOR major type and encoded length are independently typed by the wire format.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void cbor_push_type_and_len(std::vector<uint8_t>& out, uint8_t major, uint64_t value) {
     const uint8_t prefix = static_cast<uint8_t>(major << 5);
     if (value < 24) {
@@ -194,7 +204,7 @@ public:
         const auto header = read_header(0);
         if (!header.has_value())
             return std::nullopt;
-        return *header;
+        return header;
     }
 
     std::optional<int64_t> read_int() {
