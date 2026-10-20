@@ -61,6 +61,8 @@ std::string format_double(double value) {
     return oss.str();
 }
 
+// Both string arguments have distinct roles (JSON document and field name).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<std::string> extract_string(const std::string& content, const std::string& key) {
     const std::regex pattern("\"" + key + "\"\\s*:\\s*\"([^\"]*)\"", std::regex::icase);
     std::smatch match;
@@ -70,6 +72,8 @@ std::optional<std::string> extract_string(const std::string& content, const std:
     return std::nullopt;
 }
 
+// Both string arguments have distinct roles (JSON document and field name).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<double> extract_number(const std::string& content, const std::string& key) {
     const std::regex pattern("\"" + key + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)", std::regex::icase);
     std::smatch match;
@@ -83,6 +87,8 @@ std::optional<double> extract_number(const std::string& content, const std::stri
     return std::nullopt;
 }
 
+// Both string arguments have distinct roles (JSON document and field name).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<bool> extract_bool(const std::string& content, const std::string& key) {
     const std::regex pattern("\"" + key + "\"\\s*:\\s*(true|false)", std::regex::icase);
     std::smatch match;
@@ -92,6 +98,8 @@ std::optional<bool> extract_bool(const std::string& content, const std::string& 
     return std::nullopt;
 }
 
+// Both string arguments have distinct roles (JSON document and field name).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::optional<Eigen::Vector3d> extract_vec3(const std::string& content, const std::string& key) {
     const std::regex pattern("\"" + key +
                                  "\"\\s*:\\s*\\[\\s*(-?[0-9]+(?:\\.[0-9]+)?)\\s*,\\s*(-?[0-9]+(?:"
@@ -113,6 +121,8 @@ bool finite_vec3(const Eigen::Vector3d& value) {
     return std::isfinite(value.x()) && std::isfinite(value.y()) && std::isfinite(value.z());
 }
 
+// CBOR major type and encoded length are independently typed by the wire format.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void cbor_push_type_and_len(std::vector<uint8_t>& out, uint8_t major, uint64_t value) {
     const uint8_t prefix = static_cast<uint8_t>(major << 5);
     if (value < 24) {
@@ -194,7 +204,7 @@ public:
         const auto header = read_header(0);
         if (!header.has_value())
             return std::nullopt;
-        return *header;
+        return header;
     }
 
     std::optional<int64_t> read_int() {
@@ -713,7 +723,7 @@ bool packet_is_expired(const EdgePeerPacket& packet, uint64_t now_ms) {
     if (packet.ttl_ms == 0) {
         return true;
     }
-    return now_ms > (packet.timestamp_ms + packet.ttl_ms);
+    return now_ms >= packet.timestamp_ms && now_ms - packet.timestamp_ms > packet.ttl_ms;
 }
 
 std::string serialize_edge_packet_json(const EdgePeerPacket& packet) {
@@ -1008,6 +1018,12 @@ EdgePacketParseResult parse_edge_packet_cbor(std::span<const uint8_t> wire) {
         result.error = "unknown packet_type";
         return result;
     }
+    if (*sender_id > std::numeric_limits<uint32_t>::max() ||
+        *sequence_number > std::numeric_limits<uint32_t>::max() ||
+        *ttl_ms > std::numeric_limits<uint32_t>::max()) {
+        result.error = "cbor integer field exceeds uint32 range";
+        return result;
+    }
 
     result.packet.packet_type = static_cast<EdgePacketType>(*type_value);
     result.packet.sender_id = static_cast<uint32_t>(*sender_id);
@@ -1106,9 +1122,13 @@ EdgePacketValidationResult validate_edge_packet(const EdgePeerPacket& packet,
         result.error = "ttl_ms must be positive";
         return result;
     }
-    if (packet_is_expired(packet, options.now_ms)) {
-        result.error = "packet expired";
-        return result;
+    if (options.now_ms >= packet.timestamp_ms) {
+        const auto elapsed = options.now_ms - packet.timestamp_ms;
+        if (elapsed > packet.ttl_ms &&
+            elapsed - packet.ttl_ms > options.authenticated_clock_skew_ms) {
+            result.error = "packet expired";
+            return result;
+        }
     }
     if (options.has_last_sequence && packet.sequence_number <= options.last_sequence_number) {
         result.error = "stale sequence number";

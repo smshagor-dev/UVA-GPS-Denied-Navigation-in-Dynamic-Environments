@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace drone::security {
 
@@ -25,6 +26,9 @@ enum class PacketAuthResult : uint8_t {
     INVALID_SIGNATURE,
     STALE_EPOCH,
     REPLAY_DETECTED,
+    INVALID_TTL,
+    FUTURE_TIMESTAMP,
+    STALE_TIMESTAMP,
 };
 
 struct PacketAuthConfig {
@@ -33,6 +37,7 @@ struct PacketAuthConfig {
     bool allow_unsigned_in_bench{false};
     uint64_t trust_epoch{1};
     uint64_t max_clock_skew_ms{2000};
+    uint32_t max_packet_ttl_ms{5000};
     std::string shared_secret{};
     std::string shared_secret_env{"DRONE_SWARM_SECRET"};
     std::string runtime_profile{"edge_swarm"};
@@ -51,6 +56,10 @@ struct PacketAuthOutcome {
 [[nodiscard]] std::optional<AuthMode> parse_auth_mode(std::string_view value);
 [[nodiscard]] std::string_view to_string(PacketAuthResult result);
 
+// Exposed for reproducible, in-process measurements of the HMAC primitive.
+using HmacDigest = std::array<uint8_t, 32>;
+[[nodiscard]] HmacDigest hmacSha256Digest(std::string_view secret,
+                                          const std::vector<uint8_t>& data);
 [[nodiscard]] std::array<uint8_t, 32>
 canonicalPayloadHash(const drone::swarm::EdgePeerPacket& packet);
 [[nodiscard]] PacketAuthOutcome validateTrustEpoch(const drone::swarm::EdgePeerPacket& packet,

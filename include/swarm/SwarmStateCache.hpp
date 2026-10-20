@@ -47,6 +47,13 @@ struct SwarmStateCacheConfig {
     size_t max_entries{32};
     uint32_t stale_peer_timeout_ms{900};
     uint32_t entry_expiry_ms{2500};
+    uint64_t accepted_clock_skew_ms{0};
+    uint32_t maximum_authenticated_ttl_ms{0};
+};
+
+struct SwarmCacheFreshnessPolicy {
+    uint64_t clock_skew_ms{0};
+    uint32_t max_authenticated_ttl_ms{0};
 };
 
 struct SwarmStateCacheObservation {
@@ -62,6 +69,7 @@ public:
     SwarmStateCacheObservation observe_packet(const EdgePeerPacket& packet, uint64_t now_ms);
     void expire(uint64_t now_ms);
     void clear();
+    void configure_freshness(SwarmCacheFreshnessPolicy policy);
 
     [[nodiscard]] size_t peer_count() const;
     [[nodiscard]] size_t stale_peer_count() const;

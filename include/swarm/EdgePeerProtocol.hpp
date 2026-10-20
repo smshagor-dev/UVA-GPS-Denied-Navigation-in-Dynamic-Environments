@@ -134,6 +134,7 @@ struct EdgePacketValidationOptions {
     bool has_last_sequence{false};
     size_t max_packet_size_bytes{1400};
     size_t serialized_packet_size_bytes{0};
+    uint64_t authenticated_clock_skew_ms{0};
 };
 
 struct EdgePacketValidationResult {

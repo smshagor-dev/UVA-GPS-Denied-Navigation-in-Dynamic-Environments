@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <iostream>
+#include <limits>
+#include <vector>
 #include <utility>
 
 #include "swarm/EdgeConsensusManager.hpp"
@@ -15,6 +18,8 @@ using namespace drone::security;
 
 namespace {
 
+// Test fixtures use fixed positional packet fields for readability.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 EdgePeerPacket heartbeat(uint32_t sender_id, uint64_t timestamp_ms, uint32_t sequence_number) {
     EdgePeerPacket packet;
     packet.packet_type = EdgePacketType::HEARTBEAT;
@@ -31,6 +36,8 @@ EdgePeerPacket heartbeat(uint32_t sender_id, uint64_t timestamp_ms, uint32_t seq
     return packet;
 }
 
+// Test fixtures use fixed positional packet fields for readability.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 EdgePeerPacket consensus(uint32_t sender_id, uint64_t timestamp_ms, uint32_t sequence_number,
                          uint64_t epoch, ConsensusProposalType proposal) {
     EdgePeerPacket packet;
@@ -48,6 +55,8 @@ EdgePeerPacket consensus(uint32_t sender_id, uint64_t timestamp_ms, uint32_t seq
     return packet;
 }
 
+// Test fixtures use fixed positional packet fields for readability.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 EdgePeerPacket emergency_corridor(uint32_t sender_id, uint64_t timestamp_ms,
                                   uint32_t sequence_number) {
     EdgePeerPacket packet;
@@ -68,6 +77,8 @@ EdgePeerPacket emergency_corridor(uint32_t sender_id, uint64_t timestamp_ms,
     return packet;
 }
 
+// Test fixtures use fixed positional packet fields for readability.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 EdgePeerPacket obstacle_digest(uint32_t sender_id, uint64_t timestamp_ms,
                                uint32_t sequence_number) {
     EdgePeerPacket packet;
@@ -135,7 +146,10 @@ TEST(EdgePeerProtocol, CborEncodeDecodeHeartbeat) {
 
     ASSERT_TRUE(parsed.ok) << parsed.error;
     EXPECT_TRUE(equivalent_header(input, parsed.packet));
-    ASSERT_TRUE(parsed.packet.heartbeat.has_value());
+    if (!parsed.packet.heartbeat.has_value()) {
+        ADD_FAILURE() << "Missing parsed heartbeat payload";
+        return;
+    }
     EXPECT_EQ(parsed.packet.heartbeat->peer_count, 2);
     EXPECT_LT(wire.size(), serialize_edge_packet_json(input).size());
     EXPECT_EQ(metrics.mode, EdgeSerializationMode::CBOR);
@@ -155,7 +169,10 @@ TEST(EdgePeerProtocol, CborPacketEquivalenceObstacleDigest) {
 
     ASSERT_TRUE(parsed.ok) << parsed.error;
     EXPECT_TRUE(equivalent_header(input, parsed.packet));
-    ASSERT_TRUE(parsed.packet.obstacle_digest.has_value());
+    if (!parsed.packet.obstacle_digest.has_value()) {
+        ADD_FAILURE() << "Missing parsed obstacle digest";
+        return;
+    }
     EXPECT_EQ(parsed.packet.obstacle_digest->local_obstacle_count, 4);
     EXPECT_EQ(parsed.packet.obstacle_digest->digest_id, "digest-a1");
 }
@@ -272,6 +289,10 @@ TEST(PeerPacketAuth, TamperedPayloadRejected) {
     auto packet = heartbeat(7, 1000, 1);
     auto cfg = auth_config();
     ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    if (!packet.heartbeat.has_value()) {
+        ADD_FAILURE() << "Missing heartbeat fixture payload";
+        return;
+    }
     packet.heartbeat->battery_pct = 12.0;
 
     const auto verified = verifyPacket(packet, cfg, 1000);
@@ -324,6 +345,245 @@ TEST(PeerPacketAuth, StaleSequenceRejected) {
     ASSERT_TRUE(signPacket(packet, cfg).accepted());
 
     EXPECT_EQ(verifyPacket(packet, cfg, 1000, 10).result, PacketAuthResult::REPLAY_DETECTED);
+}
+
+TEST(PeerPacketAuth, FutureTimestampBoundDoesNotGrowWithTtl) {
+    auto packet = heartbeat(7, 4000, 1);
+    auto cfg = auth_config();
+    packet.ttl_ms = 5000;
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 2000).result, PacketAuthResult::ACCEPTED);
+    EXPECT_EQ(verifyPacket(packet, cfg, 1999).result, PacketAuthResult::FUTURE_TIMESTAMP);
+}
+
+TEST(PeerPacketAuth, SenderControlledTtlHasAnUpperBound) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    packet.ttl_ms = cfg.max_packet_ttl_ms + 1;
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000).result, PacketAuthResult::INVALID_TTL);
+    packet.ttl_ms = 0;
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000).result, PacketAuthResult::INVALID_TTL);
+}
+
+TEST(PeerPacketAuth, StaleTimestampBoundary) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 4000).result, PacketAuthResult::ACCEPTED);
+    EXPECT_EQ(verifyPacket(packet, cfg, 4001).result, PacketAuthResult::STALE_TIMESTAMP);
+}
+
+TEST(PeerPacketAuth, ZeroClockSkewIsStrictNotDisabled) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    cfg.max_clock_skew_ms = 0;
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000).result, PacketAuthResult::ACCEPTED);
+    EXPECT_EQ(verifyPacket(packet, cfg, 999).result, PacketAuthResult::FUTURE_TIMESTAMP);
+    EXPECT_EQ(verifyPacket(packet, cfg, 2001).result, PacketAuthResult::STALE_TIMESTAMP);
+}
+
+TEST(PeerPacketAuth, AuthenticateBeforeClassifyingReplay) {
+    auto packet = heartbeat(7, 1000, 10);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    packet.sender_id = 8;
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000, 10).result, PacketAuthResult::INVALID_SIGNATURE);
+}
+
+TEST(PeerPacketAuth, ValidReorderedPacketRejectedByStrictSequence) {
+    auto older = heartbeat(7, 1000, 10);
+    auto newer = heartbeat(7, 1001, 11);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(older, cfg).accepted());
+    ASSERT_TRUE(signPacket(newer, cfg).accepted());
+    EXPECT_EQ(verifyPacket(newer, cfg, 1001, 10).result, PacketAuthResult::ACCEPTED);
+    EXPECT_EQ(verifyPacket(older, cfg, 1001, 11).result, PacketAuthResult::REPLAY_DETECTED);
+}
+
+TEST(PeerPacketAuth, SharedSecretDoesNotAttributeOnePhysicalSender) {
+    auto forged = heartbeat(8, 1000, 12);
+    auto cfg = auth_config();
+    // The holder of the group key can sign a packet using another sender ID.
+    ASSERT_TRUE(signPacket(forged, cfg).accepted());
+    EXPECT_EQ(verifyPacket(forged, cfg, 1000).result, PacketAuthResult::ACCEPTED);
+}
+
+TEST(EdgePeerProtocol, CborUint32TruncationRejected) {
+    auto wire = serialize_edge_packet_cbor(heartbeat(7, 1000, 1));
+    ASSERT_GE(wire.size(), 4u);
+    ASSERT_EQ(wire[0], 0x8au);
+    ASSERT_EQ(wire[3], 7u);
+    // Replace the 1-byte sender ID with 2^32 + 7 (CBOR 64-bit integer).
+    std::vector<uint8_t> malformed(wire.begin(), wire.begin() + 3);
+    malformed.insert(malformed.end(), {0x1b, 0, 0, 0, 1, 0, 0, 0, 7});
+    malformed.insert(malformed.end(), wire.begin() + 4, wire.end());
+    const auto parsed = parse_edge_packet_cbor(malformed);
+    EXPECT_FALSE(parsed.ok);
+    EXPECT_EQ(parsed.error, "cbor integer field exceeds uint32 range");
+}
+
+TEST(EdgePeerProtocol, ExpirationArithmeticDoesNotWrap) {
+    auto packet = heartbeat(7, std::numeric_limits<uint64_t>::max() - 4, 1);
+    packet.ttl_ms = 1000;
+    EXPECT_FALSE(packet_is_expired(packet, std::numeric_limits<uint64_t>::max() - 3));
+    EXPECT_FALSE(packet_is_expired(packet, 1000));
+}
+
+TEST(SwarmStateCache, AuthenticatedClockSkewMatchesFreshnessWindow) {
+    SwarmStateCache cache({8, 100, 5000});
+    cache.configure_freshness({2000, 5000});
+    const auto packet = heartbeat(7, 1000, 10);
+    EXPECT_TRUE(cache.observe_packet(packet, 4000).accepted);
+    SwarmStateCache stale_cache({8, 100, 5000});
+    stale_cache.configure_freshness({2000, 5000});
+    EXPECT_FALSE(stale_cache.observe_packet(packet, 4001).accepted);
+}
+
+TEST(SwarmStateCache, ReplayMemorySurvivesShortPeerExpiry) {
+    SwarmStateCache cache({8, 100, 500});
+    cache.configure_freshness({2000, 1000});
+    ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 10), 1000).accepted);
+    cache.expire(2500);
+    ASSERT_TRUE(cache.last_sequence_number(7).has_value());
+    EXPECT_EQ(cache.last_sequence_number(7).value_or(0), 10u);
+    const auto replay = cache.observe_packet(heartbeat(7, 1000, 10), 2500);
+    EXPECT_FALSE(replay.accepted);
+    EXPECT_EQ(replay.reason, "stale sequence number");
+}
+
+TEST(PeerPacketAuth, SyntheticPacketReorderingAndLossStudy) {
+    // Deterministic delivery traces, not measurements from a physical FANET radio.
+    struct Trace {
+        const char* name;
+        size_t swap_every;
+        size_t drop_every;
+    };
+    const std::array<Trace, 4> traces = {{
+        {"ordered", 0, 0},
+        {"adjacent_reorder", 2, 0},
+        {"sparse_reorder", 10, 0},
+        {"loss_and_reorder", 8, 13},
+    }};
+    auto cfg = auth_config();
+    for (const auto& trace : traces) {
+        std::vector<EdgePeerPacket> packets;
+        for (uint32_t seq = 1; seq <= 128; ++seq) {
+            if (trace.drop_every > 0 && seq % trace.drop_every == 0) {
+                continue;
+            }
+            auto packet = heartbeat(7, 1000, seq);
+            ASSERT_TRUE(signPacket(packet, cfg).accepted());
+            packets.push_back(std::move(packet));
+        }
+        if (trace.swap_every > 0) {
+            for (size_t i = 0; i + 1 < packets.size(); i += trace.swap_every) {
+                std::swap(packets[i], packets[i + 1]);
+            }
+        }
+        std::optional<uint32_t> last;
+        size_t out_of_order = 0;
+        size_t accepted = 0;
+        size_t rejected = 0;
+        for (const auto& packet : packets) {
+            if (last && packet.sequence_number <= *last) {
+                ++out_of_order;
+            }
+            const auto outcome = verifyPacket(packet, cfg, 1000, last);
+            if (outcome.accepted()) {
+                ++accepted;
+                last = packet.sequence_number;
+            } else {
+                EXPECT_EQ(outcome.result, PacketAuthResult::REPLAY_DETECTED);
+                ++rejected;
+            }
+        }
+        EXPECT_EQ(out_of_order, rejected);
+        EXPECT_EQ(accepted + rejected, packets.size());
+        if (trace.swap_every == 0) {
+            EXPECT_EQ(rejected, 0u);
+        }
+        std::cout << "[peer-auth-synthetic-delivery] name=" << trace.name;
+        std::cout << " transmitted=128 delivered=" << packets.size();
+        std::cout << " accepted=" << accepted << " false_rejected=" << rejected;
+        const double delivered_count = static_cast<double>(packets.size());
+        const double out_of_order_rate = static_cast<double>(out_of_order) / delivered_count;
+        std::cout << " out_of_order_rate=" << out_of_order_rate;
+        std::cout << '\n';
+    }
+}
+
+TEST(PeerPacketAuth, HmacSha256KnownAnswer) {
+    const std::string message = "The quick brown fox jumps over the lazy dog";
+    const std::vector<uint8_t> input(message.begin(), message.end());
+    const auto digest = hmacSha256Digest("key", input);
+    constexpr char hex[] = "0123456789abcdef";
+    std::string actual;
+    actual.reserve(digest.size() * 2);
+    for (const auto byte : digest) {
+        actual.push_back(hex[byte >> 4]);
+        actual.push_back(hex[byte & 0x0f]);
+    }
+    EXPECT_EQ(actual, "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8");
+}
+
+TEST(PeerPacketAuth, InProcessComponentLatencySamples) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    packet.auth_hook.clear();
+    const auto data = serialize_edge_packet_cbor(packet);
+    constexpr size_t samples = 512;
+    std::array<std::vector<uint64_t>, 4> durations;
+    for (auto& group : durations) {
+        group.reserve(samples);
+    }
+    uint8_t digest_sink = 0;
+    using clock = std::chrono::steady_clock;
+    for (size_t i = 0; i < samples; ++i) {
+        auto begin = clock::now();
+        const auto encoded = serialize_edge_packet_cbor(packet);
+        auto finish = clock::now();
+        durations[0].push_back(static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(finish - begin).count()));
+        digest_sink ^= static_cast<uint8_t>(encoded.size());
+
+        begin = clock::now();
+        const auto mac = hmacSha256Digest(cfg.shared_secret, data);
+        finish = clock::now();
+        durations[1].push_back(static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(finish - begin).count()));
+        digest_sink ^= mac[i % mac.size()];
+
+        auto signed_packet = packet;
+        begin = clock::now();
+        const auto signed_result = signPacket(signed_packet, cfg);
+        finish = clock::now();
+        ASSERT_TRUE(signed_result.accepted());
+        durations[2].push_back(static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(finish - begin).count()));
+
+        begin = clock::now();
+        const auto verified = verifyPacket(signed_packet, cfg, 1000);
+        finish = clock::now();
+        ASSERT_TRUE(verified.accepted());
+        durations[3].push_back(static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(finish - begin).count()));
+    }
+    const std::array<const char*, 4> names = {"cbor_serialize", "hmac_sha256", "sign_path",
+                                              "verify_path"};
+    for (size_t i = 0; i < names.size(); ++i) {
+        auto& values = durations[i];
+        std::sort(values.begin(), values.end());
+        std::cout << "[peer-auth-inprocess] " << names[i] << " n=" << values.size();
+        std::cout << " p50_ns=" << values[values.size() / 2];
+        std::cout << " p95_ns=" << values[values.size() * 95 / 100];
+        std::cout << " p99_ns=" << values[values.size() * 99 / 100];
+        std::cout << " min_ns=" << values.front() << " max_ns=" << values.back() << '\n';
+    }
+    std::cout << "[peer-auth-inprocess] canonical_cbor_bytes=" << data.size()
+              << " digest_sink=" << static_cast<unsigned>(digest_sink) << "\n";
 }
 
 TEST(PeerPacketAuth, PqcPlaceholderReturnsUnsupported) {

@@ -527,7 +527,6 @@ void V2XMeshNetwork::handle_message(const SwarmMessage& msg) {
         handle_edge_packet(msg);
         break;
     case SwarmMessage::Type::FORMATION_CMD:
-        break;
     default:
         break;
     }
@@ -674,7 +673,7 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
 
     const auto now_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
 
     const auto last_sequence = edge_state_cache_.last_sequence_number(parsed.packet.sender_id);
@@ -726,7 +725,9 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
         std::lock_guard lock(peers_mutex_);
         auto& peer = peers_[parsed.packet.sender_id];
         peer.id = parsed.packet.sender_id;
-        peer.last_seen_ts = static_cast<double>(cached->last_packet_timestamp_ms) / 1000.0;
+        // Use the local monotonic clock for liveness, independent of wire timestamp skew.
+        const auto peer_seen_at = std::chrono::steady_clock::now();
+        peer.last_seen_ts = std::chrono::duration<double>(peer_seen_at.time_since_epoch()).count();
         peer.seq_last = cached->last_sequence_number;
         peer.reachable = !cached->stale;
         peer.position = cached->position;
@@ -752,7 +753,7 @@ void V2XMeshNetwork::expire_stale_peers() {
     bool leader_lost = false;
     const auto now_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     edge_state_cache_.expire(now_ms);
     edge_consensus_.expire(edge_state_cache_);
@@ -824,8 +825,10 @@ std::string V2XMeshNetwork::autonomy_state() const {
 
 float V2XMeshNetwork::mesh_bandwidth_kbps() const {
     std::lock_guard lock(local_edge_state_mutex_);
+    const double transmitted = static_cast<double>(edge_tx_bytes_.load());
+    const double received = static_cast<double>(edge_rx_bytes_.load());
     return static_cast<float>(local_edge_state_.mesh_bandwidth_kbps +
-                              ((edge_tx_bytes_.load() + edge_rx_bytes_.load()) / 128.0));
+                              (transmitted + received) / 128.0);
 }
 
 bool V2XMeshNetwork::disconnected_operation() const {
@@ -933,7 +936,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_heartbeat_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = edge_state.trust_epoch;
@@ -960,7 +963,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_pose_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -982,7 +985,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_health_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -1006,7 +1009,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_obstacle_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -1029,7 +1032,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_threat_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -1052,7 +1055,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_consensus_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -1078,7 +1081,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_emergency_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -1105,7 +1108,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_goodbye_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = edge_state.trust_epoch;
@@ -1121,6 +1124,8 @@ void V2XMeshNetwork::configure_security(SwarmSecurityConfig cfg) {
 }
 void V2XMeshNetwork::configure_packet_auth(drone::security::PacketAuthConfig cfg) {
     packet_auth_config_ = std::move(cfg);
+    edge_state_cache_.configure_freshness(
+        {packet_auth_config_.max_clock_skew_ms, packet_auth_config_.max_packet_ttl_ms});
     {
         std::lock_guard lock(edge_serialization_metrics_mutex_);
         edge_serialization_metrics_.auth_mode =
@@ -1222,14 +1227,19 @@ Eigen::Vector3d LeaderFollowerController::compute_target(const Eigen::Vector3d& 
         break;
     }
     case FormationCommand::Formation::VEE: {
-        const float angle = static_cast<float>(30.0 * kDegToRad);
-        const int side = (follower_index % 2 == 0) ? 1 : -1;
-        const float row = static_cast<float>((follower_index / 2) + 1);
-        offset = Eigen::Vector3d(side * row * s * std::sin(angle), -row * s * std::cos(angle), 0.0);
+        const double angle = 30.0 * kDegToRad;
+        const double side = (follower_index % 2 == 0) ? 1.0 : -1.0;
+        // Two followers share each formation row; retain intentional integer grouping.
+        const uint32_t row_index = follower_index / 2u;
+        const double row = static_cast<double>(row_index) + 1.0;
+        const double spacing = static_cast<double>(s);
+        offset = Eigen::Vector3d(side * row * spacing * std::sin(angle),
+                                 -row * spacing * std::cos(angle), 0.0);
         break;
     }
     case FormationCommand::Formation::LINE: {
-        offset = Eigen::Vector3d(0, -(follower_index + 1) * s, 0);
+        const double follower_row = static_cast<double>(follower_index) + 1.0;
+        offset = Eigen::Vector3d(0.0, -follower_row * static_cast<double>(s), 0.0);
         break;
     }
     default:
@@ -1248,10 +1258,13 @@ Eigen::Vector3d LeaderFollowerController::velocity_command(const Eigen::Vector3d
                             max_speed_mps);
 }
 
+// Positional controller arguments are retained for source compatibility.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 Eigen::Vector3d LeaderFollowerController::velocity_command(
     const Eigen::Vector3d& current_pos, const Eigen::Vector3d& current_velocity,
     const Eigen::Vector3d& target_pos, const std::vector<PeerInfo>& peers,
     const std::vector<AvoidanceObstacle>& obstacles, float kp, float max_speed_mps) const {
+    // NOLINTEND(bugprone-easily-swappable-parameters)
     Eigen::Vector3d error = target_pos - current_pos;
     Eigen::Vector3d preferred_vel = kp * error;
 
@@ -1273,11 +1286,14 @@ Eigen::Vector3d LeaderFollowerController::velocity_command(
     return vel;
 }
 
+// Vector and distance parameters are distinguished by the public controller interface.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
     const Eigen::Vector3d& current_pos, const Eigen::Vector3d& current_velocity,
     const std::vector<PeerInfo>& peers, const std::vector<AvoidanceObstacle>& obstacles,
     float min_separation_m, float influence_radius_m, float max_avoid_speed_mps,
     float prediction_horizon_s) const {
+    // NOLINTEND(bugprone-easily-swappable-parameters)
     if (peers.empty() && obstacles.empty()) {
         return Eigen::Vector3d::Zero();
     }
@@ -1387,10 +1403,13 @@ Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
     return repulsion;
 }
 
+// Existing LiDAR stride and obstacle radius parameters have distinct roles.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 std::vector<AvoidanceObstacle>
 LeaderFollowerController::obstacles_from_lidar(const sensors::LidarMeasurement& scan,
                                                const Eigen::Vector3d& drone_position, size_t stride,
                                                float obstacle_radius_m) {
+    // NOLINTEND(bugprone-easily-swappable-parameters)
     std::vector<AvoidanceObstacle> out;
     if (!scan.cloud || scan.cloud->empty()) {
         return out;
