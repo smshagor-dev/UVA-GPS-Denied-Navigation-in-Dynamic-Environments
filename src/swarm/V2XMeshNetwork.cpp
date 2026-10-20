@@ -1126,6 +1126,14 @@ void V2XMeshNetwork::configure_packet_auth(drone::security::PacketAuthConfig cfg
     packet_auth_config_ = std::move(cfg);
     edge_state_cache_.configure_freshness(
         {packet_auth_config_.max_clock_skew_ms, packet_auth_config_.max_packet_ttl_ms});
+    if (!packet_auth_config_.replay_ledger_path.empty()) {
+        const bool ready = edge_state_cache_.configure_replay_ledger(
+            packet_auth_config_.replay_ledger_path,
+            packet_auth_config_.initialize_new_replay_ledger);
+        if (!ready && logger_) {
+            logger_->error("V2X replay journal unavailable; rejecting peer packets");
+        }
+    }
     {
         std::lock_guard lock(edge_serialization_metrics_mutex_);
         edge_serialization_metrics_.auth_mode =
