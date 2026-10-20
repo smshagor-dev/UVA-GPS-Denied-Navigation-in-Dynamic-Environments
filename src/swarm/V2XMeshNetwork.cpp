@@ -527,7 +527,6 @@ void V2XMeshNetwork::handle_message(const SwarmMessage& msg) {
         handle_edge_packet(msg);
         break;
     case SwarmMessage::Type::FORMATION_CMD:
-        break;
     default:
         break;
     }
@@ -826,8 +825,10 @@ std::string V2XMeshNetwork::autonomy_state() const {
 
 float V2XMeshNetwork::mesh_bandwidth_kbps() const {
     std::lock_guard lock(local_edge_state_mutex_);
+    const double transmitted = static_cast<double>(edge_tx_bytes_.load());
+    const double received = static_cast<double>(edge_rx_bytes_.load());
     return static_cast<float>(local_edge_state_.mesh_bandwidth_kbps +
-                              ((edge_tx_bytes_.load() + edge_rx_bytes_.load()) / 128.0));
+                              (transmitted + received) / 128.0);
 }
 
 bool V2XMeshNetwork::disconnected_operation() const {
@@ -1226,14 +1227,17 @@ Eigen::Vector3d LeaderFollowerController::compute_target(const Eigen::Vector3d& 
         break;
     }
     case FormationCommand::Formation::VEE: {
-        const float angle = static_cast<float>(30.0 * kDegToRad);
-        const int side = (follower_index % 2 == 0) ? 1 : -1;
-        const float row = static_cast<float>((follower_index / 2) + 1);
-        offset = Eigen::Vector3d(side * row * s * std::sin(angle), -row * s * std::cos(angle), 0.0);
+        const double angle = 30.0 * kDegToRad;
+        const double side = (follower_index % 2 == 0) ? 1.0 : -1.0;
+        const double row = static_cast<double>(follower_index / 2) + 1.0;
+        const double spacing = static_cast<double>(s);
+        offset = Eigen::Vector3d(side * row * spacing * std::sin(angle),
+                                 -row * spacing * std::cos(angle), 0.0);
         break;
     }
     case FormationCommand::Formation::LINE: {
-        offset = Eigen::Vector3d(0, -(follower_index + 1) * s, 0);
+        const double follower_row = static_cast<double>(follower_index) + 1.0;
+        offset = Eigen::Vector3d(0.0, -follower_row * static_cast<double>(s), 0.0);
         break;
     }
     default:
@@ -1252,10 +1256,13 @@ Eigen::Vector3d LeaderFollowerController::velocity_command(const Eigen::Vector3d
                             max_speed_mps);
 }
 
+// Positional controller arguments are retained for source compatibility.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 Eigen::Vector3d LeaderFollowerController::velocity_command(
     const Eigen::Vector3d& current_pos, const Eigen::Vector3d& current_velocity,
     const Eigen::Vector3d& target_pos, const std::vector<PeerInfo>& peers,
     const std::vector<AvoidanceObstacle>& obstacles, float kp, float max_speed_mps) const {
+    // NOLINTEND(bugprone-easily-swappable-parameters)
     Eigen::Vector3d error = target_pos - current_pos;
     Eigen::Vector3d preferred_vel = kp * error;
 
@@ -1277,11 +1284,14 @@ Eigen::Vector3d LeaderFollowerController::velocity_command(
     return vel;
 }
 
+// Vector and distance parameters are distinguished by the public controller interface.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
     const Eigen::Vector3d& current_pos, const Eigen::Vector3d& current_velocity,
     const std::vector<PeerInfo>& peers, const std::vector<AvoidanceObstacle>& obstacles,
     float min_separation_m, float influence_radius_m, float max_avoid_speed_mps,
     float prediction_horizon_s) const {
+    // NOLINTEND(bugprone-easily-swappable-parameters)
     if (peers.empty() && obstacles.empty()) {
         return Eigen::Vector3d::Zero();
     }
@@ -1391,10 +1401,13 @@ Eigen::Vector3d LeaderFollowerController::compute_avoidance_velocity(
     return repulsion;
 }
 
+// Existing LiDAR stride and obstacle radius parameters have distinct roles.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 std::vector<AvoidanceObstacle>
 LeaderFollowerController::obstacles_from_lidar(const sensors::LidarMeasurement& scan,
                                                const Eigen::Vector3d& drone_position, size_t stride,
                                                float obstacle_radius_m) {
+    // NOLINTEND(bugprone-easily-swappable-parameters)
     std::vector<AvoidanceObstacle> out;
     if (!scan.cloud || scan.cloud->empty()) {
         return out;
