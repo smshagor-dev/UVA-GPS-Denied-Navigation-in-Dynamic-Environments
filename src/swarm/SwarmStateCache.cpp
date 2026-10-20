@@ -1,6 +1,7 @@
 #include "swarm/SwarmStateCache.hpp"
 
 #include <algorithm>
+#include <limits>
 
 namespace drone::swarm {
 
@@ -18,6 +19,8 @@ SwarmStateCacheObservation SwarmStateCache::observe_packet(const EdgePeerPacket&
                     existing != peers_.end() ? existing->second.last_sequence_number : 0u,
                     existing != peers_.end(),
                     1400u,
+                    0u,
+                    config_.accepted_clock_skew_ms,
                 });
     if (!validation.ok) {
         result.reason = validation.error;
@@ -86,7 +89,15 @@ void SwarmStateCache::expire(uint64_t now_ms) {
         const auto age_ms = now_ms > it->second.last_packet_timestamp_ms
                                 ? (now_ms - it->second.last_packet_timestamp_ms)
                                 : 0u;
-        if (age_ms > config_.entry_expiry_ms) {
+        // Retain the peer sequence while an earlier signed packet may still be fresh.
+        const uint64_t max_age =
+            config_.accepted_clock_skew_ms >
+                    std::numeric_limits<uint64_t>::max() - config_.maximum_authenticated_ttl_ms
+                ? std::numeric_limits<uint64_t>::max()
+                : config_.accepted_clock_skew_ms + config_.maximum_authenticated_ttl_ms;
+        const uint64_t retention_ms =
+            std::max<uint64_t>(config_.entry_expiry_ms, max_age);
+        if (age_ms > retention_ms) {
             it = peers_.erase(it);
             continue;
         }
@@ -94,6 +105,12 @@ void SwarmStateCache::expire(uint64_t now_ms) {
         it->second.split_swarm_isolated = it->second.stale || it->second.disconnected_operation;
         ++it;
     }
+}
+
+void SwarmStateCache::configure_freshness(uint64_t clock_skew_ms, uint32_t max_ttl_ms) {
+    std::lock_guard lock(mutex_);
+    config_.accepted_clock_skew_ms = clock_skew_ms;
+    config_.maximum_authenticated_ttl_ms = max_ttl_ms;
 }
 
 void SwarmStateCache::clear() {
