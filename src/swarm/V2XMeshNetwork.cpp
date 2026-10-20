@@ -727,9 +727,8 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
         auto& peer = peers_[parsed.packet.sender_id];
         peer.id = parsed.packet.sender_id;
         // Use the local monotonic clock for liveness, independent of wire timestamp skew.
-        peer.last_seen_ts = std::chrono::duration<double>(
-                                std::chrono::steady_clock::now().time_since_epoch())
-                                .count();
+        const auto peer_seen_at = std::chrono::steady_clock::now();
+        peer.last_seen_ts = std::chrono::duration<double>(peer_seen_at.time_since_epoch()).count();
         peer.seq_last = cached->last_sequence_number;
         peer.reachable = !cached->stale;
         peer.position = cached->position;
