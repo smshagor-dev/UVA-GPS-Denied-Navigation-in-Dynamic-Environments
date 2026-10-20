@@ -3,6 +3,8 @@
 #include <array>
 #include <chrono>
 #include <iostream>
+#include <limits>
+#include <vector>
 #include <utility>
 
 #include "swarm/EdgeConsensusManager.hpp"
@@ -324,6 +326,92 @@ TEST(PeerPacketAuth, StaleSequenceRejected) {
     ASSERT_TRUE(signPacket(packet, cfg).accepted());
 
     EXPECT_EQ(verifyPacket(packet, cfg, 1000, 10).result, PacketAuthResult::REPLAY_DETECTED);
+}
+
+
+TEST(PeerPacketAuth, FutureTimestampBoundDoesNotGrowWithTtl) {
+    auto packet = heartbeat(7, 4000, 1);
+    auto cfg = auth_config();
+    packet.ttl_ms = 5000;
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 2000).result, PacketAuthResult::ACCEPTED);
+    EXPECT_EQ(verifyPacket(packet, cfg, 1999).result, PacketAuthResult::FUTURE_TIMESTAMP);
+}
+
+TEST(PeerPacketAuth, SenderControlledTtlHasAnUpperBound) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    packet.ttl_ms = cfg.max_packet_ttl_ms + 1;
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000).result, PacketAuthResult::INVALID_TTL);
+    packet.ttl_ms = 0;
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000).result, PacketAuthResult::INVALID_TTL);
+}
+
+TEST(PeerPacketAuth, StaleTimestampBoundary) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 4000).result, PacketAuthResult::ACCEPTED);
+    EXPECT_EQ(verifyPacket(packet, cfg, 4001).result, PacketAuthResult::STALE_TIMESTAMP);
+}
+
+TEST(PeerPacketAuth, ZeroClockSkewIsStrictNotDisabled) {
+    auto packet = heartbeat(7, 1000, 1);
+    auto cfg = auth_config();
+    cfg.max_clock_skew_ms = 0;
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000).result, PacketAuthResult::ACCEPTED);
+    EXPECT_EQ(verifyPacket(packet, cfg, 999).result, PacketAuthResult::FUTURE_TIMESTAMP);
+    EXPECT_EQ(verifyPacket(packet, cfg, 2001).result, PacketAuthResult::STALE_TIMESTAMP);
+}
+
+TEST(PeerPacketAuth, AuthenticateBeforeClassifyingReplay) {
+    auto packet = heartbeat(7, 1000, 10);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(packet, cfg).accepted());
+    packet.sender_id = 8;
+    EXPECT_EQ(verifyPacket(packet, cfg, 1000, 10).result, PacketAuthResult::INVALID_SIGNATURE);
+}
+
+TEST(PeerPacketAuth, ValidReorderedPacketRejectedByStrictSequence) {
+    auto older = heartbeat(7, 1000, 10);
+    auto newer = heartbeat(7, 1001, 11);
+    auto cfg = auth_config();
+    ASSERT_TRUE(signPacket(older, cfg).accepted());
+    ASSERT_TRUE(signPacket(newer, cfg).accepted());
+    EXPECT_EQ(verifyPacket(newer, cfg, 1001, 10).result, PacketAuthResult::ACCEPTED);
+    EXPECT_EQ(verifyPacket(older, cfg, 1001, 11).result, PacketAuthResult::REPLAY_DETECTED);
+}
+
+TEST(PeerPacketAuth, SharedSecretDoesNotAttributeOnePhysicalSender) {
+    auto forged = heartbeat(8, 1000, 12);
+    auto cfg = auth_config();
+    // The holder of the group key can sign a packet using another sender ID.
+    ASSERT_TRUE(signPacket(forged, cfg).accepted());
+    EXPECT_EQ(verifyPacket(forged, cfg, 1000).result, PacketAuthResult::ACCEPTED);
+}
+
+TEST(EdgePeerProtocol, CborUint32TruncationRejected) {
+    auto wire = serialize_edge_packet_cbor(heartbeat(7, 1000, 1));
+    ASSERT_GE(wire.size(), 4u);
+    ASSERT_EQ(wire[0], 0x8au);
+    ASSERT_EQ(wire[3], 7u);
+    // Replace the 1-byte sender ID with 2^32 + 7 (CBOR 64-bit integer).
+    std::vector<uint8_t> malformed(wire.begin(), wire.begin() + 3);
+    malformed.insert(malformed.end(), {0x1b, 0, 0, 0, 1, 0, 0, 0, 7});
+    malformed.insert(malformed.end(), wire.begin() + 4, wire.end());
+    const auto parsed = parse_edge_packet_cbor(malformed);
+    EXPECT_FALSE(parsed.ok);
+    EXPECT_EQ(parsed.error, "cbor integer field exceeds uint32 range");
+}
+
+TEST(EdgePeerProtocol, ExpirationArithmeticDoesNotWrap) {
+    auto packet = heartbeat(7, std::numeric_limits<uint64_t>::max() - 4, 1);
+    packet.ttl_ms = 1000;
+    EXPECT_FALSE(packet_is_expired(packet, std::numeric_limits<uint64_t>::max() - 3));
+    EXPECT_FALSE(packet_is_expired(packet, 1000));
 }
 
 TEST(PeerPacketAuth, PqcPlaceholderReturnsUnsupported) {
