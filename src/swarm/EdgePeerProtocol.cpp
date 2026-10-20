@@ -1113,9 +1113,13 @@ EdgePacketValidationResult validate_edge_packet(const EdgePeerPacket& packet,
         result.error = "ttl_ms must be positive";
         return result;
     }
-    if (packet_is_expired(packet, options.now_ms)) {
-        result.error = "packet expired";
-        return result;
+    if (options.now_ms >= packet.timestamp_ms) {
+        const auto elapsed = options.now_ms - packet.timestamp_ms;
+        if (elapsed > packet.ttl_ms &&
+            elapsed - packet.ttl_ms > options.authenticated_clock_skew_ms) {
+            result.error = "packet expired";
+            return result;
+        }
     }
     if (options.has_last_sequence && packet.sequence_number <= options.last_sequence_number) {
         result.error = "stale sequence number";
