@@ -5,7 +5,7 @@
 
 namespace drone::swarm {
 
-SwarmStateCache::SwarmStateCache(SwarmStateCacheConfig config) : config_(std::move(config)) {}
+SwarmStateCache::SwarmStateCache(SwarmStateCacheConfig config) : config_(config) {}
 
 SwarmStateCacheObservation SwarmStateCache::observe_packet(const EdgePeerPacket& packet,
                                                            uint64_t now_ms) {
@@ -106,10 +106,10 @@ void SwarmStateCache::expire(uint64_t now_ms) {
     }
 }
 
-void SwarmStateCache::configure_freshness(uint64_t clock_skew_ms, uint32_t max_ttl_ms) {
+void SwarmStateCache::configure_freshness(SwarmCacheFreshnessPolicy policy) {
     std::lock_guard lock(mutex_);
-    config_.accepted_clock_skew_ms = clock_skew_ms;
-    config_.maximum_authenticated_ttl_ms = max_ttl_ms;
+    config_.accepted_clock_skew_ms = policy.clock_skew_ms;
+    config_.maximum_authenticated_ttl_ms = policy.max_authenticated_ttl_ms;
 }
 
 void SwarmStateCache::clear() {
