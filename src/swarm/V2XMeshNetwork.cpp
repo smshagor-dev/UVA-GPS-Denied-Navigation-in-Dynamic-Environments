@@ -674,7 +674,7 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
 
     const auto now_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
 
     const auto last_sequence = edge_state_cache_.last_sequence_number(parsed.packet.sender_id);
@@ -726,7 +726,10 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
         std::lock_guard lock(peers_mutex_);
         auto& peer = peers_[parsed.packet.sender_id];
         peer.id = parsed.packet.sender_id;
-        peer.last_seen_ts = static_cast<double>(cached->last_packet_timestamp_ms) / 1000.0;
+        // Use the local monotonic clock for liveness, independent of wire timestamp skew.
+        peer.last_seen_ts = std::chrono::duration<double>(
+                                std::chrono::steady_clock::now().time_since_epoch())
+                                .count();
         peer.seq_last = cached->last_sequence_number;
         peer.reachable = !cached->stale;
         peer.position = cached->position;
@@ -752,7 +755,7 @@ void V2XMeshNetwork::expire_stale_peers() {
     bool leader_lost = false;
     const auto now_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     edge_state_cache_.expire(now_ms);
     edge_consensus_.expire(edge_state_cache_);
@@ -933,7 +936,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_heartbeat_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = edge_state.trust_epoch;
@@ -960,7 +963,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_pose_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -982,7 +985,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_health_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -1006,7 +1009,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_obstacle_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -1029,7 +1032,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_threat_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -1052,7 +1055,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_consensus_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -1078,7 +1081,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_emergency_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = local_edge_state_.trust_epoch;
@@ -1105,7 +1108,7 @@ EdgePeerPacket V2XMeshNetwork::build_edge_goodbye_packet() const {
     packet.sender_id = local_id_;
     packet.timestamp_ms =
         static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  std::chrono::steady_clock::now().time_since_epoch())
+                                  std::chrono::system_clock::now().time_since_epoch())
                                   .count());
     packet.sequence_number = ++last_edge_sequence_;
     packet.trust_epoch = edge_state.trust_epoch;
