@@ -37,6 +37,7 @@ Relevant cases in `tests/test_edge_swarm.cpp` cover:
 - authenticated payload modification and sender-identifier tampering;
 - acceptance and rejection at the *future* skew boundary, regardless of sender TTL;
 - rejection of zero and oversized TTL, stale timestamp and zero-skew boundary;
+- acceptance at the cache's TTL-plus-skew boundary, rejection beyond it, and persistence of the in-memory high-watermark across short peer expiry;
 - verified replay rejection and rejection of legitimate packets arriving out of sequence;
 - verifying authenticity before classifying a packet as a replay;
 - deterministic packet-delivery traces with adjacent reordering, sparse reordering, and synthetic packet loss; outputs include delivered count, strict-monotonic false rejection count, and observed out-of-order arrival rate; these **are not** radio-channel measurements;
@@ -59,7 +60,7 @@ The second command is an example and may require using the executable produced b
 ## Claims not established by this change
 
 1. **Group secret and node capture.** All members still share a signing secret. Anyone holding that secret can generate a valid HMAC with another sender identifier. There is no implemented per-node identity, key-provisioning or distributed revocation protocol. A trust epoch is an integer gate; incrementing it does not itself distribute a new secret.
-2. **Receiver restart and cache eviction.** Last accepted sequences live in `SwarmStateCache` memory. No crash-atomic replay watermark checkpoint, persistent session binding, or authenticated reboot handshake exists in this change. Reusing the same secret and epoch after restart or removal of a stale cache entry may admit an old still-fresh signed packet.
+2. **Receiver restart and cache eviction.** Last accepted sequences live in `SwarmStateCache` memory. No crash-atomic replay watermark checkpoint, persistent session binding, or authenticated reboot handshake exists in this change. The cache now retains an in-memory sequence watermark through the maximum configured TTL plus skew after an ordinary expiry, but capacity-driven eviction, explicit cache clearing, or a process restart can still erase that watermark. Reusing the same secret and epoch after such events may admit an old still-fresh signed packet.
 3. **Reordering.** The current receiver deliberately rejects any authenticated sequence less than or equal to the highest accepted one. A sliding anti-replay bitmap in the manuscript is a *proposed* protocol, not implemented here. A benign out-of-order rejection must not be labeled proof of hostile replay.
 4. **Key and epoch changes.** No synchronized distributed group-rekey handshake, quorum transition, rollback protection, or seamless 32-bit rollover protocol is implemented.
 5. **Radio and flight experiments.** No physical FANET, RF packet-loss/reordering distribution, multi-UAV flight, GNSS-denied clock-sync characterization, or hardware side-channel measurement is established by repository software tests. The benchmark does not establish timing or power side-channel resistance.
