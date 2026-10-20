@@ -335,6 +335,12 @@ std::string_view to_string(PacketAuthResult result) {
         return "stale_epoch";
     case PacketAuthResult::REPLAY_DETECTED:
         return "replay_detected";
+    case PacketAuthResult::INVALID_TTL:
+        return "invalid_ttl";
+    case PacketAuthResult::FUTURE_TIMESTAMP:
+        return "future_timestamp";
+    case PacketAuthResult::STALE_TIMESTAMP:
+        return "stale_timestamp";
     }
     return "unknown";
 }
@@ -392,18 +398,30 @@ PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
         return outcome(PacketAuthResult::UNSUPPORTED,
                        "Ed25519 auth is placeholder-only in this build.");
     }
-    const auto age =
-        now_ms > packet.timestamp_ms ? now_ms - packet.timestamp_ms : packet.timestamp_ms - now_ms;
-    if (config.max_clock_skew_ms > 0 && age > config.max_clock_skew_ms + packet.ttl_ms) {
-        return outcome(PacketAuthResult::REJECTED, "packet timestamp outside auth clock skew");
+    // Time and TTL have different roles: TTL never expands the permitted future clock skew.
+    // Subtractions avoid unsigned overflow near the end of the timestamp space.
+    if (packet.ttl_ms == 0 || config.max_packet_ttl_ms == 0 ||
+        packet.ttl_ms > config.max_packet_ttl_ms) {
+        return outcome(PacketAuthResult::INVALID_TTL, "packet TTL outside configured bounds");
+    }
+    if (packet.timestamp_ms > now_ms) {
+        if (packet.timestamp_ms - now_ms > config.max_clock_skew_ms) {
+            return outcome(PacketAuthResult::FUTURE_TIMESTAMP, "packet timestamp exceeds future clock skew");
+        }
+    } else {
+        const auto elapsed = now_ms - packet.timestamp_ms;
+        if (elapsed > config.max_clock_skew_ms &&
+            elapsed - config.max_clock_skew_ms > packet.ttl_ms) {
+            return outcome(PacketAuthResult::STALE_TIMESTAMP, "packet timestamp exceeds TTL and clock skew");
+        }
     }
     if (auto epoch = validateTrustEpoch(packet, config); !epoch.accepted()) {
         return epoch;
     }
-    if (auto replay = validateNonceOrSequence(packet, last_sequence_number); !replay.accepted()) {
-        return replay;
-    }
     if (config.mode == AuthMode::NONE) {
+        if (auto replay = validateNonceOrSequence(packet, last_sequence_number); !replay.accepted()) {
+            return replay;
+        }
         if (unsigned_allowed_for_profile(packet, config)) {
             return outcome(PacketAuthResult::ACCEPTED,
                            "unsigned packet accepted for simulation/debug");
@@ -429,6 +447,10 @@ PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
     const auto expected = hmac_sha256_bytes(secret, canonical_bytes(packet));
     if (!constant_time_equal(*provided, expected)) {
         return outcome(PacketAuthResult::INVALID_SIGNATURE, "packet signature verification failed");
+    }
+    // Only authenticated packets receive authoritative replay classification in HMAC mode.
+    if (auto replay = validateNonceOrSequence(packet, last_sequence_number); !replay.accepted()) {
+        return replay;
     }
     return outcome(PacketAuthResult::ACCEPTED, "packet authentication accepted");
 }
