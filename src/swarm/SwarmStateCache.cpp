@@ -95,8 +95,7 @@ void SwarmStateCache::expire(uint64_t now_ms) {
                     std::numeric_limits<uint64_t>::max() - config_.maximum_authenticated_ttl_ms
                 ? std::numeric_limits<uint64_t>::max()
                 : config_.accepted_clock_skew_ms + config_.maximum_authenticated_ttl_ms;
-        const uint64_t retention_ms =
-            std::max<uint64_t>(config_.entry_expiry_ms, max_age);
+        const uint64_t retention_ms = std::max<uint64_t>(config_.entry_expiry_ms, max_age);
         if (age_ms > retention_ms) {
             it = peers_.erase(it);
             continue;
