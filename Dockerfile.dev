@@ -31,11 +31,19 @@ COPY requirements.txt /tmp/requirements.txt
 
 RUN python3 - <<'PY'
 from pathlib import Path
+import re
 
 requirements = Path("/tmp/requirements.txt").read_text(encoding="utf-8")
-# Debian bookworm's Python 3.11 cannot install NumPy 2.5.x (Python >=3.12).
-# Keep the developer image's NumPy constraint compatible with this interpreter.
-requirements = requirements.replace("numpy>=2.5.2", "numpy>=2.2,<2.5")
+# Debian bookworm uses Python 3.11. NumPy >=2.5 requires Python >=3.12.
+# Translate the project-wide NumPy floor only for this developer image,
+# including when the requirements file is updated on the default branch.
+requirements, count = re.subn(
+    r"(?m)^numpy>=2\\.5\\.[0-9]+$",
+    "numpy>=2.2,<2.5",
+    requirements,
+)
+if count != 1:
+    raise SystemExit("Expected exactly one NumPy >=2.5.x requirement")
 requirements = requirements.replace("opencv-python>=5.0.0.93", "opencv-python>=4.10.0.84")
 Path("/tmp/requirements.container.txt").write_text(requirements, encoding="utf-8")
 PY
