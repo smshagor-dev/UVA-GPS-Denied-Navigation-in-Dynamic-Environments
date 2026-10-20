@@ -398,10 +398,8 @@ PacketAuthOutcome signPacket(drone::swarm::EdgePeerPacket& packet, const PacketA
             return outcome(PacketAuthResult::MISSING_SIGNATURE,
                            "per-node signing key must contain at least 32 bytes");
         }
-        const auto mac =
-            hmac_sha256_bytes(config.local_signing_secret, canonical_bytes(packet));
-        packet.auth_hook =
-            std::string("hmac_sha256_node:") + hex_encode(mac.data(), mac.size());
+        const auto mac = hmac_sha256_bytes(config.local_signing_secret, canonical_bytes(packet));
+        packet.auth_hook = std::string("hmac_sha256_node:") + hex_encode(mac.data(), mac.size());
         return outcome(PacketAuthResult::ACCEPTED, "packet signed with local node key");
     }
     const auto secret = effective_secret(config);

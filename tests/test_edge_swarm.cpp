@@ -307,8 +307,8 @@ TEST(PeerPacketAuth, PerNodeHmacAcceptsProvisionedIndependentSenders) {
     ASSERT_TRUE(signPacket(second, second_sender).accepted());
     EXPECT_EQ(verifyPacket(first, receiver, 1000).result, PacketAuthResult::ACCEPTED);
     EXPECT_EQ(verifyPacket(second, receiver, 1000).result, PacketAuthResult::ACCEPTED);
-    EXPECT_EQ(verifyPacket(first, receiver, 1000, 1).result,
-              PacketAuthResult::REPLAY_DETECTED);
+    const auto replay = verifyPacket(first, receiver, 1000, 1);
+    EXPECT_EQ(replay.result, PacketAuthResult::REPLAY_DETECTED);
 }
 
 TEST(PeerPacketAuth, PerNodeHmacRejectsInsiderSenderSubstitution) {
@@ -344,18 +344,18 @@ TEST(PeerPacketAuth, PerNodeHmacHasNoSharedKeyOrUnsignedFallback) {
     receiver.allow_unsigned_in_simulation = true;
     auto packet = heartbeat(7, 1000, 1);
     packet.source = "simulation";
-    EXPECT_EQ(verifyPacket(packet, receiver, 1000).result,
-              PacketAuthResult::INVALID_SIGNATURE);
+    const auto unsigned_result = verifyPacket(packet, receiver, 1000);
+    EXPECT_EQ(unsigned_result.result, PacketAuthResult::INVALID_SIGNATURE);
     ASSERT_TRUE(signPacket(packet, sender).accepted());
     EXPECT_EQ(verifyPacket(packet, receiver, 1000).result, PacketAuthResult::ACCEPTED);
 
     auto legacy = auth_config();
     auto legacy_packet = heartbeat(7, 1000, 2);
     ASSERT_TRUE(signPacket(legacy_packet, legacy).accepted());
-    EXPECT_EQ(verifyPacket(legacy_packet, receiver, 1000).result,
-              PacketAuthResult::INVALID_SIGNATURE);
-    EXPECT_EQ(verifyPacket(packet, legacy, 1000).result,
-              PacketAuthResult::INVALID_SIGNATURE);
+    const auto downgrade = verifyPacket(legacy_packet, receiver, 1000);
+    EXPECT_EQ(downgrade.result, PacketAuthResult::INVALID_SIGNATURE);
+    const auto legacy_verification = verifyPacket(packet, legacy, 1000);
+    EXPECT_EQ(legacy_verification.result, PacketAuthResult::INVALID_SIGNATURE);
 }
 
 TEST(PeerPacketAuth, PerNodeHmacRejectsUnknownAndWrongKeys) {
@@ -368,8 +368,8 @@ TEST(PeerPacketAuth, PerNodeHmacRejectsUnknownAndWrongKeys) {
     receiver.mode = AuthMode::PER_NODE_HMAC_SHA256;
     auto packet = heartbeat(7, 1000, 1);
     ASSERT_TRUE(signPacket(packet, sender).accepted());
-    EXPECT_EQ(verifyPacket(packet, receiver, 1000).result,
-              PacketAuthResult::UNTRUSTED_SENDER);
+    const auto unknown_sender = verifyPacket(packet, receiver, 1000);
+    EXPECT_EQ(unknown_sender.result, PacketAuthResult::UNTRUSTED_SENDER);
     receiver.trusted_node_secrets.emplace(7u, std::string(32, 'B'));
     EXPECT_EQ(verifyPacket(packet, receiver, 1000).result,
               PacketAuthResult::INVALID_SIGNATURE);
