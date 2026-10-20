@@ -713,8 +713,7 @@ bool packet_is_expired(const EdgePeerPacket& packet, uint64_t now_ms) {
     if (packet.ttl_ms == 0) {
         return true;
     }
-    return now_ms >= packet.timestamp_ms &&
-           now_ms - packet.timestamp_ms > packet.ttl_ms;
+    return now_ms >= packet.timestamp_ms && now_ms - packet.timestamp_ms > packet.ttl_ms;
 }
 
 std::string serialize_edge_packet_json(const EdgePeerPacket& packet) {
