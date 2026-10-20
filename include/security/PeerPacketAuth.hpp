@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace drone::security {
 
@@ -55,6 +56,9 @@ struct PacketAuthOutcome {
 [[nodiscard]] std::optional<AuthMode> parse_auth_mode(std::string_view value);
 [[nodiscard]] std::string_view to_string(PacketAuthResult result);
 
+// Exposed for reproducible, in-process measurements of the HMAC primitive.
+[[nodiscard]] std::array<uint8_t, 32>
+hmacSha256Digest(std::string_view secret, const std::vector<uint8_t>& data);
 [[nodiscard]] std::array<uint8_t, 32>
 canonicalPayloadHash(const drone::swarm::EdgePeerPacket& packet);
 [[nodiscard]] PacketAuthOutcome validateTrustEpoch(const drone::swarm::EdgePeerPacket& packet,
