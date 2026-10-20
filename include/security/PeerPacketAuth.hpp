@@ -57,8 +57,9 @@ struct PacketAuthOutcome {
 [[nodiscard]] std::string_view to_string(PacketAuthResult result);
 
 // Exposed for reproducible, in-process measurements of the HMAC primitive.
-[[nodiscard]] std::array<uint8_t, 32>
-hmacSha256Digest(std::string_view secret, const std::vector<uint8_t>& data);
+using HmacDigest = std::array<uint8_t, 32>;
+[[nodiscard]] HmacDigest hmacSha256Digest(std::string_view secret,
+                                          const std::vector<uint8_t>& data);
 [[nodiscard]] std::array<uint8_t, 32>
 canonicalPayloadHash(const drone::swarm::EdgePeerPacket& packet);
 [[nodiscard]] PacketAuthOutcome validateTrustEpoch(const drone::swarm::EdgePeerPacket& packet,
