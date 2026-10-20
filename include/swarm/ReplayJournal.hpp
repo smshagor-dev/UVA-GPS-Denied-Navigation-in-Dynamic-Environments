@@ -52,9 +52,15 @@ public:
         return true;
     }
 
-    [[nodiscard]] bool enabled() const { return enabled_; }
-    [[nodiscard]] bool healthy() const { return healthy_; }
-    [[nodiscard]] size_t peer_count() const { return records_.size(); }
+    [[nodiscard]] bool enabled() const {
+        return enabled_;
+    }
+    [[nodiscard]] bool healthy() const {
+        return healthy_;
+    }
+    [[nodiscard]] size_t peer_count() const {
+        return records_.size();
+    }
 
     [[nodiscard]] const ReplayLedgerRecord* find(uint32_t peer_id) const {
         const auto it = records_.find(peer_id);
@@ -68,15 +74,20 @@ public:
         if (!healthy_) {
             return false;
         }
-        std::FILE* file = std::fopen(path_.c_str(), "rb+");
+        std::FILE* file = open_file(path_, "rb+");
         if (file == nullptr) {
             healthy_ = false;
             return false;
         }
-        const std::string row = "R " + std::to_string(record.peer_id) + " " +
-                                std::to_string(record.epoch) + " " +
-                                std::to_string(record.highest_sequence) + " " +
-                                std::to_string(record.bitmap) + "\n";
+        std::string row = "R ";
+        row += std::to_string(record.peer_id);
+        row += " ";
+        row += std::to_string(record.epoch);
+        row += " ";
+        row += std::to_string(record.highest_sequence);
+        row += " ";
+        row += std::to_string(record.bitmap);
+        row += "\n";
         const bool positioned = std::fseek(file, 0, SEEK_END) == 0;
         const bool written =
             positioned && std::fwrite(row.data(), 1, row.size(), file) == row.size();
@@ -93,6 +104,18 @@ public:
 private:
     static constexpr const char* kVersion = "UAV_REPLAY_LEDGER_V1";
 
+    static std::FILE* open_file(const std::string& path, const char* mode) {
+#ifdef _WIN32
+        std::FILE* file = nullptr;
+        if (fopen_s(&file, path.c_str(), mode) != 0) {
+            return nullptr;
+        }
+        return file;
+#else
+        return std::fopen(path.c_str(), mode);
+#endif
+    }
+
     static bool flush_durable(std::FILE* file) {
         if (std::fflush(file) != 0) {
             return false;
@@ -106,7 +129,7 @@ private:
 
     static bool create_empty(const std::string& path) {
         // Only use a private directory owned by this UAV's service account.
-        std::FILE* file = std::fopen(path.c_str(), "wb");
+        std::FILE* file = open_file(path, "wb");
         if (file == nullptr) {
             return false;
         }
@@ -120,8 +143,10 @@ private:
     static bool parse_record(const std::string& row, ReplayLedgerRecord& record) {
         std::istringstream stream(row);
         std::string marker;
-        if (!(stream >> marker >> record.peer_id >> record.epoch >>
-              record.highest_sequence >> record.bitmap)) {
+        if (!(stream >> marker >> record.peer_id)) {
+            return false;
+        }
+        if (!(stream >> record.epoch >> record.highest_sequence >> record.bitmap)) {
             return false;
         }
         std::string trailing;
