@@ -508,7 +508,9 @@ TEST(PeerPacketAuth, SyntheticPacketReorderingAndLossStudy) {
         std::cout << "[peer-auth-synthetic-delivery] name=" << trace.name;
         std::cout << " transmitted=128 delivered=" << packets.size();
         std::cout << " accepted=" << accepted << " false_rejected=" << rejected;
-        std::cout << " out_of_order_rate=" << static_cast<double>(out_of_order) / static_cast<double>(packets.size());
+        const double delivered_count = static_cast<double>(packets.size());
+        const double out_of_order_rate = static_cast<double>(out_of_order) / delivered_count;
+        std::cout << " out_of_order_rate=" << out_of_order_rate;
         std::cout << '\n';
     }
 }
