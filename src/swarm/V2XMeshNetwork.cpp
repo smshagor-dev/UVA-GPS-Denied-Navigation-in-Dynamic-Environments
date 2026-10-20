@@ -1123,8 +1123,8 @@ void V2XMeshNetwork::configure_security(SwarmSecurityConfig cfg) {
 }
 void V2XMeshNetwork::configure_packet_auth(drone::security::PacketAuthConfig cfg) {
     packet_auth_config_ = std::move(cfg);
-    edge_state_cache_.configure_freshness(packet_auth_config_.max_clock_skew_ms,
-                                          packet_auth_config_.max_packet_ttl_ms);
+    edge_state_cache_.configure_freshness(
+        {packet_auth_config_.max_clock_skew_ms, packet_auth_config_.max_packet_ttl_ms});
     {
         std::lock_guard lock(edge_serialization_metrics_mutex_);
         edge_serialization_metrics_.auth_mode =
