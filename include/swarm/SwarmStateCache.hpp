@@ -1,6 +1,7 @@
 #pragma once
 
 #include "swarm/EdgePeerProtocol.hpp"
+#include "swarm/ReplayJournal.hpp"
 
 #include <Eigen/Core>
 
@@ -72,6 +73,8 @@ public:
     void expire(uint64_t now_ms);
     void clear();
     void configure_freshness(SwarmCacheFreshnessPolicy policy);
+    [[nodiscard]] bool configure_replay_ledger(const std::string& path,
+                                               bool initialize_new = false);
 
     [[nodiscard]] size_t peer_count() const;
     [[nodiscard]] size_t stale_peer_count() const;
@@ -88,6 +91,7 @@ private:
     SwarmStateCacheConfig config_{};
     mutable std::mutex mutex_{};
     std::unordered_map<uint32_t, CachedPeerState> peers_{};
+    ReplayJournal replay_journal_{};
 };
 
 } // namespace drone::swarm
