@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace drone::security {
@@ -16,6 +17,7 @@ enum class AuthMode : uint8_t {
     HMAC_SHA256,
     ED25519_PLACEHOLDER,
     PQC_HYBRID_PLACEHOLDER,
+    PER_NODE_HMAC_SHA256,
 };
 
 enum class PacketAuthResult : uint8_t {
@@ -29,6 +31,7 @@ enum class PacketAuthResult : uint8_t {
     INVALID_TTL,
     FUTURE_TIMESTAMP,
     STALE_TIMESTAMP,
+    UNTRUSTED_SENDER,
 };
 
 struct PacketAuthConfig {
@@ -40,6 +43,11 @@ struct PacketAuthConfig {
     uint32_t max_packet_ttl_ms{5000};
     std::string shared_secret{};
     std::string shared_secret_env{"DRONE_SWARM_SECRET"};
+    // Strict per-node HMAC mode requires a local signing identity and a distinct
+    // verification secret for each accepted sender. Never falls back to group HMAC.
+    uint32_t local_node_id{0};
+    std::string local_signing_secret{};
+    std::unordered_map<uint32_t, std::string> trusted_node_secrets{};
     std::string runtime_profile{"edge_swarm"};
     // Optional durable replay state on trusted, single-writer local storage.
     std::string replay_ledger_path{};

@@ -302,6 +302,8 @@ std::string_view to_string(AuthMode mode) {
         return "ed25519_placeholder";
     case AuthMode::PQC_HYBRID_PLACEHOLDER:
         return "pqc_hybrid_placeholder";
+    case AuthMode::PER_NODE_HMAC_SHA256:
+        return "hmac_sha256_per_node";
     }
     return "unknown";
 }
@@ -316,6 +318,8 @@ std::optional<AuthMode> parse_auth_mode(std::string_view value) {
         return AuthMode::ED25519_PLACEHOLDER;
     if (lower == "pqc_hybrid_placeholder")
         return AuthMode::PQC_HYBRID_PLACEHOLDER;
+    if (lower == "hmac_sha256_per_node")
+        return AuthMode::PER_NODE_HMAC_SHA256;
     return std::nullopt;
 }
 
@@ -341,6 +345,8 @@ std::string_view to_string(PacketAuthResult result) {
         return "future_timestamp";
     case PacketAuthResult::STALE_TIMESTAMP:
         return "stale_timestamp";
+    case PacketAuthResult::UNTRUSTED_SENDER:
+        return "untrusted_sender";
     }
     return "unknown";
 }
@@ -382,6 +388,21 @@ PacketAuthOutcome signPacket(drone::swarm::EdgePeerPacket& packet, const PacketA
     if (config.mode == AuthMode::ED25519_PLACEHOLDER) {
         return outcome(PacketAuthResult::UNSUPPORTED,
                        "Ed25519 auth is placeholder-only in this build.");
+    }
+    if (config.mode == AuthMode::PER_NODE_HMAC_SHA256) {
+        if (config.local_node_id == 0 || packet.sender_id != config.local_node_id) {
+            return outcome(PacketAuthResult::UNTRUSTED_SENDER,
+                           "packet sender does not match local signing identity");
+        }
+        if (config.local_signing_secret.size() < 32u) {
+            return outcome(PacketAuthResult::MISSING_SIGNATURE,
+                           "per-node signing key must contain at least 32 bytes");
+        }
+        const auto mac =
+            hmac_sha256_bytes(config.local_signing_secret, canonical_bytes(packet));
+        packet.auth_hook =
+            std::string("hmac_sha256_node:") + hex_encode(mac.data(), mac.size());
+        return outcome(PacketAuthResult::ACCEPTED, "packet signed with local node key");
     }
     const auto secret = effective_secret(config);
     if (secret.empty()) {
@@ -440,7 +461,8 @@ PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
     if (packet.auth_hook.empty() || packet.auth_hook == "unsigned") {
         return outcome(PacketAuthResult::MISSING_SIGNATURE, "missing packet signature");
     }
-    constexpr std::string_view prefix = "hmac_sha256:";
+    const bool per_node_mode = config.mode == AuthMode::PER_NODE_HMAC_SHA256;
+    const std::string_view prefix = per_node_mode ? "hmac_sha256_node:" : "hmac_sha256:";
     if (packet.auth_hook.rfind(prefix, 0) != 0) {
         return outcome(PacketAuthResult::INVALID_SIGNATURE, "packet signature algorithm mismatch");
     }
@@ -448,11 +470,24 @@ PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
     if (!provided.has_value()) {
         return outcome(PacketAuthResult::INVALID_SIGNATURE, "packet signature encoding invalid");
     }
-    const auto secret = effective_secret(config);
-    if (secret.empty()) {
-        return outcome(PacketAuthResult::MISSING_SIGNATURE, "HMAC shared secret missing");
+    std::string group_secret;
+    std::string_view verification_key;
+    if (per_node_mode) {
+        const auto peer = config.trusted_node_secrets.find(packet.sender_id);
+        if (packet.sender_id == 0 || peer == config.trusted_node_secrets.end() ||
+            peer->second.size() < 32u) {
+            return outcome(PacketAuthResult::UNTRUSTED_SENDER,
+                           "no valid verification key for claimed sender");
+        }
+        verification_key = peer->second;
+    } else {
+        group_secret = effective_secret(config);
+        if (group_secret.empty()) {
+            return outcome(PacketAuthResult::MISSING_SIGNATURE, "HMAC shared secret missing");
+        }
+        verification_key = group_secret;
     }
-    const auto expected = hmac_sha256_bytes(secret, canonical_bytes(packet));
+    const auto expected = hmac_sha256_bytes(verification_key, canonical_bytes(packet));
     if (!constant_time_equal(*provided, expected)) {
         return outcome(PacketAuthResult::INVALID_SIGNATURE, "packet signature verification failed");
     }
