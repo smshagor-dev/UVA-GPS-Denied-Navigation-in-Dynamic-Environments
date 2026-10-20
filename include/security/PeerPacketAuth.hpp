@@ -41,6 +41,9 @@ struct PacketAuthConfig {
     std::string shared_secret{};
     std::string shared_secret_env{"DRONE_SWARM_SECRET"};
     std::string runtime_profile{"edge_swarm"};
+    // Optional durable replay state on trusted, single-writer local storage.
+    std::string replay_ledger_path{};
+    bool initialize_new_replay_ledger{false};
 };
 
 struct PacketAuthOutcome {

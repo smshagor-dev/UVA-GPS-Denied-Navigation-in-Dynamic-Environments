@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <vector>
@@ -452,6 +454,77 @@ TEST(SwarmStateCache, ReplayMemorySurvivesShortPeerExpiry) {
     const auto replay = cache.observe_packet(heartbeat(7, 1000, 10), 2500);
     EXPECT_FALSE(replay.accepted);
     EXPECT_EQ(replay.reason, "stale sequence number");
+}
+
+TEST(SwarmStateCache, DurableReplayWindowSurvivesRestartAndClear) {
+    const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto path = std::filesystem::temp_directory_path() /
+                      ("uav-replay-window-" + std::to_string(timestamp) + ".log");
+    {
+        SwarmStateCache cache;
+        ASSERT_TRUE(cache.configure_replay_ledger(path.string(), true));
+        ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 12), 1000).accepted);
+        ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 10), 1000).accepted);
+        cache.clear();
+        EXPECT_FALSE(cache.observe_packet(heartbeat(7, 1000, 12), 1000).accepted);
+        EXPECT_FALSE(cache.observe_packet(heartbeat(7, 1000, 10), 1000).accepted);
+    }
+    {
+        SwarmStateCache restarted;
+        ASSERT_TRUE(restarted.configure_replay_ledger(path.string()));
+        EXPECT_EQ(restarted.last_sequence_number(7).value_or(0), 12u);
+        EXPECT_FALSE(restarted.observe_packet(heartbeat(7, 1000, 12), 1000).accepted);
+        EXPECT_FALSE(restarted.observe_packet(heartbeat(7, 1000, 10), 1000).accepted);
+        ASSERT_TRUE(restarted.observe_packet(heartbeat(7, 1000, 11), 1000).accepted);
+        EXPECT_FALSE(restarted.observe_packet(heartbeat(7, 1000, 11), 1000).accepted);
+        EXPECT_TRUE(restarted.observe_packet(heartbeat(7, 1000, 13), 1000).accepted);
+    }
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
+}
+
+TEST(SwarmStateCache, MissingReplayJournalFailsClosed) {
+    const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto path = std::filesystem::temp_directory_path() /
+                      ("uav-missing-replay-" + std::to_string(timestamp) + ".log");
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
+    SwarmStateCache cache;
+    EXPECT_FALSE(cache.configure_replay_ledger(path.string()));
+    const auto observed = cache.observe_packet(heartbeat(7, 1000, 1), 1000);
+    EXPECT_FALSE(observed.accepted);
+    EXPECT_EQ(observed.reason, "replay journal unavailable");
+}
+
+TEST(SwarmStateCache, TornReplayJournalFailsClosed) {
+    const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto path = std::filesystem::temp_directory_path() /
+                      ("uav-torn-replay-" + std::to_string(timestamp) + ".log");
+    {
+        std::ofstream file(path, std::ios::binary);
+        file << "UAV_REPLAY_LEDGER_V1\nR 7 1 12 1";
+    }
+    SwarmStateCache cache;
+    EXPECT_FALSE(cache.configure_replay_ledger(path.string()));
+    EXPECT_FALSE(cache.observe_packet(heartbeat(7, 1000, 13), 1000).accepted);
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
+}
+
+TEST(SwarmStateCache, DurableReplayWindowSurvivesPeerExpiry) {
+    const auto timestamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    const auto path = std::filesystem::temp_directory_path() /
+                      ("uav-expired-replay-" + std::to_string(timestamp) + ".log");
+    {
+        SwarmStateCache cache({8, 100, 200});
+        ASSERT_TRUE(cache.configure_replay_ledger(path.string(), true));
+        ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 20), 1000).accepted);
+        cache.expire(8000);
+        EXPECT_EQ(cache.peer_count(), 0u);
+        EXPECT_FALSE(cache.observe_packet(heartbeat(7, 1000, 20), 1000).accepted);
+    }
+    std::error_code ignored;
+    std::filesystem::remove(path, ignored);
 }
 
 TEST(SwarmStateCache, SlidingWindowAcceptsUnseenReorderingAndRejectsDuplicates) {
