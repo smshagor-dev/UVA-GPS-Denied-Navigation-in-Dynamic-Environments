@@ -342,6 +342,31 @@ TEST(PeerPacketAuth, MonocypherPublicKeyRejectsImpersonationAndTampering) {
     EXPECT_EQ(payload_change.result, PacketAuthResult::INVALID_SIGNATURE);
 }
 
+TEST(PeerPacketAuth, MonocypherPublicKeyRejectsMalformedSignatureBytes) {
+    std::array<uint8_t, 32> seed{};
+    seed.fill(37u);
+    auto sender = auth_config();
+    sender.mode = AuthMode::MONOCYPHER_EDDSA_BLAKE2B;
+    sender.local_node_id = 7u;
+    sender.local_eddsa_seed = seed;
+
+    auto receiver = auth_config();
+    receiver.mode = AuthMode::MONOCYPHER_EDDSA_BLAKE2B;
+    receiver.trusted_node_public_keys.emplace(7u, monocypherPublicKeyFromSeed(seed));
+
+    auto packet = heartbeat(7, 1000, 1);
+    ASSERT_TRUE(signPacket(packet, sender).accepted());
+    EXPECT_EQ(verifyPacket(packet, receiver, 1000).result, PacketAuthResult::ACCEPTED);
+
+    packet.auth_hook = "monocypher_eddsa_blake2b:gg";
+    const auto malformed = verifyPacket(packet, receiver, 1000);
+    EXPECT_EQ(malformed.result, PacketAuthResult::INVALID_SIGNATURE);
+
+    packet.auth_hook = "monocypher_eddsa_blake2b:01";
+    const auto truncated = verifyPacket(packet, receiver, 1000);
+    EXPECT_EQ(truncated.result, PacketAuthResult::INVALID_SIGNATURE);
+}
+
 TEST(PeerPacketAuth, MonocypherPublicKeyRejectsDowngradeAndUnknownPeers) {
     std::array<uint8_t, 32> seed{};
     seed.fill(11u);
