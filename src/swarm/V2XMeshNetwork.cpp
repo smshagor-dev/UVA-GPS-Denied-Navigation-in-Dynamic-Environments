@@ -676,9 +676,9 @@ void V2XMeshNetwork::handle_edge_packet(const SwarmMessage& msg) {
                                   std::chrono::system_clock::now().time_since_epoch())
                                   .count());
 
-    const auto last_sequence = edge_state_cache_.last_sequence_number(parsed.packet.sender_id);
-    const auto auth =
-        drone::security::verifyPacket(parsed.packet, packet_auth_config_, now_ms, last_sequence);
+    // Authenticate first; the cache performs atomic sliding-window replay admission.
+    // Passing the monotonic watermark here would incorrectly reject valid reordering.
+    const auto auth = drone::security::verifyPacket(parsed.packet, packet_auth_config_, now_ms);
     {
         std::lock_guard lock(edge_serialization_metrics_mutex_);
         edge_serialization_metrics_.auth_mode =

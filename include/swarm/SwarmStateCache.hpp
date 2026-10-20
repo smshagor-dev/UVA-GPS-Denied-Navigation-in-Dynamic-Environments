@@ -20,6 +20,8 @@ struct CachedPeerState {
     uint64_t last_pose_timestamp_ms{0};
     uint64_t last_obstacle_digest_timestamp_ms{0};
     uint32_t last_sequence_number{0};
+    // Bit 0 is the highest seen sequence; older authenticated packets use higher bits.
+    uint64_t replay_window_bitmap{1u};
     uint64_t trust_epoch{0};
     double localization_confidence{0.0};
     Eigen::Vector3d position{Eigen::Vector3d::Zero()};

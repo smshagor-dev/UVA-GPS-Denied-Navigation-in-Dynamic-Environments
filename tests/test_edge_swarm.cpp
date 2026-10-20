@@ -454,6 +454,78 @@ TEST(SwarmStateCache, ReplayMemorySurvivesShortPeerExpiry) {
     EXPECT_EQ(replay.reason, "stale sequence number");
 }
 
+TEST(SwarmStateCache, SlidingWindowAcceptsUnseenReorderingAndRejectsDuplicates) {
+    SwarmStateCache cache;
+    ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 10), 1000).accepted);
+    ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 12), 1000).accepted);
+    ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 11), 1000).accepted);
+    EXPECT_EQ(cache.last_sequence_number(7).value_or(0), 12u);
+    EXPECT_FALSE(cache.observe_packet(heartbeat(7, 1000, 11), 1000).accepted);
+    EXPECT_FALSE(cache.observe_packet(heartbeat(7, 1000, 12), 1000).accepted);
+    EXPECT_EQ(cache.last_sequence_number(7).value_or(0), 12u);
+}
+
+TEST(SwarmStateCache, SlidingWindowBoundsOldPacketsAndLargeJumps) {
+    SwarmStateCache cache;
+    ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 2), 1000).accepted);
+    ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 70), 1000).accepted);
+    ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000, 7), 1000).accepted);
+    const auto too_old = cache.observe_packet(heartbeat(7, 1000, 6), 1000);
+    EXPECT_FALSE(too_old.accepted);
+    EXPECT_EQ(too_old.reason, "sequence outside replay window");
+    EXPECT_FALSE(cache.observe_packet(heartbeat(7, 1000, 7), 1000).accepted);
+    EXPECT_EQ(cache.last_sequence_number(7).value_or(0), 70u);
+}
+
+TEST(SwarmStateCache, ReorderedPacketsDoNotRollbackPeerState) {
+    SwarmStateCache cache;
+    auto newer = heartbeat(7, 1000, 11);
+    auto latest_heartbeat = newer.heartbeat.value_or(HeartbeatPayload{});
+    latest_heartbeat.peer_count = 81;
+    newer.heartbeat = latest_heartbeat;
+    auto older = heartbeat(7, 999, 10);
+    auto previous_heartbeat = older.heartbeat.value_or(HeartbeatPayload{});
+    previous_heartbeat.peer_count = 25;
+    older.heartbeat = previous_heartbeat;
+    ASSERT_TRUE(cache.observe_packet(newer, 1000).accepted);
+    ASSERT_TRUE(cache.observe_packet(older, 1000).accepted);
+    const auto state = cache.peer_state(7);
+    ASSERT_TRUE(state.has_value());
+    const auto cached = state.value_or(CachedPeerState{});
+    EXPECT_EQ(cached.last_sequence_number, 11u);
+    EXPECT_EQ(cached.last_packet_timestamp_ms, 1000u);
+    EXPECT_EQ(cached.last_heartbeat_timestamp_ms, 1000u);
+    EXPECT_EQ(cached.peer_count, 81);
+}
+
+TEST(SwarmStateCache, EpochChangeResetsWindowButRollbackFails) {
+    SwarmStateCache cache;
+    const auto max_sequence = heartbeat(7, 1000, std::numeric_limits<uint32_t>::max());
+    ASSERT_TRUE(cache.observe_packet(max_sequence, 1000).accepted);
+    EXPECT_FALSE(cache.observe_packet(heartbeat(7, 1000, 0), 1000).accepted);
+    auto fresh_epoch = heartbeat(7, 1000, 0);
+    fresh_epoch.trust_epoch = 2;
+    ASSERT_TRUE(cache.observe_packet(fresh_epoch, 1000).accepted);
+    EXPECT_EQ(cache.last_sequence_number(7).value_or(1), 0u);
+    EXPECT_FALSE(cache.observe_packet(heartbeat(7, 1000, 1), 1000).accepted);
+}
+
+TEST(PeerPacketAuth, SlidingWindowAdmissionAuthenticatesBeforeCacheUpdate) {
+    auto cfg = auth_config();
+    SwarmStateCache cache;
+    for (const auto sequence : {12u, 11u}) {
+        auto packet = heartbeat(7, 1000, sequence);
+        ASSERT_TRUE(signPacket(packet, cfg).accepted());
+        ASSERT_TRUE(verifyPacket(packet, cfg, 1000).accepted());
+        EXPECT_TRUE(cache.observe_packet(packet, 1000).accepted);
+    }
+    auto tampered = heartbeat(7, 1000, 10);
+    ASSERT_TRUE(signPacket(tampered, cfg).accepted());
+    tampered.sender_id = 8;
+    EXPECT_EQ(verifyPacket(tampered, cfg, 1000).result, PacketAuthResult::INVALID_SIGNATURE);
+    EXPECT_FALSE(cache.last_sequence_number(8).has_value());
+}
+
 TEST(PeerPacketAuth, SyntheticPacketReorderingAndLossStudy) {
     // Deterministic delivery traces, not measurements from a physical FANET radio.
     struct Trace {
@@ -483,28 +555,29 @@ TEST(PeerPacketAuth, SyntheticPacketReorderingAndLossStudy) {
                 std::swap(packets[i], packets[i + 1]);
             }
         }
-        std::optional<uint32_t> last;
+        SwarmStateCache cache;
+        std::optional<uint32_t> highest_arrival;
         size_t out_of_order = 0;
         size_t accepted = 0;
         size_t rejected = 0;
         for (const auto& packet : packets) {
-            if (last && packet.sequence_number <= *last) {
+            if (highest_arrival && packet.sequence_number <= *highest_arrival) {
                 ++out_of_order;
             }
-            const auto outcome = verifyPacket(packet, cfg, 1000, last);
-            if (outcome.accepted()) {
+            const auto outcome = verifyPacket(packet, cfg, 1000);
+            ASSERT_TRUE(outcome.accepted());
+            const auto observed = cache.observe_packet(packet, 1000);
+            if (observed.accepted) {
                 ++accepted;
-                last = packet.sequence_number;
             } else {
-                EXPECT_EQ(outcome.result, PacketAuthResult::REPLAY_DETECTED);
                 ++rejected;
             }
+            if (!highest_arrival || packet.sequence_number > *highest_arrival) {
+                highest_arrival = packet.sequence_number;
+            }
         }
-        EXPECT_EQ(out_of_order, rejected);
+        EXPECT_EQ(rejected, 0u);
         EXPECT_EQ(accepted + rejected, packets.size());
-        if (trace.swap_every == 0) {
-            EXPECT_EQ(rejected, 0u);
-        }
         std::cout << "[peer-auth-synthetic-delivery] name=" << trace.name;
         std::cout << " transmitted=128 delivered=" << packets.size();
         std::cout << " accepted=" << accepted << " false_rejected=" << rejected;
