@@ -480,23 +480,28 @@ TEST(SwarmStateCache, SlidingWindowBoundsOldPacketsAndLargeJumps) {
 TEST(SwarmStateCache, ReorderedPacketsDoNotRollbackPeerState) {
     SwarmStateCache cache;
     auto newer = heartbeat(7, 1000, 11);
-    newer.heartbeat->battery_pct = 81.0;
+    auto latest_heartbeat = newer.heartbeat.value_or(HeartbeatPayload{});
+    latest_heartbeat.peer_count = 81;
+    newer.heartbeat = latest_heartbeat;
     auto older = heartbeat(7, 999, 10);
-    older.heartbeat->battery_pct = 25.0;
+    auto previous_heartbeat = older.heartbeat.value_or(HeartbeatPayload{});
+    previous_heartbeat.peer_count = 25;
+    older.heartbeat = previous_heartbeat;
     ASSERT_TRUE(cache.observe_packet(newer, 1000).accepted);
     ASSERT_TRUE(cache.observe_packet(older, 1000).accepted);
     const auto state = cache.peer_state(7);
     ASSERT_TRUE(state.has_value());
-    EXPECT_EQ(state->last_sequence_number, 11u);
-    EXPECT_EQ(state->last_packet_timestamp_ms, 1000u);
-    EXPECT_EQ(state->last_heartbeat_timestamp_ms, 1000u);
+    const auto cached = state.value_or(CachedPeerState{});
+    EXPECT_EQ(cached.last_sequence_number, 11u);
+    EXPECT_EQ(cached.last_packet_timestamp_ms, 1000u);
+    EXPECT_EQ(cached.last_heartbeat_timestamp_ms, 1000u);
+    EXPECT_EQ(cached.peer_count, 81);
 }
 
 TEST(SwarmStateCache, EpochChangeResetsWindowButRollbackFails) {
     SwarmStateCache cache;
-    ASSERT_TRUE(cache.observe_packet(heartbeat(7, 1000,
-                                               std::numeric_limits<uint32_t>::max()), 1000)
-                    .accepted);
+    const auto max_sequence = heartbeat(7, 1000, std::numeric_limits<uint32_t>::max());
+    ASSERT_TRUE(cache.observe_packet(max_sequence, 1000).accepted);
     EXPECT_FALSE(cache.observe_packet(heartbeat(7, 1000, 0), 1000).accepted);
     auto fresh_epoch = heartbeat(7, 1000, 0);
     fresh_epoch.trust_epoch = 2;
