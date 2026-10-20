@@ -25,6 +25,9 @@ enum class PacketAuthResult : uint8_t {
     INVALID_SIGNATURE,
     STALE_EPOCH,
     REPLAY_DETECTED,
+    INVALID_TTL,
+    FUTURE_TIMESTAMP,
+    STALE_TIMESTAMP,
 };
 
 struct PacketAuthConfig {
@@ -33,6 +36,7 @@ struct PacketAuthConfig {
     bool allow_unsigned_in_bench{false};
     uint64_t trust_epoch{1};
     uint64_t max_clock_skew_ms{2000};
+    uint32_t max_packet_ttl_ms{5000};
     std::string shared_secret{};
     std::string shared_secret_env{"DRONE_SWARM_SECRET"};
     std::string runtime_profile{"edge_swarm"};
