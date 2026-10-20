@@ -416,6 +416,69 @@ TEST(EdgePeerProtocol, ExpirationArithmeticDoesNotWrap) {
 }
 
 
+
+TEST(PeerPacketAuth, SyntheticPacketReorderingAndLossStudy) {
+    // Deterministic delivery traces, not measurements from a physical FANET radio.
+    struct Trace {
+        const char* name;
+        size_t swap_every;
+        size_t drop_every;
+    };
+    const std::array<Trace, 4> traces = {{
+        {"ordered", 0, 0},
+        {"adjacent_reorder", 2, 0},
+        {"sparse_reorder", 10, 0},
+        {"loss_and_reorder", 8, 13},
+    }};
+    auto cfg = auth_config();
+    for (const auto& trace : traces) {
+        std::vector<EdgePeerPacket> packets;
+        for (uint32_t seq = 1; seq <= 128; ++seq) {
+            if (trace.drop_every > 0 && seq % trace.drop_every == 0) {
+                continue;
+            }
+            auto packet = heartbeat(7, 1000, seq);
+            ASSERT_TRUE(signPacket(packet, cfg).accepted());
+            packets.push_back(std::move(packet));
+        }
+        if (trace.swap_every > 0) {
+            for (size_t i = 0; i + 1 < packets.size(); i += trace.swap_every) {
+                std::swap(packets[i], packets[i + 1]);
+            }
+        }
+        std::optional<uint32_t> last;
+        size_t out_of_order = 0;
+        size_t accepted = 0;
+        size_t rejected = 0;
+        for (const auto& packet : packets) {
+            if (last && packet.sequence_number <= *last) {
+                ++out_of_order;
+            }
+            const auto outcome = verifyPacket(packet, cfg, 1000, last);
+            if (outcome.accepted()) {
+                ++accepted;
+                last = packet.sequence_number;
+            } else {
+                EXPECT_EQ(outcome.result, PacketAuthResult::REPLAY_DETECTED);
+                ++rejected;
+            }
+        }
+        EXPECT_EQ(out_of_order, rejected);
+        EXPECT_EQ(accepted + rejected, packets.size());
+        if (trace.swap_every == 0) {
+            EXPECT_EQ(rejected, 0u);
+        }
+        std::cout << "[peer-auth-synthetic-delivery] name=" << trace.name
+                  << " transmitted=128"
+                  << " delivered=" << packets.size()
+                  << " accepted=" << accepted
+                  << " false_rejected=" << rejected
+                  << " out_of_order_rate="
+                  << static_cast<double>(out_of_order) / packets.size()
+                  << "\n";
+    }
+}
+
 TEST(PeerPacketAuth, HmacSha256KnownAnswer) {
     const std::string message = "The quick brown fox jumps over the lazy dog";
     const std::vector<uint8_t> input(message.begin(), message.end());
