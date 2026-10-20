@@ -329,7 +329,6 @@ TEST(PeerPacketAuth, StaleSequenceRejected) {
     EXPECT_EQ(verifyPacket(packet, cfg, 1000, 10).result, PacketAuthResult::REPLAY_DETECTED);
 }
 
-
 TEST(PeerPacketAuth, FutureTimestampBoundDoesNotGrowWithTtl) {
     auto packet = heartbeat(7, 4000, 1);
     auto cfg = auth_config();
@@ -415,8 +414,6 @@ TEST(EdgePeerProtocol, ExpirationArithmeticDoesNotWrap) {
     EXPECT_FALSE(packet_is_expired(packet, 1000));
 }
 
-
-
 TEST(SwarmStateCache, AuthenticatedClockSkewMatchesFreshnessWindow) {
     SwarmStateCache cache({8, 100, 5000});
     cache.configure_freshness(2000, 5000);
@@ -490,14 +487,10 @@ TEST(PeerPacketAuth, SyntheticPacketReorderingAndLossStudy) {
         if (trace.swap_every == 0) {
             EXPECT_EQ(rejected, 0u);
         }
-        std::cout << "[peer-auth-synthetic-delivery] name=" << trace.name
-                  << " transmitted=128"
-                  << " delivered=" << packets.size()
-                  << " accepted=" << accepted
-                  << " false_rejected=" << rejected
-                  << " out_of_order_rate="
-                  << static_cast<double>(out_of_order) / packets.size()
-                  << "\n";
+        std::cout << "[peer-auth-synthetic-delivery] name=" << trace.name << " transmitted=128"
+                  << " delivered=" << packets.size() << " accepted=" << accepted
+                  << " false_rejected=" << rejected << " out_of_order_rate="
+                  << static_cast<double>(out_of_order) / packets.size() << "\n";
     }
 }
 
@@ -505,13 +498,14 @@ TEST(PeerPacketAuth, HmacSha256KnownAnswer) {
     const std::string message = "The quick brown fox jumps over the lazy dog";
     const std::vector<uint8_t> input(message.begin(), message.end());
     const auto digest = hmacSha256Digest("key", input);
-    const std::array<uint8_t, 32> expected = {
-        0xf7, 0xbc, 0x83, 0xf4, 0x30, 0x53, 0x84, 0x24,
-        0xb1, 0x32, 0x98, 0xe6, 0xaa, 0x6f, 0xb1, 0x43,
-        0xef, 0x4d, 0x59, 0xa1, 0x49, 0x46, 0x17, 0x59,
-        0x97, 0x47, 0x9d, 0xbc, 0x2d, 0x1a, 0x3c, 0xd8
-    };
-    EXPECT_EQ(digest, expected);
+    constexpr char hex[] = "0123456789abcdef";
+    std::string actual;
+    actual.reserve(digest.size() * 2);
+    for (const auto byte : digest) {
+        actual.push_back(hex[byte >> 4]);
+        actual.push_back(hex[byte & 0x0f]);
+    }
+    EXPECT_EQ(actual, "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8");
 }
 
 TEST(PeerPacketAuth, InProcessComponentLatencySamples) {
@@ -556,19 +550,16 @@ TEST(PeerPacketAuth, InProcessComponentLatencySamples) {
         durations[3].push_back(static_cast<uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(finish - begin).count()));
     }
-    const std::array<const char*, 4> names = {
-        "cbor_serialize", "hmac_sha256", "sign_path", "verify_path"
-    };
+    const std::array<const char*, 4> names = {"cbor_serialize", "hmac_sha256", "sign_path",
+                                              "verify_path"};
     for (size_t i = 0; i < names.size(); ++i) {
         auto& values = durations[i];
         std::sort(values.begin(), values.end());
-        std::cout << "[peer-auth-inprocess] " << names[i]
-                  << " n=" << values.size()
+        std::cout << "[peer-auth-inprocess] " << names[i] << " n=" << values.size()
                   << " p50_ns=" << values[values.size() / 2]
                   << " p95_ns=" << values[values.size() * 95 / 100]
                   << " p99_ns=" << values[values.size() * 99 / 100]
-                  << " min_ns=" << values.front()
-                  << " max_ns=" << values.back() << "\n";
+                  << " min_ns=" << values.front() << " max_ns=" << values.back() << "\n";
     }
     std::cout << "[peer-auth-inprocess] canonical_cbor_bytes=" << data.size()
               << " digest_sink=" << static_cast<unsigned>(digest_sink) << "\n";
