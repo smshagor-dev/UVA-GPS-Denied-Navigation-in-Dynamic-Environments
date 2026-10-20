@@ -487,10 +487,11 @@ TEST(PeerPacketAuth, SyntheticPacketReorderingAndLossStudy) {
         if (trace.swap_every == 0) {
             EXPECT_EQ(rejected, 0u);
         }
-        std::cout << "[peer-auth-synthetic-delivery] name=" << trace.name << " transmitted=128"
-                  << " delivered=" << packets.size() << " accepted=" << accepted
-                  << " false_rejected=" << rejected << " out_of_order_rate="
-                  << static_cast<double>(out_of_order) / packets.size() << "\n";
+        std::cout << "[peer-auth-synthetic-delivery] name=" << trace.name;
+        std::cout << " transmitted=128 delivered=" << packets.size();
+        std::cout << " accepted=" << accepted << " false_rejected=" << rejected;
+        std::cout << " out_of_order_rate=" << static_cast<double>(out_of_order) / packets.size();
+        std::cout << '\n';
     }
 }
 
@@ -555,11 +556,11 @@ TEST(PeerPacketAuth, InProcessComponentLatencySamples) {
     for (size_t i = 0; i < names.size(); ++i) {
         auto& values = durations[i];
         std::sort(values.begin(), values.end());
-        std::cout << "[peer-auth-inprocess] " << names[i] << " n=" << values.size()
-                  << " p50_ns=" << values[values.size() / 2]
-                  << " p95_ns=" << values[values.size() * 95 / 100]
-                  << " p99_ns=" << values[values.size() * 99 / 100]
-                  << " min_ns=" << values.front() << " max_ns=" << values.back() << "\n";
+        std::cout << "[peer-auth-inprocess] " << names[i] << " n=" << values.size();
+        std::cout << " p50_ns=" << values[values.size() / 2];
+        std::cout << " p95_ns=" << values[values.size() * 95 / 100];
+        std::cout << " p99_ns=" << values[values.size() * 99 / 100];
+        std::cout << " min_ns=" << values.front() << " max_ns=" << values.back() << '\n';
     }
     std::cout << "[peer-auth-inprocess] canonical_cbor_bytes=" << data.size()
               << " digest_sink=" << static_cast<unsigned>(digest_sink) << "\n";
