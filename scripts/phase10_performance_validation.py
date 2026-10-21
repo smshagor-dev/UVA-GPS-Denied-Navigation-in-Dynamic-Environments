@@ -48,18 +48,22 @@ def validate_stress(result: dict) -> None:
 
 def main() -> int:
     DOC_ROOT.mkdir(parents=True, exist_ok=True)
-    metrics = [
-        benchmark_config_load(REPO_ROOT / "config" / name, 20)
-        for name in ("runtime.json", "anchors.json", "lidar.json")
-    ]
+    metrics = []
+    config_names = ("runtime.json", "anchors.json", "lidar.json")
+    for name in config_names:
+        metrics.append(benchmark_config_load(REPO_ROOT / "config" / name, 20))
     port = allocate_free_port()
     log(f"Linux CI performance: starting local backend on ephemeral port {port}")
     process, startup_ms = start_backend(port, BACKEND_LOG)
     try:
         url = f"http://127.0.0.1:{port}"
-        metrics.append(
-            summarize("backend_startup", "process", [startup_ms], {"mode": "production"})
+        startup_metric = summarize(
+            "backend_startup",
+            "process",
+            [startup_ms],
+            {"mode": "production"},
         )
+        metrics.append(startup_metric)
         metrics.append(benchmark_backend_reads(url, 20))
         metrics.append(benchmark_telemetry_posts(url, 20))
         stress = run_stress_test(url, total_requests=100, workers=8)
