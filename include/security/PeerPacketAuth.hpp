@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace drone::security {
@@ -52,6 +53,9 @@ struct PacketAuthConfig {
     // Monocypher curve25519 EdDSA+BLAKE2b, NOT standard Ed25519.
     std::optional<std::array<uint8_t, 32>> local_eddsa_seed{};
     std::unordered_map<uint32_t, std::array<uint8_t, 32>> trusted_node_public_keys{};
+    // Receiver-side revocation for sender-specific MAC/signature modes only.
+    // Each receiver must receive fresh out-of-band revocation policy.
+    std::unordered_set<uint32_t> revoked_sender_ids{};
     std::string runtime_profile{"edge_swarm"};
     // Optional durable replay state on trusted, single-writer local storage.
     std::string replay_ledger_path{};

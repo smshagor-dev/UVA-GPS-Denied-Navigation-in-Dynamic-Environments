@@ -403,6 +403,12 @@ PacketAuthOutcome signPacket(drone::swarm::EdgePeerPacket& packet, const PacketA
         return outcome(PacketAuthResult::UNSUPPORTED,
                        "Ed25519 auth is placeholder-only in this build.");
     }
+    if (config.mode == AuthMode::MONOCYPHER_EDDSA_BLAKE2B ||
+        config.mode == AuthMode::PER_NODE_HMAC_SHA256) {
+        if (config.revoked_sender_ids.contains(packet.sender_id)) {
+            return outcome(PacketAuthResult::UNTRUSTED_SENDER, "local sender has been revoked");
+        }
+    }
     if (config.mode == AuthMode::MONOCYPHER_EDDSA_BLAKE2B) {
         if (config.local_node_id == 0 || packet.sender_id != config.local_node_id) {
             return outcome(PacketAuthResult::UNTRUSTED_SENDER,
@@ -479,6 +485,14 @@ PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
     }
     if (auto epoch = validateTrustEpoch(packet, config); !epoch.accepted()) {
         return epoch;
+    }
+    // Revocation is meaningful only when different senders have separate
+    // secrets or public keys. Group HMAC cannot guarantee sender isolation.
+    if (config.mode == AuthMode::MONOCYPHER_EDDSA_BLAKE2B ||
+        config.mode == AuthMode::PER_NODE_HMAC_SHA256) {
+        if (config.revoked_sender_ids.contains(packet.sender_id)) {
+            return outcome(PacketAuthResult::UNTRUSTED_SENDER, "claimed sender has been revoked");
+        }
     }
     if (config.mode == AuthMode::NONE) {
         if (auto replay = validateNonceOrSequence(packet, last_sequence_number);
