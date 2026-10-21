@@ -278,6 +278,99 @@ TEST(EdgePeerProtocol, StaleSequenceRejected) {
     EXPECT_EQ(observed.reason, "stale sequence number");
 }
 
+TEST(PeerPacketAuth, RevokedSenderRejectedDespiteValidPerNodeHmac) {
+    auto alice = auth_config();
+    alice.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    alice.local_node_id = 7u;
+    alice.local_signing_secret = std::string(32, 'A');
+    auto bob = alice;
+    bob.local_node_id = 8u;
+    bob.local_signing_secret = std::string(32, 'B');
+
+    auto receiver = auth_config();
+    receiver.mode = AuthMode::PER_NODE_HMAC_SHA256;
+    receiver.trusted_node_secrets.emplace(7u, std::string(32, 'A'));
+    receiver.trusted_node_secrets.emplace(8u, std::string(32, 'B'));
+
+    auto alice_packet = heartbeat(7, 1000, 1);
+    auto bob_packet = heartbeat(8, 1000, 1);
+    ASSERT_TRUE(signPacket(alice_packet, alice).accepted());
+    ASSERT_TRUE(signPacket(bob_packet, bob).accepted());
+    const auto initially_trusted = verifyPacket(alice_packet, receiver, 1000);
+    EXPECT_EQ(initially_trusted.result, PacketAuthResult::ACCEPTED);
+    receiver.revoked_sender_ids.insert(7u);
+    const auto revoked = verifyPacket(alice_packet, receiver, 1000);
+    EXPECT_EQ(revoked.result, PacketAuthResult::UNTRUSTED_SENDER);
+    EXPECT_EQ(verifyPacket(bob_packet, receiver, 1000).result, PacketAuthResult::ACCEPTED);
+
+    alice.revoked_sender_ids.insert(7u);
+    auto future = heartbeat(7, 1000, 2);
+    const auto signing = signPacket(future, alice);
+    EXPECT_EQ(signing.result, PacketAuthResult::UNTRUSTED_SENDER);
+}
+
+TEST(PeerPacketAuth, RevokedSenderRejectedDespiteValidPublicSignature) {
+    std::array<uint8_t, 32> seed_a{};
+    std::array<uint8_t, 32> seed_b{};
+    seed_a.fill(11u);
+    seed_b.fill(19u);
+
+    auto sender = auth_config();
+    sender.mode = AuthMode::MONOCYPHER_EDDSA_BLAKE2B;
+    sender.local_node_id = 7u;
+    sender.local_eddsa_seed = seed_a;
+    auto peer = sender;
+    peer.local_node_id = 8u;
+    peer.local_eddsa_seed = seed_b;
+
+    auto receiver = auth_config();
+    receiver.mode = AuthMode::MONOCYPHER_EDDSA_BLAKE2B;
+    receiver.trusted_node_public_keys.emplace(7u, monocypherPublicKeyFromSeed(seed_a));
+    receiver.trusted_node_public_keys.emplace(8u, monocypherPublicKeyFromSeed(seed_b));
+    auto first = heartbeat(7, 1000, 1);
+    auto second = heartbeat(8, 1000, 1);
+    ASSERT_TRUE(signPacket(first, sender).accepted());
+    ASSERT_TRUE(signPacket(second, peer).accepted());
+    receiver.revoked_sender_ids.insert(7u);
+    const auto blocked = verifyPacket(first, receiver, 1000);
+    EXPECT_EQ(blocked.result, PacketAuthResult::UNTRUSTED_SENDER);
+    EXPECT_EQ(verifyPacket(second, receiver, 1000).result, PacketAuthResult::ACCEPTED);
+}
+
+TEST(PeerPacketAuth, PublicKeyReplacementRejectsOldKeyAndOldEpoch) {
+    std::array<uint8_t, 32> old_seed{};
+    std::array<uint8_t, 32> new_seed{};
+    old_seed.fill(11u);
+    new_seed.fill(47u);
+    auto sender = auth_config();
+    sender.mode = AuthMode::MONOCYPHER_EDDSA_BLAKE2B;
+    sender.local_node_id = 7u;
+    sender.local_eddsa_seed = old_seed;
+    auto receiver = auth_config();
+    receiver.mode = AuthMode::MONOCYPHER_EDDSA_BLAKE2B;
+    receiver.trusted_node_public_keys.emplace(7u, monocypherPublicKeyFromSeed(old_seed));
+
+    auto previous = heartbeat(7, 1000, 1);
+    ASSERT_TRUE(signPacket(previous, sender).accepted());
+    EXPECT_EQ(verifyPacket(previous, receiver, 1000).result, PacketAuthResult::ACCEPTED);
+
+    receiver.trust_epoch = 2;
+    receiver.trusted_node_public_keys.at(7u) = monocypherPublicKeyFromSeed(new_seed);
+    const auto stale = verifyPacket(previous, receiver, 1000);
+    EXPECT_EQ(stale.result, PacketAuthResult::STALE_EPOCH);
+
+    auto rotated = heartbeat(7, 1000, 2);
+    rotated.trust_epoch = 2;
+    ASSERT_TRUE(signPacket(rotated, sender).accepted());
+    const auto wrong_key = verifyPacket(rotated, receiver, 1000);
+    EXPECT_EQ(wrong_key.result, PacketAuthResult::INVALID_SIGNATURE);
+
+    sender.trust_epoch = 2;
+    sender.local_eddsa_seed = new_seed;
+    ASSERT_TRUE(signPacket(rotated, sender).accepted());
+    EXPECT_EQ(verifyPacket(rotated, receiver, 1000).result, PacketAuthResult::ACCEPTED);
+}
+
 TEST(PeerPacketAuth, PublicKeyModeParsesAndDisplaysCorrectly) {
     EXPECT_EQ(to_string(AuthMode::MONOCYPHER_EDDSA_BLAKE2B), "monocypher_eddsa_blake2b");
     const auto parsed = parse_auth_mode("monocypher_eddsa_blake2b");
