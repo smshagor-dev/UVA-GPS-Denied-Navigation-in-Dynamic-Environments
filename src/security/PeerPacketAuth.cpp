@@ -1,4 +1,5 @@
 #include "security/PeerPacketAuth.hpp"
+#include "monocypher.h"
 
 #include <algorithm>
 #include <array>
@@ -304,6 +305,8 @@ std::string_view to_string(AuthMode mode) {
         return "pqc_hybrid_placeholder";
     case AuthMode::PER_NODE_HMAC_SHA256:
         return "hmac_sha256_per_node";
+    case AuthMode::MONOCYPHER_EDDSA_BLAKE2B:
+        return "monocypher_eddsa_blake2b";
     }
     return "unknown";
 }
@@ -320,6 +323,8 @@ std::optional<AuthMode> parse_auth_mode(std::string_view value) {
         return AuthMode::PQC_HYBRID_PLACEHOLDER;
     if (lower == "hmac_sha256_per_node")
         return AuthMode::PER_NODE_HMAC_SHA256;
+    if (lower == "monocypher_eddsa_blake2b")
+        return AuthMode::MONOCYPHER_EDDSA_BLAKE2B;
     return std::nullopt;
 }
 
@@ -349,6 +354,15 @@ std::string_view to_string(PacketAuthResult result) {
         return "untrusted_sender";
     }
     return "unknown";
+}
+
+std::array<uint8_t, 32> monocypherPublicKeyFromSeed(std::array<uint8_t, 32> secret_seed) {
+    std::array<uint8_t, 64> signing_key{};
+    std::array<uint8_t, 32> public_key{};
+    crypto_eddsa_key_pair(signing_key.data(), public_key.data(), secret_seed.data());
+    crypto_wipe(signing_key.data(), signing_key.size());
+    crypto_wipe(secret_seed.data(), secret_seed.size());
+    return public_key;
 }
 
 std::array<uint8_t, 32> hmacSha256Digest(std::string_view secret,
@@ -388,6 +402,28 @@ PacketAuthOutcome signPacket(drone::swarm::EdgePeerPacket& packet, const PacketA
     if (config.mode == AuthMode::ED25519_PLACEHOLDER) {
         return outcome(PacketAuthResult::UNSUPPORTED,
                        "Ed25519 auth is placeholder-only in this build.");
+    }
+    if (config.mode == AuthMode::MONOCYPHER_EDDSA_BLAKE2B) {
+        if (config.local_node_id == 0 || packet.sender_id != config.local_node_id) {
+            return outcome(PacketAuthResult::UNTRUSTED_SENDER,
+                           "asymmetric signing identity does not match sender");
+        }
+        if (!config.local_eddsa_seed.has_value()) {
+            return outcome(PacketAuthResult::MISSING_SIGNATURE,
+                           "no local EdDSA signing seed is provisioned");
+        }
+        auto seed = config.local_eddsa_seed.value_or(std::array<uint8_t, 32>{});
+        std::array<uint8_t, 64> signing_key{};
+        std::array<uint8_t, 32> public_key{};
+        crypto_eddsa_key_pair(signing_key.data(), public_key.data(), seed.data());
+        const auto bytes = canonical_bytes(packet);
+        std::array<uint8_t, 64> signature{};
+        crypto_eddsa_sign(signature.data(), signing_key.data(), bytes.data(), bytes.size());
+        crypto_wipe(seed.data(), seed.size());
+        crypto_wipe(signing_key.data(), signing_key.size());
+        packet.auth_hook = "monocypher_eddsa_blake2b:";
+        packet.auth_hook += hex_encode(signature.data(), signature.size());
+        return outcome(PacketAuthResult::ACCEPTED, "packet signed with Monocypher EdDSA");
     }
     if (config.mode == AuthMode::PER_NODE_HMAC_SHA256) {
         if (config.local_node_id == 0 || packet.sender_id != config.local_node_id) {
@@ -458,6 +494,40 @@ PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
     }
     if (packet.auth_hook.empty() || packet.auth_hook == "unsigned") {
         return outcome(PacketAuthResult::MISSING_SIGNATURE, "missing packet signature");
+    }
+    if (config.mode == AuthMode::MONOCYPHER_EDDSA_BLAKE2B) {
+        constexpr std::string_view tag = "monocypher_eddsa_blake2b:";
+        if (packet.auth_hook.rfind(tag, 0) != 0) {
+            return outcome(PacketAuthResult::INVALID_SIGNATURE,
+                           "packet signature algorithm mismatch");
+        }
+        const auto peer = config.trusted_node_public_keys.find(packet.sender_id);
+        if (packet.sender_id == 0 || peer == config.trusted_node_public_keys.end()) {
+            return outcome(PacketAuthResult::UNTRUSTED_SENDER,
+                           "no public verification key for claimed sender");
+        }
+        const auto provided = hex_decode(std::string_view(packet.auth_hook).substr(tag.size()));
+        if (!provided.has_value()) {
+            return outcome(PacketAuthResult::INVALID_SIGNATURE,
+                           "invalid Monocypher signature encoding");
+        }
+        if (provided->size() != 64u) {
+            return outcome(PacketAuthResult::INVALID_SIGNATURE,
+                           "invalid Monocypher signature length");
+        }
+        const auto bytes = canonical_bytes(packet);
+        const auto* signature = provided->data();
+        const auto* public_key = peer->second.data();
+        const int verified = crypto_eddsa_check(signature, public_key, bytes.data(), bytes.size());
+        if (verified != 0) {
+            return outcome(PacketAuthResult::INVALID_SIGNATURE,
+                           "Monocypher signature verification failed");
+        }
+        if (auto replay = validateNonceOrSequence(packet, last_sequence_number);
+            !replay.accepted()) {
+            return replay;
+        }
+        return outcome(PacketAuthResult::ACCEPTED, "EdDSA public-key verification accepted");
     }
     const bool per_node_mode = config.mode == AuthMode::PER_NODE_HMAC_SHA256;
     const std::string_view prefix = per_node_mode ? "hmac_sha256_node:" : "hmac_sha256:";
