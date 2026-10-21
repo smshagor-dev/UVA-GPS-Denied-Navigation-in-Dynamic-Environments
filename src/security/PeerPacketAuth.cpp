@@ -406,8 +406,7 @@ PacketAuthOutcome signPacket(drone::swarm::EdgePeerPacket& packet, const PacketA
     if (config.mode == AuthMode::MONOCYPHER_EDDSA_BLAKE2B ||
         config.mode == AuthMode::PER_NODE_HMAC_SHA256) {
         if (config.revoked_sender_ids.contains(packet.sender_id)) {
-            return outcome(PacketAuthResult::UNTRUSTED_SENDER,
-                           "local sender has been revoked");
+            return outcome(PacketAuthResult::UNTRUSTED_SENDER, "local sender has been revoked");
         }
     }
     if (config.mode == AuthMode::MONOCYPHER_EDDSA_BLAKE2B) {
@@ -492,8 +491,7 @@ PacketAuthOutcome verifyPacket(const drone::swarm::EdgePeerPacket& packet,
     if (config.mode == AuthMode::MONOCYPHER_EDDSA_BLAKE2B ||
         config.mode == AuthMode::PER_NODE_HMAC_SHA256) {
         if (config.revoked_sender_ids.contains(packet.sender_id)) {
-            return outcome(PacketAuthResult::UNTRUSTED_SENDER,
-                           "claimed sender has been revoked");
+            return outcome(PacketAuthResult::UNTRUSTED_SENDER, "claimed sender has been revoked");
         }
     }
     if (config.mode == AuthMode::NONE) {
