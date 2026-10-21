@@ -96,7 +96,7 @@ jobs:
 
       - name: Check Python formatting
         shell: bash
-        run: python3 -m black --check main.py gui tests scripts
+        run: python3 -m black --check --diff main.py gui tests scripts
 
       - name: Check Go formatting
         shell: bash
