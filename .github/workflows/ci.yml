@@ -254,6 +254,25 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/ctest-linux-gcc-validation"
           ctest --preset validation-linux-gcc --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-gcc-validation/junit.xml"
 
+      - name: Install and validate downstream consumer
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cmake --install build/validation-linux-gcc --prefix "${RUNNER_TEMP}/install-root"
+          mkdir -p "${RUNNER_TEMP}/install-manifest"
+          python3 scripts/package_consumer_smoke.py \
+            --install-prefix "${RUNNER_TEMP}/install-root" \
+            --manifest-out "${RUNNER_TEMP}/install-manifest/install-manifest.json"
+
+      - name: Upload downstream consumer evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: install-consumer-${{ github.sha }}
+          path: ${{ runner.temp }}/install-manifest/install-manifest.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Archive replay parity study
         if: always()
         uses: actions/upload-artifact@v7
@@ -604,47 +623,40 @@ jobs:
 
   install-consumer:
     name: Installation And Consumer
+    needs: linux-gcc-validation
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-linux-deps
-      - name: Print tool versions
-        shell: bash
-        run: |
-          set -euxo pipefail
-          cmake --version
-          gcc --version | head -n 1
-          echo "preset=linux-gcc-release"
-          echo "commit_sha=${GITHUB_SHA}"
-      - name: Configure
-        shell: bash
-        run: cmake --preset linux-gcc-release
-      - name: Build
-        shell: bash
-        run: cmake --build --preset linux-gcc-release
-      - name: Install
-        shell: bash
-        run: |
-          set -euxo pipefail
-          cmake --install build/linux-gcc-release --prefix "${RUNNER_TEMP}/install-root"
-      - name: Validate consumer package
-        shell: bash
-        run: |
-          set -euxo pipefail
-          mkdir -p "${RUNNER_TEMP}/install-manifest"
-          python3 scripts/package_consumer_smoke.py \
-            --install-prefix "${RUNNER_TEMP}/install-root" \
-            --manifest-out "${RUNNER_TEMP}/install-manifest/install-manifest.json"
-      - name: Upload install manifest
-        if: always()
-        uses: actions/upload-artifact@v7
+      # The GCC job must actually compile, install and link a downstream
+      # consumer before its evidence artifact can be published.
+      - uses: actions/download-artifact@v7
         with:
           name: install-consumer-${{ github.sha }}
-          path: |
-            ${{ runner.temp }}/install-manifest
-            ${{ runner.temp }}/install-root
-          retention-days: 14
+          path: ${{ runner.temp }}/install-manifest
+      - name: Verify validated consumer manifest
+        shell: bash
+        env:
+          MANIFEST_PATH: ${{ runner.temp }}/install-manifest/install-manifest.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["MANIFEST_PATH"])
+          manifest = json.loads(path.read_text(encoding="utf-8"))
+          files = set(manifest["files"])
+          required = {
+              "include/autonomy/DecisionEngine.hpp",
+              "lib/cmake/DroneSwarmSensorFusion/DroneSwarmSensorFusionConfig.cmake",
+              "lib/libsensor_fusion_core.a",
+          }
+          missing = sorted(required - files)
+          if missing:
+              raise SystemExit(f"Invalid downstream consumer manifest: missing {missing}")
+          print(f"Verified install/consumer evidence: {len(files)} installed files.")
+          PY
 
   ci-required:
     name: CI Required
