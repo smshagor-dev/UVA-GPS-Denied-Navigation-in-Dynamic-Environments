@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import random
 import subprocess
@@ -17,9 +18,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 if __package__:
-    from .peer_replay_trace_analysis import Event, analyze
+    from .peer_replay_trace_analysis import Event, analyze, read_events
 else:
-    from peer_replay_trace_analysis import Event, analyze
+    from peer_replay_trace_analysis import Event, analyze, read_events
 
 SCENARIOS = {
     "low_load": (3, 50, 0.01, 0.02, 0.20, 8, 0.004),
@@ -207,13 +208,34 @@ def study(seeds=12, packets_per_peer=240, native=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--native", type=Path, help="compiled production replay cache CLI")
+    parser.add_argument("--external-tx", type=Path, help="external matched sender trace")
+    parser.add_argument("--external-rx", type=Path, help="external matched receiver trace")
     parser.add_argument("--seeds", type=int, default=12)
     parser.add_argument("--packets-per-peer", type=int, default=240)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.native is not None and not args.native.is_file():
         parser.error("native executable does not exist")
-    result = study(args.seeds, args.packets_per_peer, args.native)
+    if bool(args.external_tx) != bool(args.external_rx):
+        parser.error("--external-tx and --external-rx must be supplied together")
+    if args.external_tx:
+        if args.native is None:
+            parser.error("external C++ comparison requires --native")
+        tx = read_events(args.external_tx, "tx_ms", 1)
+        rx = read_events(args.external_rx, "rx_ms", 1)
+        result = {
+            "classification": "externally supplied trace, measurement origin unverified",
+            "validated_rf_measurement": False,
+            "source_provenance_verified": False,
+            "native_cpp_per_arrival_verified": verify_native(args.native, rx),
+            "sha256": {
+                "tx": hashlib.sha256(args.external_tx.read_bytes()).hexdigest(),
+                "rx": hashlib.sha256(args.external_rx.read_bytes()).hexdigest(),
+            },
+            "analysis": analyze(tx, rx, source="measured_unverified"),
+        }
+    else:
+        result = study(args.seeds, args.packets_per_peer, args.native)
     rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
