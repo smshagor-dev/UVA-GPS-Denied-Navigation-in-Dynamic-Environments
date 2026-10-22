@@ -71,7 +71,7 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - uses: ./.github/actions/setup-linux-deps
+      # Formatting uses pinned Python wheels and setup-go; no PCL/OpenCV apt install.
 
       - name: Install Python formatters
         shell: bash
