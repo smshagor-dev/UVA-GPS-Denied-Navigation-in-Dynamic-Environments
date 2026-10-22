@@ -65,7 +65,9 @@ def load_receptions(
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
         if not reader.fieldnames or not REQUIRED.issubset(set(reader.fieldnames)):
-            raise ValueError(f"LoRa capture missing required columns: {sorted(REQUIRED)}")
+            raise ValueError(
+                f"LoRa capture missing required columns: {sorted(REQUIRED)}"
+            )
         for line, row in enumerate(reader, start=2):
             if row["dev_eui"].strip().lower() != device.strip().lower():
                 continue
