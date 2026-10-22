@@ -66,6 +66,7 @@ jobs:
 
   performance-validation:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -75,8 +76,18 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Run Phase 6 suite
-        run: python scripts/phase6_performance_suite.py
+      - name: Measure control-plane performance on Linux
+        run: python scripts/phase10_performance_validation.py
+      - name: Archive actual measurements and backend log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase10-linux-performance-${{ github.sha }}
+          path: |
+            docs/performance-engineering-stability-validation/linux_ci_performance.json
+            docs/performance-engineering-stability-validation/linux_ci_backend.log
+          if-no-files-found: warn
+          retention-days: 14
 
   packaging:
     runs-on: ubuntu-24.04
