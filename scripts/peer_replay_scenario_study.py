@@ -34,7 +34,9 @@ SCENARIOS = {
 
 
 def generate(name: str, seed: int, packets_per_peer: int = 240):
-    peers, interval, base_loss, enter_bad, recover, jitter, duplication = SCENARIOS[name]
+    peers, interval, base_loss, enter_bad, recover, jitter, duplication = SCENARIOS[
+        name
+    ]
     rng = random.Random(seed)
     sent, receptions = [], []
     for sender in range(1, peers + 1):
@@ -53,7 +55,9 @@ def generate(name: str, seed: int, packets_per_peer: int = 240):
             receptions.append(Event(sender, 1, seq, rx, len(receptions) + 2))
             if rng.random() < duplication:
                 receptions.append(
-                    Event(sender, 1, seq, rx + rng.randrange(1, 16), len(receptions) + 2)
+                    Event(
+                        sender, 1, seq, rx + rng.randrange(1, 16), len(receptions) + 2
+                    )
                 )
     sent.sort(key=lambda item: (item.time_ms, item.line))
     receptions.sort(key=lambda item: (item.time_ms, item.line))
@@ -114,7 +118,9 @@ def verify_native(binary: Path, received):
         if row["accepted"] not in ("0", "1"):
             raise AssertionError(f"invalid native admission at {index}")
         if bool(int(row["accepted"])) != accepted:
-            raise AssertionError(f"native/sequence reference mismatch at arrival {index}")
+            raise AssertionError(
+                f"native/sequence reference mismatch at arrival {index}"
+            )
     return True
 
 
@@ -136,7 +142,9 @@ def confidence_interval(values, seed=2026, resamples=1000):
 
 def study(seeds=12, packets_per_peer=240, native=None):
     if seeds < 2 or packets_per_peer < 70:
-        raise ValueError("at least two independent runs and 70 packets per peer required")
+        raise ValueError(
+            "at least two independent runs and 70 packets per peer required"
+        )
     summary = {
         "classification": "uncalibrated synthetic network-emulation sensitivity study",
         "not_rf_measurements": True,
@@ -165,8 +173,12 @@ def study(seeds=12, packets_per_peer=240, native=None):
                     "duplicates": t["observed_duplicate_deliveries"],
                     "reordering_fraction": t["observed_p_r"],
                     "loss_fraction": t["observed_loss_fraction"],
-                    "strict_benign_rejection_fraction": strict["benign_rejection_fraction"],
-                    "window_benign_rejection_fraction": window["benign_rejection_fraction"],
+                    "strict_benign_rejection_fraction": strict[
+                        "benign_rejection_fraction"
+                    ],
+                    "window_benign_rejection_fraction": window[
+                        "benign_rejection_fraction"
+                    ],
                     "window_minus_strict_benign_rejection_fraction": (
                         window["benign_rejection_fraction"]
                         - strict["benign_rejection_fraction"]
@@ -193,8 +205,13 @@ def study(seeds=12, packets_per_peer=240, native=None):
             "illustrative_parameters": dict(
                 zip(
                     (
-                        "senders", "interval_ms", "base_loss", "bad_state_entry",
-                        "bad_state_recovery", "jitter_scale_ms", "duplicate_chance",
+                        "senders",
+                        "interval_ms",
+                        "base_loss",
+                        "bad_state_entry",
+                        "bad_state_recovery",
+                        "jitter_scale_ms",
+                        "duplicate_chance",
                     ),
                     SCENARIOS[name],
                 )
@@ -207,9 +224,15 @@ def study(seeds=12, packets_per_peer=240, native=None):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--native", type=Path, help="compiled production replay cache CLI")
-    parser.add_argument("--external-tx", type=Path, help="external matched sender trace")
-    parser.add_argument("--external-rx", type=Path, help="external matched receiver trace")
+    parser.add_argument(
+        "--native", type=Path, help="compiled production replay cache CLI"
+    )
+    parser.add_argument(
+        "--external-tx", type=Path, help="external matched sender trace"
+    )
+    parser.add_argument(
+        "--external-rx", type=Path, help="external matched receiver trace"
+    )
     parser.add_argument("--seeds", type=int, default=12)
     parser.add_argument("--packets-per-peer", type=int, default=240)
     parser.add_argument("--output", type=Path)
