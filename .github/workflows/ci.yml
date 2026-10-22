@@ -563,7 +563,7 @@ jobs:
   full-validator:
     name: Full Validator
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -575,21 +575,24 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - uses: ./.github/actions/setup-linux-deps
+      # The required Linux GCC Validation job already configures, builds, and
+      # executes the complete native CTest suite, including replay parity.
+      # Avoid a second full apt/PCL/OpenCV installation in this job: slow
+      # Ubuntu mirrors previously exhausted the 60-minute job timeout
+      # before local validation could even begin.
       - name: Install Python dependencies
         shell: bash
         run: |
           set -euxo pipefail
           python3 -m pip install --upgrade pip
           python3 -m pip install -r requirements.txt
-      - name: Run local validator
+      - name: Run cross-language source validator
         shell: bash
         run: |
           set -euxo pipefail
           mkdir -p "${RUNNER_TEMP}/local-validate"
           python3 scripts/local_validate.py \
-            --preset validation-linux-gcc \
-            --ctest-output-junit "${RUNNER_TEMP}/local-validate/ctest-junit.xml" \
+            --skip-native \
             --report "${RUNNER_TEMP}/local-validate/local_validate_report.json"
       - name: Upload validator report
         if: always()
