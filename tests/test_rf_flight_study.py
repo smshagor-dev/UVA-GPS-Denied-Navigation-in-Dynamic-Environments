@@ -48,9 +48,12 @@ class FlightStudyTests(unittest.TestCase):
             manifest = self.make_manifest(Path(directory))
             summary = analyze_flights(manifest)
         self.assertEqual(summary["sample_count"], 2)
-        self.assertEqual(summary["metrics"]["observed_reception_order_p_r"][
-            "unweighted_flight_mean"
-        ], 0.5)
+        self.assertEqual(
+            summary["metrics"]["observed_reception_order_p_r"][
+                "unweighted_flight_mean"
+            ],
+            0.5,
+        )
         self.assertIsNone(summary["packet_loss_fraction"])
         self.assertFalse(summary["rf_calibration_verified"])
         self.assertEqual(len(summary["flights"]), 2)
