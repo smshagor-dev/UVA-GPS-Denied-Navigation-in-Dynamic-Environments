@@ -16,7 +16,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from peer_replay_trace_analysis import Event, analyze
+if __package__:\n    from .peer_replay_trace_analysis import Event, analyze\nelse:\n    from peer_replay_trace_analysis import Event, analyze
 
 SCENARIOS = {
     "low_load": (3, 50, 0.01, 0.02, 0.20, 8, 0.004),
