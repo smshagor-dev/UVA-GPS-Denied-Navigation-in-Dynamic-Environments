@@ -123,6 +123,23 @@ python3 scripts/peer_replay_trace_analysis.py \
   --epoch 1 --source measured_unverified --output /data/session/replay.json
 ```
 
+To execute the **same externally supplied receiver sequence** in the compiled
+production cache and check every admission decision, use:
+
+```sh
+python3 scripts/peer_replay_scenario_study.py \
+  --native /path/to/peer_replay_cache_cli \
+  --external-tx /data/session/tx.csv \
+  --external-rx /data/session/rx.csv \
+  --output /data/session/replay-native-parity.json
+```
+
+That command records SHA-256 hashes and verifies C++ parity, but does not
+independently verify who acquired the trace or establish whether a capture is
+real RF, simulated or incomplete. At present the C++ demonstration adapter
+uses the selected fixed epoch 1; split and normalize each externally verified
+fixed-epoch run before comparison.
+
 The `measured_unverified` flag **does not certify source authenticity**.
 Independent validation and explicit publication of network parameters,
 measurement uncertainty, replication and raw source traces are required.
