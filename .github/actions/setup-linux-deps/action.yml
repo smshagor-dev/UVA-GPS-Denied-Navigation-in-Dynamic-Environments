@@ -9,7 +9,10 @@ runs:
         set -euxo pipefail
         # Azure's default Ubuntu apt mirror has repeatedly stalled long-running
         # CI installations. Prefer the official Ubuntu archive on hosted runners.
-        for sources in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
+        # GitHub Ubuntu runners may read mirror addresses indirectly through
+        # /etc/apt/apt-mirrors.txt, not from literal entries in ubuntu.sources.
+        # Edit that indirection too, otherwise the Azure mirror stays active.
+        for sources in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
           if [[ -f "$sources" ]] && grep -q 'azure.archive.ubuntu.com' "$sources"; then
             sudo sed -i 's@http://azure.archive.ubuntu.com/ubuntu@https://archive.ubuntu.com/ubuntu@g' "$sources"
           fi
