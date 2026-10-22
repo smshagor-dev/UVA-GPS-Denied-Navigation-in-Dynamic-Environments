@@ -64,9 +64,7 @@ def analyze_flights(manifest: Path, *, native: Path | None = None) -> dict:
                 "input_sha256": hashlib.sha256(capture.read_bytes()).hexdigest(),
                 "input_matched_rows": metadata["matched_rows"],
                 "distinct_receptions": count,
-                "observed_reception_order_p_r": report[
-                    "observed_reception_order_p_r"
-                ],
+                "observed_reception_order_p_r": report["observed_reception_order_p_r"],
                 "strict_first_arrival_rejection_fraction": strict,
                 "window_first_arrival_rejection_fraction": window,
                 "window_minus_strict_rejection_fraction": window - strict,
@@ -80,9 +78,7 @@ def analyze_flights(manifest: Path, *, native: Path | None = None) -> dict:
         values = [row[key] for row in results]
         measures[key] = {
             "unweighted_flight_mean": sum(values) / len(values),
-            "flight_bootstrap_95pct": confidence_interval(
-                values, seed=8051 + offset
-            ),
+            "flight_bootstrap_95pct": confidence_interval(values, seed=8051 + offset),
         }
     return {
         "evidence_classification": "external reception-only flights, provenance unverified",
