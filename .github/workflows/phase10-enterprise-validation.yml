@@ -94,7 +94,26 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Build production image
-        run: docker build -f deployment/docker/Dockerfile.production -t drone-swarm/control-plane:phase10 .
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            log="${RUNNER_TEMP}/production-image-build-${attempt}.log"
+            if docker build -f deployment/docker/Dockerfile.production \
+                -t drone-swarm/control-plane:phase10 . 2>&1 | tee "$log"; then
+              exit 0
+            fi
+            if ! grep -Eqi '503 Service Unavailable|502 Bad Gateway|504 Gateway Timeout|429 Too Many Requests|TLS handshake timeout|connection reset by peer|i/o timeout' "$log"; then
+              echo "Docker build failed for a non-transient reason; not retrying."
+              exit 1
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "Docker registry/network error persisted after three attempts."
+              exit 1
+            fi
+            echo "Transient registry/network error; retrying the production build."
+            sleep "$((attempt * 20))"
+          done
 
   release-validation:
     runs-on: ubuntu-24.04
