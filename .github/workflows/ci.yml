@@ -254,6 +254,15 @@ jobs:
           mkdir -p "${RUNNER_TEMP}/ctest-linux-gcc-validation"
           ctest --preset validation-linux-gcc --output-on-failure --output-junit "${RUNNER_TEMP}/ctest-linux-gcc-validation/junit.xml"
 
+      - name: Archive replay parity study
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: peer-replay-validation-${{ github.sha }}
+          path: build/validation-linux-gcc/peer_replay_native_results.json
+          if-no-files-found: warn
+          retention-days: 14
+
       - name: Upload Linux GCC reports
         if: always()
         uses: actions/upload-artifact@v7
