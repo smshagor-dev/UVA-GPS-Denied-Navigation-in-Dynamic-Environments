@@ -106,8 +106,8 @@ int main(int argc, char** argv) {
                 throw std::runtime_error("synthetic packet authentication failed");
             }
             const auto outcome = cache.observe_packet(packet, 1000);
-            std::cout << fields[0] << ',' << fields[1] << ',' << fields[2] << ','
-                      << fields[3] << ',' << (outcome.accepted ? 1 : 0) << '\n';
+            std::cout << fields[0] << ',' << fields[1] << ',' << fields[2] << ',' << fields[3]
+                      << ',' << (outcome.accepted ? 1 : 0) << '\n';
         }
     } catch (const std::exception& error) {
         std::cerr << "replay cache input validation failed: " << error.what() << '\n';
