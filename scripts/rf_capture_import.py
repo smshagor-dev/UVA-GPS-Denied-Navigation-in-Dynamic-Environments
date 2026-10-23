@@ -92,7 +92,9 @@ def read_role(
             try:
                 sequence = int(record[identity_column])
             except (ValueError, TypeError) as exc:
-                raise ValueError(f"{location.name}:{number}: invalid packet ID") from exc
+                raise ValueError(
+                    f"{location.name}:{number}: invalid packet ID"
+                ) from exc
             if not 0 <= sequence <= MAX_SEQUENCE:
                 raise ValueError(f"{location.name}:{number}: sequence outside uint32")
             timestamp = parse_time(record[time_column] or "", time_format)
