@@ -25,9 +25,7 @@ DOI = "10.17632/jm58sggtj7.2"
 API = (
     "https://api.data.mendeley.com/datasets/" + DATASET_ID + "?version=" + str(VERSION)
 )
-FILES_API = (
-    "https://api.data.mendeley.com/datasets/" + DATASET_ID + "/files?version=" + str(VERSION)
-)
+FILES_API = API.replace("?version=", "/files?version=")
 FILES = frozenset(
     {
         "measurements.csv",
