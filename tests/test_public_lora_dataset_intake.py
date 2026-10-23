@@ -51,9 +51,7 @@ class PublicRadioDatasetIntakeTests(unittest.TestCase):
         item = intake.catalog_files(self.metadata([fixture_file(payload)]))[0]
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
-            with patch.object(
-                intake, "open_url", return_value=io.BytesIO(payload)
-            ):
+            with patch.object(intake, "open_url", return_value=io.BytesIO(payload)):
                 first = intake.stream_verified_file(item, folder)
             second = intake.stream_verified_file(item, folder)
             self.assertEqual((folder / item["filename"]).read_bytes(), payload)
