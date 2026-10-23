@@ -100,16 +100,20 @@ class PublicRadioDatasetIntakeTests(unittest.TestCase):
 
     def test_catalog_identity_and_version_are_pinned(self):
         with patch.object(
-            intake, "open_url", return_value=io.BytesIO(
+            intake,
+            "open_url",
+            return_value=io.BytesIO(
                 json.dumps({"id": "another", "version": 2}).encode()
-            )
+            ),
         ):
             with self.assertRaisesRegex(ValueError, "dataset ID"):
                 intake.read_catalog()
         with patch.object(
-            intake, "open_url", return_value=io.BytesIO(
+            intake,
+            "open_url",
+            return_value=io.BytesIO(
                 json.dumps({"id": intake.DATASET_ID, "version": 3}).encode()
-            )
+            ),
         ):
             with self.assertRaisesRegex(ValueError, "published version"):
                 intake.read_catalog()
