@@ -94,9 +94,9 @@ class ReviewerEvidenceDossierTests(unittest.TestCase):
         self.assertFalse(result["physical_capture_provenance_verified"])
         self.assertEqual(len(result["flight_audits"]), 2)
         self.assertEqual(
-            result["paired_descriptive_statistics"]["scenarios"][
-                "synthetic-test"
-            ]["independent_flight_count_self_declared"],
+            result["paired_descriptive_statistics"]["scenarios"]["synthetic-test"][
+                "independent_flight_count_self_declared"
+            ],
             2,
         )
         self.assertIn("NOT VERIFIED AS EMPIRICAL RF EVIDENCE", report)
@@ -123,9 +123,7 @@ class ReviewerEvidenceDossierTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             manifest, plans = self.make_data(root)
-            with (root / "run-0" / "tx.csv").open(
-                "a", encoding="utf-8"
-            ) as handle:
+            with (root / "run-0" / "tx.csv").open("a", encoding="utf-8") as handle:
                 handle.write("7,1,5,200\n")
             with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
                 verify_dossier(manifest, plans)
