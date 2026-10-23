@@ -95,9 +95,7 @@ def verify_dossier(
         verified.append(
             {
                 "flight_id": flight,
-                "plan_sha256": hashlib.sha256(
-                    plan_path.read_bytes()
-                ).hexdigest(),
+                "plan_sha256": hashlib.sha256(plan_path.read_bytes()).hexdigest(),
                 "tx_sha256": result["input_sha256"]["tx"],
                 "rx_sha256": result["input_sha256"]["rx"],
                 "planned_packet_count": result["plan_expected_packet_count"],
@@ -234,9 +232,7 @@ def main() -> int:
     parser.add_argument("--native", type=Path)
     args = parser.parse_args()
     try:
-        result = verify_dossier(
-            args.manifest, args.plans, native=args.native
-        )
+        result = verify_dossier(args.manifest, args.plans, native=args.native)
         if args.output_json.resolve() == args.output_md.resolve():
             raise ValueError("JSON and Markdown outputs must be distinct")
         for output in (args.output_json, args.output_md):
