@@ -22,10 +22,7 @@ DATASET_ID = "jm58sggtj7"
 VERSION = 2
 DOI = "10.17632/jm58sggtj7.2"
 API = (
-    "https://api.data.mendeley.com/datasets/"
-    + DATASET_ID
-    + "?version="
-    + str(VERSION)
+    "https://api.data.mendeley.com/datasets/" + DATASET_ID + "?version=" + str(VERSION)
 )
 FILES = frozenset(
     {
