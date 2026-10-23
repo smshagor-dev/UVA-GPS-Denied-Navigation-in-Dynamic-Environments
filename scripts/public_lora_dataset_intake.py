@@ -63,9 +63,7 @@ class ApprovedRedirects(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         if not trusted_download_url(newurl):
             raise ValueError("redirect to untrusted download host")
-        redirected = super().redirect_request(
-            req, fp, code, msg, headers, newurl
-        )
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
         # API bearer tokens must never leave the pinned API host via a
         # publisher-generated redirect, even to an approved storage domain.
         if redirected is not None:
