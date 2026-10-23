@@ -113,17 +113,15 @@ class PublicLoRaPERReconciliationTests(unittest.TestCase):
             self.refresh_checksum(root, summary.name)
             result = reconcile(root, config, Decimal("0.000001"))
         self.assertFalse(result["reproduction_matches_all"])
-        self.assertFalse(result["configuration_comparisons"][0][
-            "matches_published_summary"
-        ])
+        self.assertFalse(
+            result["configuration_comparisons"][0]["matches_published_summary"]
+        )
 
     def test_tampering_is_rejected_before_statistical_comparison(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config = self.prepare(root)
-            with (root / "measurements.csv").open(
-                "a", encoding="utf-8"
-            ) as stream:
+            with (root / "measurements.csv").open("a", encoding="utf-8") as stream:
                 stream.write("25,SF7,0\n")
             with self.assertRaisesRegex(ValueError, "SHA-256 differs"):
                 reconcile(root, config, Decimal("0.000001"))
