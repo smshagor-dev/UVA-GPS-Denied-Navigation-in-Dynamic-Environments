@@ -52,8 +52,7 @@ def analyze_manifest(manifest: Path, *, native: Path | None = None) -> dict:
     for entry in entries:
         required = ("flight_id", "scenario", "tx", "rx", "source_doi")
         if not isinstance(entry, dict) or not all(
-            isinstance(entry.get(key), str) and entry[key].strip()
-            for key in required
+            isinstance(entry.get(key), str) and entry[key].strip() for key in required
         ):
             raise ValueError(f"manifest entries require: {', '.join(required)}")
         flight = entry["flight_id"].strip()
