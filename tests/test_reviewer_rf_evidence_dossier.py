@@ -26,8 +26,10 @@ class ReviewerEvidenceDossierTests(unittest.TestCase):
                 (
                     tx,
                     "tx_ms",
-                    [(7, 1, sequence, sequence * 20 + trial)
-                     for sequence in (1, 2, 3, 4)],
+                    [
+                        (7, 1, sequence, sequence * 20 + trial)
+                        for sequence in (1, 2, 3, 4)
+                    ],
                 ),
                 (
                     rx,
