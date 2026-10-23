@@ -121,9 +121,22 @@ class PublicLoRaPERReconciliationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config = self.prepare(root)
+            samples = root / "measurements.csv"
+            original = samples.read_bytes()
+            tampered = original.replace(b"25,SF7,0", b"25,SF7,1", 1)
+            self.assertNotEqual(original, tampered)
+            self.assertEqual(len(original), len(tampered))
+            samples.write_bytes(tampered)
+            with self.assertRaisesRegex(ValueError, "SHA-256 differs"):
+                reconcile(root, config, Decimal("0.000001"))
+
+    def test_appended_packet_is_rejected_by_file_size_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = self.prepare(root)
             with (root / "measurements.csv").open("a", encoding="utf-8") as stream:
                 stream.write("25,SF7,0\n")
-            with self.assertRaisesRegex(ValueError, "SHA-256 differs"):
+            with self.assertRaisesRegex(ValueError, "file size differs"):
                 reconcile(root, config, Decimal("0.000001"))
 
     def test_missing_published_group_is_discrepancy(self):
