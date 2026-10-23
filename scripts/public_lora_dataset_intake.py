@@ -98,17 +98,17 @@ def read_catalog() -> dict:
     # Published dataset "id" can be an internal UUID; short_id is the
     # user-facing dataset identifier in the DOI and public URL.
     short_id = metadata.get("short_id")
+    doi = metadata.get("doi")
+    doi_id = doi.get("id") if isinstance(doi, dict) else None
     if short_id is not None:
         if short_id != DATASET_ID:
             raise ValueError("dataset ID differs from pinned public dataset")
-    elif metadata.get("id") != DATASET_ID:
+    elif metadata.get("id") != DATASET_ID and doi_id != DOI:
         raise ValueError("dataset ID differs from pinned public dataset")
     if type(metadata.get("version")) is not int or metadata["version"] != VERSION:
         raise ValueError("published version differs from pinned version")
-    doi = metadata.get("doi")
-    if isinstance(doi, dict) and doi.get("id") is not None:
-        if doi["id"].lower() != DOI:
-            raise ValueError("published DOI differs from pinned dataset")
+    if doi_id is not None and doi_id != DOI:
+        raise ValueError("published DOI differs from pinned dataset")
     if not isinstance(metadata.get("files"), list) or not metadata["files"]:
         # Public API documentation also exposes a dedicated file-list endpoint.
         file_index = read_json_response(FILES_API)
