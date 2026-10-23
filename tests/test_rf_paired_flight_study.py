@@ -18,9 +18,7 @@ class MatchedFieldCapturesTests(unittest.TestCase):
             with tx.open("w", encoding="utf-8", newline="") as handle:
                 writer = csv.writer(handle)
                 writer.writerow(["sender_id", "epoch", "sequence", "tx_ms"])
-                writer.writerows(
-                    [(7, 1, seq, seq * 10 + index) for seq in range(1, 6)]
-                )
+                writer.writerows([(7, 1, seq, seq * 10 + index) for seq in range(1, 6)])
             with rx.open("w", encoding="utf-8", newline="") as handle:
                 writer = csv.writer(handle)
                 writer.writerow(["sender_id", "epoch", "sequence", "rx_ms"])
