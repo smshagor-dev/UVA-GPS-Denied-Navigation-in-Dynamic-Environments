@@ -137,6 +137,19 @@ def run(spec_path: Path, output_dir: Path) -> dict:
     rx_path = (spec_path.parent / require_text(rx_spec, "file")).resolve()
     if tx_path == rx_path:
         raise ValueError("TX and RX cannot be the same source file")
+    # Normalization must never overwrite the investigator's original capture.
+    generated = {
+        (output_dir / name).resolve()
+        for name in (
+            "matched-tx.csv",
+            "matched-rx.csv",
+            "paired-manifest-entry.json",
+            "capture-audit.json",
+        )
+    }
+    if tx_path in generated or rx_path in generated:
+        raise ValueError("output would overwrite original source capture")
+
     tx_hash, rx_hash = hash_file(tx_path), hash_file(rx_path)
     if tx_hash == rx_hash:
         raise ValueError("TX and RX cannot have identical file contents")
