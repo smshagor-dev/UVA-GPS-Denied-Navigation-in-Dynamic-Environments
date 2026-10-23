@@ -135,7 +135,9 @@ def analyze_manifest(manifest: Path, *, native: Path | None = None) -> dict:
         "observed_loss_is_end_to_end_not_rf_attribution": True,
         "model_scope": "authenticated and fresh packets assumed; sequence policy only",
         "replay_cpp_parity_checked": native is not None,
-        "confidence_interval_method": "95% percentile bootstrap across entire declared flights",
+        "confidence_interval_method": (
+            "95% percentile bootstrap across entire declared flights"
+        ),
         "independence_cannot_be_established_from_manifest": True,
         "scenarios": scenario_summaries,
     }
