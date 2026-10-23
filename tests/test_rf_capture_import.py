@@ -118,6 +118,19 @@ class CaptureImportTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "no matching sender-side"):
                 run(spec_file, root / "out")
 
+    def test_output_never_overwrites_source_capture(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            spec_file, config = self.fixture(root)
+            original = (root / "sender.csv").read_bytes()
+            source = root / "matched-tx.csv"
+            source.write_bytes(original)
+            config["tx"]["file"] = source.name
+            spec_file.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "overwrite original source"):
+                run(spec_file, root)
+            self.assertEqual(source.read_bytes(), original)
+
     def test_invalid_timezone_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
