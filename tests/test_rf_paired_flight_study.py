@@ -67,11 +67,15 @@ class MatchedFieldCapturesTests(unittest.TestCase):
             0.25,
         )
         self.assertEqual(
-            scenario["metrics"]["strict_first_arrival_rejection_fraction"]["mean_of_flights"],
+            scenario["metrics"]["strict_first_arrival_rejection_fraction"][
+                "mean_of_flights"
+            ],
             0.25,
         )
         self.assertEqual(
-            scenario["metrics"]["window_first_arrival_rejection_fraction"]["mean_of_flights"],
+            scenario["metrics"]["window_first_arrival_rejection_fraction"][
+                "mean_of_flights"
+            ],
             0.0,
         )
         self.assertEqual(
