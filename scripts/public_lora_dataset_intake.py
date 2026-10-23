@@ -63,20 +63,28 @@ class ApprovedRedirects(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         if not trusted_download_url(newurl):
             raise ValueError("redirect to untrusted download host")
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+        redirected = super().redirect_request(
+            req, fp, code, msg, headers, newurl
+        )
+        # API bearer tokens must never leave the pinned API host via a
+        # publisher-generated redirect, even to an approved storage domain.
+        if redirected is not None:
+            redirected.remove_header("Authorization")
+        return redirected
 
 
 def open_url(url: str):
     if not trusted_download_url(url):
         raise ValueError("download URL is not a permitted HTTPS location")
     opener = urllib.request.build_opener(ApprovedRedirects())
-    request = urllib.request.Request(
-        url,
-        headers={
-            "User-Agent": "Reviewer3-Radio-Evidence-Intake/1.0",
-            "Accept": "application/json, application/octet-stream, */*",
-        },
-    )
+    request_headers = {
+        "User-Agent": "Reviewer3-Radio-Evidence-Intake/1.0",
+        "Accept": "application/json, application/octet-stream, */*",
+    }
+    token = os.environ.get("MENDELEY_DATA_ACCESS_TOKEN", "").strip()
+    if token and urllib.parse.urlsplit(url).hostname == "api.data.mendeley.com":
+        request_headers["Authorization"] = "Bearer " + token
+    request = urllib.request.Request(url, headers=request_headers)
     return opener.open(request, timeout=35)
 
 
