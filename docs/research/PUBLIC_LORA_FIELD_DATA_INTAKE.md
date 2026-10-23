@@ -72,3 +72,38 @@ Automated tests mock the publisher's responses and use synthetic bytes.
 
 This code should not be described as a completed experiment or substitute
 for independent field collection.
+
+
+## API metadata compatibility and local header inspection
+
+The published API may identify a dataset using an internal UUID in \`id\`,
+while its public DOI uses the \`short_id\`. The downloader accepts the pinned
+public short ID, or the pinned DOI when only an internal UUID is available.
+It rejects a conflicting public short ID, DOI or version. If a public dataset
+response omits the file list, the documented
+\`/datasets/{id}/files?version=2\` endpoint is queried. If a file omits a
+direct signed URL but has a valid file UUID, the documented
+\`/files/{file_uuid}/file_downloaded?version=2\` publisher redirect endpoint
+is used. All file content still needs publisher SHA-256 and exact size;
+no unverified mirror URL is accepted.
+
+After downloading, inspect the actual source headers and row counts:
+
+\`\`\`sh
+python3 scripts/inspect_public_lora_schema.py \
+  --dataset-dir /data/field-lora-v2 \
+  --output /data/lora-column-inventory.json
+\`\`\`
+
+The inspector verifies both files against the existing integrity index,
+reads their CSV headings and row counts and fails on malformed records.
+Use those confirmed headings to prepare a manually reviewed mapping for
+\`scripts/reconcile_public_lora_per.py\`. Header discovery does not infer
+missing packets, verify original sender-side transmission inventory, or
+prove that the integrity-index JSON was independently authenticated.
+
+**Runtime caveat:** The official public API response has been modeled from
+publisher documentation and tested with synthetic mocked JSON. Live Mendeley
+API access was not available from this execution environment; compatibility
+with its current live response and any signed storage redirect still
+requires an actual external execution.

@@ -8,6 +8,7 @@ import unittest
 from decimal import Decimal
 from pathlib import Path
 
+from scripts.inspect_public_lora_schema import inspect_schema
 from scripts.reconcile_public_lora_per import reconcile
 
 
@@ -86,6 +87,43 @@ class PublicLoRaPERReconciliationTests(unittest.TestCase):
                 file["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
                 file["size"] = path.stat().st_size
         index.write_text(json.dumps(metadata), encoding="utf-8")
+
+    def test_checksum_matched_raw_header_inventory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.prepare(root)
+            report = inspect_schema(root)
+        self.assertFalse(report["source_is_multi_uav_fanet"])
+        self.assertFalse(report["packet_loss_denominator_verified"])
+        self.assertEqual(len(report["contents"]), 2)
+        self.assertEqual(report["contents"][0]["data_row_count"], 6)
+        self.assertEqual(
+            report["contents"][0]["column_names"], ["distance", "sf", "lost"]
+        )
+
+    def test_header_inventory_rejects_duplicate_headers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.prepare(root)
+            samples = root / "measurements.csv"
+            samples.write_text(
+                samples.read_text(encoding="utf-8").replace(
+                    "distance,sf,lost", "distance,sf,sf"
+                ),
+                encoding="utf-8",
+            )
+            self.refresh_checksum(root, samples.name)
+            with self.assertRaisesRegex(ValueError, "repeated CSV headings"):
+                inspect_schema(root)
+
+    def test_header_inventory_checks_original_checksums(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.prepare(root)
+            samples = root / "measurements.csv"
+            samples.write_bytes(samples.read_bytes().replace(b"SF7", b"SF8", 1))
+            with self.assertRaisesRegex(ValueError, "SHA-256 differs"):
+                inspect_schema(root)
 
     def test_reproduction_matches_publisher_summary(self):
         with tempfile.TemporaryDirectory() as directory:

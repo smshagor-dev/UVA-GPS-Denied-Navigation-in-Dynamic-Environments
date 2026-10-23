@@ -118,6 +118,72 @@ class PublicRadioDatasetIntakeTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "published version"):
                 intake.read_catalog()
 
+    def test_public_short_id_can_accompany_internal_uuid(self):
+        data = self.metadata()
+        data["id"] = "30ae499e-5abb-42d3-8f6e-6d3f93e427fa"
+        data["short_id"] = intake.DATASET_ID
+        data["doi"] = {"id": intake.DOI}
+        stream = io.BytesIO(json.dumps(data).encode())
+        with patch.object(intake, "open_url", return_value=stream):
+            result = intake.read_catalog()
+        self.assertEqual(result["short_id"], intake.DATASET_ID)
+
+    def test_internal_uuid_with_exact_doi_is_accepted(self):
+        data = self.metadata()
+        data["id"] = "30ae499e-5abb-42d3-8f6e-6d3f93e427fa"
+        data["doi"] = {"id": intake.DOI}
+        stream = io.BytesIO(json.dumps(data).encode())
+        with patch.object(intake, "open_url", return_value=stream):
+            result = intake.read_catalog()
+        self.assertEqual(result["version"], intake.VERSION)
+
+    def test_wrong_public_short_id_is_rejected(self):
+        data = self.metadata()
+        data["short_id"] = "another-dataset"
+        stream = io.BytesIO(json.dumps(data).encode())
+        with patch.object(intake, "open_url", return_value=stream):
+            with self.assertRaisesRegex(ValueError, "dataset ID"):
+                intake.read_catalog()
+
+    def test_mismatched_doi_is_rejected(self):
+        data = self.metadata()
+        data["doi"] = {"id": "10.17632/other.2"}
+        stream = io.BytesIO(json.dumps(data).encode())
+        with patch.object(intake, "open_url", return_value=stream):
+            with self.assertRaisesRegex(ValueError, "DOI differs"):
+                intake.read_catalog()
+
+    def test_official_files_endpoint_used_when_catalog_has_no_files(self):
+        data = self.metadata()
+        del data["files"]
+        pages = [
+            io.BytesIO(json.dumps(data).encode()),
+            io.BytesIO(json.dumps([fixture_file()]).encode()),
+        ]
+        with patch.object(intake, "open_url", side_effect=pages) as opened:
+            result = intake.read_catalog()
+        self.assertEqual(len(result["files"]), 1)
+        self.assertEqual(opened.call_args_list[1].args[0], intake.FILES_API)
+
+    def test_missing_signed_url_uses_official_file_redirect_endpoint(self):
+        entry = fixture_file()
+        entry["id"] = "01234567-89ab-4def-8123-0123456789ab"
+        entry["content_details"]["download_url"] = None
+        data = self.metadata([entry])
+        selected = intake.catalog_files(data)
+        self.assertEqual(
+            selected[0]["download_url"],
+            "https://api.data.mendeley.com/datasets/jm58sggtj7/files/"
+            "01234567-89ab-4def-8123-0123456789ab/file_downloaded?version=2",
+        )
+
+    def test_missing_url_without_valid_file_id_is_rejected(self):
+        entry = fixture_file()
+        entry["id"] = "../bogus"
+        entry["content_details"]["download_url"] = None
+        with self.assertRaisesRegex(ValueError, "file UUID"):
+            intake.catalog_files(self.metadata([entry]))
+
     def test_metadata_cannot_replace_verifiable_raw_source(self):
         result = self.metadata([fixture_file()])
         with patch.object(intake, "read_catalog", return_value=result):

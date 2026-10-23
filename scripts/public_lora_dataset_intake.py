@@ -16,6 +16,7 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 
 DATASET_ID = "jm58sggtj7"
@@ -24,6 +25,7 @@ DOI = "10.17632/jm58sggtj7.2"
 API = (
     "https://api.data.mendeley.com/datasets/" + DATASET_ID + "?version=" + str(VERSION)
 )
+FILES_API = API.replace("?version=", "/files?version=")
 FILES = frozenset(
     {
         "measurements.csv",
@@ -78,18 +80,41 @@ def open_url(url: str):
     return opener.open(request, timeout=35)
 
 
-def read_catalog() -> dict:
-    with open_url(API) as stream:
+def read_json_response(url: str):
+    """Read a publisher JSON response with a hard 4 MiB size limit."""
+    with open_url(url) as stream:
         raw = stream.read(4 * 1024 * 1024 + 1)
     if len(raw) > 4 * 1024 * 1024:
         raise ValueError("metadata exceeds 4 MiB")
-    metadata = json.loads(raw)
+    return json.loads(raw)
+
+
+def read_catalog() -> dict:
+    metadata = read_json_response(API)
     if not isinstance(metadata, dict):
         raise ValueError("unexpected public dataset metadata")
-    if metadata.get("id") != DATASET_ID:
+    # Published dataset "id" can be an internal UUID; short_id is the
+    # user-facing dataset identifier in the DOI and public URL.
+    short_id = metadata.get("short_id")
+    doi = metadata.get("doi")
+    doi_id = doi.get("id") if isinstance(doi, dict) else None
+    if short_id is not None:
+        if short_id != DATASET_ID:
+            raise ValueError("dataset ID differs from pinned public dataset")
+    elif metadata.get("id") != DATASET_ID and doi_id != DOI:
         raise ValueError("dataset ID differs from pinned public dataset")
-    if metadata.get("version") != VERSION:
+    if type(metadata.get("version")) is not int or metadata["version"] != VERSION:
         raise ValueError("published version differs from pinned version")
+    if doi_id is not None and doi_id != DOI:
+        raise ValueError("published DOI differs from pinned dataset")
+    if not isinstance(metadata.get("files"), list) or not metadata["files"]:
+        # Public API documentation also exposes a dedicated file-list endpoint.
+        file_index = read_json_response(FILES_API)
+        if isinstance(file_index, dict):
+            file_index = file_index.get("results")
+        if not isinstance(file_index, list):
+            raise ValueError("publisher file-list endpoint returned invalid metadata")
+        metadata["files"] = file_index
     return metadata
 
 
@@ -116,10 +141,28 @@ def catalog_files(metadata: dict) -> list[dict]:
         size = details.get("size", row.get("size"))
         if not isinstance(digest, str) or not SHA.fullmatch(digest):
             raise ValueError(f"{filename}: no verifiable SHA-256 from publisher")
-        if not isinstance(size, int) or not 0 <= size <= MAX_BYTES:
+        if type(size) is not int or not 0 <= size <= MAX_BYTES:
             raise ValueError(f"{filename}: invalid file size")
+        if not url:
+            # Official file_downloaded endpoint redirects to a temporary,
+            # publisher-selected signed URL. Never synthesize a storage URL.
+            file_id = row.get("id")
+            try:
+                file_id = str(uuid.UUID(file_id))
+            except (ValueError, TypeError, AttributeError) as exc:
+                raise ValueError(
+                    f"{filename}: missing publisher download URL and file UUID"
+                ) from exc
+            url = (
+                "https://api.data.mendeley.com/datasets/"
+                + DATASET_ID
+                + "/files/"
+                + file_id
+                + "/file_downloaded?version="
+                + str(VERSION)
+            )
         if not trusted_download_url(url):
-            raise ValueError(f"{filename}: untrusted or absent publisher download URL")
+            raise ValueError(f"{filename}: untrusted publisher download URL")
         result.append(
             {
                 "filename": filename,
