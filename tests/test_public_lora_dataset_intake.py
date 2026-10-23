@@ -3,7 +3,9 @@
 import hashlib
 import io
 import json
+import os
 import tempfile
+import urllib.request
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -97,6 +99,36 @@ class PublicRadioDatasetIntakeTests(unittest.TestCase):
         missing["filename"] = "../private.csv"
         with self.assertRaisesRegex(ValueError, "no recognized"):
             intake.catalog_files(self.metadata([missing]))
+
+    def test_api_token_only_applies_to_pinned_publisher_host(self):
+        with patch.dict(
+            os.environ, {"MENDELEY_DATA_ACCESS_TOKEN": "private-api-token"}
+        ):
+            with patch.object(intake.urllib.request, "build_opener") as builder:
+                intake.open_url(intake.API)
+                request = builder.return_value.open.call_args.args[0]
+                self.assertEqual(
+                    request.get_header("Authorization"),
+                    "Bearer private-api-token",
+                )
+                intake.open_url("https://storage.googleapis.com/public/test")
+                external = builder.return_value.open.call_args.args[0]
+                self.assertIsNone(external.get_header("Authorization"))
+
+    def test_api_token_is_removed_before_any_redirect(self):
+        request = urllib.request.Request(
+            intake.API, headers={"Authorization": "Bearer private-api-token"}
+        )
+        redirected = intake.ApprovedRedirects().redirect_request(
+            request,
+            None,
+            307,
+            "Temporary Redirect",
+            {},
+            "https://storage.googleapis.com/publisher/archive.zip",
+        )
+        self.assertIsNotNone(redirected)
+        self.assertIsNone(redirected.get_header("Authorization"))
 
     def test_catalog_identity_and_version_are_pinned(self):
         with patch.object(
