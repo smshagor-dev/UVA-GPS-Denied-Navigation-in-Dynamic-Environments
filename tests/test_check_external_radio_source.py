@@ -92,7 +92,28 @@ class PublicSourceProbeTests(unittest.TestCase):
                     encoding="utf-8"
                 )
         self.assertEqual(result["http_status"], 403)
+        self.assertEqual(result["result"], "publisher_access_denied")
+        self.assertEqual(
+            result["access_blocker"],
+            "publisher_authentication_or_permissions_required",
+        )
         self.assertNotIn(secret, payload)
+
+    def test_unauthorized_publisher_access_does_not_certify_source(self):
+        error = urllib.error.HTTPError(
+            "https://api.data.mendeley.com/datasets/jm58sggtj7",
+            401,
+            "Unauthorized",
+            None,
+            None,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(probe, "acquire", side_effect=error):
+                report = probe.attempt(Path(directory))
+        self.assertEqual(report["http_status"], 401)
+        self.assertEqual(report["result"], "publisher_access_denied")
+        self.assertFalse(report["schema_inventory_available"])
+        self.assertEqual(report["verified_download_count"], 0)
 
     def test_strict_mode_fails_when_external_source_unavailable(self):
         with tempfile.TemporaryDirectory() as directory:
