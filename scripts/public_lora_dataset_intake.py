@@ -38,7 +38,7 @@ FILES = frozenset(
     }
 )
 MAX_BYTES = 100 * 1024 * 1024
-SHA = re.compile(r"[0-9a-fA-F]{64}\\Z")
+SHA = re.compile(r"[0-9a-fA-F]{64}\Z")
 
 
 def trusted_download_url(url: str) -> bool:
@@ -204,7 +204,7 @@ def acquire(folder: Path, *, download: bool = False) -> dict:
         ]
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "public-dataset-integrity.json").write_text(
-        json.dumps(public_index, indent=2, sort_keys=True) + "\\n",
+        json.dumps(public_index, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     return public_index
