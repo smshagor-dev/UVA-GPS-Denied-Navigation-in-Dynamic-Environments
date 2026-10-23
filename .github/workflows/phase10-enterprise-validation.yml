@@ -103,7 +103,7 @@ jobs:
                 -t drone-swarm/control-plane:phase10 . 2>&1 | tee "$log"; then
               exit 0
             fi
-            if ! grep -Eqi '503 Service Unavailable|502 Bad Gateway|504 Gateway Timeout|429 Too Many Requests|TLS handshake timeout|connection reset by peer|i/o timeout' "$log"; then
+            if ! grep -Eqi '500 Internal Server Error|503 Service Unavailable|502 Bad Gateway|504 Gateway Timeout|429 Too Many Requests|TLS handshake timeout|connection reset by peer|i/o timeout' "$log"; then
               echo "Docker build failed for a non-transient reason; not retrying."
               exit 1
             fi

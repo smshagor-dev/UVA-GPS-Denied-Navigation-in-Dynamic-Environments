@@ -160,14 +160,14 @@ jobs:
 
       - name: Python syntax validation
         shell: bash
-        run: python3 -m py_compile tests/__init__.py tests/test_dashboard_backend_status.py main.py scripts/generate_firmware_manifest.py scripts/drone_setup.py scripts/bench_check.py scripts/local_validate.py scripts/generate_tls_certs.py scripts/pre_arm_check.py scripts/production_telemetry_smoke_test.py scripts/telemetry_smoke_test.py gui/dashboard.py gui/backend_status.py gui/operator_console.py scripts/peer_replay_trace_analysis.py tests/test_peer_replay_trace_analysis.py scripts/peer_replay_scenario_study.py tests/test_peer_replay_scenario_study.py scripts/rf_reception_audit.py tests/test_rf_reception_audit.py scripts/rf_flight_study.py tests/test_rf_flight_study.py scripts/rf_paired_flight_study.py tests/test_rf_paired_flight_study.py scripts/rf_capture_import.py tests/test_rf_capture_import.py scripts/rf_capture_plan_audit.py tests/test_rf_capture_plan_audit.py scripts/reviewer_rf_evidence_dossier.py tests/test_reviewer_rf_evidence_dossier.py
+        run: python3 -m py_compile tests/__init__.py tests/test_dashboard_backend_status.py main.py scripts/generate_firmware_manifest.py scripts/drone_setup.py scripts/bench_check.py scripts/local_validate.py scripts/generate_tls_certs.py scripts/pre_arm_check.py scripts/production_telemetry_smoke_test.py scripts/telemetry_smoke_test.py gui/dashboard.py gui/backend_status.py gui/operator_console.py scripts/peer_replay_trace_analysis.py tests/test_peer_replay_trace_analysis.py scripts/peer_replay_scenario_study.py tests/test_peer_replay_scenario_study.py scripts/rf_reception_audit.py tests/test_rf_reception_audit.py scripts/rf_flight_study.py tests/test_rf_flight_study.py scripts/rf_paired_flight_study.py tests/test_rf_paired_flight_study.py scripts/rf_capture_import.py tests/test_rf_capture_import.py scripts/rf_capture_plan_audit.py tests/test_rf_capture_plan_audit.py scripts/reviewer_rf_evidence_dossier.py tests/test_reviewer_rf_evidence_dossier.py scripts/public_lora_dataset_intake.py tests/test_public_lora_dataset_intake.py
 
       - name: Python unit tests with coverage
         shell: bash
         run: |
           set -euxo pipefail
           mkdir -p "${RUNNER_TEMP}/python-coverage"
-          python3 -m coverage run -m unittest tests.test_dashboard_backend_status tests.test_peer_replay_trace_analysis tests.test_peer_replay_scenario_study tests.test_rf_reception_audit tests.test_rf_flight_study tests.test_rf_paired_flight_study tests.test_rf_capture_import tests.test_rf_capture_plan_audit tests.test_reviewer_rf_evidence_dossier
+          python3 -m coverage run -m unittest tests.test_dashboard_backend_status tests.test_peer_replay_trace_analysis tests.test_peer_replay_scenario_study tests.test_rf_reception_audit tests.test_rf_flight_study tests.test_rf_paired_flight_study tests.test_rf_capture_import tests.test_rf_capture_plan_audit tests.test_reviewer_rf_evidence_dossier tests.test_public_lora_dataset_intake
           python3 -m coverage report | tee "${RUNNER_TEMP}/python-coverage/coverage.txt"
           python3 -m coverage xml -o "${RUNNER_TEMP}/python-coverage/coverage.xml"
 
