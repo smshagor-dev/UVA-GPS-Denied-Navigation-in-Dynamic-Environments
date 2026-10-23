@@ -130,8 +130,7 @@ def rows(path: Path, required: set[str]):
             raise ValueError(f"{path.name}: missing mapped CSV headings")
         for index, row in enumerate(reader, start=2):
             if None in row or any(
-                row.get(name) is None or not row[name].strip()
-                for name in required
+                row.get(name) is None or not row[name].strip() for name in required
             ):
                 raise ValueError(f"{path.name}:{index}: malformed or empty field")
             yield row
@@ -223,8 +222,7 @@ def reconcile(folder: Path, mapping_path: Path, tolerance: Decimal) -> dict:
         comparisons.append(
             {
                 "configuration": {
-                    entry["label"]: value
-                    for entry, value in zip(dimensions, key)
+                    entry["label"]: value for entry, value in zip(dimensions, key)
                 },
                 "packet_rows": calculated[0] if calculated else None,
                 "flagged_lost": calculated[1] if calculated else None,
