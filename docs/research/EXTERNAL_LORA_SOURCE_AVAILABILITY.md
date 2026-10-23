@@ -62,3 +62,39 @@ UAV RF/TX/RX trial evidence.
 The GitHub Actions test is deliberately network-dependent and therefore
 *not a required merge gate*. Required Python CI only runs fully offline
 synthetic regression tests against this probe's behavior.
+
+## Actual GitHub-hosted source probe result
+
+The first PR #67 probe performed an unauthenticated request to the
+publisher endpoint on GitHub-hosted Ubuntu and received **HTTP 401**. No
+real dataset bytes were verified, and no CSV header inventory was made.
+A completed informational workflow is **not evidence of dataset access**.
+
+HTTP 401/403 is now reported as `publisher_access_denied` with an
+`access_blocker` indicating authentication or permissions may be needed.
+The probe intentionally records no signed URLs, tokens, or raw HTTP
+exception strings.
+
+For investigators authorized to use a publisher API access token, the
+intake supports an **optional** `MENDELEY_DATA_ACCESS_TOKEN` environment
+variable. The token is added only to requests sent to the exact
+`api.data.mendeley.com` host, and removed from all redirects before
+downloading any publisher storage content. Do not place the token in
+repository files, test fixtures, shell history, PR descriptions, CI logs,
+or a pull-request workflow environment.
+
+Example local use after configuring the credential in the caller's
+environment:
+
+```sh
+python3 scripts/check_external_radio_source.py \
+  --output-dir /data/public-radio \
+  --strict
+```
+
+The GitHub pull-request informational probe deliberately has **no
+publisher API credential**. An authorized credential can be used in a
+separately secured investigator environment. Even successful authenticated
+download proves the retrieved file checksum matches the publisher
+metadata; it does not establish a complete sender-side transmission
+inventory, multi-UAV FANET applicability or RF loss attribution.
