@@ -154,9 +154,7 @@ def run(spec_path: Path, output_dir: Path) -> dict:
     if tx_hash == rx_hash:
         raise ValueError("TX and RX cannot have identical file contents")
 
-    sent, tx_rows = read_role(
-        tx_path, tx_spec, sender_id=sender, epoch=epoch, tx=True
-    )
+    sent, tx_rows = read_role(tx_path, tx_spec, sender_id=sender, epoch=epoch, tx=True)
     received, rx_rows = read_role(
         rx_path, rx_spec, sender_id=sender, epoch=epoch, tx=False
     )
