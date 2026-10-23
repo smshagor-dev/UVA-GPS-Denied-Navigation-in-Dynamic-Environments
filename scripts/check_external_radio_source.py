@@ -62,6 +62,11 @@ def attempt(folder: Path, *, download: bool = True) -> dict:
         # temporary signed download credentials.
         if isinstance(error, urllib.error.HTTPError):
             status["http_status"] = error.code
+            if error.code in (401, 403):
+                status["result"] = "publisher_access_denied"
+                status["access_blocker"] = (
+                    "publisher_authentication_or_permissions_required"
+                )
 
     folder.mkdir(parents=True, exist_ok=True)
     (folder / REPORT).write_text(
