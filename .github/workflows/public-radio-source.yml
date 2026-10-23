@@ -1,0 +1,62 @@
+name: External LoRa Source Availability
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/public-radio-source.yml"
+      - "scripts/public_lora_dataset_intake.py"
+      - "scripts/inspect_public_lora_schema.py"
+      - "scripts/check_external_radio_source.py"
+      - "tests/test_check_external_radio_source.py"
+
+permissions:
+  contents: read
+
+jobs:
+  real-source-probe:
+    name: External Dataset Status (informational)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Probe public publisher files without empirical claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/check_external_radio_source.py \
+            --output-dir "${RUNNER_TEMP}/public-lora"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          folder = Path(os.environ["RUNNER_TEMP"]) / "public-lora"
+          status = json.loads((folder / "external-source-status.json").read_text())
+          lines = [
+              "## External LoRa source availability (informational)",
+              "",
+              f"- Download status: `{status['result']}`",
+              f"- Verified downloaded files: {status['verified_download_count']}",
+              f"- Header inventory available: {status['schema_inventory_available']}",
+              "- **This does not establish UAV FANET data or measured replay-security.**",
+              "- A blocked publisher request is an acquisition blocker, not a CI pass for data validity.",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
+              output.write("\n".join(lines) + "\n")
+          if status["result"] != "publisher_files_and_csv_schema_verified":
+              print("::warning::External LoRa archive not yet fully accessible/verified")
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: external-lora-probe-status
+          path: |
+            ${{ runner.temp }}/public-lora/external-source-status.json
+            ${{ runner.temp }}/public-lora/public-dataset-integrity.json
+            ${{ runner.temp }}/public-lora/public-lora-schema.json
+          if-no-files-found: warn
+          retention-days: 14
