@@ -54,9 +54,7 @@ def verify_dossier(
     entries = read_list(capture_manifest)
     flights = {}
     for entry in entries:
-        if not isinstance(entry, dict) or not isinstance(
-            entry.get("flight_id"), str
-        ):
+        if not isinstance(entry, dict) or not isinstance(entry.get("flight_id"), str):
             raise ValueError("paired manifest requires a flight ID per entry")
         flight = entry["flight_id"]
         if flight in flights:
@@ -136,9 +134,7 @@ def verify_dossier(
         "capture_manifest_sha256": hashlib.sha256(
             capture_manifest.read_bytes()
         ).hexdigest(),
-        "plan_index_sha256": hashlib.sha256(
-            index_file.read_bytes()
-        ).hexdigest(),
+        "plan_index_sha256": hashlib.sha256(index_file.read_bytes()).hexdigest(),
         "flight_audits": verified,
         "paired_descriptive_statistics": summary,
         "reviewer_gaps": [
