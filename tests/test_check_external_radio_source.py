@@ -19,9 +19,7 @@ class PublicSourceProbeTests(unittest.TestCase):
             target = Path(directory)
             with patch.object(probe, "acquire", side_effect=OSError("offline")):
                 result = probe.attempt(target)
-            report = json.loads(
-                (target / probe.REPORT).read_text(encoding="utf-8")
-            )
+            report = json.loads((target / probe.REPORT).read_text(encoding="utf-8"))
         self.assertEqual(result["result"], "source_unavailable_or_incomplete")
         self.assertEqual(result["verified_download_count"], 0)
         self.assertFalse(report["is_uav_fanet_evidence"])
@@ -51,13 +49,9 @@ class PublicSourceProbeTests(unittest.TestCase):
                 with patch.object(probe, "inspect_schema", return_value=inventory):
                     result = probe.attempt(target)
             schema = json.loads(
-                (target / "public-lora-schema.json").read_text(
-                    encoding="utf-8"
-                )
+                (target / "public-lora-schema.json").read_text(encoding="utf-8")
             )
-        self.assertEqual(
-            result["result"], "publisher_files_and_csv_schema_verified"
-        )
+        self.assertEqual(result["result"], "publisher_files_and_csv_schema_verified")
         self.assertEqual(result["verified_download_count"], 2)
         self.assertTrue(result["schema_inventory_available"])
         self.assertEqual(schema["contents"][0]["data_row_count"], 2)
@@ -88,9 +82,7 @@ class PublicSourceProbeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with patch.object(probe, "acquire", side_effect=error):
                 result = probe.attempt(Path(directory))
-                payload = (Path(directory) / probe.REPORT).read_text(
-                    encoding="utf-8"
-                )
+                payload = (Path(directory) / probe.REPORT).read_text(encoding="utf-8")
         self.assertEqual(result["http_status"], 403)
         self.assertEqual(result["result"], "publisher_access_denied")
         self.assertEqual(
@@ -120,9 +112,7 @@ class PublicSourceProbeTests(unittest.TestCase):
             with patch.object(
                 sys, "argv", ["probe", "--output-dir", directory, "--strict"]
             ):
-                with patch.object(
-                    probe, "acquire", side_effect=OSError("offline")
-                ):
+                with patch.object(probe, "acquire", side_effect=OSError("offline")):
                     with contextlib.redirect_stdout(io.StringIO()):
                         code = probe.main()
         self.assertEqual(code, 1)
