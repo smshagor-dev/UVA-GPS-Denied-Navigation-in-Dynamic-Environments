@@ -22,9 +22,7 @@ def inspect_schema(folder: Path) -> dict:
     verified = check_files(folder)
     results = []
     for filename in REQUIRED_FILES:
-        with (folder / filename).open(
-            "r", encoding="utf-8-sig", newline=""
-        ) as stream:
+        with (folder / filename).open("r", encoding="utf-8-sig", newline="") as stream:
             reader = csv.reader(stream)
             try:
                 headings = next(reader)
@@ -40,9 +38,7 @@ def inspect_schema(folder: Path) -> dict:
             count = 0
             for number, row in enumerate(reader, start=2):
                 if len(row) != len(headings):
-                    raise ValueError(
-                        f"{filename}:{number}: column count mismatch"
-                    )
+                    raise ValueError(f"{filename}:{number}: column count mismatch")
                 count += 1
         results.append(
             {
