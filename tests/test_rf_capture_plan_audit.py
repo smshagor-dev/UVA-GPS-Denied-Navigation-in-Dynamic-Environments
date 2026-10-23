@@ -71,7 +71,9 @@ class CapturePlanAuditTests(unittest.TestCase):
         self.assertTrue(result["plan_coverage_verified"])
         self.assertEqual(result["plan_expected_packet_count"], 5)
         self.assertEqual(result["policy_analysis"]["trace"]["received_distinct"], 4)
-        self.assertEqual(result["policy_analysis"]["trace"]["observed_loss_fraction"], 0.2)
+        self.assertEqual(
+            result["policy_analysis"]["trace"]["observed_loss_fraction"], 0.2
+        )
         self.assertFalse(result["capture_provenance_independently_verified"])
         self.assertFalse(result["physical_rf_origin_verified"])
         self.assertFalse(result["protocol_was_preregistered_verified"])
