@@ -156,6 +156,82 @@ class DryadSourceTests(unittest.TestCase):
         self.assertFalse(stored["complete_independent_sender_tx_inventory_established"])
         self.assertFalse(stored["replay_false_rejection_measured"])
 
+    def test_investigator_supplied_files_match_live_publisher_hashes(self):
+        items = [
+            {
+                "filename": name,
+                "size": len(contents),
+                "sha256": hashlib.sha256(contents).hexdigest(),
+                "download_url": source.API + "/files/101/download",
+            }
+            for name, contents in self.payloads.items()
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            for name, payload in self.payloads.items():
+                (folder / name).write_bytes(payload)
+            with patch.object(
+                source, "catalog", return_value=(items, {"published_version_id": 12345})
+            ):
+                with patch.object(source, "open_url") as network:
+                    report = source.probe(folder, verify_local=True)
+            network.assert_not_called()
+            self.assertEqual(report["verified_local_file_count"], 2)
+            self.assertEqual(report["verified_download_count"], 0)
+            self.assertEqual(report["result"], "local_files_match_publisher_sha256")
+            self.assertTrue(report["publisher_file_hashes_matched"])
+            self.assertEqual(
+                report["input_origin"], "investigator_supplied_local_files"
+            )
+            self.assertFalse(report["real_multi_uav_fanet_evidence"])
+
+    def test_invalid_local_archive_cannot_claim_publisher_integrity(self):
+        items = [
+            {
+                "filename": name,
+                "size": len(contents),
+                "sha256": hashlib.sha256(contents).hexdigest(),
+                "download_url": source.API + "/files/101/download",
+            }
+            for name, contents in self.payloads.items()
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            for name, payload in self.payloads.items():
+                (folder / name).write_bytes(payload)
+            archive = folder / source.ARCHIVE
+            original = archive.read_bytes()
+            archive.write_bytes(b"x" * len(original))
+            with patch.object(
+                source, "catalog", return_value=(items, {"published_version_id": 12345})
+            ):
+                with patch.object(source, "open_url") as network:
+                    report = source.probe(folder, verify_local=True)
+            network.assert_not_called()
+        self.assertFalse(report["publisher_file_hashes_matched"])
+        self.assertEqual(report["verified_local_file_count"], 0)
+        self.assertEqual(report["result"], "source_unavailable_or_incomplete")
+
+    def test_missing_local_files_are_not_fetched_over_network(self):
+        items = [
+            {
+                "filename": name,
+                "size": len(contents),
+                "sha256": hashlib.sha256(contents).hexdigest(),
+                "download_url": source.API + "/files/101/download",
+            }
+            for name, contents in self.payloads.items()
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(
+                source, "catalog", return_value=(items, {"published_version_id": 12345})
+            ):
+                with patch.object(source, "open_url") as network:
+                    report = source.probe(Path(directory), verify_local=True)
+            network.assert_not_called()
+        self.assertEqual(report["result"], "source_unavailable_or_incomplete")
+        self.assertFalse(report["publisher_file_hashes_matched"])
+
     def test_unavailable_source_never_claims_download_success(self):
         error = urllib.error.HTTPError(
             source.DATASET_URL, 403, "Forbidden", None, None
