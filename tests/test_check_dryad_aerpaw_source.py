@@ -135,11 +135,16 @@ class DryadSourceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
             with patch.object(
-                source, "catalog", return_value=(entries, {"published_version_id": 12345})
+                source,
+                "catalog",
+                return_value=(entries, {"published_version_id": 12345}),
             ):
                 with patch.object(
-                    source, "open_url",
-                    side_effect=[io.BytesIO(self.payloads[x["filename"]]) for x in entries],
+                    source,
+                    "open_url",
+                    side_effect=[
+                        io.BytesIO(self.payloads[x["filename"]]) for x in entries
+                    ],
                 ):
                     report = source.probe(folder, download=True)
             stored = json.loads(
