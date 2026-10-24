@@ -78,7 +78,7 @@ class DryadSourceTests(unittest.TestCase):
         self.assertFalse(source.trusted("https://127.0.0.1/"))
         self.assertFalse(source.trusted("https://datadryad.org.evil.org/a"))
         self.assertFalse(source.trusted("https://foo:bar@datadryad.org/a"))
-        with self.assertRaisesRegex(ValueError, "expected resource"):
+        with self.assertRaisesRegex(ValueError, "parameterized API link"):
             source.api_link(
                 "/api/v2/files/123/download?token=x",
                 r"/api/v2/files/[1-9][0-9]*/download",
