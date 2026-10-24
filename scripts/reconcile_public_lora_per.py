@@ -262,9 +262,7 @@ def reconcile(
             }
         )
 
-    tables_agree = all(
-        item["matches_published_summary"] for item in comparisons
-    )
+    tables_agree = all(item["matches_published_summary"] for item in comparisons)
     return {
         "schema": "external-lora-packet-per-reconciliation-v1",
         "dataset_doi": "10.17632/jm58sggtj7.2",
