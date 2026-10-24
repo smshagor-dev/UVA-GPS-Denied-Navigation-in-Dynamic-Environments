@@ -11,9 +11,7 @@ from scripts.review_local_public_lora_bundle import inspect_local_bundle
 
 class LocalPublicLoRaBundleTests(unittest.TestCase):
     def make_bundle(self, folder: Path) -> Path:
-        with (folder / "measurements.csv").open(
-            "w", encoding="utf-8", newline=""
-        ) as stream:
+        with (folder / "measurements.csv").open("w", encoding="utf-8", newline="") as stream:
             writer = csv.writer(stream)
             writer.writerow(["configuration", "lost"])
             writer.writerows([("A", "0"), ("A", "1"), ("B", "0")])
