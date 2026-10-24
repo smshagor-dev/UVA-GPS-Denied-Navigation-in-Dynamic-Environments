@@ -18,11 +18,7 @@ def record(name: str, contents: bytes, number: int) -> dict:
         "size": len(contents),
         "digest": hashlib.sha256(contents).hexdigest(),
         "digestType": "sha-256",
-        "_links": {
-            "stash:download": {
-                "href": f"/api/v2/files/{number}/download"
-            }
-        },
+        "_links": {"stash:download": {"href": f"/api/v2/files/{number}/download"}},
     }
 
 
@@ -48,9 +44,7 @@ class DryadSourceTests(unittest.TestCase):
         }
 
     def test_public_dataset_catalog_and_sha256_manifest(self):
-        with patch.object(
-            source, "read_json", side_effect=[self.dataset, self.files]
-        ):
+        with patch.object(source, "read_json", side_effect=[self.dataset, self.files]):
             files, metadata = source.catalog()
         self.assertEqual(metadata["published_version_id"], 12345)
         self.assertEqual(len(files), 2)
@@ -67,9 +61,7 @@ class DryadSourceTests(unittest.TestCase):
     def test_metadata_digest_not_sha256_is_rejected(self):
         listing = json.loads(json.dumps(self.files))
         listing["_embedded"]["stash:files"][0]["digestType"] = "md5"
-        with patch.object(
-            source, "read_json", side_effect=[self.dataset, listing]
-        ):
+        with patch.object(source, "read_json", side_effect=[self.dataset, listing]):
             with self.assertRaisesRegex(ValueError, "not SHA-256"):
                 source.catalog()
 
@@ -94,9 +86,7 @@ class DryadSourceTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            with patch.object(
-                source, "open_url", return_value=io.BytesIO(payload)
-            ):
+            with patch.object(source, "open_url", return_value=io.BytesIO(payload)):
                 first = source.download_verified(root, item)
             reused = source.download_verified(root, item)
             self.assertEqual((root / "README.md").read_bytes(), payload)
@@ -114,9 +104,7 @@ class DryadSourceTests(unittest.TestCase):
         changed = b"x" * len(payload)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            with patch.object(
-                source, "open_url", return_value=io.BytesIO(changed)
-            ):
+            with patch.object(source, "open_url", return_value=io.BytesIO(changed)):
                 with self.assertRaisesRegex(ValueError, "fails size or SHA-256"):
                     source.download_verified(root, item)
             self.assertFalse((root / "README.md").exists())
@@ -233,9 +221,7 @@ class DryadSourceTests(unittest.TestCase):
         self.assertFalse(report["publisher_file_hashes_matched"])
 
     def test_unavailable_source_never_claims_download_success(self):
-        error = urllib.error.HTTPError(
-            source.DATASET_URL, 403, "Forbidden", None, None
-        )
+        error = urllib.error.HTTPError(source.DATASET_URL, 403, "Forbidden", None, None)
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
             with patch.object(source, "catalog", side_effect=error):
