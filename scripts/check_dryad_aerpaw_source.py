@@ -210,14 +210,42 @@ def download_verified(folder: Path, item: dict) -> dict:
         temporary.unlink(missing_ok=True)
 
 
-def probe(folder: Path, *, download: bool = False) -> dict:
+def verify_local_files(folder: Path, items: list[dict]) -> list[dict]:
+    """Check investigator-supplied archive bytes against live Dryad digests.
+
+    Never fall back to downloading a missing local file.
+    """
+    reviewed = []
+    for item in items:
+        path = folder / item["filename"]
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"{item['filename']}: local original file is missing")
+        if path.stat().st_size != item["size"] or path.stat().st_size > LIMIT:
+            raise ValueError(f"{item['filename']}: local publisher size mismatch")
+        sha = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                sha.update(chunk)
+        if sha.hexdigest() != item["sha256"]:
+            raise ValueError(f"{item['filename']}: local publisher SHA-256 mismatch")
+        reviewed.append({"filename": item["filename"], "sha256": sha.hexdigest()})
+    return reviewed
+
+
+def probe(
+    folder: Path, *, download: bool = False, verify_local: bool = False
+) -> dict:
+    if download and verify_local:
+        raise ValueError("download and verify_local are mutually exclusive")
     result = {
         "schema": "dryad-aerpaw-lorawan-source-probe-v1",
         "dataset_doi": DOI,
         "source_type": "LoRaWAN gateway and moving helikite/vehicle telemetry",
         "result": "source_unavailable",
         "verified_download_count": 0,
+        "verified_local_file_count": 0,
         "publisher_file_hashes_matched": False,
+        "input_origin": "not_obtained",
         "real_multi_uav_fanet_evidence": False,
         "complete_independent_sender_tx_inventory_established": False,
         "observed_rf_loss_causally_attributed": False,
@@ -236,11 +264,20 @@ def probe(folder: Path, *, download: bool = False) -> dict:
             result["verified_download_count"] = len(verified)
             result["result"] = "all_publisher_sha256_matched"
             result["publisher_file_hashes_matched"] = True
+            result["input_origin"] = "retrieved_from_dryad_api"
+        elif verify_local:
+            verified = verify_local_files(folder, items)
+            result["verified_local_file_count"] = len(verified)
+            result["result"] = "local_files_match_publisher_sha256"
+            result["publisher_file_hashes_matched"] = True
+            result["input_origin"] = "investigator_supplied_local_files"
     except (OSError, ValueError, TypeError, KeyError, urllib.error.URLError) as exc:
         result["result"] = "source_unavailable_or_incomplete"
         result["failure_class"] = type(exc).__name__
         if isinstance(exc, urllib.error.HTTPError):
             result["http_status"] = exc.code
+            if exc.code in (401, 403) and result.get("publisher_files"):
+                result["result"] = "publisher_manifest_available_download_denied"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "dryad-source-status.json").write_text(
         json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -251,15 +288,27 @@ def probe(folder: Path, *, download: bool = False) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--download", action="store_true")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--download", action="store_true")
+    modes.add_argument(
+        "--verify-local",
+        action="store_true",
+        help="Verify pre-existing files against the live publisher hash manifest",
+    )
     parser.add_argument("--strict", action="store_true")
     args = parser.parse_args()
-    result = probe(args.output_dir, download=args.download)
-    print(json.dumps(result, indent=2, sort_keys=True))
-    expected = (
-        "all_publisher_sha256_matched" if args.download
-        else "publisher_file_manifest_available"
+    result = probe(
+        args.output_dir,
+        download=args.download,
+        verify_local=args.verify_local,
     )
+    print(json.dumps(result, indent=2, sort_keys=True))
+    if args.verify_local:
+        expected = "local_files_match_publisher_sha256"
+    elif args.download:
+        expected = "all_publisher_sha256_matched"
+    else:
+        expected = "publisher_file_manifest_available"
     return 1 if args.strict and result["result"] != expected else 0
 
 
