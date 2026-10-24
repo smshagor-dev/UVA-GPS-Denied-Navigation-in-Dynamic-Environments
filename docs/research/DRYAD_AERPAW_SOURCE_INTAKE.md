@@ -65,3 +65,39 @@ metadata identity, file list, digest type, redirect origin, corruption,
 existing file reuse and honest result classification. These tests do not
 validate any measured RF outcome. Dryad's live service can still change;
 the live-source probe is nonblocking and reports the actual result.
+
+## Verified real publisher metadata, even when file downloads require a token
+
+The first real GitHub-hosted Dryad API probe returned the **published
+version identifier 353153** and publisher SHA-256 checksums for both files,
+but the file download endpoint responded with **HTTP 401**. Actual raw
+archive bytes have not been downloaded or analyzed.
+
+The metadata-only `publisher_file_manifest_available` result is already
+useful: an investigator can download the exact archive and README using
+the Dryad browser/authorized channel, put the **original untouched files**
+in a local directory and validate their bytes against the current public
+Dryad metadata without guessing or fabricating checksums:
+
+```sh
+python3 scripts/check_dryad_aerpaw_source.py \
+  --output-dir /data/independently-downloaded-dryad \
+  --verify-local --strict
+```
+
+The `--verify-local` option **never downloads a missing local file**. It
+requires both approved filenames already present, checks their original
+length and streamed SHA-256 against the publisher version file listing, and
+records `local_files_match_publisher_sha256` only if both match. It
+distinguishes `verified_local_file_count` from
+`verified_download_count` and describes the files as investigator-supplied.
+
+A download HTTP 401/403 that occurs **after successfully fetching the
+published file index** is recorded as
+`publisher_manifest_available_download_denied` rather than pretending
+the archive was never cataloged.
+
+**Important:** cryptographic agreement with the publisher's file digest
+authenticates the downloaded file's bytes against that catalog. It does
+not prove complete independent sender TX logging, link-level RF loss,
+physical flight independence, or multi-UAV peer-replay security.
