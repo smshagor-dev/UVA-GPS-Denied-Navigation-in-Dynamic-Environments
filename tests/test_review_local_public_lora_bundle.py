@@ -11,7 +11,9 @@ from scripts.review_local_public_lora_bundle import inspect_local_bundle
 
 class LocalPublicLoRaBundleTests(unittest.TestCase):
     def make_bundle(self, folder: Path) -> Path:
-        with (folder / "measurements.csv").open("w", encoding="utf-8", newline="") as stream:
+        with (folder / "measurements.csv").open(
+            "w", encoding="utf-8", newline=""
+        ) as stream:
             writer = csv.writer(stream)
             writer.writerow(["configuration", "lost"])
             writer.writerows([("A", "0"), ("A", "1"), ("B", "0")])
@@ -47,9 +49,7 @@ class LocalPublicLoRaBundleTests(unittest.TestCase):
         self.assertEqual(len(report["files"]), 2)
         self.assertEqual(report["files"][0]["data_row_count"], 3)
         self.assertTrue(report["locally_computed_checksums"])
-        self.assertTrue(
-            report["column_mapping_review"]["mapped_csv_headings_present"]
-        )
+        self.assertTrue(report["column_mapping_review"]["mapped_csv_headings_present"])
         self.assertFalse(report["publisher_sha256_independently_verified"])
         self.assertFalse(report["source_origin_independently_verified"])
         self.assertFalse(report["can_use_as_measured_uav_replay_results"])
@@ -67,9 +67,7 @@ class LocalPublicLoRaBundleTests(unittest.TestCase):
             folder = Path(directory)
             self.make_bundle(folder)
             csv_path = folder / "measurements.csv"
-            csv_path.write_text(
-                "configuration,configuration\nA,0\n", encoding="utf-8"
-            )
+            csv_path.write_text("configuration,configuration\nA,0\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "duplicate CSV headings"):
                 inspect_local_bundle(folder)
 
