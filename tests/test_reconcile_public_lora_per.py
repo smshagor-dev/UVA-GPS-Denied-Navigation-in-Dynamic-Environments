@@ -10,6 +10,7 @@ import tempfile
 import unittest
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.inspect_public_lora_schema import inspect_schema
 from scripts.reconcile_public_lora_per import main, reconcile
@@ -211,7 +212,7 @@ class PublicLoRaPERReconciliationTests(unittest.TestCase):
                 str(output),
                 "--local-unverified",
             ]
-            with unittest.mock.patch.object(sys, "argv", argv):
+            with patch.object(sys, "argv", argv):
                 printed = io.StringIO()
                 with contextlib.redirect_stdout(printed):
                     status = main()
