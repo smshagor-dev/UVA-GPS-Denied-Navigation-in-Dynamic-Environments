@@ -102,3 +102,53 @@ with source and protocol provenance are obtained.
 The output deliberately sets `is_fanet_field_validation`,
 `packet_tx_completeness_verified` and
 `field_origin_independently_verified` to false.
+
+## Explicit provisional comparison of manually downloaded CSV files
+
+If the public Mendeley API responds with HTTP 401, an investigator may
+download the original CSVs through an authorized browser session and use
+the previously implemented local-bundle inspector. The authoritative
+`public-dataset-integrity.json` must **not** be fabricated from local
+hashes just to make the published-verification mode run.
+
+Instead, after inspecting the true CSV headings and creating a mapping
+that matches the source's documented packet-loss semantics, opt into
+the *separate, unverified* input mode:
+
+```sh
+python3 scripts/review_local_public_lora_bundle.py \
+  --input-dir /data/lora-v2-from-publisher \
+  --mapping /data/reviewed-column-map.json \
+  --output /data/local-bundle-review.json
+
+python3 scripts/reconcile_public_lora_per.py \
+  --dataset-dir /data/lora-v2-from-publisher \
+  --mapping /data/reviewed-column-map.json \
+  --local-unverified \
+  --output /data/provisional-per-table-comparison.json
+```
+
+The local mode requires original `measurements.csv` and
+`packet_loss_by_config.csv` but deliberately does **not** require or
+construct a publisher-hash index. It checks file sizes, locally computed
+SHA-256 fingerprints and CSV structure, then compares packet counts, lost
+counts and PER using the same conservative alignment and failure rules
+as the verified mode. Any mismatch still returns a nonzero exit code.
+
+**Crucial report distinction:** `supplied_tables_agree` can be true
+when the two *local* files agree numerically, but
+`reproduction_matches_all` is always **false** for the unverified mode.
+The fields `publisher_checksum_matched_local_files`,
+`publisher_origin_independently_verified`,
+`source_files_independently_authenticated` and
+`safe_to_claim_measured_uav_replay_results` are all false.
+A successful command is an *exploratory local consistency check*, not
+reproduction of an authenticated publisher result.
+
+The default command without `--local-unverified` still requires the
+publisher metadata index and verifies its declared SHA-256 and file sizes
+before analysis, as described above. That local check of an index is itself
+not a cryptographic proof of independently authenticated archive origin.
+
+All unit tests use synthetic data only. No real LoRa field records or
+multi-UAV FANET captures were acquired by this change.
