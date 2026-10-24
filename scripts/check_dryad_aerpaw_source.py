@@ -104,17 +104,12 @@ def catalog() -> tuple[list[dict], dict]:
     current = links.get("stash:version")
     if not isinstance(current, dict):
         raise ValueError("Dryad published version link missing")
-    version_url = api_link(
-        current.get("href"), r"/api/v2/versions/[1-9][0-9]*"
-    )
+    version_url = api_link(current.get("href"), r"/api/v2/versions/[1-9][0-9]*")
     version_id = version_url.rsplit("/", 1)[1]
     items = []
     seen = set()
     for page in range(1, 5):
-        url = (
-            API + "/versions/" + version_id
-            + "/files?per_page=100&page=" + str(page)
-        )
+        url = API + "/versions/" + version_id + "/files?per_page=100&page=" + str(page)
         response = read_json(url)
         embedded = response.get("_embedded")
         if not isinstance(embedded, dict):
@@ -232,9 +227,7 @@ def verify_local_files(folder: Path, items: list[dict]) -> list[dict]:
     return reviewed
 
 
-def probe(
-    folder: Path, *, download: bool = False, verify_local: bool = False
-) -> dict:
+def probe(folder: Path, *, download: bool = False, verify_local: bool = False) -> dict:
     if download and verify_local:
         raise ValueError("download and verify_local are mutually exclusive")
     result = {
@@ -255,8 +248,7 @@ def probe(
         items, origin = catalog()
         result.update(origin)
         result["publisher_files"] = [
-            {k: item[k] for k in ("filename", "size", "sha256")}
-            for item in items
+            {k: item[k] for k in ("filename", "size", "sha256")} for item in items
         ]
         result["result"] = "publisher_file_manifest_available"
         if download:
