@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Reconcile LoRa packet loss indicators against a published aggregate CSV.
 
-Inputs must already match publisher SHA-256 metadata. Explicit column mapping
-is mandatory because field names and packet denominators must not be guessed.
+Publisher mode requires SHA-256 metadata. An explicit provisional local mode
+permits exploratory table comparison without claiming publisher authenticity.
+Column mapping and packet denominators must never be guessed.
 This audit is not an independent radio experiment or a UAV FANET measurement.
 """
 
@@ -157,12 +158,38 @@ def packet_rate(value: str, unit: str) -> Decimal:
     return number
 
 
-def reconcile(folder: Path, mapping_path: Path, tolerance: Decimal) -> dict:
+def reconcile(
+    folder: Path,
+    mapping_path: Path,
+    tolerance: Decimal,
+    *,
+    local_unverified: bool = False,
+) -> dict:
     if not isinstance(tolerance, Decimal) or not tolerance.is_finite():
         raise ValueError("PER tolerance must be a finite Decimal")
     if not Decimal(0) <= tolerance <= Decimal("0.01"):
         raise ValueError("PER fraction tolerance must be between 0 and 0.01")
-    checksums = check_files(folder)
+    if type(local_unverified) is not bool:
+        raise ValueError("local_unverified must be a boolean")
+    if local_unverified:
+        # The local bundle reviewer checks source size, CSV shape and symlinks.
+        # These are local fingerprints, NOT independent publisher hashes.
+        if __package__:
+            from .review_local_public_lora_bundle import inspect_local_bundle
+        else:
+            from review_local_public_lora_bundle import inspect_local_bundle
+
+        local = inspect_local_bundle(folder)
+        checksums = {
+            item["filename"]: {
+                "sha256": item["local_sha256"],
+                "size": item["size_bytes"],
+            }
+            for item in local["files"]
+            if item["filename"] in REQUIRED_FILES
+        }
+    else:
+        checksums = check_files(folder)
     mapping = load_mapping(mapping_path)
     dimensions = mapping["groups"]
     observed = defaultdict(lambda: [0, 0])
@@ -235,17 +262,31 @@ def reconcile(folder: Path, mapping_path: Path, tolerance: Decimal) -> dict:
             }
         )
 
+    tables_agree = all(
+        item["matches_published_summary"] for item in comparisons
+    )
     return {
         "schema": "external-lora-packet-per-reconciliation-v1",
         "dataset_doi": "10.17632/jm58sggtj7.2",
-        "evidence_class": "external point-to-point LoRa CAN telemetry",
+        "evidence_class": (
+            "unverified locally supplied LoRa CSV tables"
+            if local_unverified
+            else "external point-to-point LoRa CAN telemetry"
+        ),
+        "integrity_mode": (
+            "local_checksums_only_not_publisher_authenticated"
+            if local_unverified
+            else "claimed_publisher_index_checksums_matched"
+        ),
+        "publisher_origin_independently_verified": False,
+        "source_files_independently_authenticated": False,
+        "safe_to_claim_measured_uav_replay_results": False,
         "is_fanet_field_validation": False,
         "packet_tx_completeness_verified": False,
         "field_origin_independently_verified": False,
-        "publisher_checksum_matched_local_files": True,
-        "reproduction_matches_all": all(
-            item["matches_published_summary"] for item in comparisons
-        ),
+        "publisher_checksum_matched_local_files": not local_unverified,
+        "supplied_tables_agree": tables_agree,
+        "reproduction_matches_all": tables_agree and not local_unverified,
         "loss_denominator": "packet-level CSV rows per configuration only",
         "tolerance_fraction": float(tolerance),
         "source_sha256": checksums,
@@ -259,10 +300,20 @@ def main() -> int:
     parser.add_argument("--mapping", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--tolerance", default="0.000001")
+    parser.add_argument(
+        "--local-unverified",
+        action="store_true",
+        help="Compare local CSVs provisionally without publisher authentication",
+    )
     args = parser.parse_args()
     try:
         tolerance = Decimal(args.tolerance)
-        result = reconcile(args.dataset_dir, args.mapping, tolerance)
+        result = reconcile(
+            args.dataset_dir,
+            args.mapping,
+            tolerance,
+            local_unverified=args.local_unverified,
+        )
         protected = {
             (args.dataset_dir / filename).resolve()
             for filename in (*REQUIRED_FILES, PUBLIC_INDEX)
@@ -278,7 +329,12 @@ def main() -> int:
     except (OSError, ValueError, TypeError, InvalidOperation) as exc:
         parser.error(str(exc))
     print(json.dumps(result, indent=2, sort_keys=True))
-    return 0 if result["reproduction_matches_all"] else 1
+    if args.local_unverified:
+        print(
+            "PROVISIONAL ONLY: local source identity and publisher hashes "
+            "have not been independently verified.",
+        )
+    return 0 if result["supplied_tables_agree"] else 1
 
 
 if __name__ == "__main__":
