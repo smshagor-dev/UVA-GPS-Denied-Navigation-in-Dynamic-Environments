@@ -150,9 +150,7 @@ class PublicLoRaPERReconciliationTests(unittest.TestCase):
             (root / "public-dataset-integrity.json").unlink()
             with self.assertRaises(FileNotFoundError):
                 reconcile(root, config, Decimal("0.000001"))
-            result = reconcile(
-                root, config, Decimal("0.000001"), local_unverified=True
-            )
+            result = reconcile(root, config, Decimal("0.000001"), local_unverified=True)
         self.assertTrue(result["supplied_tables_agree"])
         self.assertFalse(result["reproduction_matches_all"])
         self.assertFalse(result["publisher_checksum_matched_local_files"])
@@ -174,9 +172,7 @@ class PublicLoRaPERReconciliationTests(unittest.TestCase):
                 summary.read_text(encoding="utf-8").replace(",4,1,25", ",4,1,50"),
                 encoding="utf-8",
             )
-            result = reconcile(
-                root, config, Decimal("0.000001"), local_unverified=True
-            )
+            result = reconcile(root, config, Decimal("0.000001"), local_unverified=True)
         self.assertFalse(result["supplied_tables_agree"])
         self.assertFalse(result["reproduction_matches_all"])
         self.assertFalse(
@@ -192,9 +188,7 @@ class PublicLoRaPERReconciliationTests(unittest.TestCase):
                 "distance,sf,sf\n25,SF7,0\n", encoding="utf-8"
             )
             with self.assertRaisesRegex(ValueError, "duplicate CSV headings"):
-                reconcile(
-                    root, config, Decimal("0.000001"), local_unverified=True
-                )
+                reconcile(root, config, Decimal("0.000001"), local_unverified=True)
 
     def test_cli_local_unverified_reports_provisional_not_verified(self):
         with tempfile.TemporaryDirectory() as directory:
