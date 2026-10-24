@@ -24,37 +24,37 @@ The intake uses the official, read-only Dryad REST API:
 5. Stream bytes to temporary files with a strict maximum size, and publish only
    after the SHA-256 digest and exact size match the publisher's catalog.
 
-\`\`\`sh
+```sh
 python3 scripts/check_dryad_aerpaw_source.py \
   --output-dir /tmp/dryad-aerpaw --download --strict
-\`\`\`
+```
 
-The script saves \`dryad-source-status.json\`. A result of
-\`all_publisher_sha256_matched\` is necessary to claim that the local archive
+The script saves `dryad-source-status.json`. A result of
+`all_publisher_sha256_matched` is necessary to claim that the local archive
 bytes match the Dryad API's published file hashes. A result of
-\`publisher_file_manifest_available\` establishes only that catalog metadata
+`publisher_file_manifest_available` establishes only that catalog metadata
 was available, not that data files were obtained. If network access fails,
-\`source_unavailable_or_incomplete\` is recorded without fabricating
+`source_unavailable_or_incomplete` is recorded without fabricating
 measurements or making a green check imply source success.
 
-The companion \`.github/workflows/dryad-source.yml\` runs an **informational**
+The companion `.github/workflows/dryad-source.yml` runs an **informational**
 live-source probe on PRs changing this code and via manual dispatch. It uploads
 **only the JSON acquisition status**, not the 7z archive, README, inferred TX
 logs, raw RF metadata or any actual research measurements.
 
 ## Evidence limits
 
-The archive is a compressed \`7z\` file: this first stage deliberately does
+The archive is a compressed `7z` file: this first stage deliberately does
 **not** extract it, to avoid treating unaudited decompressed data as validated.
 Any later archive inspection must use bounded extraction, inspect true schema
 and provenance, and differentiate gateway RX observations from independent TX.
 
 The status output hard-codes the following as false:
 
-- \`real_multi_uav_fanet_evidence\`
-- \`complete_independent_sender_tx_inventory_established\`
-- \`observed_rf_loss_causally_attributed\`
-- \`replay_false_rejection_measured\`
+- `real_multi_uav_fanet_evidence`
+- `complete_independent_sender_tx_inventory_established`
+- `observed_rf_loss_causally_attributed`
+- `replay_false_rejection_measured`
 
 Successful download alone cannot establish these facts. Do not substitute
 helikite/LoRaWAN reception statistics for an independent multi-UAV FANET
