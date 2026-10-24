@@ -1,15 +1,19 @@
 """Validate packet-level LoRa PER reconciliation without invented field results."""
 
+import contextlib
 import csv
 import hashlib
+import io
 import json
+import sys
 import tempfile
 import unittest
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts.inspect_public_lora_schema import inspect_schema
-from scripts.reconcile_public_lora_per import reconcile
+from scripts.reconcile_public_lora_per import main, reconcile
 
 
 class PublicLoRaPERReconciliationTests(unittest.TestCase):
@@ -138,6 +142,79 @@ class PublicLoRaPERReconciliationTests(unittest.TestCase):
         self.assertEqual(first["packet_rows"], 4)
         self.assertEqual(first["flagged_lost"], 1)
         self.assertEqual(first["computed_per"], 0.25)
+
+    def test_local_unverified_mode_does_not_pretend_publisher_reproduction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = self.prepare(root)
+            (root / "public-dataset-integrity.json").unlink()
+            with self.assertRaises(FileNotFoundError):
+                reconcile(root, config, Decimal("0.000001"))
+            result = reconcile(root, config, Decimal("0.000001"), local_unverified=True)
+        self.assertTrue(result["supplied_tables_agree"])
+        self.assertFalse(result["reproduction_matches_all"])
+        self.assertFalse(result["publisher_checksum_matched_local_files"])
+        self.assertFalse(result["publisher_origin_independently_verified"])
+        self.assertFalse(result["safe_to_claim_measured_uav_replay_results"])
+        self.assertEqual(
+            result["integrity_mode"],
+            "local_checksums_only_not_publisher_authenticated",
+        )
+        self.assertEqual(len(result["source_sha256"]), 2)
+
+    def test_local_unverified_mode_retains_mismatch_detection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = self.prepare(root)
+            (root / "public-dataset-integrity.json").unlink()
+            summary = root / "packet_loss_by_config.csv"
+            summary.write_text(
+                summary.read_text(encoding="utf-8").replace(",4,1,25", ",4,1,50"),
+                encoding="utf-8",
+            )
+            result = reconcile(root, config, Decimal("0.000001"), local_unverified=True)
+        self.assertFalse(result["supplied_tables_agree"])
+        self.assertFalse(result["reproduction_matches_all"])
+        self.assertFalse(
+            result["configuration_comparisons"][0]["matches_published_summary"]
+        )
+
+    def test_local_unverified_mode_rejects_invalid_input(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = self.prepare(root)
+            (root / "public-dataset-integrity.json").unlink()
+            (root / "measurements.csv").write_text(
+                "distance,sf,sf\n25,SF7,0\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ValueError, "duplicate CSV headings"):
+                reconcile(root, config, Decimal("0.000001"), local_unverified=True)
+
+    def test_cli_local_unverified_reports_provisional_not_verified(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            mapping = self.prepare(root)
+            (root / "public-dataset-integrity.json").unlink()
+            output = root / "local-comparison.json"
+            argv = [
+                "reconcile_public_lora_per",
+                "--dataset-dir",
+                str(root),
+                "--mapping",
+                str(mapping),
+                "--output",
+                str(output),
+                "--local-unverified",
+            ]
+            with patch.object(sys, "argv", argv):
+                printed = io.StringIO()
+                with contextlib.redirect_stdout(printed):
+                    status = main()
+                result = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(status, 0)
+        self.assertIn("PROVISIONAL ONLY", printed.getvalue())
+        self.assertTrue(result["supplied_tables_agree"])
+        self.assertFalse(result["reproduction_matches_all"])
 
     def test_disagreement_is_reported_not_relabelled_success(self):
         with tempfile.TemporaryDirectory() as directory:
