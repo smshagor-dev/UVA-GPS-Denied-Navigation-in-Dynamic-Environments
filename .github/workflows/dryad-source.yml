@@ -1,0 +1,58 @@
+name: Dryad AERPAW Source Availability
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/dryad-source.yml"
+      - "scripts/check_dryad_aerpaw_source.py"
+      - "tests/test_check_dryad_aerpaw_source.py"
+
+permissions:
+  contents: read
+
+jobs:
+  external-dryad:
+    name: Dryad Source Status (informational)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Fetch real public Dryad source and validate publisher digests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/check_dryad_aerpaw_source.py \
+            --output-dir "${RUNNER_TEMP}/dryad-aerpaw" --download
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              (Path(os.environ["RUNNER_TEMP"]) / "dryad-aerpaw"
+               / "dryad-source-status.json").read_text(encoding="utf-8")
+          )
+          lines = [
+              "## Dryad AERPAW public source (informational)",
+              "",
+              f"- Source acquisition: {report['result']}",
+              f"- Publisher hash matched files: {report['verified_download_count']}",
+              "- Dataset is LoRaWAN gateway/helikite data, not a FANET.",
+              "- No independent complete sender TX inventory is certified.",
+          ]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
+              output.write("\n".join(lines) + "\n")
+          if report["result"] != "all_publisher_sha256_matched":
+              print("::warning::Dryad original files not fully verified")
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: dryad-source-availability-status
+          path: ${{ runner.temp }}/dryad-aerpaw/dryad-source-status.json
+          if-no-files-found: warn
+          retention-days: 14
