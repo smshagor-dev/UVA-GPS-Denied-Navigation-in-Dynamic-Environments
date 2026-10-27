@@ -629,7 +629,7 @@ jobs:
     steps:
       # The GCC job must actually compile, install and link a downstream
       # consumer before its evidence artifact can be published.
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: install-consumer-${{ github.sha }}
           path: ${{ runner.temp }}/install-manifest
