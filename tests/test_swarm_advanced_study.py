@@ -71,7 +71,7 @@ class SwarmAdvancedEvidenceTests(unittest.TestCase):
 
     def test_exact_sign_test_scales_without_monte_carlo_resolution_floor(self):
         p, positives, negatives, informative = exact_paired_sign_test([-1.0] * 50)
-        self.assertAlmostEqual(p, 2 / (2 ** 50))
+        self.assertAlmostEqual(p, 2 / (2**50))
         self.assertEqual((positives, negatives, informative), (0, 50, 50))
 
     def test_exact_sign_test_ignores_ties_and_is_two_sided(self):
