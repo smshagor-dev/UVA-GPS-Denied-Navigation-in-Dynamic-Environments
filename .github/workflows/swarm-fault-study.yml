@@ -5,6 +5,9 @@ on:
     paths:
       - "research/experiments/swarm_fault_study.py"
       - "tests/test_swarm_fault_study.py"
+      - "research/experiments/swarm_stats.py"
+      - "research/experiments/cbaa_reference_study.py"
+      - "tests/test_swarm_advanced_study.py"
       - ".github/workflows/swarm-fault-study.yml"
   workflow_dispatch:
 
@@ -23,7 +26,7 @@ jobs:
           python-version: "3.14"
 
       - name: Run metric integrity tests
-        run: python3 -m unittest tests.test_swarm_fault_study -v
+        run: python3 -m unittest tests.test_swarm_fault_study tests.test_swarm_advanced_study -v
 
       - name: Generate paired trials
         run: |
@@ -32,11 +35,25 @@ jobs:
             --seeds 10 \
             --out "$RUNNER_TEMP/swarm-fault-study"
 
+      - name: Paired confidence intervals and exact sign-flip tests
+        run: |
+          python3 research/experiments/swarm_stats.py \
+            --runs "$RUNNER_TEMP/swarm-fault-study/runs.csv" \
+            --out "$RUNNER_TEMP/swarm-fault-study/stats.json"
+
+      - name: Reconstruct CBAA-style IEEE reference and exact oracle
+        run: |
+          python3 research/experiments/cbaa_reference_study.py \
+            --seeds 20 \
+            --out "$RUNNER_TEMP/swarm-cbaa-reference"
+
       - name: Preserve raw trials and report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: swarm-fault-software-simulation-${{ github.sha }}
-          path: ${{ runner.temp }}/swarm-fault-study
+          path: |
+            ${{ runner.temp }}/swarm-fault-study
+            ${{ runner.temp }}/swarm-cbaa-reference
           if-no-files-found: warn
           retention-days: 30
