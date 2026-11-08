@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import heapq
 import json
 import math
 import random
@@ -18,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-POLICIES = ("static_roles", "adaptive_unfiltered", "adaptive_freshness", "adaptive_freshness_safety")
+POLICIES = ("static_roles", "adaptive_unfiltered", "adaptive_freshness", "adaptive_freshness_safety", "adaptive_freshness_local_safety")
 SCENARIOS = ("nominal", "packet_loss", "node_failure", "combined")
 DT_S = 0.5
 DURATION_S = 75.0
@@ -41,6 +42,10 @@ class Agent:
     cache: dict[int, tuple[float, int | None]] = field(default_factory=dict)
     distance_m: float = 0.0
     known_done: set[int] = field(default_factory=set)
+    # Last authenticated-in-simulation peer pose; this is not real sensor data.
+    peer_poses: dict[int, tuple[float, float, float, float, float]] = field(default_factory=dict)
+    vx: float = 0.0
+    vy: float = 0.0
 
 
 @dataclass
@@ -83,7 +88,7 @@ def select_task(agent: Agent, agents: list[Agent], tasks: list[Task],
     for peer_id, (observed_s, claimed_task) in agent.cache.items():
         if peer_id == agent.identifier or claimed_task is None:
             continue
-        if policy in {"adaptive_freshness", "adaptive_freshness_safety"} and now_s - observed_s > PEER_TTL_S:
+        if policy in {"adaptive_freshness", "adaptive_freshness_safety", "adaptive_freshness_local_safety"} and now_s - observed_s > PEER_TTL_S:
             continue
         claims.add(claimed_task)
     def cost(task: Task) -> tuple[float, int]:
@@ -143,6 +148,41 @@ def safety_filter(agents: list[Agent], proposals: dict[int, tuple[float, float]]
     return accepted, rejected
 
 
+def local_safety_filter(
+    agent: Agent,
+    proposed: tuple[float, float],
+    number_of_agents: int,
+    now_s: float,
+) -> tuple[tuple[float, float], bool]:
+    """Conservative local-information step check; intentionally no global position access.
+
+    Each UAV uses its own position and the last delayed, lossy peer pose. An
+    unseen/stale peer causes a hold (availability cost). Peer velocities are
+    extrapolated linearly, with a heuristic age margin. This *cannot guarantee*
+    physical separation because peer intentions and model errors are unknown.
+    """
+    start = (agent.x, agent.y)
+    if proposed == start:
+        return proposed, False
+    for peer_id in range(number_of_agents):
+        if peer_id == agent.identifier:
+            continue
+        observation = agent.peer_poses.get(peer_id)
+        if observation is None:
+            return start, True
+        sent_s, x, y, vx, vy = observation
+        age = now_s - sent_s
+        if age < 0.0 or age > PEER_TTL_S:
+            return start, True
+        inferred_now = (x + vx * age, y + vy * age)
+        inferred_next = (inferred_now[0] + vx * DT_S, inferred_now[1] + vy * DT_S)
+        # This is a tunable heuristic, not a worst-case reachability tube.
+        margin = SAFETY_DISTANCE_M + 0.25 * age
+        if swept_distance(start, proposed, inferred_now, inferred_next) < margin:
+            return start, True
+    return proposed, False
+
+
 def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
     if policy not in POLICIES or scenario not in SCENARIOS or count < 4:
         raise ValueError("invalid policy, scenario, or UAV count")
@@ -152,7 +192,8 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
     link_rng = random.Random(seed * 65537 + count)
     agents = make_agents(count)
     tasks = make_tasks(count, geo_rng)
-    pending_messages: list[tuple[int, int, int, float, int | None, tuple[int, ...]]] = []
+    pending_messages: list[tuple[int, int, int, int, float, int | None, tuple[int, ...], float, float, float, float]] = []
+    message_order = 0
     decision_ms: list[float] = []
     packets_sent = packets_delivered = tx_bytes = duplicate_ticks = 0
     separation_violations = 0
@@ -176,11 +217,20 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
             agents[0].task_id = None
 
         # Deliver only packets whose simulated delivery time has elapsed.
-        incoming = [item for item in pending_messages if item[0] <= step]
-        pending_messages = [item for item in pending_messages if item[0] > step]
-        for _, receiver_id, sender_id, sent_s, claimed_task, known_done in incoming:
-            agents[receiver_id].cache[sender_id] = (sent_s, claimed_task)
-            agents[receiver_id].known_done.update(known_done)
+        while pending_messages and pending_messages[0][0] <= step:
+            (
+                _, _, receiver_id, sender_id, sent_s, claimed_task, known_done,
+                x, y, vx, vy,
+            ) = heapq.heappop(pending_messages)
+            receiver = agents[receiver_id]
+            if not receiver.alive:
+                continue
+            previous = receiver.cache.get(sender_id)
+            # A delayed old packet must never roll back current claims or pose.
+            if previous is None or sent_s >= previous[0]:
+                receiver.cache[sender_id] = (sent_s, claimed_task)
+                receiver.peer_poses[sender_id] = (sent_s, x, y, vx, vy)
+            receiver.known_done.update(known_done)
             packets_delivered += 1
 
         # Decisions use local peer caches, not a centralized global peer-state oracle.
@@ -202,6 +252,7 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
                 payload = json.dumps({"id": sender.identifier, "t": now_s,
                                       "target": sender.task_id, "battery": round(sender.battery, 3),
                                       "x": round(sender.x, 3), "y": round(sender.y, 3),
+                                      "vx": round(sender.vx, 3), "vy": round(sender.vy, 3),
                                       "done": sorted(sender.known_done)},
                                      separators=(",", ":")).encode("utf-8")
                 for receiver in agents:
@@ -211,9 +262,13 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
                     tx_bytes += len(payload)
                     if link_rng.random() >= loss_prob:
                         wait_ticks = link_rng.randint(1, max_delay_ticks)
-                        pending_messages.append((step + wait_ticks, receiver.identifier,
-                                                 sender.identifier, now_s, sender.task_id,
-                                                 tuple(sorted(sender.known_done))))
+                        heapq.heappush(pending_messages, (
+                            step + wait_ticks, message_order, receiver.identifier,
+                            sender.identifier, now_s, sender.task_id,
+                            tuple(sorted(sender.known_done)), sender.x, sender.y,
+                            sender.vx, sender.vy,
+                        ))
+                        message_order += 1
 
         # Update actual simulated positions and battery, with common dynamics.
         next_positions: dict[int, tuple[float, float]] = {}
@@ -231,6 +286,15 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
         if policy == "adaptive_freshness_safety":
             next_positions, rejects = safety_filter(agents, next_positions)
             safety_rejections += rejects
+        elif policy == "adaptive_freshness_local_safety":
+            accepted = {}
+            for agent in live:
+                proposed = next_positions.get(agent.identifier, (agent.x, agent.y))
+                actual, rejected = local_safety_filter(agent, proposed, count, now_s)
+                if rejected:
+                    safety_rejections += 1
+                accepted[agent.identifier] = actual
+            next_positions = accepted
         for i, left in enumerate(live):
             a0 = (left.x, left.y)
             a1 = next_positions.get(left.identifier, a0)
@@ -245,7 +309,12 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
                 travel = math.hypot(new_position[0] - agent.x, new_position[1] - agent.y)
                 agent.distance_m += travel
                 agent.battery -= travel * 0.025
+                agent.vx = (new_position[0] - agent.x) / DT_S
+                agent.vy = (new_position[1] - agent.y) / DT_S
                 agent.x, agent.y = new_position
+            else:
+                agent.vx = 0.0
+                agent.vy = 0.0
 
         for i, left in enumerate(live):
             for right in live[i + 1:]:
@@ -327,7 +396,7 @@ def experiment(counts: tuple[int, ...], seeds: int) -> tuple[list[dict], dict]:
                     "safety_rejections_mean": round(statistics.mean(r["safety_rejected_steps"] for r in subset), 3),
                     "logical_unicast_tx_bytes_mean": round(statistics.mean(r["logical_unicast_tx_bytes"] for r in subset), 1),
                 })
-    return records, {"model": "simplified_discrete_time_task_coordination_v3_safety_oracle_ablation",
+    return records, {"model": "simplified_discrete_time_task_coordination_v4_local_peer_safety",
                      "simulated_seconds": DURATION_S, "dt_seconds": DT_S,
                      "fault_start_seconds": FAULT_START_S, "fault_end_seconds": FAULT_END_S,
                      "peer_ttl_seconds": PEER_TTL_S,
@@ -360,6 +429,7 @@ def write_outputs(output_dir: Path, records: list[dict], summary: dict) -> None:
                  "- Duplicate worker ticks: redundant simultaneously present agents at a target; counts each 0.5 s step.",
                  "- Separation violations: sampled agent pairs closer than 1 m; swept violations use continuous interpolation within each step; neither represents physical collisions.",
                  "- Safety-oracle ablation: idealized full-state sequential reservation; uses true positions of all agents and cannot be claimed as distributed or onboard collision avoidance.",
+                 "- Local-safety ablation: only own position and time-stamped peer pose received over modeled links; unknown/stale peer means holding motion. Uses heuristic future peer trajectory, not formal collision guarantee.",
                  "- Transmitted bytes: UTF-8 JSON sizes counted per simulated logical unicast; not measured RF throughput.",
                  "- Decision latency: host process time measured using perf_counter_ns; environment-specific, not flight end-to-end latency.",
                  "- Formation error: not measured because this task-centric model does not implement closed-loop formation dynamics.",
@@ -367,7 +437,8 @@ def write_outputs(output_dir: Path, records: list[dict], summary: dict) -> None:
                  "- Independent toy-model policy controls only, not replications of published algorithms; the safety-oracle arm is optimistic and centralized.",
                  "- Task coordinates are common mission inputs, while completion is learned locally or via peer messages; policies have no global completion oracle.",
                  "- Peer state arrives through delayed/lossy simulated messages. The model does not simulate routing, real radios, battery physics, or sensors.",
-                 "- These results cannot establish superiority, real decentralization, safety certification, or IEEE publication readiness.", ""])
+                 "- Local-safety arm uses a simulated peer-view, but ignores peer intention and physical state estimation errors, so it does not prove collision freedom.",
+                 "- These results cannot establish superiority, real decentralization of the entire mission system, safety certification, or IEEE publication readiness.", ""])
     (output_dir / "REPORT.md").write_text("\n".join(rows), encoding="utf-8")
 
 
