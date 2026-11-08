@@ -79,9 +79,7 @@ class SwarmFaultStudyTests(unittest.TestCase):
 
     def test_idealized_safety_oracle_holds_conflicting_movements(self) -> None:
         agents = [Agent(0, 0.0, 0.0, 90.0), Agent(1, 2.0, 0.0, 90.0)]
-        moves, rejected = safety_filter(
-            agents, {0: (3.0, 0.0), 1: (-1.0, 0.0)}
-        )
+        moves, rejected = safety_filter(agents, {0: (3.0, 0.0), 1: (-1.0, 0.0)})
         self.assertGreater(rejected, 0)
         self.assertEqual(moves[0], (0.0, 0.0))
         self.assertEqual(moves[1], (2.0, 0.0))
