@@ -132,6 +132,62 @@ TEST(MotorSensor, ProducesHealthMeasurement) {
     EXPECT_LE(measurement->average_health, 1.0f);
 }
 
+// Native controller checks: software geometry and command bounds, not flight safety.
+TEST(V2XFormation, NominalDiamondTargetsAreDistinct) {
+    LeaderFollowerController controller(2, {});
+    FormationCommand cmd;
+    cmd.shape = FormationCommand::Formation::DIAMOND;
+    cmd.spacing_m = 3.0f;
+    const Eigen::Vector3d leader(10.0, 20.0, 5.0);
+    const auto first = controller.compute_target(leader, cmd, 0);
+    const auto second = controller.compute_target(leader, cmd, 1);
+    EXPECT_NEAR(first.x(), 13.0, 1e-8);
+    EXPECT_NEAR(second.x(), 7.0, 1e-8);
+    EXPECT_NEAR(first.y(), 20.0, 1e-8);
+    EXPECT_NEAR(second.y(), 20.0, 1e-8);
+    EXPECT_GT((first - second).norm(), 5.9);
+}
+
+TEST(V2XFormation, VelocityCommandIsBoundedAndReducesNominalError) {
+    LeaderFollowerController controller(2, {});
+    const Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+    const Eigen::Vector3d goal(10.0, 2.0, 0.0);
+    const auto velocity = controller.velocity_command(
+        origin, origin, goal, std::vector<PeerInfo>{},
+        std::vector<AvoidanceObstacle>{}, 1.5f, 2.0f);
+    EXPECT_LE(velocity.norm(), 2.0 + 1e-8);
+    EXPECT_LT((goal - velocity * 0.1).norm(), goal.norm());
+}
+
+TEST(V2XFormation, NearbyPeerProducesRepulsion) {
+    LeaderFollowerController controller(2, {});
+    PeerInfo peer;
+    peer.id = 3;
+    peer.reachable = true;
+    peer.position = Eigen::Vector3d(1.5, 0.0, 0.0);
+    peer.velocity = Eigen::Vector3d(-0.5, 0.0, 0.0);
+    const auto velocity = controller.compute_avoidance_velocity(
+        Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(),
+        std::vector<PeerInfo>{peer});
+    EXPECT_LT(velocity.x(), 0.0);
+    EXPECT_GT(velocity.norm(), 0.0);
+    EXPECT_LE(velocity.norm(), 3.0 + 1e-8);
+}
+
+TEST(V2XFormation, AvoidanceStillRespectsOverallCommandSpeedLimit) {
+    LeaderFollowerController controller(2, {});
+    PeerInfo peer;
+    peer.id = 3;
+    peer.reachable = true;
+    peer.position = Eigen::Vector3d(1.5, 0.0, 0.0);
+    const Eigen::Vector3d zero = Eigen::Vector3d::Zero();
+    const auto command = controller.velocity_command(
+        zero, zero, Eigen::Vector3d(20.0, 0.0, 0.0),
+        std::vector<PeerInfo>{peer}, std::vector<AvoidanceObstacle>{},
+        1.5f, 2.0f);
+    EXPECT_LE(command.norm(), 2.0 + 1e-8);
+}
+
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
