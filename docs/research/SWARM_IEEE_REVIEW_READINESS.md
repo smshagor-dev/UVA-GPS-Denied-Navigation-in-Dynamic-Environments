@@ -28,7 +28,7 @@ alone is an original novelty claim**.
 
 | Research operation | Implementation | Evidence type | Status |
 |---|---|---|---|
-| Fixed-role vs adaptive policy controls | swarm_fault_study.py | Paired simulated experiments, 360 trials | Implemented |
+| Fixed-role vs adaptive policy controls | swarm_fault_study.py | Paired simulated experiments, 480 trials | Implemented |
 | Peer-message completed-task propagation | swarm_fault_study.py | No global task completion oracle, unit test | Implemented |
 | Event-derived mission completion and fault recovery | swarm_fault_study.py | Simulated task-service events | Implemented |
 | Logical packet overhead/proximity violations | swarm_fault_study.py | Simulated events | Implemented |
@@ -41,7 +41,7 @@ alone is an original novelty claim**.
 | Exact replication of current IEEE methods | None | No author-equivalent setup/source | Not complete |
 | Establishment of a distinct new algorithm | None | No controlled novelty evidence | Not complete |
 
-## Controlled model v2: combined node failure and packet degradation
+## Controlled model v3: combined node failure and packet degradation
 
 All measurements below are **software simulation** values. Each configuration
 has ten paired seeds. The reported recovery median excludes censored trials.
@@ -52,17 +52,20 @@ The static policy has no reallocation by design.
 | 4 | Static roles | 0.8750 | 0/10 | censored | 1.9 |
 | 4 | Adaptive unfiltered | 1.0000 | 10/10 | 30.50 | 39.8 |
 | 4 | Adaptive freshness | 1.0000 | 10/10 | 9.75 | 106.7 |
+| 4 | Full-information safety oracle | 1.0000 | 10/10 | 10.50 | 0.0 |
 | 8 | Static roles | 0.9375 | 0/10 | censored | 7.6 |
 | 8 | Adaptive unfiltered | 0.99375 | 10/10 | 11.25 | 110.9 |
 | 8 | Adaptive freshness | 0.99375 | 10/10 | 13.50 | 147.0 |
+| 8 | Full-information safety oracle | 0.98750 | 10/10 | 16.00 | 0.0 |
 | 12 | Static roles | 0.958333 | 0/10 | censored | 11.6 |
 | 12 | Adaptive unfiltered | 0.983333 | 9/10 | 16.50 | 182.9 |
 | 12 | Adaptive freshness | 0.97500 | 10/10 | 9.75 | 184.1 |
+| 12 | Full-information safety oracle | 0.98750 | 10/10 | 12.75 | 0.0 |
 
 Under four UAVs with combined failure, 66.9 additional sampled pair-ticks
 occur in the freshness-aware policy versus unfiltered, with paired 95% bootstrap
 CI [15.8, 118.4]. The exact unadjusted sign-flip p is 0.048828125; after
-Holm family-wise correction across 60 reported comparisons, **p_adj = 1.0**.
+Holm family-wise correction across the original 60 comparisons, **p_adj = 1.0**. In the new four-arm model, rerun the now-expanded **144-comparison** family and use its correction instead.
 No statistically significant superiority is established.
 
 ## CBAA-style study: 160 runs, static allocation only
@@ -71,7 +74,7 @@ The reference reconstructs one-task auction bidding and neighbor max-consensus.
 Twenty seeds were used for each of eight network/size configurations. It does
 not implement the authors' complete CBBA code or the 2025 TAES algorithms.
 These static one-task assignments **must not** be directly compared as if they
-were the same mission model as the 360 dynamic task-completion trials.
+were the same mission model as the 480 dynamic task-completion trials.
 
 ## Native C++ study: evidence boundaries
 
@@ -101,9 +104,16 @@ artifact before quoting any native numbers.
    work, disclose overlapping prior manuscripts and distinguish simulation
    from actual experiments.
 
+### Additional verification against 2026 literature
+
+- *Robust Safety Assurance for Robotic Swarms Using Decentralized Collision Verification*, IEEE TAES, DOI: https://doi.org/10.1109/TAES.2026.3683620. This published work reports real swarm flights, so the present oracle cannot be claimed as a comparable safety advance.
+- *Fault Tolerant Control for Unmanned Aerial Vehicle Formation Based on Distributed Nonlinear Model Predictive Control*, IEEE/ASME Transactions on Mechatronics, DOI: https://doi.org/10.1109/TMECH.2026.3662905. Formation fault control already has substantial prior art.
+- The fourth task-simulation arm is a full-position **centralized upper-reference**, not a usable decentralized UAV control algorithm. The core novelty issue remains open.
+
 ### Claims explicitly disallowed
 
 - 100% accurate or 100% safe, collision-free, or hardware-proven.
+- Decentralized safety superiority based on a full-position safety oracle.
 - Replicated CBBA or a 2025 TAES paper, when only the CBAA-style reconstruction exists.
 - Statistically significant superiority from the currently corrected p-values.
 - Native flight validation from a deterministic controller replay.
