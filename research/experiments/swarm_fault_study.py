@@ -40,6 +40,7 @@ class Agent:
     alive: bool = True
     cache: dict[int, tuple[float, int | None]] = field(default_factory=dict)
     distance_m: float = 0.0
+    known_done: set[int] = field(default_factory=set)
 
 
 @dataclass
@@ -71,10 +72,11 @@ def select_task(agent: Agent, agents: list[Agent], tasks: list[Task],
     if policy == "static_roles":
         # Unchanging equal-size task queues: no replacement on node failure.
         assigned = [task for task in tasks
-                    if task.identifier % len(agents) == agent.identifier and task.done_at_s is None]
+                    if task.identifier % len(agents) == agent.identifier
+                    and task.identifier not in agent.known_done]
         return assigned[0].identifier if assigned else None
 
-    pending = [task for task in tasks if task.done_at_s is None]
+    pending = [task for task in tasks if task.identifier not in agent.known_done]
     if not pending:
         return None
     claims = set()
@@ -112,7 +114,7 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
     link_rng = random.Random(seed * 65537 + count)
     agents = make_agents(count)
     tasks = make_tasks(count, geo_rng)
-    pending_messages: list[tuple[int, int, int, float, int | None]] = []
+    pending_messages: list[tuple[int, int, int, float, int | None, tuple[int, ...]]] = []
     decision_ms: list[float] = []
     packets_sent = packets_delivered = tx_bytes = duplicate_ticks = 0
     separation_violations = 0
@@ -136,8 +138,9 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
         # Deliver only packets whose simulated delivery time has elapsed.
         incoming = [item for item in pending_messages if item[0] <= step]
         pending_messages = [item for item in pending_messages if item[0] > step]
-        for _, receiver_id, sender_id, sent_s, claimed_task in incoming:
+        for _, receiver_id, sender_id, sent_s, claimed_task, known_done in incoming:
             agents[receiver_id].cache[sender_id] = (sent_s, claimed_task)
+            agents[receiver_id].known_done.update(known_done)
             packets_delivered += 1
 
         # Decisions use local peer caches, not a centralized global peer-state oracle.
@@ -158,7 +161,8 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
                     continue
                 payload = json.dumps({"id": sender.identifier, "t": now_s,
                                       "target": sender.task_id, "battery": round(sender.battery, 3),
-                                      "x": round(sender.x, 3), "y": round(sender.y, 3)},
+                                      "x": round(sender.x, 3), "y": round(sender.y, 3),
+                                      "done": sorted(sender.known_done)},
                                      separators=(",", ":")).encode("utf-8")
                 for receiver in agents:
                     if receiver.identifier == sender.identifier or not receiver.alive:
@@ -168,7 +172,8 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
                     if link_rng.random() >= loss_prob:
                         wait_ticks = link_rng.randint(1, max_delay_ticks)
                         pending_messages.append((step + wait_ticks, receiver.identifier,
-                                                 sender.identifier, now_s, sender.task_id))
+                                                 sender.identifier, now_s, sender.task_id,
+                                                 tuple(sorted(sender.known_done))))
 
         # Update actual simulated positions and battery, with common dynamics.
         next_positions: dict[int, tuple[float, float]] = {}
@@ -194,6 +199,14 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
                 if math.hypot(left.x - right.x, left.y - right.y) < SAFETY_DISTANCE_M:
                     separation_violations += 1  # discrete pair-tick violation, not a collision
 
+        # Only physically present peers detect completed targets locally.
+        for agent in live:
+            if agent.task_id is not None:
+                observed = tasks[agent.task_id]
+                if (observed.done_at_s is not None and
+                        math.hypot(agent.x - observed.x, agent.y - observed.y) <= 1.5):
+                    agent.known_done.add(observed.identifier)
+
         for task in tasks:
             if task.done_at_s is not None:
                 continue
@@ -206,6 +219,7 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
                 if task.service_s + 1e-9 >= SERVICE_S:
                     task.done_at_s = now_s + DT_S
                     task.done_by = workers[0].identifier
+                    workers[0].known_done.add(task.identifier)
                     if (fault_enabled and faulted_task == task.identifier and
                             recovery_time_s is None and task.done_by != 0):
                         recovery_time_s = round(task.done_at_s - FAULT_START_S, 3)
@@ -256,7 +270,7 @@ def experiment(counts: tuple[int, ...], seeds: int) -> tuple[list[dict], dict]:
                     "sampled_separation_violations_mean": round(statistics.mean(r["sampled_separation_violations"] for r in subset), 3),
                     "logical_unicast_tx_bytes_mean": round(statistics.mean(r["logical_unicast_tx_bytes"] for r in subset), 1),
                 })
-    return records, {"model": "simplified_discrete_time_task_coordination_v1",
+    return records, {"model": "simplified_discrete_time_task_coordination_v2_peer_completion",
                      "simulated_seconds": DURATION_S, "dt_seconds": DT_S,
                      "fault_start_seconds": FAULT_START_S, "fault_end_seconds": FAULT_END_S,
                      "peer_ttl_seconds": PEER_TTL_S,
@@ -293,7 +307,7 @@ def write_outputs(output_dir: Path, records: list[dict], summary: dict) -> None:
                  "- Formation error: not measured because this task-centric model does not implement closed-loop formation dynamics.",
                  "", "## Limitations", "",
                  "- Independent toy-model policy controls only, not replications of published algorithms.",
-                 "- Every agent is granted the same immediately visible list of globally completed tasks; this is an idealized shared-work assumption.",
+                 "- Task coordinates are common mission inputs, while completion is learned locally or via peer messages; policies have no global completion oracle.",
                  "- Peer state arrives through delayed/lossy simulated messages. The model does not simulate routing, real radios, battery physics, or sensors.",
                  "- These results cannot establish superiority, real decentralization, safety certification, or IEEE publication readiness.", ""])
     (output_dir / "REPORT.md").write_text("\n".join(rows), encoding="utf-8")
