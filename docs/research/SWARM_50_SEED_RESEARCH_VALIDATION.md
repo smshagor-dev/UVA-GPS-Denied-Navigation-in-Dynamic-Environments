@@ -1,5 +1,7 @@
 # 50-seed research validation: communication faults and local safety
 
+> **Historical five-policy v4 benchmark (3,000 trials).** The updated six-policy v5 experiment (3,600 trials) and its conditional assumptions are in [SWARM_LOCAL_PROXIMITY_BOUND_AND_RESULTS.md](SWARM_LOCAL_PROXIMITY_BOUND_AND_RESULTS.md). Do not present the table below as the final six-policy matrix.
+
 **Scope:** software-only exploratory UAV task coordination. **Not** native multi-UAV
 flight, RF/HIL, safety certification, or evidence of a new IEEE-contribution algorithm.
 
