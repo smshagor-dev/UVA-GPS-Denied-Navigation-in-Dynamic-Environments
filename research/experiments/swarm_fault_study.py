@@ -19,7 +19,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-POLICIES = ("static_roles", "adaptive_unfiltered", "adaptive_freshness", "adaptive_freshness_safety", "adaptive_freshness_local_safety")
+POLICIES = ("static_roles", "adaptive_unfiltered", "adaptive_freshness", "adaptive_freshness_safety", "adaptive_freshness_local_safety", "adaptive_freshness_proximity")
 SCENARIOS = ("nominal", "packet_loss", "node_failure", "combined")
 DT_S = 0.5
 DURATION_S = 75.0
@@ -29,6 +29,7 @@ PEER_TTL_S = 2.0
 SPEED_M_S = 2.5
 SERVICE_S = 2.0
 SAFETY_DISTANCE_M = 1.0
+LOCAL_SENSOR_RANGE_M = 5.0
 
 
 @dataclass
@@ -88,7 +89,7 @@ def select_task(agent: Agent, agents: list[Agent], tasks: list[Task],
     for peer_id, (observed_s, claimed_task) in agent.cache.items():
         if peer_id == agent.identifier or claimed_task is None:
             continue
-        if policy in {"adaptive_freshness", "adaptive_freshness_safety", "adaptive_freshness_local_safety"} and now_s - observed_s > PEER_TTL_S:
+        if policy in {"adaptive_freshness", "adaptive_freshness_safety", "adaptive_freshness_local_safety", "adaptive_freshness_proximity"} and now_s - observed_s > PEER_TTL_S:
             continue
         claims.add(claimed_task)
     def cost(task: Task) -> tuple[float, int]:
@@ -183,6 +184,29 @@ def local_safety_filter(
     return proposed, False
 
 
+def proximity_safety_filter(
+    agent: Agent,
+    proposed: tuple[float, float],
+    sensed_peers: list[tuple[int, float, float]],
+) -> tuple[tuple[float, float], bool]:
+    """Idealized local range-sensor reference, NOT measured onboard perception.
+
+    The controller sees its own pose and provided detections only, not a
+    world-state list. For peers within range, the checked path is buffered by
+    the maximum distance a peer could move during a single time step.
+    """
+    start = (agent.x, agent.y)
+    if proposed == start:
+        return proposed, False
+    max_peer_step = SPEED_M_S * DT_S
+    clearance = SAFETY_DISTANCE_M + max_peer_step
+    for _, peer_x, peer_y in sensed_peers:
+        center = (peer_x, peer_y)
+        if swept_distance(start, proposed, center, center) < clearance:
+            return start, True
+    return proposed, False
+
+
 def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
     if policy not in POLICIES or scenario not in SCENARIOS or count < 4:
         raise ValueError("invalid policy, scenario, or UAV count")
@@ -199,6 +223,7 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
     separation_violations = 0
     swept_separation_violations = 0
     safety_rejections = 0
+    proximity_sensor_observations = 0
     faulted_task: int | None = None
     recovery_time_s: float | None = None
     fault_enabled = scenario in {"node_failure", "combined"}
@@ -295,6 +320,26 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
                     safety_rejections += 1
                 accepted[agent.identifier] = actual
             next_positions = accepted
+        elif policy == "adaptive_freshness_proximity":
+            # Simulator creates near-field observations. The policy receives only
+            # sensed peer locations within 5 m, not global positions or roles.
+            accepted = {}
+            for agent in live:
+                sensed_peers = [
+                    (peer.identifier, peer.x, peer.y)
+                    for peer in live
+                    if peer.identifier != agent.identifier
+                    and math.hypot(agent.x - peer.x, agent.y - peer.y)
+                    <= LOCAL_SENSOR_RANGE_M
+                ]
+                proximity_sensor_observations += len(sensed_peers)
+                proposed = next_positions.get(agent.identifier, (agent.x, agent.y))
+                actual, rejected = proximity_safety_filter(
+                    agent, proposed, sensed_peers
+                )
+                safety_rejections += int(rejected)
+                accepted[agent.identifier] = actual
+            next_positions = accepted
         for i, left in enumerate(live):
             a0 = (left.x, left.y)
             a1 = next_positions.get(left.identifier, a0)
@@ -359,6 +404,7 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
         "sampled_separation_violations": separation_violations,
         "swept_separation_violations": swept_separation_violations,
         "safety_rejected_steps": safety_rejections,
+        "simulated_local_sensor_observations": proximity_sensor_observations,
         "packets_sent": packets_sent, "packets_delivered": packets_delivered,
         "logical_unicast_tx_bytes": tx_bytes,
         "total_distance_m": round(sum(a.distance_m for a in agents), 4),
@@ -394,9 +440,10 @@ def experiment(counts: tuple[int, ...], seeds: int) -> tuple[list[dict], dict]:
                     "sampled_separation_violations_mean": round(statistics.mean(r["sampled_separation_violations"] for r in subset), 3),
                     "swept_separation_violations_mean": round(statistics.mean(r["swept_separation_violations"] for r in subset), 3),
                     "safety_rejections_mean": round(statistics.mean(r["safety_rejected_steps"] for r in subset), 3),
+                    "local_sensor_observations_mean": round(statistics.mean(r["simulated_local_sensor_observations"] for r in subset), 3),
                     "logical_unicast_tx_bytes_mean": round(statistics.mean(r["logical_unicast_tx_bytes"] for r in subset), 1),
                 })
-    return records, {"model": "simplified_discrete_time_task_coordination_v4_local_peer_safety",
+    return records, {"model": "simplified_discrete_time_task_coordination_v5_local_proximity_reference",
                      "simulated_seconds": DURATION_S, "dt_seconds": DT_S,
                      "fault_start_seconds": FAULT_START_S, "fault_end_seconds": FAULT_END_S,
                      "peer_ttl_seconds": PEER_TTL_S,
@@ -430,6 +477,8 @@ def write_outputs(output_dir: Path, records: list[dict], summary: dict) -> None:
                  "- Separation violations: sampled agent pairs closer than 1 m; swept violations use continuous interpolation within each step; neither represents physical collisions.",
                  "- Safety-oracle ablation: idealized full-state sequential reservation; uses true positions of all agents and cannot be claimed as distributed or onboard collision avoidance.",
                  "- Local-safety ablation: only own position and time-stamped peer pose received over modeled links; unknown/stale peer means holding motion. Uses heuristic future peer trajectory, not formal collision guarantee.",
+                 "- Proximity reference: idealized, synchronous, noiseless and unoccluded 5 m local position sensing. Uses a bounded-speed 1-step clearance rule; no real camera/LiDAR has been tested.",
+                 "- The chosen range must exceed separation threshold plus twice the maximum per-step travel; this conditional model does not cover occlusions, sensor errors, clock drift or nonlinear motion.",
                  "- Transmitted bytes: UTF-8 JSON sizes counted per simulated logical unicast; not measured RF throughput.",
                  "- Decision latency: host process time measured using perf_counter_ns; environment-specific, not flight end-to-end latency.",
                  "- Formation error: not measured because this task-centric model does not implement closed-loop formation dynamics.",
