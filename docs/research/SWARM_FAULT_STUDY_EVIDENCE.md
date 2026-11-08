@@ -13,9 +13,9 @@ Run from the repository root:
     python3 -m unittest tests.test_swarm_fault_study -v
     python3 research/experiments/swarm_fault_study.py --counts 4,8,12 --seeds 10 --out results/swarm_fault_study
 
-The workflow \`.github/workflows/swarm-fault-study.yml\` reruns the same matrix.
-A complete run produces \`runs.csv\`, \`summary.json\`, and \`REPORT.md\`.
-\`summary.json\` records the script SHA-256. Host-time decision timings vary by machine.
+The workflow `.github/workflows/swarm-fault-study.yml` reruns the same matrix.
+A complete run produces `runs.csv`, `summary.json`, and `REPORT.md`.
+`summary.json` records the script SHA-256. Host-time decision timings vary by machine.
 
 ## Controlled policies
 
