@@ -14,6 +14,7 @@ from research.experiments.swarm_fault_study import (
     run_trial,
     select_task,
     safety_filter,
+    local_safety_filter,
     swept_distance,
 )
 
@@ -88,6 +89,40 @@ class SwarmFaultStudyTests(unittest.TestCase):
         row = run_trial("adaptive_freshness_safety", "combined", 4, 7)
         self.assertEqual(row["swept_separation_violations"], 0)
         self.assertGreater(row["safety_rejected_steps"], 0)
+
+    def test_local_safety_holds_without_fresh_peer_evidence(self) -> None:
+        agent = Agent(0, 0.0, 0.0, 90.0)
+        self.assertEqual(
+            local_safety_filter(agent, (1.0, 0.0), 2, 1.0),
+            ((0.0, 0.0), True),
+        )
+        agent.peer_poses[1] = (0.0, 20.0, 0.0, 0.0, 0.0)
+        self.assertEqual(
+            local_safety_filter(agent, (1.0, 0.0), 2, 3.0),
+            ((0.0, 0.0), True),
+        )
+
+    def test_local_safety_accepts_distant_fresh_peer(self) -> None:
+        agent = Agent(0, 0.0, 0.0, 90.0)
+        agent.peer_poses[1] = (1.0, 20.0, 0.0, 0.0, 0.0)
+        self.assertEqual(
+            local_safety_filter(agent, (1.0, 0.0), 2, 1.5),
+            ((1.0, 0.0), False),
+        )
+
+    def test_local_safety_rejects_predicted_crossing(self) -> None:
+        agent = Agent(0, 0.0, 0.0, 90.0)
+        agent.peer_poses[1] = (1.0, 0.5, -1.0, 0.0, 2.0)
+        self.assertEqual(
+            local_safety_filter(agent, (1.0, 0.0), 2, 1.0),
+            ((0.0, 0.0), True),
+        )
+
+    def test_local_safety_reports_measured_not_guaranteed_outcomes(self) -> None:
+        row = run_trial("adaptive_freshness_local_safety", "combined", 4, 3)
+        self.assertEqual(row["policy"], "adaptive_freshness_local_safety")
+        self.assertGreater(row["safety_rejected_steps"], 0)
+        self.assertGreaterEqual(row["swept_separation_violations"], 0)
 
     def test_reject_invalid_inputs(self) -> None:
         with self.assertRaises(ValueError):
