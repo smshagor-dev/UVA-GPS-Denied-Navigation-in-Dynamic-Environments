@@ -18,7 +18,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-POLICIES = ("static_roles", "adaptive_unfiltered", "adaptive_freshness")
+POLICIES = ("static_roles", "adaptive_unfiltered", "adaptive_freshness", "adaptive_freshness_safety")
 SCENARIOS = ("nominal", "packet_loss", "node_failure", "combined")
 DT_S = 0.5
 DURATION_S = 75.0
@@ -83,7 +83,7 @@ def select_task(agent: Agent, agents: list[Agent], tasks: list[Task],
     for peer_id, (observed_s, claimed_task) in agent.cache.items():
         if peer_id == agent.identifier or claimed_task is None:
             continue
-        if policy == "adaptive_freshness" and now_s - observed_s > PEER_TTL_S:
+        if policy in {"adaptive_freshness", "adaptive_freshness_safety"} and now_s - observed_s > PEER_TTL_S:
             continue
         claims.add(claimed_task)
     def cost(task: Task) -> tuple[float, int]:
@@ -105,6 +105,44 @@ def percentile(values: list[float], pct: float) -> float | None:
     return round(ordered[index], 6)
 
 
+def swept_distance(a0: tuple[float, float], a1: tuple[float, float],
+                   b0: tuple[float, float], b1: tuple[float, float]) -> float:
+    """Minimum Euclidean gap between simultaneous linear trajectories."""
+    rx, ry = a0[0] - b0[0], a0[1] - b0[1]
+    vx = (a1[0] - a0[0]) - (b1[0] - b0[0])
+    vy = (a1[1] - a0[1]) - (b1[1] - b0[1])
+    denom = vx * vx + vy * vy
+    alpha = max(0.0, min(1.0, -(rx * vx + ry * vy) / denom)) if denom > 1e-14 else 0.0
+    return math.hypot(rx + alpha * vx, ry + alpha * vy)
+
+
+def safety_filter(agents: list[Agent], proposals: dict[int, tuple[float, float]]) -> tuple[dict[int, tuple[float, float]], int]:
+    """Idealized full-position reservation: smaller agent IDs have earlier priority.
+
+    This uses the TRUE current location of ALL active agents (a safety oracle).
+    It is an optimistic centralized reference, NOT decentralized sensing,
+    RF/HIL collision avoidance, or an onboard flight-safety guarantee.
+    """
+    active = [a for a in agents if a.alive]
+    accepted: dict[int, tuple[float, float]] = {}
+    rejected = 0
+    for agent in active:
+        a0 = (agent.x, agent.y)
+        candidate = proposals.get(agent.identifier, a0)
+        if candidate != a0:
+            for peer in active:
+                if peer.identifier == agent.identifier:
+                    continue
+                b0 = (peer.x, peer.y)
+                b1 = accepted.get(peer.identifier, b0)
+                if swept_distance(a0, candidate, b0, b1) < SAFETY_DISTANCE_M:
+                    candidate = a0
+                    rejected += 1
+                    break
+        accepted[agent.identifier] = candidate
+    return accepted, rejected
+
+
 def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
     if policy not in POLICIES or scenario not in SCENARIOS or count < 4:
         raise ValueError("invalid policy, scenario, or UAV count")
@@ -118,6 +156,8 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
     decision_ms: list[float] = []
     packets_sent = packets_delivered = tx_bytes = duplicate_ticks = 0
     separation_violations = 0
+    swept_separation_violations = 0
+    safety_rejections = 0
     faulted_task: int | None = None
     recovery_time_s: float | None = None
     fault_enabled = scenario in {"node_failure", "combined"}
@@ -187,13 +227,26 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
                 next_positions[agent.identifier] = (
                     agent.x + travel * (target.x - agent.x) / d,
                     agent.y + travel * (target.y - agent.y) / d)
-            agent.distance_m += travel
-            agent.battery -= travel * 0.025
-        for agent in agents:
-            if agent.identifier in next_positions:
-                agent.x, agent.y = next_positions[agent.identifier]
-
         live = [a for a in agents if a.alive]
+        if policy == "adaptive_freshness_safety":
+            next_positions, rejects = safety_filter(agents, next_positions)
+            safety_rejections += rejects
+        for i, left in enumerate(live):
+            a0 = (left.x, left.y)
+            a1 = next_positions.get(left.identifier, a0)
+            for right in live[i + 1:]:
+                b0 = (right.x, right.y)
+                b1 = next_positions.get(right.identifier, b0)
+                if swept_distance(a0, a1, b0, b1) < SAFETY_DISTANCE_M:
+                    swept_separation_violations += 1
+        for agent in live:
+            if agent.identifier in next_positions:
+                new_position = next_positions[agent.identifier]
+                travel = math.hypot(new_position[0] - agent.x, new_position[1] - agent.y)
+                agent.distance_m += travel
+                agent.battery -= travel * 0.025
+                agent.x, agent.y = new_position
+
         for i, left in enumerate(live):
             for right in live[i + 1:]:
                 if math.hypot(left.x - right.x, left.y - right.y) < SAFETY_DISTANCE_M:
@@ -235,6 +288,8 @@ def run_trial(policy: str, scenario: str, count: int, seed: int) -> dict:
         "orphan_task_recovered": recovery_time_s is not None,
         "duplicate_worker_ticks": duplicate_ticks,
         "sampled_separation_violations": separation_violations,
+        "swept_separation_violations": swept_separation_violations,
+        "safety_rejected_steps": safety_rejections,
         "packets_sent": packets_sent, "packets_delivered": packets_delivered,
         "logical_unicast_tx_bytes": tx_bytes,
         "total_distance_m": round(sum(a.distance_m for a in agents), 4),
@@ -268,9 +323,11 @@ def experiment(counts: tuple[int, ...], seeds: int) -> tuple[list[dict], dict]:
                     if recovered else None,
                     "duplicate_worker_ticks_mean": round(statistics.mean(r["duplicate_worker_ticks"] for r in subset), 3),
                     "sampled_separation_violations_mean": round(statistics.mean(r["sampled_separation_violations"] for r in subset), 3),
+                    "swept_separation_violations_mean": round(statistics.mean(r["swept_separation_violations"] for r in subset), 3),
+                    "safety_rejections_mean": round(statistics.mean(r["safety_rejected_steps"] for r in subset), 3),
                     "logical_unicast_tx_bytes_mean": round(statistics.mean(r["logical_unicast_tx_bytes"] for r in subset), 1),
                 })
-    return records, {"model": "simplified_discrete_time_task_coordination_v2_peer_completion",
+    return records, {"model": "simplified_discrete_time_task_coordination_v3_safety_oracle_ablation",
                      "simulated_seconds": DURATION_S, "dt_seconds": DT_S,
                      "fault_start_seconds": FAULT_START_S, "fault_end_seconds": FAULT_END_S,
                      "peer_ttl_seconds": PEER_TTL_S,
@@ -301,12 +358,13 @@ def write_outputs(output_dir: Path, records: list[dict], summary: dict) -> None:
                  "- Task completion: number of tasks whose 2.0 s simulated service requirement was reached.",
                  "- Recovery: elapsed simulated time from permanent UAV-0 failure at 16 s to completion of its interrupted task by another UAV; unrecovered trials are censored, not zero.",
                  "- Duplicate worker ticks: redundant simultaneously present agents at a target; counts each 0.5 s step.",
-                 "- Separation violations: live UAV pairs closer than 1 m per simulation step; **not physical collisions**.",
+                 "- Separation violations: sampled agent pairs closer than 1 m; swept violations use continuous interpolation within each step; neither represents physical collisions.",
+                 "- Safety-oracle ablation: idealized full-state sequential reservation; uses true positions of all agents and cannot be claimed as distributed or onboard collision avoidance.",
                  "- Transmitted bytes: UTF-8 JSON sizes counted per simulated logical unicast; not measured RF throughput.",
                  "- Decision latency: host process time measured using perf_counter_ns; environment-specific, not flight end-to-end latency.",
                  "- Formation error: not measured because this task-centric model does not implement closed-loop formation dynamics.",
                  "", "## Limitations", "",
-                 "- Independent toy-model policy controls only, not replications of published algorithms.",
+                 "- Independent toy-model policy controls only, not replications of published algorithms; the safety-oracle arm is optimistic and centralized.",
                  "- Task coordinates are common mission inputs, while completion is learned locally or via peer messages; policies have no global completion oracle.",
                  "- Peer state arrives through delayed/lossy simulated messages. The model does not simulate routing, real radios, battery physics, or sensors.",
                  "- These results cannot establish superiority, real decentralization, safety certification, or IEEE publication readiness.", ""])
