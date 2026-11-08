@@ -426,3 +426,22 @@ if(Python3_Interpreter_FOUND)
         TIMEOUT 180
     )
 endif()
+
+
+# Research-only native controller replay. Samples the real C++ formation
+# controller using synthetic trajectories; does not represent physical flight.
+add_executable(swarm_native_formation_metrics swarm_native_formation_metrics.cpp)
+target_link_libraries(swarm_native_formation_metrics PRIVATE sensor_fusion_core Eigen3::Eigen)
+drone_apply_project_warnings(swarm_native_formation_metrics)
+drone_enable_coverage(swarm_native_formation_metrics)
+drone_enable_sanitizers(swarm_native_formation_metrics)
+drone_set_target_output_dirs(swarm_native_formation_metrics "tests" "tests" "tests")
+add_test(
+    NAME swarm_native_formation_metrics
+    COMMAND $<TARGET_FILE:swarm_native_formation_metrics>
+            "${PROJECT_BINARY_DIR}/swarm_native_formation_metrics.json"
+)
+set_tests_properties(swarm_native_formation_metrics PROPERTIES
+    LABELS "integration;swarm;simulation;research"
+    TIMEOUT 60
+)
