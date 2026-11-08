@@ -13,13 +13,15 @@ from research.experiments.swarm_fault_study import (
     experiment,
     run_trial,
     select_task,
+    safety_filter,
+    swept_distance,
 )
 
 
 class SwarmFaultStudyTests(unittest.TestCase):
     def test_matrix_is_balanced(self) -> None:
         runs, report = experiment((4, 8), 2)
-        self.assertEqual(len(runs), 2 * 4 * 2 * 3)
+        self.assertEqual(len(runs), 2 * 4 * 2 * len(POLICIES))
         self.assertEqual(report["trial_count"], len(runs))
         self.assertEqual({row["policy"] for row in runs}, set(POLICIES))
         self.assertEqual({row["scenario"] for row in runs}, set(SCENARIOS))
@@ -64,6 +66,30 @@ class SwarmFaultStudyTests(unittest.TestCase):
         self.assertGreater(row["packets_sent"], row["packets_delivered"])
         self.assertGreater(row["logical_unicast_tx_bytes"], 0)
         self.assertLessEqual(row["tasks_completed"], row["tasks_total"])
+
+    def test_swept_distance_detects_crossing_between_endpoints(self) -> None:
+        self.assertAlmostEqual(
+            swept_distance((0.0, 0.0), (2.0, 0.0), (1.0, -1.0), (1.0, 1.0)),
+            0.0,
+        )
+        self.assertAlmostEqual(
+            swept_distance((0.0, 0.0), (2.0, 0.0), (0.0, 2.0), (2.0, 2.0)),
+            2.0,
+        )
+
+    def test_idealized_safety_oracle_holds_conflicting_movements(self) -> None:
+        agents = [Agent(0, 0.0, 0.0, 90.0), Agent(1, 2.0, 0.0, 90.0)]
+        moves, rejected = safety_filter(
+            agents, {0: (3.0, 0.0), 1: (-1.0, 0.0)}
+        )
+        self.assertGreater(rejected, 0)
+        self.assertEqual(moves[0], (0.0, 0.0))
+        self.assertEqual(moves[1], (2.0, 0.0))
+
+    def test_safety_reference_has_no_swept_violations_for_seed(self) -> None:
+        row = run_trial("adaptive_freshness_safety", "combined", 4, 7)
+        self.assertEqual(row["swept_separation_violations"], 0)
+        self.assertGreater(row["safety_rejected_steps"], 0)
 
     def test_reject_invalid_inputs(self) -> None:
         with self.assertRaises(ValueError):
