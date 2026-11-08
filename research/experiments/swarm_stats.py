@@ -110,6 +110,8 @@ def analyze(records):
         ("adaptive_unfiltered", "adaptive_freshness"),
         ("adaptive_freshness", "adaptive_freshness_safety"),
         ("adaptive_freshness", "adaptive_freshness_local_safety"),
+        ("adaptive_freshness", "adaptive_freshness_proximity"),
+        ("adaptive_freshness_local_safety", "adaptive_freshness_proximity"),
     )
     grouped = defaultdict(list)
     for (size, scenario, _), policies in paired.items():
@@ -174,7 +176,7 @@ def main():
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps({
         "scope": "exploratory paired simulation comparison, not real UAV/RF",
-        "policy_pairs": [["adaptive_unfiltered", "adaptive_freshness"], ["adaptive_freshness", "adaptive_freshness_safety"], ["adaptive_freshness", "adaptive_freshness_local_safety"]],
+        "policy_pairs": [["adaptive_unfiltered", "adaptive_freshness"], ["adaptive_freshness", "adaptive_freshness_safety"], ["adaptive_freshness", "adaptive_freshness_local_safety"], ["adaptive_freshness", "adaptive_freshness_proximity"], ["adaptive_freshness_local_safety", "adaptive_freshness_proximity"]],
         "multiple_comparison_adjustment": "Holm across all comparisons separately for (i) sign-flip p and (ii) exact sign-test p",
         "sign_test_null": "probability of positive paired difference given nonzero is 0.5; not a mean-effect test",
         "censored_recovery": "analyzed as recovered/not recovered, not zero seconds",
