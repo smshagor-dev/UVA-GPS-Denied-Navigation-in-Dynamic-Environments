@@ -152,9 +152,7 @@ TEST(V2XFormation, VelocityCommandIsBoundedAndReducesNominalError) {
     LeaderFollowerController controller(2, {});
     const Eigen::Vector3d origin = Eigen::Vector3d::Zero();
     const Eigen::Vector3d goal(10.0, 2.0, 0.0);
-    const auto velocity = controller.velocity_command(
-        origin, origin, goal, std::vector<PeerInfo>{},
-        std::vector<AvoidanceObstacle>{}, 1.5f, 2.0f);
+    const auto velocity = controller.velocity_command(origin, origin, goal, 1.5f, 2.0f);
     EXPECT_LE(velocity.norm(), 2.0 + 1e-8);
     EXPECT_LT((goal - velocity * 0.1).norm(), goal.norm());
 }
@@ -166,9 +164,9 @@ TEST(V2XFormation, NearbyPeerProducesRepulsion) {
     peer.reachable = true;
     peer.position = Eigen::Vector3d(1.5, 0.0, 0.0);
     peer.velocity = Eigen::Vector3d(-0.5, 0.0, 0.0);
-    const auto velocity = controller.compute_avoidance_velocity(
-        Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(),
-        std::vector<PeerInfo>{peer});
+    const Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+    const std::vector<PeerInfo> peers{peer};
+    const auto velocity = controller.compute_avoidance_velocity(origin, origin, peers);
     EXPECT_LT(velocity.x(), 0.0);
     EXPECT_GT(velocity.norm(), 0.0);
     EXPECT_LE(velocity.norm(), 3.0 + 1e-8);
@@ -181,10 +179,9 @@ TEST(V2XFormation, AvoidanceStillRespectsOverallCommandSpeedLimit) {
     peer.reachable = true;
     peer.position = Eigen::Vector3d(1.5, 0.0, 0.0);
     const Eigen::Vector3d zero = Eigen::Vector3d::Zero();
-    const auto command = controller.velocity_command(
-        zero, zero, Eigen::Vector3d(20.0, 0.0, 0.0),
-        std::vector<PeerInfo>{peer}, std::vector<AvoidanceObstacle>{},
-        1.5f, 2.0f);
+    const Eigen::Vector3d goal(20.0, 0.0, 0.0);
+    const std::vector<PeerInfo> peers{peer};
+    const auto command = controller.velocity_command(zero, zero, goal, peers, {}, 1.5f, 2.0f);
     EXPECT_LE(command.norm(), 2.0 + 1e-8);
 }
 
