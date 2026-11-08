@@ -1,0 +1,42 @@
+name: Swarm Fault Study Evidence
+
+on:
+  pull_request:
+    paths:
+      - "research/experiments/swarm_fault_study.py"
+      - "tests/test_swarm_fault_study.py"
+      - ".github/workflows/swarm-fault-study.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controlled-simulation:
+    name: Reproduce software-only baseline comparison
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Run metric integrity tests
+        run: python3 -m unittest tests.test_swarm_fault_study -v
+
+      - name: Generate paired trials
+        run: |
+          python3 research/experiments/swarm_fault_study.py \
+            --counts 4,8,12 \
+            --seeds 10 \
+            --out "$RUNNER_TEMP/swarm-fault-study"
+
+      - name: Preserve raw trials and report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: swarm-fault-software-simulation-${{ github.sha }}
+          path: ${{ runner.temp }}/swarm-fault-study
+          if-no-files-found: warn
+          retention-days: 30
