@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import itertools
 import json
 import random
@@ -44,6 +45,32 @@ def exact_signflip(diffs):
     return matches / (2 ** len(diffs))
 
 
+def paired_signflip(diffs, draws=4096):
+    """Exact for <=16 paired seeds, otherwise seeded Monte Carlo sign flips.
+
+    The +1 correction is a valid conservative estimate of the tail area.
+    A Monte Carlo p-value is *not* labeled exact; randomization error remains.
+    """
+    if not diffs:
+        raise ValueError("no paired observations")
+    if len(diffs) <= 16:
+        return exact_signflip(diffs), "exact", 2 ** len(diffs)
+    if all(abs(delta) < 1e-12 for delta in diffs):
+        return 1.0, "monte_carlo_degenerate", draws
+    seed_bytes = hashlib.sha256(repr(tuple(diffs)).encode("utf-8")).digest()
+    rng = random.Random(int.from_bytes(seed_bytes[:8], "big"))
+    threshold = abs(sum(diffs)) - 1e-12
+    extreme = 0
+    for _ in range(draws):
+        bits = rng.getrandbits(len(diffs))
+        delta_sum = sum(
+            value if bits & (1 << i) else -value
+            for i, value in enumerate(diffs)
+        )
+        extreme += abs(delta_sum) >= threshold
+    return (extreme + 1) / (draws + 1), "monte_carlo", draws
+
+
 def bootstrap_ci(diffs, seed, repeats=5000):
     rng = random.Random(seed)
     values = sorted(
@@ -65,6 +92,7 @@ def analyze(records):
     policy_pairs = (
         ("adaptive_unfiltered", "adaptive_freshness"),
         ("adaptive_freshness", "adaptive_freshness_safety"),
+        ("adaptive_freshness", "adaptive_freshness_local_safety"),
     )
     grouped = defaultdict(list)
     for (size, scenario, _), policies in paired.items():
@@ -78,6 +106,7 @@ def analyze(records):
     for (size, scenario, control, treatment), pairs in sorted(grouped.items()):
         for metric in METRICS:
             differences = [number(t[metric]) - number(c[metric]) for c, t in pairs]
+            p_value, method, draws = paired_signflip(differences)
             output.append({
                 "uavs": size,
                 "scenario": scenario,
@@ -90,13 +119,15 @@ def analyze(records):
                     differences,
                     1808 + size + len(scenario) + len(control) + len(treatment),
                 ),
-                "unadjusted_exact_signflip_p": exact_signflip(differences),
+                "unadjusted_signflip_p": p_value,
+                "signflip_method": method,
+                "signflip_sample_count": draws,
             })
     # Holm family-wise multiplicity correction across all outcome comparisons.
-    ordered = sorted(range(len(output)), key=lambda i: output[i]["unadjusted_exact_signflip_p"])
+    ordered = sorted(range(len(output)), key=lambda i: output[i]["unadjusted_signflip_p"])
     previous = 0.0
     for position, index in enumerate(ordered):
-        raw = output[index]["unadjusted_exact_signflip_p"]
+        raw = output[index]["unadjusted_signflip_p"]
         previous = min(1.0, max(previous, raw * (len(output) - position)))
         output[index]["holm_adjusted_p"] = round(previous, 8)
     return output
@@ -113,8 +144,8 @@ def main():
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps({
         "scope": "exploratory paired simulation comparison, not real UAV/RF",
-        "policy_pairs": [["adaptive_unfiltered", "adaptive_freshness"], ["adaptive_freshness", "adaptive_freshness_safety"]],
-        "multiple_comparison_adjustment": "Holm family-wise across all comparisons",
+        "policy_pairs": [["adaptive_unfiltered", "adaptive_freshness"], ["adaptive_freshness", "adaptive_freshness_safety"], ["adaptive_freshness", "adaptive_freshness_local_safety"]],
+        "multiple_comparison_adjustment": "Holm family-wise across all comparisons; exact for <=16 pairs, seeded sign-flip Monte Carlo beyond 16",
         "censored_recovery": "analyzed as recovered/not recovered, not zero seconds",
         "comparisons": comparisons,
     }, indent=2) + "\n", encoding="utf-8")
