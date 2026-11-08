@@ -1,5 +1,7 @@
 # IEEE TAES swarm intelligence: evidence and reviewer-readiness audit
 
+> **Research update:** The v3/v4 results below are historical exploratory baselines. The current v5 experiment contains six policy arms, 3,600 paired software simulations, and a conditional local proximity model. See [SWARM_LOCAL_PROXIMITY_BOUND_AND_RESULTS.md](SWARM_LOCAL_PROXIMITY_BOUND_AND_RESULTS.md). The manuscript remains **not submission-ready**.
+
 **Date:** 2026-11-08  
 **Target:** original work on communication/freshness-aware UAV swarm coordination.  
 **Status:** software research evidence improved; **not yet submission-ready**.
