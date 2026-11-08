@@ -13,6 +13,7 @@ from research.experiments.swarm_stats import (
     analyze,
     bootstrap_ci,
     exact_signflip,
+    exact_paired_sign_test,
     paired_signflip,
 )
 
@@ -67,6 +68,16 @@ class SwarmAdvancedEvidenceTests(unittest.TestCase):
             paired_signflip([0.0] * 25, draws=100),
             (1.0, "monte_carlo_degenerate", 100),
         )
+
+    def test_exact_sign_test_scales_without_monte_carlo_resolution_floor(self):
+        p, positives, negatives, informative = exact_paired_sign_test([-1.0] * 50)
+        self.assertAlmostEqual(p, 2 / (2 ** 50))
+        self.assertEqual((positives, negatives, informative), (0, 50, 50))
+
+    def test_exact_sign_test_ignores_ties_and_is_two_sided(self):
+        self.assertEqual(exact_paired_sign_test([0.0, 0.0]), (1.0, 0, 0, 0))
+        self.assertEqual(exact_paired_sign_test([1.0, -1.0, 0.0]), (1.0, 1, 1, 2))
+        self.assertEqual(exact_paired_sign_test([1.0] * 4), (0.125, 4, 0, 4))
 
     def test_unpaired_trial_is_rejected(self):
         with self.assertRaises(ValueError):
