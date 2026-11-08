@@ -81,6 +81,13 @@ def analyze(records):
                 "mean_diff_bootstrap_95pct_ci": bootstrap_ci(differences, 1808 + size + len(scenario)),
                 "unadjusted_exact_signflip_p": exact_signflip(differences),
             })
+    # Holm family-wise multiplicity correction across all outcome comparisons.
+    ordered = sorted(range(len(output)), key=lambda i: output[i]["unadjusted_exact_signflip_p"])
+    previous = 0.0
+    for position, index in enumerate(ordered):
+        raw = output[index]["unadjusted_exact_signflip_p"]
+        previous = min(1.0, max(previous, raw * (len(output) - position)))
+        output[index]["holm_adjusted_p"] = round(previous, 8)
     return output
 
 
@@ -97,7 +104,7 @@ def main():
         "scope": "exploratory paired simulation comparison, not real UAV/RF",
         "control": "adaptive_unfiltered",
         "treatment": "adaptive_freshness",
-        "multiple_comparison_adjustment": "none; p-values are exploratory",
+        "multiple_comparison_adjustment": "Holm family-wise across all comparisons",
         "censored_recovery": "analyzed as recovered/not recovered, not zero seconds",
         "comparisons": comparisons,
     }, indent=2) + "\n", encoding="utf-8")
