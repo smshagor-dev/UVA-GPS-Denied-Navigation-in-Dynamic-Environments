@@ -15,6 +15,11 @@ from research.experiments.swarm_fault_study import (
     select_task,
     safety_filter,
     local_safety_filter,
+    proximity_safety_filter,
+    LOCAL_SENSOR_RANGE_M,
+    SAFETY_DISTANCE_M,
+    SPEED_M_S,
+    DT_S,
     swept_distance,
 )
 
@@ -123,6 +128,31 @@ class SwarmFaultStudyTests(unittest.TestCase):
         self.assertEqual(row["policy"], "adaptive_freshness_local_safety")
         self.assertGreater(row["safety_rejected_steps"], 0)
         self.assertGreaterEqual(row["swept_separation_violations"], 0)
+
+    def test_proximity_reference_has_sufficient_range_under_step_bound(self) -> None:
+        self.assertGreaterEqual(
+            LOCAL_SENSOR_RANGE_M,
+            SAFETY_DISTANCE_M + 2 * SPEED_M_S * DT_S,
+        )
+
+    def test_proximity_reference_checks_only_supplied_local_detections(self) -> None:
+        agent = Agent(0, 0.0, 0.0, 90.0)
+        close = [(1, 1.5, 0.0)]
+        far = [(1, 4.5, 0.0)]
+        self.assertEqual(
+            proximity_safety_filter(agent, (1.25, 0.0), close),
+            ((0.0, 0.0), True),
+        )
+        self.assertEqual(
+            proximity_safety_filter(agent, (1.25, 0.0), far),
+            ((1.25, 0.0), False),
+        )
+
+    def test_idealized_local_proximity_reference_one_seed(self) -> None:
+        row = run_trial("adaptive_freshness_proximity", "combined", 4, 7)
+        self.assertEqual(row["policy"], "adaptive_freshness_proximity")
+        self.assertGreater(row["simulated_local_sensor_observations"], 0)
+        self.assertEqual(row["swept_separation_violations"], 0)
 
     def test_reject_invalid_inputs(self) -> None:
         with self.assertRaises(ValueError):
