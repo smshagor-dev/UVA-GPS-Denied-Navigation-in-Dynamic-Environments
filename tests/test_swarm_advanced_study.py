@@ -48,12 +48,16 @@ class SwarmAdvancedEvidenceTests(unittest.TestCase):
 
     def test_unpaired_trial_is_rejected(self):
         with self.assertRaises(ValueError):
-            analyze([{
-                "uavs": 4,
-                "scenario": "nominal",
-                "seed": 0,
-                "policy": "adaptive_freshness",
-            }])
+            analyze(
+                [
+                    {
+                        "uavs": 4,
+                        "scenario": "nominal",
+                        "seed": 0,
+                        "policy": "adaptive_freshness",
+                    }
+                ]
+            )
 
 
 if __name__ == "__main__":
