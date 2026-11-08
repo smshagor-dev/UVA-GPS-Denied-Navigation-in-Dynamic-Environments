@@ -44,6 +44,18 @@ class SwarmFaultStudyTests(unittest.TestCase):
         )
         self.assertGreater(9.0 - 1.0, PEER_TTL_S)
 
+    def test_completed_tasks_are_not_globally_known(self) -> None:
+        agents = [Agent(i, 0.0, 0.0, 90.0) for i in range(4)]
+        tasks = [Task(0, 2.0, 0.0, done_at_s=1.0), Task(1, 10.0, 0.0)]
+        # World knows task 0 is complete, but agent 0 has not yet learned it.
+        self.assertEqual(
+            select_task(agents[0], agents, tasks, "adaptive_freshness", 9.0), 0
+        )
+        agents[0].known_done.add(0)
+        self.assertEqual(
+            select_task(agents[0], agents, tasks, "adaptive_freshness", 9.0), 1
+        )
+
     def test_fault_outcomes_not_formula_derived(self) -> None:
         row = run_trial("static_roles", "node_failure", 4, 5)
         self.assertIsNotNone(row["fault_orphan_task"])
