@@ -26,6 +26,8 @@ struct Result {
     double rmse_m{0.0};
     double minimum_pair_separation_m{std::numeric_limits<double>::infinity()};
     int separation_pair_ticks_under_1m{0};
+    double minimum_swept_separation_m{std::numeric_limits<double>::infinity()};
+    int swept_pair_ticks_under_1m{0};
     int observations{0};
 };
 
@@ -87,6 +89,26 @@ Result replay(bool peer_avoidance) {
             squared_error_sum += (next_positions[i] - target).squaredNorm();
             ++result.observations;
         }
+        // Exact closest approach for linearly interpolated relative motion
+        // within this discrete-time step; endpoint-only tests miss crossings.
+        for (size_t i = 1; i < count; ++i) {
+            for (size_t j = i + 1; j < count; ++j) {
+                const Eigen::Vector3d relative_start = pos[i] - pos[j];
+                const Eigen::Vector3d relative_delta =
+                    (next_positions[i] - pos[i]) - (next_positions[j] - pos[j]);
+                const double denom = relative_delta.squaredNorm();
+                const double alpha =
+                    denom > 1e-12
+                        ? std::clamp(-relative_start.dot(relative_delta) / denom, 0.0, 1.0)
+                        : 0.0;
+                const double gap = (relative_start + alpha * relative_delta).norm();
+                result.minimum_swept_separation_m =
+                    std::min(result.minimum_swept_separation_m, gap);
+                if (gap < 1.0) {
+                    ++result.swept_pair_ticks_under_1m;
+                }
+            }
+        }
         pos = next_positions;
         velocities = next_velocities;
         for (size_t i = 1; i < count; ++i) {
@@ -121,12 +143,20 @@ int main(int argc, char** argv) {
                    << "    \"formation_rmse_m\": " << no_avoidance.rmse_m << ",\n"
                    << "    \"min_pair_separation_m\": " << no_avoidance.minimum_pair_separation_m << ",\n"
                    << "    \"pair_ticks_under_1m\": "
-                   << no_avoidance.separation_pair_ticks_under_1m << "\n  },\n"
+                   << no_avoidance.separation_pair_ticks_under_1m << ",\n"
+                   << "    \"min_swept_separation_m\": "
+                   << no_avoidance.minimum_swept_separation_m << ",\n"
+                   << "    \"swept_pair_ticks_under_1m\": "
+                   << no_avoidance.swept_pair_ticks_under_1m << "\n  },\n"
                    << "  \"with_peer_avoidance\": {\n"
                    << "    \"formation_rmse_m\": " << peer_avoidance.rmse_m << ",\n"
                    << "    \"min_pair_separation_m\": " << peer_avoidance.minimum_pair_separation_m << ",\n"
                    << "    \"pair_ticks_under_1m\": "
-                   << peer_avoidance.separation_pair_ticks_under_1m << "\n  }\n}\n";
+                   << peer_avoidance.separation_pair_ticks_under_1m << ",\n"
+                   << "    \"min_swept_separation_m\": "
+                   << peer_avoidance.minimum_swept_separation_m << ",\n"
+                   << "    \"swept_pair_ticks_under_1m\": "
+                   << peer_avoidance.swept_pair_ticks_under_1m << "\n  }\n}\n";
             return output.str();
         }();
         if (argc > 1) {
