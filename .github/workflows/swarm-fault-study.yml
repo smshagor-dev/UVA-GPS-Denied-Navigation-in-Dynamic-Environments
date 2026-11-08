@@ -69,7 +69,7 @@ jobs:
         with:
           python-version: "3.14"
 
-      - name: Generate 50-seed paired comparison (5 policies)
+      - name: Generate 50-seed paired comparison (6 policies)
         run: |
           python3 research/experiments/swarm_fault_study.py \
             --counts 4,8,12 \
