@@ -48,8 +48,10 @@ Result replay(bool peer_avoidance) {
     LeaderFollowerController controller1(1, {});
     LeaderFollowerController controller2(2, {});
     LeaderFollowerController controller3(3, {});
-    const std::array<LeaderFollowerController*, 3> controllers{
-        &controller1, &controller2, &controller3};
+    std::vector<LeaderFollowerController*> controllers;
+    controllers.push_back(&controller1);
+    controllers.push_back(&controller2);
+    controllers.push_back(&controller3);
 
     Result result;
     double squared_error_sum = 0.0;
@@ -126,39 +128,36 @@ Result replay(bool peer_avoidance) {
     return result;
 }
 
+std::string metrics_json(const Result& result) {
+    std::ostringstream output;
+    output << std::fixed << std::setprecision(6);
+    output << "{\n";
+    output << "    \"formation_rmse_m\": " << result.rmse_m << ",\n";
+    output << "    \"min_pair_separation_m\": " << result.minimum_pair_separation_m << ",\n";
+    output << "    \"pair_ticks_under_1m\": " << result.separation_pair_ticks_under_1m << ",\n";
+    output << "    \"min_swept_separation_m\": " << result.minimum_swept_separation_m << ",\n";
+    output << "    \"swept_pair_ticks_under_1m\": " << result.swept_pair_ticks_under_1m;
+    output << "\n  }";
+    return output.str();
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
     try {
         const auto no_avoidance = replay(false);
         const auto peer_avoidance = replay(true);
-        const std::string json = [&]() {
-            std::ostringstream output;
-            output << std::fixed << std::setprecision(6)
-                   << "{\n  \"scope\": \"synthetic_native_cpp_closed_loop_replay\",\n"
-                   << "  \"radio_or_physical_flight\": false,\n"
-                   << "  \"dt_s\": 0.1,\n"
-                   << "  \"steps\": 200,\n"
-                   << "  \"without_peer_avoidance\": {\n"
-                   << "    \"formation_rmse_m\": " << no_avoidance.rmse_m << ",\n"
-                   << "    \"min_pair_separation_m\": " << no_avoidance.minimum_pair_separation_m << ",\n"
-                   << "    \"pair_ticks_under_1m\": "
-                   << no_avoidance.separation_pair_ticks_under_1m << ",\n"
-                   << "    \"min_swept_separation_m\": "
-                   << no_avoidance.minimum_swept_separation_m << ",\n"
-                   << "    \"swept_pair_ticks_under_1m\": "
-                   << no_avoidance.swept_pair_ticks_under_1m << "\n  },\n"
-                   << "  \"with_peer_avoidance\": {\n"
-                   << "    \"formation_rmse_m\": " << peer_avoidance.rmse_m << ",\n"
-                   << "    \"min_pair_separation_m\": " << peer_avoidance.minimum_pair_separation_m << ",\n"
-                   << "    \"pair_ticks_under_1m\": "
-                   << peer_avoidance.separation_pair_ticks_under_1m << ",\n"
-                   << "    \"min_swept_separation_m\": "
-                   << peer_avoidance.minimum_swept_separation_m << ",\n"
-                   << "    \"swept_pair_ticks_under_1m\": "
-                   << peer_avoidance.swept_pair_ticks_under_1m << "\n  }\n}\n";
-            return output.str();
-        }();
+        std::ostringstream output;
+        output << std::fixed << std::setprecision(6);
+        output << "{\n";
+        output << "  \"scope\": \"synthetic_native_cpp_closed_loop_replay\",\n";
+        output << "  \"radio_or_physical_flight\": false,\n";
+        output << "  \"dt_s\": 0.1,\n";
+        output << "  \"steps\": 200,\n";
+        output << "  \"without_peer_avoidance\": " << metrics_json(no_avoidance) << ",\n";
+        output << "  \"with_peer_avoidance\": " << metrics_json(peer_avoidance) << "\n";
+        output << "}\n";
+        const std::string json = output.str();
         if (argc > 1) {
             std::ofstream file(argv[1]);
             if (!file) {
