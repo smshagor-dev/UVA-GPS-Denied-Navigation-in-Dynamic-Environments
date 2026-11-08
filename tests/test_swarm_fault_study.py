@@ -3,8 +3,16 @@
 from __future__ import annotations
 
 import unittest
+
 from research.experiments.swarm_fault_study import (
-    POLICIES, SCENARIOS, PEER_TTL_S, Agent, Task, experiment, run_trial, select_task,
+    POLICIES,
+    SCENARIOS,
+    PEER_TTL_S,
+    Agent,
+    Task,
+    experiment,
+    run_trial,
+    select_task,
 )
 
 
@@ -28,8 +36,12 @@ class SwarmFaultStudyTests(unittest.TestCase):
         agents = [Agent(i, 0.0, 0.0, 90.0) for i in range(4)]
         tasks = [Task(0, 2.0, 0.0), Task(1, 10.0, 0.0)]
         agents[0].cache[1] = (1.0, 0)
-        self.assertEqual(select_task(agents[0], agents, tasks, "adaptive_unfiltered", 9.0), 1)
-        self.assertEqual(select_task(agents[0], agents, tasks, "adaptive_freshness", 9.0), 0)
+        self.assertEqual(
+            select_task(agents[0], agents, tasks, "adaptive_unfiltered", 9.0), 1
+        )
+        self.assertEqual(
+            select_task(agents[0], agents, tasks, "adaptive_freshness", 9.0), 0
+        )
         self.assertGreater(9.0 - 1.0, PEER_TTL_S)
 
     def test_fault_outcomes_not_formula_derived(self) -> None:
