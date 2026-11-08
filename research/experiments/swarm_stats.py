@@ -10,6 +10,7 @@ import csv
 import hashlib
 import itertools
 import json
+import math
 import random
 import statistics
 from collections import defaultdict
@@ -71,6 +72,22 @@ def paired_signflip(diffs, draws=4096):
     return (extreme + 1) / (draws + 1), "monte_carlo", draws
 
 
+def exact_paired_sign_test(diffs):
+    """Exact two-sided binomial test of the sign of nonzero paired differences.
+
+    The tested null is P(positive difference | nonzero difference) == 0.5,
+    not equality of mean differences. Zeros are excluded by design.
+    """
+    positive = sum(value > 1e-12 for value in diffs)
+    negative = sum(value < -1e-12 for value in diffs)
+    informative = positive + negative
+    if informative == 0:
+        return 1.0, 0, 0, 0
+    tail = sum(math.comb(informative, k) for k in range(min(positive, negative) + 1))
+    p = min(1.0, 2.0 * tail / (2 ** informative))
+    return p, positive, negative, informative
+
+
 def bootstrap_ci(diffs, seed, repeats=5000):
     rng = random.Random(seed)
     values = sorted(
@@ -107,6 +124,7 @@ def analyze(records):
         for metric in METRICS:
             differences = [number(t[metric]) - number(c[metric]) for c, t in pairs]
             p_value, method, draws = paired_signflip(differences)
+            sign_p, sign_pos, sign_neg, sign_n = exact_paired_sign_test(differences)
             output.append({
                 "uavs": size,
                 "scenario": scenario,
@@ -122,6 +140,10 @@ def analyze(records):
                 "unadjusted_signflip_p": p_value,
                 "signflip_method": method,
                 "signflip_sample_count": draws,
+                "exact_sign_test_p": sign_p,
+                "sign_positive_pairs": sign_pos,
+                "sign_negative_pairs": sign_neg,
+                "sign_informative_pairs": sign_n,
             })
     # Holm family-wise multiplicity correction across all outcome comparisons.
     ordered = sorted(range(len(output)), key=lambda i: output[i]["unadjusted_signflip_p"])
@@ -130,6 +152,14 @@ def analyze(records):
         raw = output[index]["unadjusted_signflip_p"]
         previous = min(1.0, max(previous, raw * (len(output) - position)))
         output[index]["holm_adjusted_p"] = round(previous, 8)
+    # Separate Holm family: this tests a different hypothesis (direction of
+    # paired differences), not the mean effect used by the sign-flip statistic.
+    sign_order = sorted(range(len(output)), key=lambda i: output[i]["exact_sign_test_p"])
+    previous = 0.0
+    for rank, index in enumerate(sign_order):
+        raw = output[index]["exact_sign_test_p"]
+        previous = min(1.0, max(previous, raw * (len(output) - rank)))
+        output[index]["holm_adjusted_exact_sign_p"] = round(previous, 15)
     return output
 
 
@@ -145,7 +175,8 @@ def main():
     args.out.write_text(json.dumps({
         "scope": "exploratory paired simulation comparison, not real UAV/RF",
         "policy_pairs": [["adaptive_unfiltered", "adaptive_freshness"], ["adaptive_freshness", "adaptive_freshness_safety"], ["adaptive_freshness", "adaptive_freshness_local_safety"]],
-        "multiple_comparison_adjustment": "Holm family-wise across all comparisons; exact for <=16 pairs, seeded sign-flip Monte Carlo beyond 16",
+        "multiple_comparison_adjustment": "Holm across all comparisons separately for (i) sign-flip p and (ii) exact sign-test p",
+        "sign_test_null": "probability of positive paired difference given nonzero is 0.5; not a mean-effect test",
         "censored_recovery": "analyzed as recovered/not recovered, not zero seconds",
         "comparisons": comparisons,
     }, indent=2) + "\n", encoding="utf-8")
