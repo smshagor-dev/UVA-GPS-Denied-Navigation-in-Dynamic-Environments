@@ -9,7 +9,12 @@ from research.experiments.cbaa_reference_study import (
     scores_for,
     trial,
 )
-from research.experiments.swarm_stats import analyze, bootstrap_ci, exact_signflip
+from research.experiments.swarm_stats import (
+    analyze,
+    bootstrap_ci,
+    exact_signflip,
+    paired_signflip,
+)
 
 
 class SwarmAdvancedEvidenceTests(unittest.TestCase):
@@ -45,6 +50,23 @@ class SwarmAdvancedEvidenceTests(unittest.TestCase):
         self.assertEqual(exact_signflip([0.0, 0.0]), 1.0)
         self.assertEqual(exact_signflip([1.0] * 4), 0.125)
         self.assertEqual(bootstrap_ci([2.0, 2.0], 7), [2.0, 2.0])
+
+    def test_large_pair_signflip_uses_reproducible_monte_carlo(self):
+        values = [1.0, -0.5, 0.75, 2.0, -1.0] * 5
+        first = paired_signflip(values, draws=512)
+        second = paired_signflip(values, draws=512)
+        self.assertEqual(first, second)
+        self.assertEqual(first[1], "monte_carlo")
+        self.assertEqual(first[2], 512)
+        self.assertGreaterEqual(first[0], 1 / 513)
+        self.assertLessEqual(first[0], 1.0)
+
+    def test_exact_small_pair_and_degenerate_large_pair(self):
+        self.assertEqual(paired_signflip([1.0] * 4), (0.125, "exact", 16))
+        self.assertEqual(
+            paired_signflip([0.0] * 25, draws=100),
+            (1.0, "monte_carlo_degenerate", 100),
+        )
 
     def test_unpaired_trial_is_rejected(self):
         with self.assertRaises(ValueError):
