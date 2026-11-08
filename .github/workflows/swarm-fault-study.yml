@@ -1,0 +1,92 @@
+name: Swarm Fault Study Evidence
+
+on:
+  pull_request:
+    paths:
+      - "research/experiments/swarm_fault_study.py"
+      - "tests/test_swarm_fault_study.py"
+      - "research/experiments/swarm_stats.py"
+      - "research/experiments/cbaa_reference_study.py"
+      - "tests/test_swarm_advanced_study.py"
+      - ".github/workflows/swarm-fault-study.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controlled-simulation:
+    name: Reproduce software-only baseline comparison
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Run metric integrity tests
+        run: python3 -m unittest tests.test_swarm_fault_study tests.test_swarm_advanced_study -v
+
+      - name: Generate 10-seed smoke trial matrix
+        run: |
+          python3 research/experiments/swarm_fault_study.py \
+            --counts 4,8,12 \
+            --seeds 10 \
+            --out "$RUNNER_TEMP/swarm-fault-study"
+
+      - name: Paired confidence intervals and exact sign-flip tests
+        run: |
+          python3 research/experiments/swarm_stats.py \
+            --runs "$RUNNER_TEMP/swarm-fault-study/runs.csv" \
+            --out "$RUNNER_TEMP/swarm-fault-study/stats.json"
+
+      - name: Reconstruct CBAA-style IEEE reference and exact oracle
+        run: |
+          python3 research/experiments/cbaa_reference_study.py \
+            --seeds 20 \
+            --out "$RUNNER_TEMP/swarm-cbaa-reference"
+
+      - name: Preserve raw trials and report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: swarm-fault-software-simulation-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/swarm-fault-study
+            ${{ runner.temp }}/swarm-cbaa-reference
+          if-no-files-found: warn
+          retention-days: 30
+
+  robustness-50-seeds:
+    name: Larger paired sample (50 seeds)
+    needs: controlled-simulation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Generate 50-seed paired comparison (6 policies)
+        run: |
+          python3 research/experiments/swarm_fault_study.py \
+            --counts 4,8,12 \
+            --seeds 50 \
+            --out "$RUNNER_TEMP/swarm-50-seeds"
+
+      - name: Large-sample paired inference (Monte Carlo when necessary)
+        run: |
+          python3 research/experiments/swarm_stats.py \
+            --runs "$RUNNER_TEMP/swarm-50-seeds/runs.csv" \
+            --out "$RUNNER_TEMP/swarm-50-seeds/stats.json"
+
+      - name: Archive raw paired outcomes and uncertainty
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: swarm-local-safety-50-seeds-${{ github.sha }}
+          path: ${{ runner.temp }}/swarm-50-seeds
+          if-no-files-found: warn
+          retention-days: 30

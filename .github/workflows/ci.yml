@@ -282,6 +282,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+      - name: Upload native swarm formation replay metrics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: swarm-native-formation-${{ github.sha }}
+          path: build/validation-linux-gcc/swarm_native_formation_metrics.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Upload Linux GCC reports
         if: always()
         uses: actions/upload-artifact@v7
