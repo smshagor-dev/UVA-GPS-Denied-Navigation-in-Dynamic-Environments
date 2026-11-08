@@ -12,6 +12,8 @@ using namespace drone::swarm;
 
 namespace {
 
+// The two integer fields represent distinct protocol fields, not interchangeable values.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 SwarmMessage make_message(uint32_t src, uint32_t seq,
                           SwarmMessage::Type type = SwarmMessage::Type::MISSION_SYNC) {
     SwarmMessage msg;
@@ -43,9 +45,12 @@ TEST(SwarmSecurity, SecureRoundTripWorks) {
     const auto opened = receiver.open(frame.data(), frame.size());
 
     ASSERT_TRUE(opened.has_value());
+    // ASSERT_TRUE stops the test before dereference; clang-tidy does not model that macro.
+    // NOLINTBEGIN(bugprone-unchecked-optional-access)
     EXPECT_EQ(opened->src_id, 1u);
     EXPECT_EQ(opened->seq_num, 1u);
     EXPECT_EQ(opened->type, SwarmMessage::Type::MISSION_SYNC);
+    // NOLINTEND(bugprone-unchecked-optional-access)
 }
 
 TEST(SwarmSecurity, TamperedFrameIsRejected) {
@@ -128,8 +133,11 @@ TEST(MotorSensor, ProducesHealthMeasurement) {
     sensor.poll();
     const auto measurement = sensor.latest();
     ASSERT_TRUE(measurement.has_value());
+    // See the checked optional assertion above.
+    // NOLINTBEGIN(bugprone-unchecked-optional-access)
     EXPECT_GT(measurement->average_health, 0.0f);
     EXPECT_LE(measurement->average_health, 1.0f);
+    // NOLINTEND(bugprone-unchecked-optional-access)
 }
 
 // Native controller checks: software geometry and command bounds, not flight safety.
