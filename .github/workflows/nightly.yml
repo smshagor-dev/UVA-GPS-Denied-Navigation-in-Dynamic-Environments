@@ -9,6 +9,9 @@ on:
       - main
     paths:
       - .github/workflows/nightly.yml
+      - tests/CMakeLists.txt
+      - cmake/Sanitizers.cmake
+      - cmake/Coverage.cmake
   push:
     branches:
       - main
