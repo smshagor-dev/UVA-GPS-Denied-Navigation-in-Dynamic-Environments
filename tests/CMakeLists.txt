@@ -408,6 +408,12 @@ endif()
 add_executable(peer_replay_cache_cli peer_replay_cache_cli.cpp)
 target_link_libraries(peer_replay_cache_cli PRIVATE sensor_fusion_core Eigen3::Eigen)
 drone_apply_project_warnings(peer_replay_cache_cli)
+# The linked sensor_fusion_core static library carries sanitizer/coverage
+# instrumentation in the corresponding presets. This executable must link
+# the same runtimes or nightly ASan/UBSan and gcov builds fail with unresolved
+# __asan_*/__ubsan_* and __gcov_* symbols.
+drone_enable_coverage(peer_replay_cache_cli)
+drone_enable_sanitizers(peer_replay_cache_cli)
 drone_set_target_output_dirs(peer_replay_cache_cli "tests" "tests" "tests")
 
 find_package(Python3 QUIET COMPONENTS Interpreter)
