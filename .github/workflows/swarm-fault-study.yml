@@ -8,6 +8,8 @@ on:
       - "research/experiments/swarm_stats.py"
       - "research/experiments/cbaa_reference_study.py"
       - "tests/test_swarm_advanced_study.py"
+      - "research/experiments/verify_swarm_artifacts.py"
+      - "tests/test_swarm_artifact_integrity.py"
       - ".github/workflows/swarm-fault-study.yml"
   workflow_dispatch:
 
@@ -26,7 +28,7 @@ jobs:
           python-version: "3.14"
 
       - name: Run metric integrity tests
-        run: python3 -m unittest tests.test_swarm_fault_study tests.test_swarm_advanced_study -v
+        run: python3 -m unittest tests.test_swarm_fault_study tests.test_swarm_advanced_study tests.test_swarm_artifact_integrity -v
 
       - name: Generate 10-seed smoke trial matrix
         run: |
@@ -40,6 +42,12 @@ jobs:
           python3 research/experiments/swarm_stats.py \
             --runs "$RUNNER_TEMP/swarm-fault-study/runs.csv" \
             --out "$RUNNER_TEMP/swarm-fault-study/stats.json"
+
+      - name: Verify 10-seed raw and aggregate artifact integrity
+        run: |
+          python3 -m research.experiments.verify_swarm_artifacts \
+            --counts 4,8,12 --seeds 10 \
+            --out "$RUNNER_TEMP/swarm-fault-study"
 
       - name: Reconstruct CBAA-style IEEE reference and exact oracle
         run: |
@@ -81,6 +89,12 @@ jobs:
           python3 research/experiments/swarm_stats.py \
             --runs "$RUNNER_TEMP/swarm-50-seeds/runs.csv" \
             --out "$RUNNER_TEMP/swarm-50-seeds/stats.json"
+
+      - name: Verify full 50-seed paired artifact integrity
+        run: |
+          python3 -m research.experiments.verify_swarm_artifacts \
+            --counts 4,8,12 --seeds 50 \
+            --out "$RUNNER_TEMP/swarm-50-seeds"
 
       - name: Archive raw paired outcomes and uncertainty
         if: always()
