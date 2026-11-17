@@ -177,10 +177,27 @@ def tracked_stereo_motion(
     )
     require(next_pixels is not None and tracked is not None,
             "optical flow produced no tracks")
+    backward_pixels, backward_tracked, _ = cv2.calcOpticalFlowPyrLK(
+        current_left,
+        previous_left,
+        next_pixels,
+        None,
+        winSize=(21, 21),
+        maxLevel=3,
+        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
+    )
+    require(backward_pixels is not None and backward_tracked is not None,
+            "backward optical flow produced no tracks")
+    fb_error = np.linalg.norm(
+        backward_pixels.reshape(-1, 2) - pixels, axis=1
+    )
     current = next_pixels.reshape(-1, 2)
     width, height = rect["image_size"]
     valid = (
         (tracked.reshape(-1) == 1)
+        & (backward_tracked.reshape(-1) == 1)
+        & np.isfinite(fb_error)
+        & (fb_error <= 1.5)
         & np.isfinite(current).all(axis=1)
         & (current[:, 0] >= 0)
         & (current[:, 0] < width)
@@ -228,6 +245,9 @@ def visual_measurements(
         stamp = frame["timestamp_ns"]
         if frame["status"] not in ("anchor", "ready"):
             statuses["sync_" + frame["status"]] += 1
+            if previous is not None:
+                statuses["failed_sync_discontinuity"] += 1
+                break
             continue
         path0 = (root / frame["cam0_relative_path"]).resolve(strict=True)
         path1 = (root / frame["cam1_relative_path"]).resolve(strict=True)
