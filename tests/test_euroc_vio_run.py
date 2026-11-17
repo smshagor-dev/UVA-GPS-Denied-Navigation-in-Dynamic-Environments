@@ -14,8 +14,16 @@ from research.experiments.euroc_vio_run import run
 
 STAMPS = [1403636579800000000, 1403636579820000000]
 VISUAL_COLUMNS = [
-    "timestamp_ns", "x_m", "y_m", "z_m", "vx_mps", "vy_mps", "vz_mps",
-    "sigma_position_m", "sigma_velocity_mps", "pnp_inliers",
+    "timestamp_ns",
+    "x_m",
+    "y_m",
+    "z_m",
+    "vx_mps",
+    "vy_mps",
+    "vz_mps",
+    "sigma_position_m",
+    "sigma_velocity_mps",
+    "pnp_inliers",
     "pnp_reprojection_rmse_px",
 ]
 
@@ -72,9 +80,10 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
                 for stamp in STAMPS:
                     writer.writerow([stamp, 0, 0, 0])
         return subprocess.CompletedProcess(
-            argv, 0,
+            argv,
+            0,
             stdout="IMU: 12 original rows; 1 interpolated camera-time rows; "
-                   "2 visual updates accepted by both filters.\n",
+            "2 visual updates accepted by both filters.\n",
             stderr="",
         )
 
@@ -113,6 +122,7 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
     def test_native_process_rejection_leaves_failure_manifest(self):
         def failed(argv, **kwargs):
             return subprocess.CompletedProcess(argv, 1, stdout="", stderr="rejected")
+
         patch_sync, patch_visual, patch_native = self.patches(native=failed)
         with patch_sync, patch_visual, patch_native:
             with self.assertRaisesRegex(ValueError, "native C\\+\\+ estimator"):
@@ -127,11 +137,11 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
             done = self.native(argv, **kwargs)
             path = Path(argv[argv.index("--shadow-output") + 1])
             path.write_text(
-                "timestamp_ns,x_m,y_m,z_m\n"
-                f"{STAMPS[0]},0,0,0\n",
+                "timestamp_ns,x_m,y_m,z_m\n" f"{STAMPS[0]},0,0,0\n",
                 encoding="utf-8",
             )
             return done
+
         patch_sync, patch_visual, patch_native = self.patches(native=mismatch)
         with patch_sync, patch_visual, patch_native:
             with self.assertRaisesRegex(ValueError, "lost, duplicated or reordered"):
