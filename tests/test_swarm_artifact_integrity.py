@@ -24,7 +24,8 @@ class SwarmArtifactIntegrityTests(unittest.TestCase):
             self.records if records is None else records,
             self.summary if summary is None else summary,
             self.stats if stats is None else stats,
-            (4,), 2,
+            (4,),
+            2,
         )
 
     def test_valid_complete_paired_artifacts(self):
@@ -70,8 +71,7 @@ class SwarmArtifactIntegrityTests(unittest.TestCase):
 
     def test_censored_recovery_cannot_be_relabelled(self):
         records = copy.deepcopy(self.records)
-        row = next(row for row in records
-                   if row["orphan_task_recovered"] is False)
+        row = next(row for row in records if row["orphan_task_recovered"] is False)
         row["orphan_task_recovered"] = True
         with self.assertRaisesRegex(ValueError, "censored recovery"):
             self.check(records=records)
