@@ -25,7 +25,7 @@ from research.experiments.euroc_stereo_visual_odometry import (
 )
 
 
-TRAJECTORY_COLUMNS = ["timestamp_ns", "x_m", "y_m", "z_m"]
+TRAJECTORY_COLUMNS = ["timestamp_ns", "x_m", "y_m", "z_m", "qw", "qx", "qy", "qz"]
 NATIVE_COUNTS = re.compile(
     r"IMU: (\d+) original rows; (\d+) interpolated camera-time rows; "
     r"(\d+) visual updates accepted by both filters\."
@@ -64,6 +64,8 @@ def checked_trajectory(path: Path, expected_stamps: list[int]) -> dict:
                 all(math.isfinite(float(row[name])) for name in TRAJECTORY_COLUMNS[1:]),
                 "nonfinite native pose",
             )
+            qnorm = sum(float(row[k]) ** 2 for k in ("qw", "qx", "qy", "qz"))
+            require(abs(qnorm - 1.0) < 0.02, "non-unit native fused attitude")
     require(
         timestamps == expected_stamps,
         "native trajectory lost, duplicated or reordered visual timestamps",
@@ -122,13 +124,14 @@ def run(
         "ground_truth_used": False,
         "dataset_provenance_verified": False,
         "publishable_accuracy_evidence": False,
-        "full_6dof_orientation_fused": False,
+        "full_6dof_orientation_fused": True,
+        "visual_orientation_uncertainty_empirically_calibrated": False,
         "identity_initial_imu_orientation": True,
         "frame_limit": max_frames,
         "limitations": [
             "no publisher dataset archive provenance verified",
             "no independent ground-truth ATE/RPE or SOTA comparison",
-            "camera PnP orientation is not fused into the native filter",
+            "sequential stereo PnP attitude is fused but is temporally correlated",
             "native EKF/ESKF initial attitude is unverified identity",
             "partial camera trajectory fails closed by default",
         ],
