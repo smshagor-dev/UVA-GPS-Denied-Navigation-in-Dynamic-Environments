@@ -444,4 +444,4 @@ drone_set_target_output_dirs(euroc_imu_native_replay "tests" "tests" "tests")
 add_test(NAME euroc_imu_native_replay_selftest
          COMMAND $<TARGET_FILE:euroc_imu_native_replay> --self-test)
 set_tests_properties(euroc_imu_native_replay_selftest PROPERTIES
-    LABELS "integration;navigation;replay;euorc-imu-only")
+    LABELS "integration;navigation;replay;euroc-imu-only")
