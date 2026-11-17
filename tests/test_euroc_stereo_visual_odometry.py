@@ -6,6 +6,7 @@ No authentic EuRoC imagery or publisher ground truth is evaluated here.
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import cv2
 import numpy as np
@@ -16,6 +17,7 @@ from research.experiments.euroc_stereo_visual_odometry import (
     integrate_camera_motion,
     make_transform,
     relative_camera_pnp,
+    visual_measurements,
 )
 
 
@@ -100,6 +102,82 @@ class StereoVisualOdometryTests(unittest.TestCase):
             VISUAL_COLUMNS[7:9],
             ("sigma_position_m", "sigma_velocity_mps"),
         )
+
+
+    def test_rejected_camera_frame_breaks_visual_trajectory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "synthetic"
+            root.mkdir()
+            (root / "cam0.png").write_bytes(b"not-a-real-image")
+            (root / "cam1.png").write_bytes(b"not-a-real-image")
+            frames = [
+                {
+                    "timestamp_ns": 1000000000,
+                    "status": "anchor",
+                    "cam0_relative_path": "cam0.png",
+                    "cam1_relative_path": "cam1.png",
+                },
+                {
+                    "timestamp_ns": 1020000000,
+                    "status": "missing_cam1",
+                    "cam0_relative_path": "cam0.png",
+                    "cam1_relative_path": None,
+                },
+                {
+                    "timestamp_ns": 1040000000,
+                    "status": "ready",
+                    "cam0_relative_path": "cam0.png",
+                    "cam1_relative_path": "cam1.png",
+                },
+            ]
+            sync_manifest = {
+                "source_sensor_hashes": {"cam0": {}, "cam1": {}, "imu0": {}},
+                "status_counts": {"anchor": 1, "missing_cam1": 1, "ready": 1},
+            }
+            calibration = {
+                "T_imu_cam0": np.eye(4).tolist(),
+                "source_yaml_sha256": {"cam0": "synthetic"},
+            }
+            stereo_points = {
+                "rectified_left_points": np.zeros((15, 2)),
+                "rectified_points_m": np.ones((15, 3)),
+            }
+            image = np.zeros((100, 100), dtype=np.uint8)
+            with (
+                mock.patch(
+                    "research.experiments.euroc_stereo_visual_odometry.synchronize",
+                    return_value=(frames, sync_manifest),
+                ),
+                mock.patch(
+                    "research.experiments.euroc_stereo_visual_odometry.audit",
+                    return_value=calibration,
+                ),
+                mock.patch(
+                    "research.experiments.euroc_stereo_visual_odometry.rectification",
+                    return_value={"R0": np.eye(3)},
+                ),
+                mock.patch(
+                    "research.experiments.euroc_stereo_visual_odometry.cv2.imread",
+                    return_value=image,
+                ),
+                mock.patch(
+                    "research.experiments.euroc_stereo_visual_odometry.rectified_left",
+                    return_value=image,
+                ),
+                mock.patch(
+                    "research.experiments.euroc_stereo_visual_odometry.find_stereo_landmarks",
+                    return_value=stereo_points,
+                ) as frontend,
+            ):
+                observations, manifest = visual_measurements(root)
+            self.assertEqual(observations, [])
+            self.assertTrue(manifest["failed_closed_on_tracking_loss"])
+            self.assertEqual(
+                manifest["visual_status_counts"]["failed_sync_discontinuity"],
+                1,
+            )
+            self.assertEqual(manifest["camera_timestamps_examined"], 2)
+            frontend.assert_called_once()
 
     def test_export_refuses_output_in_source_tree(self):
         with tempfile.TemporaryDirectory() as directory:
