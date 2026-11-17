@@ -79,6 +79,33 @@ def checked_trajectory(path: Path, expected_stamps: list[int]) -> dict:
     }
 
 
+def export_evaluator_positions(pose_csv: Path, position_csv: Path) -> dict:
+    """Lossless position columns for the independent legacy EuRoC ATE/RPE evaluator.
+
+    Orientation remains in the full 6-DoF trajectory, never inserted into
+    source/ground truth files, and is not evaluated by position-only ATE.
+    """
+    require(not position_csv.exists() and not position_csv.is_symlink(),
+            "refusing to overwrite position-only evaluator projection")
+    with pose_csv.open("r", newline="", encoding="utf-8") as source:
+        reader = csv.DictReader(source)
+        require(reader.fieldnames == TRAJECTORY_COLUMNS,
+                "full pose schema must be validated before projection")
+        with position_csv.open("x", newline="", encoding="utf-8") as target:
+            writer = csv.DictWriter(
+                target, fieldnames=["timestamp_ns", "x_m", "y_m", "z_m"]
+            )
+            writer.writeheader()
+            count = 0
+            for row in reader:
+                writer.writerow({
+                    key: row[key] for key in ("timestamp_ns", "x_m", "y_m", "z_m")
+                })
+                count += 1
+    return {"relative_file": position_csv.name, "sample_count": count,
+            "sha256": digest(position_csv)}
+
+
 def run(
     sequence_root: Path,
     output_dir: Path,
@@ -276,6 +303,12 @@ def run(
         }
         manifest["native_active"] = checked_trajectory(active_path, expected_stamps)
         manifest["native_shadow"] = checked_trajectory(shadow_path, expected_stamps)
+        manifest["active_evaluator_positions"] = export_evaluator_positions(
+            active_path, destination / "active_position_only.csv"
+        )
+        manifest["shadow_evaluator_positions"] = export_evaluator_positions(
+            shadow_path, destination / "shadow_position_only.csv"
+        )
         manifest["status"] = (
             "completed_unverified_partial_software_replay"
             if visual_info["frame_limit_truncated"]
