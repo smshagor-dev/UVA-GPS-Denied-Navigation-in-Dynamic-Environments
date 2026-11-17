@@ -88,6 +88,8 @@ def synchronize(
             elif (
                 stamp - imu_stamps[before_index] > max_bracket_ns
                 or imu_stamps[after_index] - stamp > max_bracket_ns
+                or imu_stamps[after_index] - imu_stamps[before_index]
+                > max_imu_gap_ns
             ):
                 frame["status"] = "imu_bracket_gap"
             elif previous_accepted_ns is None:
