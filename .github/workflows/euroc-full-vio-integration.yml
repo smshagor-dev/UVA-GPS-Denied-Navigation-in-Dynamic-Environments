@@ -1,0 +1,45 @@
+name: EuRoC Stereo Visual-Inertial Fusion Regression
+
+on:
+  pull_request:
+    paths:
+      - "research/experiments/euroc_stereo_visual_odometry.py"
+      - "tests/test_euroc_stereo_visual_odometry.py"
+      - "tools/euroc_stereo_imu_native_fusion.cpp"
+      - "tests/CMakeLists.txt"
+      - ".github/workflows/navigation-validation.yml"
+      - "docs/research/EUROC_FULL_VIO_INTEGRATION_PROTOCOL.md"
+      - ".github/workflows/euroc-full-vio-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pnp-and-calibration-contract:
+    name: EuRoC stereo temporal PnP and fusion contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install pinned-range open-source visual odometry dependencies
+        run: python -m pip install "numpy>=2.3,<3" "PyYAML>=6.0.3,<7" "opencv-python-headless>=4.10,<6"
+      - name: Run sensor, calibration, stereo and PnP regression suites
+        run: |
+          python -m unittest tests.test_euroc_sensor_intake -v
+          python -m unittest tests.test_euroc_calibration_validation -v
+          python -m unittest tests.test_euroc_stereo_frontend -v
+          python -m unittest tests.test_euroc_stereo_imu_synchronization -v
+          python -m unittest tests.test_euroc_stereo_visual_odometry -v
+      - name: Compile Python sources and test modules
+        run: |
+          python -m py_compile research/experiments/euroc_stereo_visual_odometry.py
+          python -m py_compile tests/test_euroc_stereo_visual_odometry.py
+      - name: Provenance boundary
+        run: |
+          echo "Synthetic geometry and sensor fixtures only; no authentic EuRoC run."
+          echo "C++ native fusion self-test executes through navigation-validation CI."
+          echo "No publisher ground truth, estimated benchmark ATE or flight evidence."
