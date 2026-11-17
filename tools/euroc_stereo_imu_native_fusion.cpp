@@ -77,9 +77,8 @@ std::string trimmed(std::string s) {
 
 uint64_t decimal_timestamp(const std::string& text) {
     const std::string value = trimmed(text);
-    if (value.empty() || !std::all_of(value.begin(), value.end(), [](unsigned char c) {
-            return c >= '0' && c <= '9';
-        })) {
+    if (value.empty() || !std::all_of(value.begin(), value.end(),
+                                      [](unsigned char c) { return c >= '0' && c <= '9'; })) {
         throw std::runtime_error("timestamp_ns must be an unsigned decimal integer");
     }
     size_t used = 0;
@@ -116,9 +115,8 @@ std::vector<ImuSample> load_imu(const fs::path& path) {
         throw std::runtime_error("empty IMU source");
     }
     const auto headers = split_csv(line);
-    const std::array<std::string, 6> columns{
-        "w_RS_S_x", "w_RS_S_y", "w_RS_S_z",
-        "a_RS_S_x", "a_RS_S_y", "a_RS_S_z"};
+    const std::array<std::string, 6> columns{"w_RS_S_x", "w_RS_S_y", "w_RS_S_z",
+                                             "a_RS_S_x", "a_RS_S_y", "a_RS_S_z"};
     if (headers.size() != 7 || trimmed(headers.front()).rfind("#timestamp", 0) != 0) {
         throw std::runtime_error("unexpected IMU source header");
     }
@@ -159,9 +157,17 @@ std::vector<VisualSample> load_visual(const fs::path& path) {
         throw std::runtime_error("empty visual source");
     }
     const auto columns = split_csv(line);
-    const std::array<std::string, 11> expected{
-        "timestamp_ns", "x_m", "y_m", "z_m", "vx_mps", "vy_mps", "vz_mps",
-        "sigma_position_m", "sigma_velocity_mps", "pnp_inliers", "pnp_reprojection_rmse_px"};
+    const std::array<std::string, 11> expected{"timestamp_ns",
+                                               "x_m",
+                                               "y_m",
+                                               "z_m",
+                                               "vx_mps",
+                                               "vy_mps",
+                                               "vz_mps",
+                                               "sigma_position_m",
+                                               "sigma_velocity_mps",
+                                               "pnp_inliers",
+                                               "pnp_reprojection_rmse_px"};
     if (columns.size() != expected.size()) {
         throw std::runtime_error("unexpected visual input schema");
     }
@@ -181,19 +187,15 @@ std::vector<VisualSample> load_visual(const fs::path& path) {
         if (!result.empty() && s.timestamp_ns <= result.back().timestamp_ns) {
             throw std::runtime_error("nonmonotonic visual timestamps");
         }
-        s.position = {finite_scalar(cells[1]), finite_scalar(cells[2]),
-                      finite_scalar(cells[3])};
-        s.velocity = {finite_scalar(cells[4]), finite_scalar(cells[5]),
-                      finite_scalar(cells[6])};
+        s.position = {finite_scalar(cells[1]), finite_scalar(cells[2]), finite_scalar(cells[3])};
+        s.velocity = {finite_scalar(cells[4]), finite_scalar(cells[5]), finite_scalar(cells[6])};
         s.sigma_position_m = finite_scalar(cells[7]);
         s.sigma_velocity_mps = finite_scalar(cells[8]);
         const uint64_t n_inliers = decimal_timestamp(cells[9]);
         const double reprojection_rmse_px = finite_scalar(cells[10]);
-        if (n_inliers < 8 || n_inliers > 100000 ||
-            s.sigma_position_m <= 0.0 || s.sigma_velocity_mps <= 0.0 ||
-            s.sigma_position_m > 100 || s.sigma_velocity_mps > 100 ||
-            reprojection_rmse_px < 0.0 || reprojection_rmse_px > 3.0 ||
-            s.velocity.norm() > 30.0) {
+        if (n_inliers < 8 || n_inliers > 100000 || s.sigma_position_m <= 0.0 ||
+            s.sigma_velocity_mps <= 0.0 || s.sigma_position_m > 100 || s.sigma_velocity_mps > 100 ||
+            reprojection_rmse_px < 0.0 || reprojection_rmse_px > 3.0 || s.velocity.norm() > 30.0) {
             throw std::runtime_error("unsupported visual quality/sigma values");
         }
         s.inliers = static_cast<size_t>(n_inliers);
@@ -219,10 +221,8 @@ Result replay(const std::vector<ImuSample>& imu, const std::vector<VisualSample>
     EKFStateEstimatorAdapter active;
     Phase17StateEstimatorAdapter shadow;
     // Identity is a declared prior, not a GT-derived initial orientation.
-    active.reset(Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity(),
-                 Eigen::Vector3d::Zero());
-    shadow.reset(Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity(),
-                 Eigen::Vector3d::Zero());
+    active.reset(Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero());
+    shadow.reset(Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero());
 
     Result result;
     std::ostringstream active_csv;
@@ -288,10 +288,10 @@ Result replay(const std::vector<ImuSample>& imu, const std::vector<VisualSample>
             !b.position_m.allFinite()) {
             throw std::runtime_error("invalid fused estimator state");
         }
-        active_csv << s.timestamp_ns << "," << a.position_m.x() << ","
-                   << a.position_m.y() << "," << a.position_m.z() << "\n";
-        shadow_csv << s.timestamp_ns << "," << b.position_m.x() << ","
-                   << b.position_m.y() << "," << b.position_m.z() << "\n";
+        active_csv << s.timestamp_ns << "," << a.position_m.x() << "," << a.position_m.y() << ","
+                   << a.position_m.z() << "\n";
+        shadow_csv << s.timestamp_ns << "," << b.position_m.x() << "," << b.position_m.y() << ","
+                   << b.position_m.z() << "\n";
         ++result.visual_update_count;
     };
 
@@ -356,10 +356,8 @@ void self_test() {
         });
     }
     const std::vector<VisualSample> visual{
-        {start + 22000000ULL, Eigen::Vector3d::Zero(),
-         Eigen::Vector3d::Zero(), 0.5, 0.75, 36},
-        {start + 50000000ULL, Eigen::Vector3d::Zero(),
-         Eigen::Vector3d::Zero(), 0.5, 0.75, 32},
+        {start + 22000000ULL, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(), 0.5, 0.75, 36},
+        {start + 50000000ULL, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(), 0.5, 0.75, 32},
     };
     const auto good = replay(imu, visual);
     if (good.visual_update_count != 2 || good.interpolated_imu_count != 1 ||
@@ -373,8 +371,7 @@ void self_test() {
         (void)replay(imu, invalid);
         throw std::runtime_error("bad visual chronology accepted");
     } catch (const std::runtime_error& e) {
-        if (std::string(e.what()).find("bad visual chronology accepted") !=
-            std::string::npos) {
+        if (std::string(e.what()).find("bad visual chronology accepted") != std::string::npos) {
             throw;
         }
     }
@@ -390,8 +387,7 @@ int main(int argc, char** argv) {
             return 0;
         }
         if (argc != 10 || std::string(argv[1]) != "--imu-csv" ||
-            std::string(argv[3]) != "--visual-csv" ||
-            std::string(argv[5]) != "--active-output" ||
+            std::string(argv[3]) != "--visual-csv" || std::string(argv[5]) != "--active-output" ||
             std::string(argv[7]) != "--shadow-output" ||
             std::string(argv[9]) != "--assume-initial-imu-identity") {
             std::cerr << "Usage: euroc_stereo_imu_native_fusion --imu-csv <imu0/data.csv> "
@@ -403,9 +399,9 @@ int main(int argc, char** argv) {
         const fs::path visual_path = argv[4];
         const fs::path active_path = argv[6];
         const fs::path shadow_path = argv[8];
-        if (active_path == shadow_path || fs::exists(active_path) ||
-            fs::exists(shadow_path) || fs::is_symlink(active_path) ||
-            fs::is_symlink(shadow_path) || !fs::is_directory(active_path.parent_path()) ||
+        if (active_path == shadow_path || fs::exists(active_path) || fs::exists(shadow_path) ||
+            fs::is_symlink(active_path) || fs::is_symlink(shadow_path) ||
+            !fs::is_directory(active_path.parent_path()) ||
             !fs::is_directory(shadow_path.parent_path())) {
             throw std::runtime_error("output paths must differ, not exist, and have parents");
         }
@@ -459,7 +455,8 @@ int main(int argc, char** argv) {
         }
         std::cout << "IMU: " << output.real_imu_count << " original rows; "
                   << output.interpolated_imu_count << " interpolated camera-time rows; "
-                  << output.visual_update_count << " visual updates accepted by both filters. "
+                  << output.visual_update_count
+                  << " visual updates accepted by both filters. "
                      "No ground truth used. No physical UAV evidence.\n";
         return 0;
     } catch (const std::exception& e) {
