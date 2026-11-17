@@ -65,6 +65,8 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
         return {
             "visual_measurement_count": 2,
             "frame_limit_truncated": max_frames > 0,
+            "tracking_failure_truncated": False,
+            "failed_closed_on_tracking_loss": False,
             "visual_status_counts": {"visual_pose": 2},
             "frame_audit": audit,
             "frame_audit_count": len(audit),
@@ -128,6 +130,17 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
             json.loads((self.output / "run_manifest.json").read_text())["status"],
             "completed_unverified_software_replay",
         )
+
+    def test_explicit_frame_limit_is_labelled_partial_not_complete(self):
+        patch_sync, patch_visual, patch_native = self.patches()
+        with patch_sync, patch_visual, patch_native:
+            result = run(self.source, self.output, self.binary, max_frames=2)
+        self.assertEqual(
+            result["status"], "completed_unverified_partial_software_replay"
+        )
+        self.assertEqual(result["frame_limit"], 2)
+        self.assertTrue(result["visual"]["frame_limit_truncated"])
+        self.assertFalse(result["publishable_accuracy_evidence"])
 
     def test_native_process_rejection_leaves_failure_manifest(self):
         def failed(argv, **kwargs):
