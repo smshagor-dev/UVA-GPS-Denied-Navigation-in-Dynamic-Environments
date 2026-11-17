@@ -2818,6 +2818,11 @@ Phase17StateEstimatorAdapter::process_measurement(const MeasurementEnvelope& env
                                       payload.sigma_position_m, payload.sigma_velocity_mps);
         return estimator_.diagnostics().last_operation_result;
     }
+    case MeasurementType::VisualAttitude: {
+        const auto& payload = std::get<VisualAttitudeMeasurementPayload>(envelope.payload);
+        estimator_.update_visual_attitude(payload.world_from_imu, payload.sigma_orientation_rad);
+        return estimator_.diagnostics().last_operation_result;
+    }
     case MeasurementType::VisualFeatures: {
         const auto& payload = std::get<VisualFeatureMeasurementPayload>(envelope.payload);
         const std::vector<Eigen::Vector2d> z_pixels(payload.z_pixels.begin(),
