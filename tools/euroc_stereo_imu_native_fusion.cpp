@@ -407,6 +407,24 @@ int main(int argc, char** argv) {
             !fs::is_directory(shadow_path.parent_path())) {
             throw std::runtime_error("output paths must differ, not exist, and have parents");
         }
+        // The source data tree is immutable; resolve output parents and any
+        // symlink ancestors before creating a new trajectory file.
+        const fs::path source_root =
+            fs::weakly_canonical(imu_path.parent_path().parent_path().parent_path());
+        const auto output_within_source = [&source_root](const fs::path& path) {
+            const fs::path resolved = fs::weakly_canonical(path);
+            auto actual = resolved.begin();
+            for (auto source = source_root.begin(); source != source_root.end(); ++source) {
+                if (actual == resolved.end() || *actual != *source) {
+                    return false;
+                }
+                ++actual;
+            }
+            return true;
+        };
+        if (output_within_source(active_path) || output_within_source(shadow_path)) {
+            throw std::runtime_error("output trajectories must remain outside source sequence");
+        }
         const auto imu = load_imu(imu_path);
         const auto visual = load_visual(visual_path);
         const auto output = replay(imu, visual);
