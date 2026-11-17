@@ -20,6 +20,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <system_error>
 #include <vector>
 
 namespace {
@@ -401,27 +402,39 @@ int main(int argc, char** argv) {
         const fs::path active_path = argv[6];
         const fs::path shadow_path = argv[8];
         if (active_path == shadow_path || fs::exists(active_path) ||
-            fs::exists(shadow_path) || !fs::is_directory(active_path.parent_path()) ||
+            fs::exists(shadow_path) || fs::is_symlink(active_path) ||
+            fs::is_symlink(shadow_path) || !fs::is_directory(active_path.parent_path()) ||
             !fs::is_directory(shadow_path.parent_path())) {
             throw std::runtime_error("output paths must differ, not exist, and have parents");
         }
         const auto imu = load_imu(imu_path);
         const auto visual = load_visual(visual_path);
         const auto output = replay(imu, visual);
-        {
-            std::ofstream a(active_path, std::ios::out | std::ios::trunc);
-            if (!a || !(a << output.active_csv)) {
-                throw std::runtime_error("could not write active trajectory");
-            }
-        }
         try {
-            std::ofstream b(shadow_path, std::ios::out | std::ios::trunc);
-            if (!b || !(b << output.shadow_csv)) {
-                throw std::runtime_error("could not write shadow trajectory");
+            {
+                std::ofstream a(active_path, std::ios::out | std::ios::trunc);
+                if (!a || !(a << output.active_csv)) {
+                    throw std::runtime_error("could not write active trajectory");
+                }
+                a.close();
+                if (!a) {
+                    throw std::runtime_error("could not finalize active trajectory");
+                }
+            }
+            {
+                std::ofstream b(shadow_path, std::ios::out | std::ios::trunc);
+                if (!b || !(b << output.shadow_csv)) {
+                    throw std::runtime_error("could not write shadow trajectory");
+                }
+                b.close();
+                if (!b) {
+                    throw std::runtime_error("could not finalize shadow trajectory");
+                }
             }
         } catch (...) {
-            fs::remove(active_path);
-            fs::remove(shadow_path);
+            std::error_code cleanup_error;
+            fs::remove(active_path, cleanup_error);
+            fs::remove(shadow_path, cleanup_error);
             throw;
         }
         std::cout << "IMU: " << output.real_imu_count << " original rows; "
