@@ -390,15 +390,26 @@ void self_test() {
             Eigen::Vector3d{0.0, 0.0, 9.81},
         });
     }
-    const std::vector<VisualSample> visual{
+    std::vector<VisualSample> visual{
         {start + 22000000ULL, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(), 0.5, 0.75, 36},
         {start + 50000000ULL, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(), 0.5, 0.75, 32},
     };
+    visual[1].orientation =
+        Eigen::Quaterniond(Eigen::AngleAxisd(0.12, Eigen::Vector3d::UnitZ()));
     const auto good = replay(imu, visual);
     if (good.visual_update_count != 2 || good.interpolated_imu_count != 1 ||
         std::count(good.active_csv.begin(), good.active_csv.end(), '\n') != 3 ||
         std::count(good.shadow_csv.begin(), good.shadow_csv.end(), '\n') != 3) {
         throw std::runtime_error("synthetic fused replay self-test failed");
+    }
+    std::istringstream trajectory(good.active_csv);
+    std::string current_line;
+    std::getline(trajectory, current_line); // header
+    std::getline(trajectory, current_line); // first visual pose
+    std::getline(trajectory, current_line); // second visual pose
+    const auto columns = split_csv(current_line);
+    if (columns.size() != 8 || std::stod(columns[7]) < 0.001) {
+        throw std::runtime_error("native fused visual orientation did not update");
     }
     auto invalid = visual;
     invalid[1].timestamp_ns = invalid[0].timestamp_ns - 1;
