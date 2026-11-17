@@ -23,9 +23,7 @@ from research.experiments.euroc_stereo_visual_odometry import (
 
 class StereoVisualOdometryTests(unittest.TestCase):
     def setUp(self):
-        self.K = np.asarray(
-            [[458.0, 0.0, 367.0], [0.0, 457.0, 248.0], [0.0, 0.0, 1.0]]
-        )
+        self.K = np.asarray([[458.0, 0.0, 367.0], [0.0, 457.0, 248.0], [0.0, 0.0, 1.0]])
         rng = np.random.default_rng(81)
         self.landmarks = np.column_stack(
             (
@@ -70,9 +68,7 @@ class StereoVisualOdometryTests(unittest.TestCase):
 
     def test_insufficient_pnp_points_gate(self):
         with self.assertRaisesRegex(ValueError, "insufficient"):
-            relative_camera_pnp(
-                self.landmarks[:5], self.current_pixels[:5], self.K
-            )
+            relative_camera_pnp(self.landmarks[:5], self.current_pixels[:5], self.K)
 
     def test_nonfinite_correspondence_gate(self):
         pixels = self.current_pixels.copy()
