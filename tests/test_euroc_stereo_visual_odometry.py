@@ -165,6 +165,15 @@ class StereoVisualOdometryTests(unittest.TestCase):
                 1,
             )
             self.assertEqual(manifest["camera_timestamps_examined"], 2)
+            self.assertEqual(manifest["frame_audit_count"], 2)
+            self.assertEqual(
+                [entry["status"] for entry in manifest["frame_audit"]],
+                ["anchor", "failed_sync_discontinuity"],
+            )
+            self.assertEqual(
+                manifest["frame_audit"][1]["sync_rejection"], "missing_cam1"
+            )
+            self.assertEqual(len(manifest["frame_audit_sha256"]), 64)
             frontend.assert_called_once()
 
     def test_export_refuses_output_in_source_tree(self):
