@@ -306,6 +306,9 @@ def visual_measurements(
         "sync_status_counts": synchronization["status_counts"],
         "visual_status_counts": dict(sorted(statuses.items())),
         "camera_timestamps_examined": considered,
+        "camera_timestamps_total": len(frames),
+        "frame_limit_requested": max_frames,
+        "frame_limit_truncated": considered < len(frames),
         "visual_measurement_count": len(observations),
         "failed_closed_on_tracking_loss": any(
             key.startswith("failed_") for key in statuses
@@ -322,7 +325,8 @@ def visual_measurements(
 
 
 def export(sequence_root: Path, output_csv: Path, manifest_json: Path,
-           *, max_frames: int = 0, min_inliers: int = 12) -> dict:
+           *, max_frames: int = 0, min_inliers: int = 12,
+           allow_partial: bool = False) -> dict:
     root = sequence_root.resolve(strict=True)
     for output in (output_csv, manifest_json):
         require(not output.resolve().is_relative_to(root),
@@ -335,6 +339,11 @@ def export(sequence_root: Path, output_csv: Path, manifest_json: Path,
         root, max_frames=max_frames, min_inliers=min_inliers
     )
     require(bool(observations), "no accepted visual measurements to export")
+    require(not manifest["failed_closed_on_tracking_loss"] or allow_partial,
+            "tracking failed; refusing partial visual trajectory without --allow-partial")
+    manifest["partial_failure_export"] = bool(
+        manifest["failed_closed_on_tracking_loss"] and allow_partial
+    )
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     manifest_json.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -361,10 +370,12 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--max-frames", type=int, default=0)
     parser.add_argument("--min-inliers", type=int, default=12)
+    parser.add_argument("--allow-partial", action="store_true")
     args = parser.parse_args()
     result = export(
         args.sequence_root, args.output_visual_csv, args.manifest,
-        max_frames=args.max_frames, min_inliers=args.min_inliers
+        max_frames=args.max_frames, min_inliers=args.min_inliers,
+        allow_partial=args.allow_partial,
     )
     print(
         f"Visual PnP measurements: {result['visual_measurement_count']}; "
