@@ -135,6 +135,18 @@ class NativeStereoImuCliTests(unittest.TestCase):
         self.assertIn("unsupported visual quality/sigma values", result.stderr)
         self.assertFalse(self.active.exists())
 
+    def test_negative_pnp_reprojection_error_is_rejected(self):
+        source = self.visual.read_text(encoding="utf-8")
+        self.visual.write_text(
+            source.replace(",32,0.25", ",32,-0.1"),
+            encoding="utf-8",
+        )
+        result = self.run_native()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported visual quality/sigma values", result.stderr)
+        self.assertFalse(self.active.exists())
+        self.assertFalse(self.shadow.exists())
+
     def test_visual_beyond_original_imu_window_is_rejected(self):
         self.write_visual(timestamp_offsets=[22_000_000, 100_000_000])
         result = self.run_native()
