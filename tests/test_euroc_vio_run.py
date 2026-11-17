@@ -220,9 +220,7 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
 
         def changed_source(*args, **kwargs):
             result = original(*args, **kwargs)
-            result["camera_source_hashes"] = {
-                "imu0": "synthetic-sensor-data-tampered"
-            }
+            result["camera_source_hashes"] = {"imu0": "synthetic-sensor-data-tampered"}
             return result
 
         with (
