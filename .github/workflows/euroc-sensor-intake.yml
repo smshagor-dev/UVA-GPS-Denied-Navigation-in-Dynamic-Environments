@@ -1,0 +1,32 @@
+name: EuRoC Sensor Intake Regression
+
+on:
+  pull_request:
+    paths:
+      - "research/experiments/euroc_sensor_intake.py"
+      - "tests/test_euroc_sensor_intake.py"
+      - "docs/research/EUROC_SENSOR_INTAKE_PROTOCOL.md"
+      - ".github/workflows/euroc-sensor-intake.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-intake-regression:
+    name: EuRoC sensor intake parser and provenance unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Run synthetic fixture tests
+        run: python -m unittest tests.test_euroc_sensor_intake -v
+      - name: Compile parser
+        run: python -m py_compile research/experiments/euroc_sensor_intake.py
+      - name: Evidence boundary
+        run: |
+          echo "Only synthetic parsing fixtures were executed."
+          echo "No genuine EuRoC dataset, estimator, or ATE benchmark result was produced."
