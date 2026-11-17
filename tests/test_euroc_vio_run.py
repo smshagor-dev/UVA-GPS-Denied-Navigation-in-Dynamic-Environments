@@ -263,7 +263,9 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
             ),
             mock.patch(
                 "research.experiments.euroc_vio_run.subprocess.run",
-                side_effect=AssertionError("native called after calibration digest change"),
+                side_effect=AssertionError(
+                    "native called after calibration digest change"
+                ),
             ) as native,
         ):
             with self.assertRaisesRegex(ValueError, "calibration file digests changed"):
