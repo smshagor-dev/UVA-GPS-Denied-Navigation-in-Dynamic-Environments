@@ -61,9 +61,7 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
             for stamp in STAMPS:
                 writer.writerow([stamp, 0, 0, 0, 0, 0, 0, 0.5, 0.75, 25, 0.25])
         manifest.write_text('{"scope":"synthetic"}\n', encoding="utf-8")
-        audit = [
-            {"timestamp_ns": stamp, "status": "visual_pose"} for stamp in STAMPS
-        ]
+        audit = [{"timestamp_ns": stamp, "status": "visual_pose"} for stamp in STAMPS]
         return {
             "visual_measurement_count": 2,
             "frame_limit_truncated": max_frames > 0,
@@ -192,7 +190,9 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
                 side_effect=AssertionError("native called despite mismatched ledger"),
             ) as native,
         ):
-            with self.assertRaisesRegex(ValueError, "do not match accepted frame audit"):
+            with self.assertRaisesRegex(
+                ValueError, "do not match accepted frame audit"
+            ):
                 run(self.source, self.output, self.binary)
             native.assert_not_called()
         status = json.loads((self.output / "run_manifest.json").read_text())
