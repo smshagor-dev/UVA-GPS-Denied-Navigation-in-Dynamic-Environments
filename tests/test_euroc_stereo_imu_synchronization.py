@@ -45,10 +45,7 @@ def set_imu(root, offsets):
     ]
     write_rows(
         path,
-        [header] + [
-            [NS0 + offset, 0, 0, 0, 0, 0, 9.81]
-            for offset in offsets
-        ],
+        [header] + [[NS0 + offset, 0, 0, 0, 0, 0, 9.81] for offset in offsets],
     )
 
 
@@ -58,9 +55,7 @@ def set_camera(root, name, offsets):
     for offset in offsets:
         timestamp = NS0 + offset
         filename = f"{timestamp}.png"
-        (folder / "data" / filename).write_bytes(
-            b"offline-synthetic-intake-fixture"
-        )
+        (folder / "data" / filename).write_bytes(b"offline-synthetic-intake-fixture")
         rows.append([timestamp, filename])
     write_rows(folder / "data.csv", rows)
 
@@ -75,16 +70,18 @@ class EurocStereoImuSynchronizationTests(unittest.TestCase):
 
     def test_paired_frames_have_nonoverlapping_original_imu_segments(self):
         records, manifest = synchronize(self.root)
-        self.assertEqual([r["status"] for r in records], [
-            "anchor", "ready", "ready"
-        ])
+        self.assertEqual([r["status"] for r in records], ["anchor", "ready", "ready"])
         self.assertEqual(manifest["ready_intervals"], 2)
         self.assertEqual(manifest["rejected_frame_count"], 0)
         self.assertEqual(manifest["imu_sample_count"], 11)
         first = [s["timestamp_ns"] for s in records[1]["imu_interframe"]]
         second = [s["timestamp_ns"] for s in records[2]["imu_interframe"]]
-        self.assertEqual(first, [NS0 + n for n in range(5_000_000, 20_000_001, STEP_NS)])
-        self.assertEqual(second, [NS0 + n for n in range(25_000_000, 40_000_001, STEP_NS)])
+        self.assertEqual(
+            first, [NS0 + n for n in range(5_000_000, 20_000_001, STEP_NS)]
+        )
+        self.assertEqual(
+            second, [NS0 + n for n in range(25_000_000, 40_000_001, STEP_NS)]
+        )
         self.assertTrue(set(first).isdisjoint(second))
         self.assertFalse(manifest["ground_truth_used"])
         self.assertFalse(manifest["world_pose_estimated"])
@@ -93,12 +90,11 @@ class EurocStereoImuSynchronizationTests(unittest.TestCase):
     def test_missing_second_camera_is_recorded_and_imu_is_not_dropped(self):
         set_camera(self.root, "cam1", (0, 40_000_000))
         records, manifest = synchronize(self.root)
-        self.assertEqual([r["status"] for r in records],
-                         ["anchor", "missing_cam1", "ready"])
-        self.assertEqual(manifest["rejected_frame_count"], 1)
         self.assertEqual(
-            len(records[-1]["imu_interframe"]), 8
+            [r["status"] for r in records], ["anchor", "missing_cam1", "ready"]
         )
+        self.assertEqual(manifest["rejected_frame_count"], 1)
+        self.assertEqual(len(records[-1]["imu_interframe"]), 8)
         self.assertEqual(records[1]["imu_interframe"], [])
 
     def test_no_imu_before_is_explicit(self):
@@ -117,12 +113,10 @@ class EurocStereoImuSynchronizationTests(unittest.TestCase):
     def test_imu_gap_at_stereo_timestamp_is_not_silently_interpolated(self):
         set_imu(
             self.root,
-            [0, 5_000_000, 10_000_000, 35_000_000,
-             40_000_000, 45_000_000, 50_000_000],
+            [0, 5_000_000, 10_000_000, 35_000_000, 40_000_000, 45_000_000, 50_000_000],
         )
         records, manifest = synchronize(
-            self.root, max_bracket_ns=25_000_000,
-            max_imu_gap_ns=12_000_000
+            self.root, max_bracket_ns=25_000_000, max_imu_gap_ns=12_000_000
         )
         self.assertEqual(records[1]["status"], "imu_bracket_gap")
         self.assertEqual(records[2]["status"], "imu_interframe_gap")
@@ -152,9 +146,7 @@ class EurocStereoImuSynchronizationTests(unittest.TestCase):
     def test_hashed_export_has_verified_content_digest(self):
         events_path = Path(self.temp.name) / "exports" / "events.jsonl"
         manifest_path = Path(self.temp.name) / "exports" / "manifest.json"
-        manifest = export(
-            self.root, events_path, manifest_path, hash_images=True
-        )
+        manifest = export(self.root, events_path, manifest_path, hash_images=True)
         lines = [json.loads(line) for line in events_path.read_text().splitlines()]
         self.assertEqual(len(lines), 3)
         self.assertEqual(
@@ -162,9 +154,7 @@ class EurocStereoImuSynchronizationTests(unittest.TestCase):
             hashlib.sha256(events_path.read_bytes()).hexdigest(),
         )
         self.assertIn("cam0", lines[1]["source_image_sha256"])
-        self.assertEqual(
-            json.loads(manifest_path.read_text())["ready_intervals"], 2
-        )
+        self.assertEqual(json.loads(manifest_path.read_text())["ready_intervals"], 2)
         with self.assertRaisesRegex(ValueError, "overwrite"):
             export(self.root, events_path, manifest_path)
 
