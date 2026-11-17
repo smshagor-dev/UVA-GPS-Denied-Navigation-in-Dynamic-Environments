@@ -27,9 +27,7 @@ def stereo_fixture(root, *, blank=False):
     for sensor, values in calibration.items():
         folder = root / "mav0" / sensor
         folder.mkdir(parents=True, exist_ok=True)
-        (folder / "sensor.yaml").write_text(
-            yaml.safe_dump(values), encoding="utf-8"
-        )
+        (folder / "sensor.yaml").write_text(yaml.safe_dump(values), encoding="utf-8")
 
     rng = np.random.default_rng(131)
     width, height = 752, 480
@@ -50,9 +48,7 @@ def stereo_fixture(root, *, blank=False):
         filename = f"{START_NS}.png"
         self_image = folder / "data" / filename
         assert cv2.imwrite(str(self_image), image)
-        with (folder / "data.csv").open(
-            "w", newline="", encoding="utf-8"
-        ) as stream:
+        with (folder / "data.csv").open("w", newline="", encoding="utf-8") as stream:
             writer = csv.writer(stream)
             writer.writerow(["#timestamp [ns]", "filename"])
             writer.writerow([START_NS, filename])
@@ -91,18 +87,14 @@ class EurocStereoFrontendTests(unittest.TestCase):
         projection1 = (rect["P1"] @ homogeneous.T).T
         pixels0 = projection0[:, :2] / projection0[:, 2:3]
         pixels1 = projection1[:, :2] / projection1[:, 2:3]
-        chosen, triangulated = triangulate_correspondences(
-            rect, pixels0, pixels1
-        )
+        chosen, triangulated = triangulate_correspondences(rect, pixels0, pixels1)
         self.assertEqual(len(chosen), len(xyz))
         self.assertTrue(np.allclose(triangulated, xyz, atol=1e-5))
 
     def test_genuine_image_pipeline_on_synthetic_texture(self):
         result = evaluate_pair(self.root, START_NS, include_landmarks=True)
         self.assertGreaterEqual(result["camera_metric_points"], 8)
-        self.assertEqual(
-            len(result["landmarks"]), result["camera_metric_points"]
-        )
+        self.assertEqual(len(result["landmarks"]), result["camera_metric_points"])
         self.assertEqual(result["point_frame"], "IMU")
         self.assertFalse(result["ground_truth_used"])
         self.assertFalse(result["world_pose_estimated"])
