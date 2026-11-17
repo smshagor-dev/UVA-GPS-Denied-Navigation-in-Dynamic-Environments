@@ -237,6 +237,7 @@ def visual_measurements(
     previous_landmarks = None
     observations = []
     statuses = Counter()
+    frame_audit = []
     considered = 0
     for frame in frames:
         if max_frames and considered >= max_frames:
@@ -247,7 +248,16 @@ def visual_measurements(
             statuses["sync_" + frame["status"]] += 1
             if previous is not None:
                 statuses["failed_sync_discontinuity"] += 1
+                frame_audit.append({
+                    "timestamp_ns": stamp,
+                    "status": "failed_sync_discontinuity",
+                    "sync_rejection": frame["status"],
+                })
                 break
+            frame_audit.append({
+                "timestamp_ns": stamp,
+                "status": "sync_" + frame["status"],
+            })
             continue
         path0 = (root / frame["cam0_relative_path"]).resolve(strict=True)
         path1 = (root / frame["cam1_relative_path"]).resolve(strict=True)
@@ -260,18 +270,27 @@ def visual_measurements(
                 image0, image1, rect,
             )
             current_left = rectified_left(path0, rect)
-        except (ValueError, cv2.error) as exc:
+        except (ValueError, cv2.error):
             statuses["failed_stereo_frontend"] += 1
+            frame_audit.append({
+                "timestamp_ns": stamp,
+                "status": "failed_stereo_frontend",
+            })
             break
         if previous is None:
             previous = stamp
             previous_left = current_left
             previous_landmarks = features
             statuses["anchor"] += 1
+            frame_audit.append({"timestamp_ns": stamp, "status": "anchor"})
             continue
         dt_s = (stamp - previous) * 1e-9
         if not 0 < dt_s <= 0.5:
             statuses["failed_temporal_gap"] += 1
+            frame_audit.append({
+                "timestamp_ns": stamp,
+                "status": "failed_temporal_gap",
+            })
             break
         try:
             delta, stats = tracked_stereo_motion(
@@ -283,12 +302,20 @@ def visual_measurements(
             )
         except (ValueError, cv2.error, np.linalg.LinAlgError):
             statuses["failed_temporal_tracking"] += 1
+            frame_audit.append({
+                "timestamp_ns": stamp,
+                "status": "failed_temporal_tracking",
+            })
             break
         position = candidate[:3, 3]
         velocity = (position - last_position) / dt_s
         speed = float(np.linalg.norm(velocity))
         if not np.all(np.isfinite(velocity)) or speed > 30.0:
             statuses["failed_speed_gate"] += 1
+            frame_audit.append({
+                "timestamp_ns": stamp,
+                "status": "failed_speed_gate",
+            })
             break
         # These sigmas are conservative fixed defaults, NOT calibrated
         # residual statistics or a benchmark uncertainty estimate.
@@ -306,12 +333,21 @@ def visual_measurements(
             "pnp_reprojection_rmse_px": stats["rmse_px"],
         })
         statuses["visual_pose"] += 1
+        frame_audit.append({
+            "timestamp_ns": stamp,
+            "status": "visual_pose",
+            "pnp_inliers": stats["inliers"],
+            "pnp_reprojection_rmse_px": stats["rmse_px"],
+            "flow_tracks": stats["flow_tracks"],
+        })
         world_imu = candidate
         last_position = position
         previous = stamp
         previous_left = current_left
         previous_landmarks = features
 
+    require(len(frame_audit) == considered,
+            "every examined camera timestamp must have an audit record")
     manifest = {
         "schema_version": 1,
         "scope": "stereo_visual_odometry_measurements_not_benchmark",
@@ -325,6 +361,11 @@ def visual_measurements(
         "calibration_sha256": calibration["source_yaml_sha256"],
         "sync_status_counts": synchronization["status_counts"],
         "visual_status_counts": dict(sorted(statuses.items())),
+        "frame_audit": frame_audit,
+        "frame_audit_count": len(frame_audit),
+        "frame_audit_sha256": hashlib.sha256(
+            json.dumps(frame_audit, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest(),
         "camera_timestamps_examined": considered,
         "camera_timestamps_total": len(frames),
         "frame_limit_requested": max_frames,
