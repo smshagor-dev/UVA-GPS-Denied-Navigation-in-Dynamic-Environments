@@ -24,6 +24,11 @@ VISUAL_COLUMNS = [
     "sigma_velocity_mps",
     "pnp_inliers",
     "pnp_reprojection_rmse_px",
+    "qw",
+    "qx",
+    "qy",
+    "qz",
+    "sigma_orientation_rad",
 ]
 
 
@@ -78,6 +83,11 @@ class NativeStereoImuCliTests(unittest.TestCase):
                         0.75,
                         32,
                         0.25,
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.25,
                     ]
                 )
 
@@ -119,6 +129,8 @@ class NativeStereoImuCliTests(unittest.TestCase):
                 self.assertTrue(
                     all(abs(float(row[k])) < 100 for k in ("x_m", "y_m", "z_m"))
                 )
+                self.assertAlmostEqual(float(row["qw"]), 1.0, places=3)
+                self.assertAlmostEqual(float(row["qx"]), 0.0, places=3)
 
     def test_visual_out_of_order_is_rejected_without_outputs(self):
         self.write_visual(timestamp_offsets=[50_000_000, 22_000_000])
