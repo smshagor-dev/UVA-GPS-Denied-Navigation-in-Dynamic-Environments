@@ -432,3 +432,16 @@ if(Python3_Interpreter_FOUND)
         TIMEOUT 180
     )
 endif()
+
+# Real raw-IMU replay through the repository's active EKF and shadow ESKF.
+# The test uses synthetic in-memory IMU samples only; it is NOT an accuracy benchmark.
+add_executable(euroc_imu_native_replay ../tools/euroc_imu_native_replay.cpp)
+target_link_libraries(euroc_imu_native_replay PRIVATE sensor_fusion_core Eigen3::Eigen)
+drone_apply_project_warnings(euroc_imu_native_replay)
+drone_enable_coverage(euroc_imu_native_replay)
+drone_enable_sanitizers(euroc_imu_native_replay)
+drone_set_target_output_dirs(euroc_imu_native_replay "tests" "tests" "tests")
+add_test(NAME euroc_imu_native_replay_selftest
+         COMMAND $<TARGET_FILE:euroc_imu_native_replay> --self-test)
+set_tests_properties(euroc_imu_native_replay_selftest PROPERTIES
+    LABELS "integration;navigation;replay;euorc-imu-only")
