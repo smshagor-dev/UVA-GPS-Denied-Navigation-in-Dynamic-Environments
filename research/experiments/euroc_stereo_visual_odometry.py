@@ -369,7 +369,14 @@ def visual_measurements(
         "camera_timestamps_examined": considered,
         "camera_timestamps_total": len(frames),
         "frame_limit_requested": max_frames,
-        "frame_limit_truncated": considered < len(frames),
+        "frame_limit_truncated": bool(
+            max_frames and considered < len(frames)
+            and not any(key.startswith("failed_") for key in statuses)
+        ),
+        "tracking_failure_truncated": bool(
+            considered < len(frames)
+            and any(key.startswith("failed_") for key in statuses)
+        ),
         "visual_measurement_count": len(observations),
         "failed_closed_on_tracking_loss": any(
             key.startswith("failed_") for key in statuses
