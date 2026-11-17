@@ -188,10 +188,12 @@ std::vector<VisualSample> load_visual(const fs::path& path) {
         s.sigma_position_m = finite_scalar(cells[7]);
         s.sigma_velocity_mps = finite_scalar(cells[8]);
         const uint64_t n_inliers = decimal_timestamp(cells[9]);
+        const double reprojection_rmse_px = finite_scalar(cells[10]);
         if (n_inliers < 8 || n_inliers > 100000 ||
             s.sigma_position_m <= 0.0 || s.sigma_velocity_mps <= 0.0 ||
             s.sigma_position_m > 100 || s.sigma_velocity_mps > 100 ||
-            finite_scalar(cells[10]) > 3.0) {
+            reprojection_rmse_px < 0.0 || reprojection_rmse_px > 3.0 ||
+            s.velocity.norm() > 30.0) {
             throw std::runtime_error("unsupported visual quality/sigma values");
         }
         s.inliers = static_cast<size_t>(n_inliers);
