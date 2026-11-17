@@ -1,6 +1,7 @@
 """Synthetic orchestration and fail-closed evidence manifest regression."""
 
 import csv
+import hashlib
 import json
 import subprocess
 import sys
@@ -60,10 +61,19 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
             for stamp in STAMPS:
                 writer.writerow([stamp, 0, 0, 0, 0, 0, 0, 0.5, 0.75, 25, 0.25])
         manifest.write_text('{"scope":"synthetic"}\n', encoding="utf-8")
+        audit = [
+            {"timestamp_ns": stamp, "status": "visual_pose"} for stamp in STAMPS
+        ]
         return {
             "visual_measurement_count": 2,
             "frame_limit_truncated": max_frames > 0,
             "visual_status_counts": {"visual_pose": 2},
+            "frame_audit": audit,
+            "frame_audit_count": len(audit),
+            "camera_timestamps_examined": len(audit),
+            "frame_audit_sha256": hashlib.sha256(
+                json.dumps(audit, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest(),
         }
 
     def native(self, argv, *, capture_output, text, check, timeout):
@@ -112,6 +122,8 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
         self.assertFalse(result["ground_truth_used"])
         self.assertFalse(result["publishable_accuracy_evidence"])
         self.assertEqual(result["native_counts"]["visual_updates"], 2)
+        self.assertEqual(result["visual"]["frame_audit_count"], 2)
+        self.assertEqual(len(result["visual"]["frame_audit_sha256"]), 64)
         self.assertEqual(result["native_active"]["sample_count"], 2)
         self.assertEqual(result["native_shadow"]["sample_count"], 2)
         self.assertEqual(
@@ -150,6 +162,41 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
             json.loads((self.output / "run_manifest.json").read_text())["status"],
             "failed",
         )
+
+    def test_visual_frame_audit_mismatch_blocks_native_estimator(self):
+        original = self.export_visual
+
+        def forged(*args, **kwargs):
+            result = original(*args, **kwargs)
+            result["frame_audit"][1]["timestamp_ns"] += 1_000_000
+            result["frame_audit_sha256"] = hashlib.sha256(
+                json.dumps(
+                    result["frame_audit"],
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest()
+            return result
+
+        with (
+            mock.patch(
+                "research.experiments.euroc_vio_run.export_sync",
+                side_effect=self.export_sync,
+            ),
+            mock.patch(
+                "research.experiments.euroc_vio_run.export_visual",
+                side_effect=forged,
+            ),
+            mock.patch(
+                "research.experiments.euroc_vio_run.subprocess.run",
+                side_effect=AssertionError("native called despite mismatched ledger"),
+            ) as native,
+        ):
+            with self.assertRaisesRegex(ValueError, "do not match accepted frame audit"):
+                run(self.source, self.output, self.binary)
+            native.assert_not_called()
+        status = json.loads((self.output / "run_manifest.json").read_text())
+        self.assertEqual(status["status"], "failed")
 
     def test_output_directory_inside_source_is_never_created(self):
         forbidden = self.source / "original_data_overwrite"
