@@ -1,0 +1,41 @@
+name: EuRoC Calibrated Stereo Frontend Regression
+
+on:
+  pull_request:
+    paths:
+      - "research/experiments/euroc_stereo_frontend.py"
+      - "research/experiments/euroc_calibration_validation.py"
+      - "tests/test_euroc_stereo_frontend.py"
+      - "tests/test_euroc_calibration_validation.py"
+      - "docs/research/EUROC_CALIBRATED_STEREO_FRONTEND_PROTOCOL.md"
+      - ".github/workflows/euroc-calibrated-stereo-frontend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-geometry-and-png-tests:
+    name: EuRoC calibrated stereo image and triangulation regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install reproducible frontend dependencies
+        run: python -m pip install "numpy>=2.3,<3" "PyYAML>=6.0.3,<7" "opencv-python-headless>=4.10,<6"
+      - name: Run synthetic calibration and stereo regressions
+        run: |
+          python -m unittest tests.test_euroc_calibration_validation -v
+          python -m unittest tests.test_euroc_stereo_frontend -v
+      - name: Compile source and tests
+        run: |
+          python -m py_compile research/experiments/euroc_calibration_validation.py
+          python -m py_compile research/experiments/euroc_stereo_frontend.py
+          python -m py_compile tests/test_euroc_stereo_frontend.py
+      - name: Evidence boundary
+        run: |
+          echo "The tests generate fake calibration, texture, timestamps and geometry."
+          echo "No genuine EuRoC dataset, world trajectory, VIO estimator or ATE was evaluated."
