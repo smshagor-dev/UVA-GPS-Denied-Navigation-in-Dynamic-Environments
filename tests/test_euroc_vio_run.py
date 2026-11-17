@@ -26,6 +26,11 @@ VISUAL_COLUMNS = [
     "sigma_velocity_mps",
     "pnp_inliers",
     "pnp_reprojection_rmse_px",
+    "qw",
+    "qx",
+    "qy",
+    "qz",
+    "sigma_orientation_rad",
 ]
 
 
@@ -61,7 +66,8 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
             writer = csv.writer(file)
             writer.writerow(VISUAL_COLUMNS)
             for stamp in STAMPS:
-                writer.writerow([stamp, 0, 0, 0, 0, 0, 0, 0.5, 0.75, 25, 0.25])
+                writer.writerow([stamp, 0, 0, 0, 0, 0, 0, 0.5, 0.75, 25, 0.25,
+                                 1.0, 0.0, 0.0, 0.0, 0.25])
         manifest.write_text('{"scope":"synthetic"}\n', encoding="utf-8")
         audit = [{"timestamp_ns": stamp, "status": "visual_pose"} for stamp in STAMPS]
         return {
@@ -90,9 +96,10 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
         for file in (active, shadow):
             with file.open("w", newline="", encoding="utf-8") as stream:
                 writer = csv.writer(stream)
-                writer.writerow(["timestamp_ns", "x_m", "y_m", "z_m"])
+                writer.writerow(["timestamp_ns", "x_m", "y_m", "z_m",
+                                 "qw", "qx", "qy", "qz"])
                 for stamp in STAMPS:
-                    writer.writerow([stamp, 0, 0, 0])
+                    writer.writerow([stamp, 0, 0, 0, 1.0, 0.0, 0.0, 0.0])
         return subprocess.CompletedProcess(
             argv,
             0,
@@ -164,7 +171,8 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
             done = self.native(argv, **kwargs)
             path = Path(argv[argv.index("--shadow-output") + 1])
             path.write_text(
-                "timestamp_ns,x_m,y_m,z_m\n" f"{STAMPS[0]},0,0,0\n",
+                "timestamp_ns,x_m,y_m,z_m,qw,qx,qy,qz\n"
+                f"{STAMPS[0]},0,0,0,1,0,0,0\n",
                 encoding="utf-8",
             )
             return done
