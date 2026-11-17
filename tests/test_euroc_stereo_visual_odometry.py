@@ -58,17 +58,13 @@ class StereoVisualOdometryTests(unittest.TestCase):
             "K0": np.eye(3, dtype=np.float64),
             "D0": np.zeros(4, dtype=np.float64),
             "R0": np.eye(3, dtype=np.float64),
-            "P0": np.column_stack(
-                (np.eye(3, dtype=np.float64), np.zeros((3, 1)))
-            ),
+            "P0": np.column_stack((np.eye(3, dtype=np.float64), np.zeros((3, 1)))),
         }
         with mock.patch(
             "research.experiments.euroc_stereo_visual_odometry.cv2.imread",
             side_effect=AssertionError("unnecessary repeated camera image disk read"),
         ) as disk_read:
-            loaded = rectified_left(
-                Path("not-on-disk.png"), rect, source_image=image
-            )
+            loaded = rectified_left(Path("not-on-disk.png"), rect, source_image=image)
         disk_read.assert_not_called()
         self.assertEqual(loaded.shape, image.shape)
         self.assertEqual(loaded.dtype, np.uint8)
