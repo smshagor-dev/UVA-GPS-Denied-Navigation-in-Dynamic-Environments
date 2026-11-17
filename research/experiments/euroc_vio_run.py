@@ -154,6 +154,14 @@ def run(
             max_frames=max_frames,
             min_inliers=min_inliers,
         )
+        require(
+            sync_info["source_sensor_hashes"] == visual_info["camera_source_hashes"],
+            "sensor source digests changed between synchronization and visual extraction",
+        )
+        require(
+            sync_info["calibration_yaml_sha256"] == visual_info["calibration_sha256"],
+            "calibration file digests changed between synchronization and visual extraction",
+        )
         manifest["visual"] = {
             "manifest_sha256": digest(visual_manifest_path),
             "csv_sha256": digest(visual_path),
