@@ -17,6 +17,7 @@ from research.experiments.euroc_stereo_visual_odometry import (
     integrate_camera_motion,
     make_transform,
     relative_camera_pnp,
+    rectified_left,
     visual_measurements,
 )
 
@@ -49,6 +50,28 @@ class StereoVisualOdometryTests(unittest.TestCase):
         self.assertLess(diagnostics["rmse_px"], 0.01)
         self.assertTrue(np.allclose(relative[:3, :3], self.rotation, atol=0.005))
         self.assertTrue(np.allclose(relative[:3, 3], self.translation, atol=0.02))
+
+    def test_rectification_reuses_loaded_camera_pixels(self):
+        image = np.full((24, 32), 128, dtype=np.uint8)
+        rect = {
+            "image_size": (32, 24),
+            "K0": np.eye(3, dtype=np.float64),
+            "D0": np.zeros(4, dtype=np.float64),
+            "R0": np.eye(3, dtype=np.float64),
+            "P0": np.column_stack(
+                (np.eye(3, dtype=np.float64), np.zeros((3, 1)))
+            ),
+        }
+        with mock.patch(
+            "research.experiments.euroc_stereo_visual_odometry.cv2.imread",
+            side_effect=AssertionError("unnecessary repeated camera image disk read"),
+        ) as disk_read:
+            loaded = rectified_left(
+                Path("not-on-disk.png"), rect, source_image=image
+            )
+        disk_read.assert_not_called()
+        self.assertEqual(loaded.shape, image.shape)
+        self.assertEqual(loaded.dtype, np.uint8)
 
     def test_initial_imu_world_pose_and_camera_lever_arm(self):
         extra = make_transform(np.eye(3), [0.16, 0.02, -0.04])
