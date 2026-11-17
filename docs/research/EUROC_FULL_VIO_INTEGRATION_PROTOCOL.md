@@ -9,9 +9,9 @@
 3. **Exact stereo/IMU timestamp synchronization** (#80) validates camera pairing, sensor gaps, missing observations and source hashes; reject records remain reported.
 4. **Calibrated stereo frontend** (#79) detects and ratio-matches ORB landmarks in undistorted/rectified stereo pairs and triangulates positive-depth metric 3D points.
 5. **New temporal VO** (`euroc_stereo_visual_odometry.py`) uses rectified left-camera optical flow and RANSAC PnP against the **previous frame's stereo-derived 3D points**. Its `T_Ccurrent_Cprevious` measurements are integrated into an IMU-anchored world coordinate frame using calibrated `T_I_Crect`. Source images and calibration are hashed; no ground truth is involved.
-6. **New native EKF/ESKF replay** (`euroc_stereo_imu_native_fusion.cpp`) reads genuine imu0/data.csv and the VO-generated visual.csv, enforces chronological and positive-quality input, and invokes the repository's existing `EKFStateEstimatorAdapter` and `Phase17StateEstimatorAdapter`. Visual measurements update **position and velocity only**. Both native filter outputs are separate CSV trajectories with `timestamp_ns,x_m,y_m,z_m`. If any active/shadow event is rejected, replay fails rather than silently producing a benchmark row.
+6. **New native EKF/ESKF replay** (`euroc_stereo_imu_native_fusion.cpp`) reads genuine imu0/data.csv and the VO-generated visual.csv, enforces chronological and positive-quality input, and invokes the repository's existing `EKFStateEstimatorAdapter` and `Phase17StateEstimatorAdapter`. Visual pose and attitude observations update **position, velocity and a separately gated quaternion orientation**. Each native estimator emits `timestamp_ns,x_m,y_m,z_m,qw,qx,qy,qz`. The runner additionally exports immutable-position columns as `active_position_only.csv` and `shadow_position_only.csv` for the legacy independent ATE/RPE evaluator. If any active/shadow event is rejected, replay fails rather than silently producing a benchmark row.
 
-**Important method limitation:** The visual frontend estimates orientation changes through PnP for camera-frame geometry, but `VisualPoseMeasurementPayload` does not fuse attitude. The EKF's initial attitude is **identity, not a gravity-aligned estimated state**, and extrinsic rotation is not dynamically updated. The resulting estimated trajectories are *experimental software outputs*, not validated robust 6-DoF VIO. There is no absolute heading observability or learned IMU bias calibration. These limitations must be resolved or explicitly treated in benchmark interpretation.
+**Important method limitation:** The visual frontend now supplies right-handed `q_W_I` through a distinct `VisualAttitudeMeasurementPayload`; both EKF and ESKF perform a body-right quaternion error-state correction with a conservative outlier gate. This is **experimental 6-DoF software fusion, not validated robust 6-DoF VIO**: initial attitude is identity rather than estimated gravity alignment; sequential PnP orientation/position updates are temporally correlated; the 0.25 rad uncertainty is provisional and uncalibrated; absolute heading remains unobservable; and no authentic EuRoC ATE/RPE or orientation error evidence is reported. Do not claim genuine robustness, flight performance or accuracy on this basis.
 
 ## Reproducibility (Linux)
 
@@ -47,7 +47,7 @@ build/linux-gcc-release/tests/Release/euroc_stereo_imu_native_fusion \
   --assume-initial-imu-identity
 ```
 
-Adjust the build output executable path for the selected CMake multi-config preset and system. All outputs must be new paths outside the original dataset. The Python visual CSV contains fixed non-benchmark uncertainty weights `sigma_position_m=0.5` and `sigma_velocity_mps=0.75`, PnP inlier count and reprojection RMSE. It is NOT legitimate to reinterpret these constants as measured uncertainties.
+Adjust the build output executable path for the selected CMake multi-config preset and system. All outputs must be new paths outside the original dataset. The Python visual CSV contains fixed non-benchmark uncertainty weights `sigma_position_m=0.5`, `sigma_velocity_mps=0.75`, `sigma_orientation_rad=0.25`, `qw,qx,qy,qz`, PnP inlier count and reprojection RMSE. It is NOT legitimate to reinterpret these constants as measured uncertainties.
 
 ## One-command end-to-end evidence collection
 
@@ -89,6 +89,14 @@ separate native CTest uses a compiled real C++ executable. These are
 not substitute validations for independently obtained original EuRoC
 images or benchmark comparisons.
 
+The `active_position_only.csv` and `shadow_position_only.csv` files contain
+the same checked nanosecond timestamps and meter-valued positions as the
+corresponding full 6-DoF files. Position-only ATE/RPE cannot validate the
+quaternion attitude estimates. Visual quaternions use scalar-first
+`qw,qx,qy,qz` orientation from the initial IMU-anchored world to the IMU body
+(`q_W_I`). Correctness of gravity alignment and uncertainty still requires
+a separate physically meaningful experiment.
+
 ## Explicit temporal interpolation, not timestamp rounding
 
 The native bridge consumes original IMU timestamps. When a camera-derived visual update falls *between* consecutive original IMU timestamps, it inserts a linearly interpolated accelerometer/gyro sample at the precise camera nanosecond time (and counts these events separately). This is an approximation that must be tested in sensitivity analysis. Unsupported sensor gaps over 25 ms, time inversions, insufficient visual correspondences, large PnP residual, nonfinite values, source schema mismatches and native estimator rejections are fail-closed.
@@ -101,7 +109,7 @@ Visual tracking intentionally **stops after the first tracking failure**. By def
 - [ ] Real EuRoC source archives independently verified (not generated or fabricated).
 - [ ] Measure actual accepted, rejected, interpolated and dropped events across prespecified authentic sequences.
 - [ ] Validate gravity alignment and attitude observability, propagation noise, clock offsets, PnP degeneracy and long-run tracking resets.
-- [ ] Check full 6-DoF orientation integration or mark positional-only visual fusion as a restricted baseline.
+- [ ] Validate the new visual quaternion attitude update on authentic EuRoC sequences; run independent orientation error analysis and IMU-gravity alignment ablations.
 - [ ] Compare genuine estimated trajectories against EuRoC ground truth using independent #75 ATE/RPE evaluator; run paired credible SOTA and ablations. Use GT only for post-run evaluation.
 - [ ] Distinguish single-UAV MAV benchmark evidence from physical multi-UAV swarm/fault testing.
 
