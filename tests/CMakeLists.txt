@@ -458,3 +458,16 @@ add_test(NAME euroc_stereo_imu_native_fusion_selftest
          COMMAND $<TARGET_FILE:euroc_stereo_imu_native_fusion> --self-test)
 set_tests_properties(euroc_stereo_imu_native_fusion_selftest PROPERTIES
     LABELS "integration;navigation;replay;euroc-visual-inertial")
+
+if(Python3_Interpreter_FOUND)
+    add_test(
+        NAME euroc_stereo_imu_native_fusion_cli_regression
+        COMMAND "${Python3_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tests/test_euroc_native_fusion_cli.py"
+                --binary "$<TARGET_FILE:euroc_stereo_imu_native_fusion>"
+    )
+    set_tests_properties(euroc_stereo_imu_native_fusion_cli_regression PROPERTIES
+        LABELS "integration;navigation;replay;euroc-visual-inertial"
+        TIMEOUT 120
+    )
+endif()
