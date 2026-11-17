@@ -1,6 +1,7 @@
 // Native EuRoC sensor fusion replay: real IMU CSV and independently produced
 // camera-derived visual odometry CSV, NEVER EuRoC publisher ground truth.
-// Visual updates are position/velocity ONLY; orientation is not visually fused.
+// Visual position/velocity and quaternion attitude updates share the VO frame.
+// Angular uncertainty is provisional; this is NOT a validated 6-DoF benchmark.
 #include "vio/EKFStateEstimatorAdapter.hpp"
 #include "vio/Phase17ESKFEstimator.hpp"
 
@@ -34,6 +35,7 @@ using drone::vio::MeasurementFrame;
 using drone::vio::MeasurementType;
 using drone::vio::Phase17StateEstimatorAdapter;
 using drone::vio::VisualPoseMeasurementPayload;
+using drone::vio::VisualAttitudeMeasurementPayload;
 
 struct ImuSample {
     uint64_t timestamp_ns{0};
@@ -48,6 +50,8 @@ struct VisualSample {
     double sigma_position_m{0.5};
     double sigma_velocity_mps{0.75};
     size_t inliers{0};
+    Eigen::Quaterniond orientation{Eigen::Quaterniond::Identity()};
+    double sigma_orientation_rad{0.25};
 };
 
 struct Result {
@@ -157,7 +161,7 @@ std::vector<VisualSample> load_visual(const fs::path& path) {
         throw std::runtime_error("empty visual source");
     }
     const auto columns = split_csv(line);
-    const std::array<std::string, 11> expected{"timestamp_ns",
+    const std::array<std::string, 16> expected{"timestamp_ns",
                                                "x_m",
                                                "y_m",
                                                "z_m",
@@ -167,7 +171,12 @@ std::vector<VisualSample> load_visual(const fs::path& path) {
                                                "sigma_position_m",
                                                "sigma_velocity_mps",
                                                "pnp_inliers",
-                                               "pnp_reprojection_rmse_px"};
+                                               "pnp_reprojection_rmse_px",
+                                               "qw",
+                                               "qx",
+                                               "qy",
+                                               "qz",
+                                               "sigma_orientation_rad"};
     if (columns.size() != expected.size()) {
         throw std::runtime_error("unexpected visual input schema");
     }
@@ -199,6 +208,15 @@ std::vector<VisualSample> load_visual(const fs::path& path) {
             throw std::runtime_error("unsupported visual quality/sigma values");
         }
         s.inliers = static_cast<size_t>(n_inliers);
+        s.orientation = Eigen::Quaterniond(finite_scalar(cells[11]), finite_scalar(cells[12]),
+                                           finite_scalar(cells[13]), finite_scalar(cells[14]));
+        s.sigma_orientation_rad = finite_scalar(cells[15]);
+        if (!s.orientation.coeffs().array().isFinite().all() ||
+            std::abs(s.orientation.squaredNorm() - 1.0) > 0.02 ||
+            s.sigma_orientation_rad <= 0.0 || s.sigma_orientation_rad > 1.0) {
+            throw std::runtime_error("invalid visual orientation or attitude uncertainty");
+        }
+        s.orientation.normalize();
         result.push_back(s);
         if (result.size() > 500000) {
             throw std::runtime_error("visual source size cap exceeded");
@@ -229,7 +247,7 @@ Result replay(const std::vector<ImuSample>& imu, const std::vector<VisualSample>
     std::ostringstream shadow_csv;
     active_csv << std::setprecision(17);
     shadow_csv << std::setprecision(17);
-    const std::string header = "timestamp_ns,x_m,y_m,z_m\n";
+    const std::string header = "timestamp_ns,x_m,y_m,z_m,qw,qx,qy,qz\n";
     active_csv << header;
     shadow_csv << header;
     const uint64_t origin = imu.front().timestamp_ns;
