@@ -44,3 +44,21 @@ jobs:
           echo "Synthetic geometry and sensor fixtures only; no authentic EuRoC run."
           echo "C++ native fusion self-test executes through navigation-validation CI."
           echo "No publisher ground truth, estimated benchmark ATE or flight evidence."
+
+  native-fusion-release:
+    name: Native EuRoC active EKF and shadow ESKF fusion regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Configure native estimator and fusion target
+        run: cmake --preset linux-gcc-release
+      - name: Build native visual and inertial fusion
+        run: cmake --build --preset linux-gcc-release --target euroc_stereo_imu_native_fusion -- -j2
+      - name: Run in-memory and original-format synthetic CSV replay
+        run: ctest --preset linux-gcc-release -R '^euroc_stereo_imu_native_fusion_(selftest|cli_regression)$' --output-on-failure
+      - name: Mark evidence scope
+        run: |
+          echo "Only synthetic IMU and visual pose CSV cases."
+          echo "No independent original EuRoC dataset or physical flight experiment."
