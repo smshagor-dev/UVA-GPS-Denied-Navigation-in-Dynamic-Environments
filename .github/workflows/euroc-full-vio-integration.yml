@@ -78,8 +78,3 @@ jobs:
         run: python -m black --check --diff tests/test_euroc_stereo_visual_odometry.py tests/test_euroc_native_fusion_cli.py
       - name: Check native C++ fusion source
         run: clang-format --dry-run --Werror tools/euroc_stereo_imu_native_fusion.cpp
-      - name: Emit clang-format canonical source only on failure
-        if: failure()
-        run: |
-          clang-format -i tools/euroc_stereo_imu_native_fusion.cpp
-          python -c 'import base64, pathlib; p=pathlib.Path("tools/euroc_stereo_imu_native_fusion.cpp"); print("CANONICAL_CPP_BASE64_BEGIN"); print(base64.b64encode(p.read_bytes()).decode()); print("CANONICAL_CPP_BASE64_END")'
