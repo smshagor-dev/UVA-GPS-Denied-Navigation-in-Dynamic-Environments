@@ -159,6 +159,7 @@ def run(
             "csv_sha256": digest(visual_path),
             "accepted_count": visual_info["visual_measurement_count"],
             "frame_limit_truncated": visual_info["frame_limit_truncated"],
+            "tracking_failure_truncated": visual_info["tracking_failure_truncated"],
             "visual_status_counts": visual_info["visual_status_counts"],
             "frame_audit_count": visual_info["frame_audit_count"],
             "frame_audit_sha256": visual_info["frame_audit_sha256"],
@@ -176,6 +177,14 @@ def run(
             == visual_info["frame_audit_count"]
             == visual_info["camera_timestamps_examined"],
             "frame audit count differs from examined camera timestamps",
+        )
+        require(
+            not max_frames or len(ledger) <= max_frames,
+            "examined frames exceed explicitly requested frame limit",
+        )
+        require(
+            not visual_info["failed_closed_on_tracking_loss"],
+            "refusing to classify failed stereo tracking as successful replay",
         )
         audit_stamps = [row["timestamp_ns"] for row in ledger]
         require(
@@ -256,7 +265,11 @@ def run(
         }
         manifest["native_active"] = checked_trajectory(active_path, expected_stamps)
         manifest["native_shadow"] = checked_trajectory(shadow_path, expected_stamps)
-        manifest["status"] = "completed_unverified_software_replay"
+        manifest["status"] = (
+            "completed_unverified_partial_software_replay"
+            if visual_info["frame_limit_truncated"]
+            else "completed_unverified_software_replay"
+        )
     except Exception as error:
         manifest["status"] = "failed"
         manifest["failure_reason"] = str(error)
