@@ -73,6 +73,16 @@ synchronization/visual/native files, checks native counter totals,
 and rejects native trajectory missing/duplicate/reordered timestamps.
 The actual native file location varies by platform/CMake preset.
 
+The visual manifest contains an ordered `frame_audit` ledger with one
+timestamped entry for each examined frame. It records accepted anchor/visual
+updates, rejected synchronization windows and the first terminal tracking
+failure. Accepted visual entries include PnP inlier counts, reprojection RMSE,
+and optical-flow track counts; the ledger has its own SHA-256 digest. The
+end-to-end runner verifies its length and timestamps against the camera stream
+and against the exact visual rows that the native estimators will consume.
+This ensures dropped frames and accepted updates are independently inspectable
+instead of appearing only as aggregate counts.
+
 The integration test for the wrapper uses **mocked sensor data and an
 in-memory fake native process** to verify the evidence contract; the
 separate native CTest uses a compiled real C++ executable. These are
