@@ -18,6 +18,7 @@ from research.experiments.euroc_stereo_visual_odometry import (
     make_transform,
     relative_camera_pnp,
     rectified_left,
+    rotation_to_quaternion_wxyz,
     visual_measurements,
 )
 
@@ -50,6 +51,18 @@ class StereoVisualOdometryTests(unittest.TestCase):
         self.assertLess(diagnostics["rmse_px"], 0.01)
         self.assertTrue(np.allclose(relative[:3, :3], self.rotation, atol=0.005))
         self.assertTrue(np.allclose(relative[:3, 3], self.translation, atol=0.02))
+
+    def test_right_handed_visual_quaternion_from_pnp_rotation(self):
+        quaternion = rotation_to_quaternion_wxyz(self.rotation)
+        self.assertAlmostEqual(float(np.linalg.norm(quaternion)), 1.0, places=9)
+        self.assertGreater(quaternion[0], 0.0)
+        self.assertTrue(
+            np.allclose(quaternion[1:], np.array([0.004, -0.006, 0.0075]), atol=1e-4)
+        )
+
+    def test_reflected_rotation_quaternion_rejected(self):
+        with self.assertRaisesRegex(ValueError, "proper rotation"):
+            rotation_to_quaternion_wxyz(np.diag([-1.0, 1.0, 1.0]))
 
     def test_rectification_reuses_loaded_camera_pixels(self):
         image = np.full((24, 32), 128, dtype=np.uint8)
@@ -104,7 +117,7 @@ class StereoVisualOdometryTests(unittest.TestCase):
             )
 
     def test_csv_schema_matches_native_visual_pose_contract(self):
-        self.assertEqual(len(VISUAL_COLUMNS), 11)
+        self.assertEqual(len(VISUAL_COLUMNS), 16)
         self.assertEqual(VISUAL_COLUMNS[0], "timestamp_ns")
         self.assertEqual(VISUAL_COLUMNS[1:4], ("x_m", "y_m", "z_m"))
         self.assertEqual(
@@ -268,6 +281,8 @@ class StereoVisualOdometryTests(unittest.TestCase):
             self.assertEqual(observations[0]["timestamp_ns"], 1_100_000_000)
             self.assertAlmostEqual(observations[0]["x_m"], -0.1, places=6)
             self.assertAlmostEqual(observations[0]["vx_mps"], -1.0, places=6)
+            self.assertAlmostEqual(observations[0]["qw"], 1.0, places=7)
+            self.assertAlmostEqual(observations[0]["sigma_orientation_rad"], 0.25)
             self.assertEqual(manifest["frame_audit_count"], 2)
             self.assertEqual(
                 [row["status"] for row in manifest["frame_audit"]],
