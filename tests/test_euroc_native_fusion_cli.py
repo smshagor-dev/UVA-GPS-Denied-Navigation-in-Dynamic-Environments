@@ -159,6 +159,35 @@ class NativeStereoImuCliTests(unittest.TestCase):
         self.assertFalse(self.active.exists())
         self.assertFalse(self.shadow.exists())
 
+    def test_nonunit_visual_quaternion_is_rejected(self):
+        source = self.visual.read_text(encoding="utf-8")
+        self.visual.write_text(
+            source.replace(",1.0,0.0,0.0,0.0,0.25", ",0.0,0.0,0.0,0.0,0.25"),
+            encoding="utf-8",
+        )
+        result = self.run_native()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("invalid visual orientation", result.stderr)
+        self.assertFalse(self.active.exists())
+        self.assertFalse(self.shadow.exists())
+
+    def test_synthetic_visual_yaw_corrects_both_native_attitudes(self):
+        source = self.visual.read_text(encoding="utf-8")
+        rows = source.splitlines()
+        rows[-1] = rows[-1].replace(
+            ",1.0,0.0,0.0,0.0,0.25",
+            ",0.9987502604,0.0,0.0,0.0499791693,0.25",
+        )
+        self.visual.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        result = self.run_native()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for path in (self.active, self.shadow):
+            with path.open(newline="", encoding="utf-8") as file:
+                records = list(csv.DictReader(file))
+            self.assertEqual(len(records), 2)
+            self.assertGreater(float(records[-1]["qz"]), 0.001)
+            self.assertLess(float(records[-1]["qz"]), 0.10)
+
     def test_visual_beyond_original_imu_window_is_rejected(self):
         self.write_visual(timestamp_offsets=[22_000_000, 100_000_000])
         result = self.run_native()
