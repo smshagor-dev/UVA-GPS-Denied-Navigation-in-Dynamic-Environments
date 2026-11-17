@@ -28,9 +28,15 @@ def make_fixture(root):
     write_rows(
         imu / "data.csv",
         [
-            ["#timestamp [ns]", "w_RS_S_x [rad s^-1]", "w_RS_S_y [rad s^-1]",
-             "w_RS_S_z [rad s^-1]", "a_RS_S_x [m s^-2]",
-             "a_RS_S_y [m s^-2]", "a_RS_S_z [m s^-2]"],
+            [
+                "#timestamp [ns]",
+                "w_RS_S_x [rad s^-1]",
+                "w_RS_S_y [rad s^-1]",
+                "w_RS_S_z [rad s^-1]",
+                "a_RS_S_x [m s^-2]",
+                "a_RS_S_y [m s^-2]",
+                "a_RS_S_z [m s^-2]",
+            ],
             [NS0, 0.1, 0.2, 0.3, 0, 0, 9.81],
             [NS0 + 1_000_000, 0.1, 0.2, 0.3, 0, 0, 9.81],
         ],
@@ -38,7 +44,9 @@ def make_fixture(root):
     for camera in ("cam0", "cam1"):
         directory = mav / camera
         (directory / "data").mkdir(parents=True)
-        (directory / "sensor.yaml").write_text("sensor_type: camera\n", encoding="utf-8")
+        (directory / "sensor.yaml").write_text(
+            "sensor_type: camera\n", encoding="utf-8"
+        )
         name = f"{NS0}.png"
         (directory / "data" / name).write_bytes(b"offline-fixture-not-a-real-png")
         write_rows(
@@ -62,9 +70,9 @@ class EurocSensorIntakeTests(unittest.TestCase):
         (gt / "data.csv").write_text("invalid ground truth\n", encoding="utf-8")
         events, manifest = collect(self.root, hash_images=True)
         self.assertEqual(len(events), 4)
-        self.assertEqual([e["sensor"] for e in events], [
-            "imu0", "cam0", "cam1", "imu0"
-        ])
+        self.assertEqual(
+            [e["sensor"] for e in events], ["imu0", "cam0", "cam1", "imu0"]
+        )
         self.assertEqual(manifest["stereo_exact_timestamp_pairs"], 1)
         self.assertFalse(manifest["ground_truth_used"])
         self.assertFalse(manifest["dataset_provenance_verified"])
@@ -77,8 +85,9 @@ class EurocSensorIntakeTests(unittest.TestCase):
         event_path, manifest_path = out / "events.jsonl", out / "manifest.json"
         result = export(self.root, event_path, manifest_path)
         data = event_path.read_bytes()
-        self.assertEqual(hashlib.sha256(data).hexdigest(),
-                         result["event_stream_sha256"])
+        self.assertEqual(
+            hashlib.sha256(data).hexdigest(), result["event_stream_sha256"]
+        )
         self.assertEqual(json.loads(manifest_path.read_text())["total_events"], 4)
         self.assertFalse(result["images_hashed"])
         self.assertNotIn("image_sha256", data.decode())
@@ -112,16 +121,21 @@ class EurocSensorIntakeTests(unittest.TestCase):
 
     def test_output_inside_original_dataset_rejected(self):
         with self.assertRaisesRegex(ValueError, "outside"):
-            export(self.root, self.root / "events.jsonl",
-                   Path(self.tmp.name) / "manifest.json")
+            export(
+                self.root,
+                self.root / "events.jsonl",
+                Path(self.tmp.name) / "manifest.json",
+            )
 
     def test_camera_timestamp_mismatch_is_reported_not_hidden(self):
         folder = self.root / "mav0" / "cam1"
         previous = folder / "data" / f"{NS0}.png"
         name = f"{NS0 + 1_000_000}.png"
         previous.rename(folder / "data" / name)
-        write_rows(folder / "data.csv",
-                   [["#timestamp [ns]", "filename"], [NS0 + 1_000_000, name]])
+        write_rows(
+            folder / "data.csv",
+            [["#timestamp [ns]", "filename"], [NS0 + 1_000_000, name]],
+        )
         events, manifest = collect(self.root)
         self.assertEqual(len(events), 4)
         self.assertEqual(manifest["stereo_exact_timestamp_pairs"], 0)
