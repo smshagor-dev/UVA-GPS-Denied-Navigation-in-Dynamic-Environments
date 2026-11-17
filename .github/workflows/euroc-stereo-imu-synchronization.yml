@@ -1,0 +1,39 @@
+name: EuRoC Stereo IMU Synchronization Regression
+
+on:
+  pull_request:
+    paths:
+      - "research/experiments/euroc_stereo_imu_synchronization.py"
+      - "tests/test_euroc_stereo_imu_synchronization.py"
+      - "docs/research/EUROC_STEREO_IMU_SYNCHRONIZATION_PROTOCOL.md"
+      - ".github/workflows/euroc-stereo-imu-synchronization.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-timestamp-regression:
+    name: EuRoC synchronized timestamp and gap regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install calibration and source parser dependencies
+        run: python -m pip install "numpy>=2.3,<3" "PyYAML>=6.0.3,<7"
+      - name: Execute synthetic tests
+        run: |
+          python -m unittest tests.test_euroc_sensor_intake -v
+          python -m unittest tests.test_euroc_calibration_validation -v
+          python -m unittest tests.test_euroc_stereo_imu_synchronization -v
+      - name: Validate bytecode
+        run: |
+          python -m py_compile research/experiments/euroc_stereo_imu_synchronization.py
+          python -m py_compile tests/test_euroc_stereo_imu_synchronization.py
+      - name: Scientific integrity statement
+        run: |
+          echo "Synthetic timestamp/calibration fixture tests only."
+          echo "No genuine EuRoC sequence, estimator run, ATE or physical flight evidence."
