@@ -160,6 +160,8 @@ class StereoVisualOdometryTests(unittest.TestCase):
                 observations, manifest = visual_measurements(root)
             self.assertEqual(observations, [])
             self.assertTrue(manifest["failed_closed_on_tracking_loss"])
+            self.assertTrue(manifest["tracking_failure_truncated"])
+            self.assertFalse(manifest["frame_limit_truncated"])
             self.assertEqual(
                 manifest["visual_status_counts"]["failed_sync_discontinuity"],
                 1,
