@@ -18,6 +18,8 @@ enum class MeasurementType : uint8_t {
     ManualZupt,
     LidarDepth,
     DisabledLidarObservation,
+    // Appended to preserve existing serialized measurement type ordinals.
+    VisualAttitude,
 };
 
 enum class MeasurementFrame : uint8_t {
@@ -39,6 +41,14 @@ struct VisualPoseMeasurementPayload {
     Eigen::Vector3d velocity_mps{Eigen::Vector3d::Zero()};
     double sigma_position_m{0.35};
     double sigma_velocity_mps{0.45};
+
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
+
+struct VisualAttitudeMeasurementPayload {
+    // q_W_I: IMU-body rotation into initial VO world reference frame.
+    Eigen::Quaterniond world_from_imu{Eigen::Quaterniond::Identity()};
+    double sigma_orientation_rad{0.25}; // conservative, not calibrated
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
@@ -68,7 +78,8 @@ struct DisabledLidarObservationPayload {
 using MeasurementPayload =
     std::variant<ImuMeasurementPayload, VisualPoseMeasurementPayload,
                  VisualFeatureMeasurementPayload, ManualZuptMeasurementPayload,
-                 LidarDepthMeasurementPayload, DisabledLidarObservationPayload>;
+                 LidarDepthMeasurementPayload, DisabledLidarObservationPayload,
+                 VisualAttitudeMeasurementPayload>;
 
 struct MeasurementEnvelope {
     MeasurementType type{MeasurementType::Imu};
