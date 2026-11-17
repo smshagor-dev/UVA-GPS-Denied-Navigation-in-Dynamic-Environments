@@ -135,8 +135,15 @@ def integrate_camera_motion(
     return result
 
 
-def rectified_left(image_path: Path, rect: dict) -> np.ndarray:
-    raw = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+def rectified_left(
+    image_path: Path, rect: dict, *, source_image: np.ndarray | None = None
+) -> np.ndarray:
+    # Reuse the already-validated source image to avoid a second disk read.
+    raw = (
+        cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+        if source_image is None
+        else source_image
+    )
     width, height = rect["image_size"]
     require(raw is not None and raw.dtype == np.uint8 and
             raw.shape == (height, width),
@@ -269,7 +276,7 @@ def visual_measurements(
             features = find_stereo_landmarks(
                 image0, image1, rect,
             )
-            current_left = rectified_left(path0, rect)
+            current_left = rectified_left(path0, rect, source_image=image0)
         except (ValueError, cv2.error):
             statuses["failed_stereo_frontend"] += 1
             frame_audit.append({
