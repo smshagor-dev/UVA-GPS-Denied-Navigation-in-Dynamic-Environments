@@ -172,7 +172,8 @@ def run(
         )
         ledger = visual_info["frame_audit"]
         require(
-            len(ledger) == visual_info["frame_audit_count"]
+            len(ledger)
+            == visual_info["frame_audit_count"]
             == visual_info["camera_timestamps_examined"],
             "frame audit count differs from examined camera timestamps",
         )
@@ -190,17 +191,27 @@ def run(
             "visual CSV timestamps do not match accepted frame audit",
         )
         require(
-            all(row["status"] in (
-                "anchor", "visual_pose", "failed_stereo_frontend",
-                "failed_temporal_gap", "failed_temporal_tracking",
-                "failed_speed_gate", "failed_sync_discontinuity",
-            ) or row["status"].startswith("sync_") for row in ledger),
+            all(
+                row["status"]
+                in (
+                    "anchor",
+                    "visual_pose",
+                    "failed_stereo_frontend",
+                    "failed_temporal_gap",
+                    "failed_temporal_tracking",
+                    "failed_speed_gate",
+                    "failed_sync_discontinuity",
+                )
+                or row["status"].startswith("sync_")
+                for row in ledger
+            ),
             "unknown visual frame audit status",
         )
         require(
             hashlib.sha256(
                 json.dumps(ledger, sort_keys=True, separators=(",", ":")).encode()
-            ).hexdigest() == visual_info["frame_audit_sha256"],
+            ).hexdigest()
+            == visual_info["frame_audit_sha256"],
             "visual frame audit hash mismatch",
         )
 
