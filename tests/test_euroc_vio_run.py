@@ -137,6 +137,16 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
         self.assertEqual(len(result["visual"]["frame_audit_sha256"]), 64)
         self.assertEqual(result["native_active"]["sample_count"], 2)
         self.assertEqual(result["native_shadow"]["sample_count"], 2)
+        for field in ("active_evaluator_positions", "shadow_evaluator_positions"):
+            report = result[field]
+            self.assertEqual(report["sample_count"], 2)
+            self.assertEqual(len(report["sha256"]), 64)
+            with (self.output / report["relative_file"]).open(
+                newline="", encoding="utf-8"
+            ) as file:
+                reader = csv.DictReader(file)
+                self.assertEqual(reader.fieldnames, ["timestamp_ns", "x_m", "y_m", "z_m"])
+                self.assertEqual(len(list(reader)), 2)
         self.assertEqual(
             json.loads((self.output / "run_manifest.json").read_text())["status"],
             "completed_unverified_software_replay",
