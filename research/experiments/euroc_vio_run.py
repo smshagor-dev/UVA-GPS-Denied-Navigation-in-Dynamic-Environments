@@ -41,25 +41,33 @@ def digest(path: Path) -> str:
 
 
 def checked_trajectory(path: Path, expected_stamps: list[int]) -> dict:
-    require(path.is_file() and not path.is_symlink(),
-            f"missing or symlinked native trajectory: {path}")
+    require(
+        path.is_file() and not path.is_symlink(),
+        f"missing or symlinked native trajectory: {path}",
+    )
     timestamps = []
     with path.open("r", newline="", encoding="utf-8-sig") as reader:
         rows = csv.DictReader(reader)
-        require(rows.fieldnames == TRAJECTORY_COLUMNS,
-                "native trajectory columns must match independent evaluator")
+        require(
+            rows.fieldnames == TRAJECTORY_COLUMNS,
+            "native trajectory columns must match independent evaluator",
+        )
         for row in rows:
             require(None not in row, "extra native trajectory columns")
             stamp = row["timestamp_ns"]
-            require(bool(stamp) and stamp.isascii() and stamp.isdecimal(),
-                    "non-integer native trajectory timestamp")
+            require(
+                bool(stamp) and stamp.isascii() and stamp.isdecimal(),
+                "non-integer native trajectory timestamp",
+            )
             timestamps.append(int(stamp))
             require(
                 all(math.isfinite(float(row[name])) for name in TRAJECTORY_COLUMNS[1:]),
                 "nonfinite native pose",
             )
-    require(timestamps == expected_stamps,
-            "native trajectory lost, duplicated or reordered visual timestamps")
+    require(
+        timestamps == expected_stamps,
+        "native trajectory lost, duplicated or reordered visual timestamps",
+    )
     return {
         "sample_count": len(timestamps),
         "first_timestamp_ns": timestamps[0],
@@ -79,20 +87,29 @@ def run(
     timeout_s: int = 3600,
 ) -> dict:
     require(type(max_frames) is int and max_frames >= 0, "invalid frame limit")
-    require(type(min_inliers) is int and 8 <= min_inliers <= 1000,
-            "invalid PnP inlier gate")
-    require(type(timeout_s) is int and timeout_s > 0,
-            "timeout must be positive integer seconds")
+    require(
+        type(min_inliers) is int and 8 <= min_inliers <= 1000, "invalid PnP inlier gate"
+    )
+    require(
+        type(timeout_s) is int and timeout_s > 0,
+        "timeout must be positive integer seconds",
+    )
     source = sequence_root.resolve(strict=True)
     require(source.is_dir(), "EuRoC source must be a directory")
     native = native_binary.resolve(strict=True)
-    require(native.is_file() and os.access(native, os.X_OK),
-            "native C++ fusion executable not found or not executable")
+    require(
+        native.is_file() and os.access(native, os.X_OK),
+        "native C++ fusion executable not found or not executable",
+    )
     destination = output_dir.resolve()
-    require(not destination.is_relative_to(source),
-            "output directory must remain outside the original EuRoC source")
-    require(not destination.exists() and not output_dir.is_symlink(),
-            "refusing to overwrite an existing experiment output directory")
+    require(
+        not destination.is_relative_to(source),
+        "output directory must remain outside the original EuRoC source",
+    )
+    require(
+        not destination.exists() and not output_dir.is_symlink(),
+        "refusing to overwrite an existing experiment output directory",
+    )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.mkdir(exist_ok=False)
 
@@ -120,9 +137,7 @@ def run(
     try:
         sync_path = destination / "synchronized_frames.jsonl"
         sync_manifest_path = destination / "synchronization_manifest.json"
-        sync_info = export_sync(
-            source, sync_path, sync_manifest_path, hash_images=True
-        )
+        sync_info = export_sync(source, sync_path, sync_manifest_path, hash_images=True)
         manifest["synchronization"] = {
             "manifest_sha256": digest(sync_manifest_path),
             "events_sha256": digest(sync_path),
@@ -133,8 +148,11 @@ def run(
         visual_path = destination / "visual_odometry.csv"
         visual_manifest_path = destination / "visual_manifest.json"
         visual_info = export_visual(
-            source, visual_path, visual_manifest_path,
-            max_frames=max_frames, min_inliers=min_inliers,
+            source,
+            visual_path,
+            visual_manifest_path,
+            max_frames=max_frames,
+            min_inliers=min_inliers,
         )
         manifest["visual"] = {
             "manifest_sha256": digest(visual_manifest_path),
@@ -146,42 +164,52 @@ def run(
         with visual_path.open("r", newline="", encoding="utf-8") as reader:
             rows = list(csv.DictReader(reader))
         expected_stamps = [int(row["timestamp_ns"]) for row in rows]
-        require(len(expected_stamps) == visual_info["visual_measurement_count"],
-                "inconsistent visual rows and manifest")
+        require(
+            len(expected_stamps) == visual_info["visual_measurement_count"],
+            "inconsistent visual rows and manifest",
+        )
 
         active_path = destination / "active_estimated.csv"
         shadow_path = destination / "shadow_estimated.csv"
         process = subprocess.run(
             [
-                str(native), "--imu-csv", str(source / "mav0/imu0/data.csv"),
-                "--visual-csv", str(visual_path),
-                "--active-output", str(active_path),
-                "--shadow-output", str(shadow_path),
+                str(native),
+                "--imu-csv",
+                str(source / "mav0/imu0/data.csv"),
+                "--visual-csv",
+                str(visual_path),
+                "--active-output",
+                str(active_path),
+                "--shadow-output",
+                str(shadow_path),
                 "--assume-initial-imu-identity",
             ],
-            capture_output=True, text=True, check=False, timeout=timeout_s,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_s,
         )
         manifest["native_exit_code"] = process.returncode
         manifest["native_stdout"] = process.stdout[-4000:]
         manifest["native_stderr"] = process.stderr[-4000:]
-        require(process.returncode == 0,
-                "native C++ estimator fusion failed; inspect run_manifest.json")
+        require(
+            process.returncode == 0,
+            "native C++ estimator fusion failed; inspect run_manifest.json",
+        )
         matched = NATIVE_COUNTS.search(process.stdout)
         require(matched is not None, "native fusion counter contract missing")
         originals, interpolated, updates = map(int, matched.groups())
-        require(updates == len(expected_stamps) and originals >= 2,
-                "native update count or original IMU count incorrect")
+        require(
+            updates == len(expected_stamps) and originals >= 2,
+            "native update count or original IMU count incorrect",
+        )
         manifest["native_counts"] = {
             "original_imu_rows": originals,
             "interpolated_camera_time_imu_rows": interpolated,
             "visual_updates": updates,
         }
-        manifest["native_active"] = checked_trajectory(
-            active_path, expected_stamps
-        )
-        manifest["native_shadow"] = checked_trajectory(
-            shadow_path, expected_stamps
-        )
+        manifest["native_active"] = checked_trajectory(active_path, expected_stamps)
+        manifest["native_shadow"] = checked_trajectory(shadow_path, expected_stamps)
         manifest["status"] = "completed_unverified_software_replay"
     except Exception as error:
         manifest["status"] = "failed"
@@ -206,8 +234,11 @@ def main() -> None:
     parser.add_argument("--timeout-seconds", type=int, default=3600)
     args = parser.parse_args()
     result = run(
-        args.sequence_root, args.output_dir, args.native_binary,
-        max_frames=args.max_frames, min_inliers=args.min_inliers,
+        args.sequence_root,
+        args.output_dir,
+        args.native_binary,
+        max_frames=args.max_frames,
+        min_inliers=args.min_inliers,
         timeout_s=args.timeout_seconds,
     )
     print(
