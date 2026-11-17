@@ -49,20 +49,14 @@ class StereoVisualOdometryTests(unittest.TestCase):
         self.assertEqual(diagnostics["matches"], 60)
         self.assertGreaterEqual(diagnostics["inliers"], 50)
         self.assertLess(diagnostics["rmse_px"], 0.01)
-        self.assertTrue(
-            np.allclose(relative[:3, :3], self.rotation, atol=0.005)
-        )
-        self.assertTrue(
-            np.allclose(relative[:3, 3], self.translation, atol=0.02)
-        )
+        self.assertTrue(np.allclose(relative[:3, :3], self.rotation, atol=0.005))
+        self.assertTrue(np.allclose(relative[:3, 3], self.translation, atol=0.02))
 
     def test_initial_imu_world_pose_and_camera_lever_arm(self):
         extra = make_transform(np.eye(3), [0.16, 0.02, -0.04])
         relative = make_transform(np.eye(3), [0.10, 0.0, 0.0])
         fused = integrate_camera_motion(np.eye(4), relative, extra)
-        self.assertTrue(
-            np.allclose(fused[:3, 3], [-0.1, 0.0, 0.0], atol=1e-10)
-        )
+        self.assertTrue(np.allclose(fused[:3, 3], [-0.1, 0.0, 0.0], atol=1e-10))
         self.assertTrue(np.allclose(fused[:3, :3], np.eye(3)))
 
     def test_right_handed_rotation_gate(self):
@@ -99,10 +93,8 @@ class StereoVisualOdometryTests(unittest.TestCase):
         self.assertEqual(VISUAL_COLUMNS[0], "timestamp_ns")
         self.assertEqual(VISUAL_COLUMNS[1:4], ("x_m", "y_m", "z_m"))
         self.assertEqual(
-            VISUAL_COLUMNS[7:9],
-            ("sigma_position_m", "sigma_velocity_mps"),
+            VISUAL_COLUMNS[7:9], ("sigma_position_m", "sigma_velocity_mps")
         )
-
 
     def test_rejected_camera_frame_breaks_visual_trajectory(self):
         with tempfile.TemporaryDirectory() as directory:
