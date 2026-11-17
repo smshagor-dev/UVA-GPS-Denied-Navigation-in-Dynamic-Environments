@@ -1,0 +1,177 @@
+"""End-to-end, synthetic-file CLI verification for native EuRoC VO + IMU replay.
+
+No real EuRoC data, camera image or ground truth is used in these tests.
+"""
+
+import argparse
+import csv
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+
+START = 1403636579763555584
+VISUAL_COLUMNS = [
+    "timestamp_ns",
+    "x_m",
+    "y_m",
+    "z_m",
+    "vx_mps",
+    "vy_mps",
+    "vz_mps",
+    "sigma_position_m",
+    "sigma_velocity_mps",
+    "pnp_inliers",
+    "pnp_reprojection_rmse_px",
+]
+
+
+class NativeStereoImuCliTests(unittest.TestCase):
+    binary = None
+
+    def setUp(self):
+        self.workspace = tempfile.TemporaryDirectory()
+        self.addCleanup(self.workspace.cleanup)
+        root = Path(self.workspace.name)
+        self.imu = root / "mav0" / "imu0" / "data.csv"
+        self.imu.parent.mkdir(parents=True)
+        self.visual = root / "visual.csv"
+        self.active = root / "active.csv"
+        self.shadow = root / "shadow.csv"
+        self.write_imu()
+        self.write_visual()
+
+    def write_imu(self):
+        with self.imu.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(
+                [
+                    "#timestamp [ns]",
+                    "w_RS_S_x [rad s^-1]",
+                    "w_RS_S_y [rad s^-1]",
+                    "w_RS_S_z [rad s^-1]",
+                    "a_RS_S_x [m s^-2]",
+                    "a_RS_S_y [m s^-2]",
+                    "a_RS_S_z [m s^-2]",
+                ]
+            )
+            for n in range(16):
+                writer.writerow([START + n * 5_000_000, 0, 0, 0, 0, 0, 9.81])
+
+    def write_visual(self, *, timestamp_offsets=None, bad_sigma=False):
+        offsets = timestamp_offsets or [22_000_000, 50_000_000]
+        with self.visual.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(VISUAL_COLUMNS)
+            for offset in offsets:
+                writer.writerow(
+                    [
+                        START + offset,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        -0.5 if bad_sigma else 0.5,
+                        0.75,
+                        32,
+                        0.25,
+                    ]
+                )
+
+    def run_native(self, *, active=None, shadow=None):
+        self.assertIsNotNone(self.binary)
+        return subprocess.run(
+            [
+                self.binary,
+                "--imu-csv",
+                str(self.imu),
+                "--visual-csv",
+                str(self.visual),
+                "--active-output",
+                str(active or self.active),
+                "--shadow-output",
+                str(shadow or self.shadow),
+                "--assume-initial-imu-identity",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+
+    def test_two_fused_output_trajectories_and_interpolation(self):
+        result = self.run_native()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("1 interpolated camera-time rows", result.stdout)
+        self.assertIn("2 visual updates accepted", result.stdout)
+        for path in (self.active, self.shadow):
+            with path.open(newline="", encoding="utf-8") as file:
+                rows = list(csv.DictReader(file))
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(
+                [int(r["timestamp_ns"]) for r in rows],
+                [START + 22_000_000, START + 50_000_000],
+            )
+            for row in rows:
+                self.assertTrue(
+                    all(abs(float(row[k])) < 100 for k in ("x_m", "y_m", "z_m"))
+                )
+
+    def test_visual_out_of_order_is_rejected_without_outputs(self):
+        self.write_visual(timestamp_offsets=[50_000_000, 22_000_000])
+        result = self.run_native()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("nonmonotonic visual timestamps", result.stderr)
+        self.assertFalse(self.active.exists())
+        self.assertFalse(self.shadow.exists())
+
+    def test_bad_visual_covariance_is_rejected(self):
+        self.write_visual(bad_sigma=True)
+        result = self.run_native()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported visual quality/sigma values", result.stderr)
+        self.assertFalse(self.active.exists())
+
+    def test_visual_beyond_original_imu_window_is_rejected(self):
+        self.write_visual(timestamp_offsets=[22_000_000, 100_000_000])
+        result = self.run_native()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("outside original IMU support", result.stderr)
+        self.assertFalse(self.active.exists())
+
+    def test_existing_output_is_not_overwritten(self):
+        self.active.write_text("existing result\n", encoding="utf-8")
+        result = self.run_native()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.active.read_text(), "existing result\n")
+        self.assertFalse(self.shadow.exists())
+
+    def test_original_imu_source_with_nonfinite_value_is_rejected(self):
+        text = self.imu.read_text(encoding="utf-8")
+        text = text.replace(",9.81", ",nan", 1)
+        self.imu.write_text(text, encoding="utf-8")
+        result = self.run_native()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("nonfinite", result.stderr)
+        self.assertFalse(self.active.exists())
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--binary", required=True, type=Path)
+    args = parser.parse_args()
+    if not args.binary.is_file():
+        parser.error("native binary must exist")
+    NativeStereoImuCliTests.binary = str(args.binary.resolve())
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(
+        NativeStereoImuCliTests
+    )
+    report = unittest.TextTestRunner(verbosity=2).run(suite)
+    raise SystemExit(0 if report.wasSuccessful() else 1)
+
+
+if __name__ == "__main__":
+    main()
