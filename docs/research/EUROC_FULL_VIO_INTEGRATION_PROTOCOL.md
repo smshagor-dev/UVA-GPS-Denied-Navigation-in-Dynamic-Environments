@@ -49,6 +49,36 @@ build/linux-gcc-release/tests/Release/euroc_stereo_imu_native_fusion \
 
 Adjust the build output executable path for the selected CMake multi-config preset and system. All outputs must be new paths outside the original dataset. The Python visual CSV contains fixed non-benchmark uncertainty weights `sigma_position_m=0.5` and `sigma_velocity_mps=0.75`, PnP inlier count and reprojection RMSE. It is NOT legitimate to reinterpret these constants as measured uncertainties.
 
+## One-command end-to-end evidence collection
+
+After building the native C++ binary, use the orchestration wrapper to
+validate synchronization, extract visual odometry, run both native estimators
+and verify accepted measurement timestamps and SHA-256 digests:
+
+```bash
+python3 -m research.experiments.euroc_vio_run \
+  --sequence-root /data/EuRoC/MH_01_easy \
+  --native-binary build/linux-gcc-release/tests/euroc_stereo_imu_native_fusion \
+  --output-dir /data/exports/MH_01_easy_trial01 \
+  --max-frames 0 \
+  --min-inliers 12
+```
+
+The output directory must **not already exist**, may not be inside the
+source sequence, and retains a `run_manifest.json` with explicit
+`status: failed` for any interrupted or invalid run. Successful runs
+are labeled `completed_unverified_software_replay`, never
+`publishable_accuracy_evidence`. The runner hashes all generated
+synchronization/visual/native files, checks native counter totals,
+and rejects native trajectory missing/duplicate/reordered timestamps.
+The actual native file location varies by platform/CMake preset.
+
+The integration test for the wrapper uses **mocked sensor data and an
+in-memory fake native process** to verify the evidence contract; the
+separate native CTest uses a compiled real C++ executable. These are
+not substitute validations for independently obtained original EuRoC
+images or benchmark comparisons.
+
 ## Explicit temporal interpolation, not timestamp rounding
 
 The native bridge consumes original IMU timestamps. When a camera-derived visual update falls *between* consecutive original IMU timestamps, it inserts a linearly interpolated accelerometer/gyro sample at the precise camera nanosecond time (and counts these events separately). This is an approximation that must be tested in sensitivity analysis. Unsupported sensor gaps over 25 ms, time inversions, insufficient visual correspondences, large PnP residual, nonfinite values, source schema mismatches and native estimator rejections are fail-closed.
