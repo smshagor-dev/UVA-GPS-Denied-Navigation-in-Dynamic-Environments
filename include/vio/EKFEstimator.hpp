@@ -321,6 +321,9 @@ public:
     void update_visual_pose(const Eigen::Vector3d& observed_position,
                             const Eigen::Vector3d& observed_velocity,
                             double sigma_position_m = 0.35, double sigma_velocity_mps = 0.45);
+    // Body-right error-state quaternion update (q_W_I), with conservative gate.
+    void update_visual_attitude(const Eigen::Quaterniond& observed_world_from_imu,
+                                double sigma_orientation_rad = 0.25);
 
     //  Zero velocity update (on ground detection)
     void update_zupt();
