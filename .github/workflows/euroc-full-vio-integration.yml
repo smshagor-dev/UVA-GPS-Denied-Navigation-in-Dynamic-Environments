@@ -5,6 +5,7 @@ on:
     paths:
       - "research/experiments/euroc_stereo_visual_odometry.py"
       - "tests/test_euroc_stereo_visual_odometry.py"
+      - "tests/test_euroc_native_fusion_cli.py"
       - "tools/euroc_stereo_imu_native_fusion.cpp"
       - "tests/CMakeLists.txt"
       - ".github/workflows/navigation-validation.yml"
