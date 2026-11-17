@@ -160,6 +160,8 @@ def run(
             "accepted_count": visual_info["visual_measurement_count"],
             "frame_limit_truncated": visual_info["frame_limit_truncated"],
             "visual_status_counts": visual_info["visual_status_counts"],
+            "frame_audit_count": visual_info["frame_audit_count"],
+            "frame_audit_sha256": visual_info["frame_audit_sha256"],
         }
         with visual_path.open("r", newline="", encoding="utf-8") as reader:
             rows = list(csv.DictReader(reader))
@@ -167,6 +169,39 @@ def run(
         require(
             len(expected_stamps) == visual_info["visual_measurement_count"],
             "inconsistent visual rows and manifest",
+        )
+        ledger = visual_info["frame_audit"]
+        require(
+            len(ledger) == visual_info["frame_audit_count"]
+            == visual_info["camera_timestamps_examined"],
+            "frame audit count differs from examined camera timestamps",
+        )
+        audit_stamps = [row["timestamp_ns"] for row in ledger]
+        require(
+            all(isinstance(value, int) for value in audit_stamps)
+            and all(a < b for a, b in zip(audit_stamps, audit_stamps[1:])),
+            "frame audit timestamps must be strictly increasing",
+        )
+        audit_visual_stamps = [
+            row["timestamp_ns"] for row in ledger if row["status"] == "visual_pose"
+        ]
+        require(
+            expected_stamps == audit_visual_stamps,
+            "visual CSV timestamps do not match accepted frame audit",
+        )
+        require(
+            all(row["status"] in (
+                "anchor", "visual_pose", "failed_stereo_frontend",
+                "failed_temporal_gap", "failed_temporal_tracking",
+                "failed_speed_gate", "failed_sync_discontinuity",
+            ) or row["status"].startswith("sync_") for row in ledger),
+            "unknown visual frame audit status",
+        )
+        require(
+            hashlib.sha256(
+                json.dumps(ledger, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest() == visual_info["frame_audit_sha256"],
+            "visual frame audit hash mismatch",
         )
 
         active_path = destination / "active_estimated.csv"
