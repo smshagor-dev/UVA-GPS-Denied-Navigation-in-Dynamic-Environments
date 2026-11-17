@@ -128,7 +128,7 @@ class EurocCalibrationValidationTests(unittest.TestCase):
             audit(self.root)
 
     def test_nonfinite_distortion_is_rejected(self):
-        self.blocks["cam0"]["distortion_coefficients"][1] = ".nan"
+        self.blocks["cam0"]["distortion_coefficients"][1] = float("nan")
         self.save_all()
         with self.assertRaisesRegex(ValueError, "nonfinite"):
             audit(self.root)
