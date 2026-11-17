@@ -244,6 +244,35 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
         self.assertEqual(manifest["status"], "failed")
         self.assertFalse(manifest["publishable_accuracy_evidence"])
 
+    def test_reject_changed_calibration_between_sync_and_visual_stages(self):
+        original = self.export_visual
+
+        def changed_calibration(*args, **kwargs):
+            result = original(*args, **kwargs)
+            result["calibration_sha256"] = {"imu0": "synthetic-calibration-tampered"}
+            return result
+
+        with (
+            mock.patch(
+                "research.experiments.euroc_vio_run.export_sync",
+                side_effect=self.export_sync,
+            ),
+            mock.patch(
+                "research.experiments.euroc_vio_run.export_visual",
+                side_effect=changed_calibration,
+            ),
+            mock.patch(
+                "research.experiments.euroc_vio_run.subprocess.run",
+                side_effect=AssertionError("native called after calibration digest change"),
+            ) as native,
+        ):
+            with self.assertRaisesRegex(ValueError, "calibration file digests changed"):
+                run(self.source, self.output, self.binary)
+            native.assert_not_called()
+        manifest = json.loads((self.output / "run_manifest.json").read_text())
+        self.assertEqual(manifest["status"], "failed")
+        self.assertFalse(manifest["publishable_accuracy_evidence"])
+
     def test_output_directory_inside_source_is_never_created(self):
         forbidden = self.source / "original_data_overwrite"
         with self.assertRaisesRegex(ValueError, "outside"):
