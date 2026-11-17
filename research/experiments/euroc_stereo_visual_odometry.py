@@ -79,6 +79,8 @@ def relative_camera_pnp(
             np.all(np.isfinite(K)) and K[0, 0] > 0 and K[1, 1] > 0,
             "nonfinite or invalid PnP calibration/input")
     require(max_rmse_px > 0, "invalid reprojection tolerance")
+    require(np.linalg.matrix_rank(np.cov(uv.T), tol=1e-8) == 2,
+            "degenerate PnP image feature distribution")
     cv2.setRNGSeed(2026)
     ok, rvec, tvec, inliers = cv2.solvePnPRansac(
         np.ascontiguousarray(xyz),
