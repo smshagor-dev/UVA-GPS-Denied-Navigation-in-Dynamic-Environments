@@ -37,6 +37,11 @@ VISUAL_COLUMNS = (
     "sigma_velocity_mps",
     "pnp_inliers",
     "pnp_reprojection_rmse_px",
+    "qw",
+    "qx",
+    "qy",
+    "qz",
+    "sigma_orientation_rad",
 )
 
 
@@ -133,6 +138,30 @@ def integrate_camera_motion(
     require(np.all(np.isfinite(result)),
             "nonfinite world-to-IMU motion")
     return result
+
+
+def rotation_to_quaternion_wxyz(rotation: np.ndarray) -> np.ndarray:
+    """Right-handed orientation q_W_I from the integrated metric stereo pose.
+
+    The first accepted IMU orientation is an identity prior, NOT measured gravity.
+    """
+    r = np.asarray(rotation, dtype=np.float64)
+    require(r.shape == (3, 3) and np.isfinite(r).all(),
+            "visual orientation must be a finite 3x3 matrix")
+    require(np.linalg.norm(r.T @ r - np.eye(3)) < 1e-3 and
+            abs(float(np.linalg.det(r)) - 1.0) < 1e-3,
+            "visual orientation must be a proper rotation")
+    vector, _ = cv2.Rodrigues(r)
+    vector = vector.reshape(3)
+    theta = float(np.linalg.norm(vector))
+    if theta < 1e-12:
+        q = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+    else:
+        half = theta / 2.0
+        q = np.r_[np.cos(half), np.sin(half) * vector / theta]
+    require(abs(float(np.dot(q, q)) - 1.0) < 1e-8,
+            "non-unit visual orientation quaternion")
+    return q
 
 
 def rectified_left(
@@ -326,6 +355,7 @@ def visual_measurements(
             break
         # These sigmas are conservative fixed defaults, NOT calibrated
         # residual statistics or a benchmark uncertainty estimate.
+        attitude = rotation_to_quaternion_wxyz(candidate[:3, :3])
         observations.append({
             "timestamp_ns": stamp,
             "x_m": float(position[0]),
@@ -338,6 +368,11 @@ def visual_measurements(
             "sigma_velocity_mps": 0.75,
             "pnp_inliers": stats["inliers"],
             "pnp_reprojection_rmse_px": stats["rmse_px"],
+            "qw": float(attitude[0]),
+            "qx": float(attitude[1]),
+            "qy": float(attitude[2]),
+            "qz": float(attitude[3]),
+            "sigma_orientation_rad": 0.25,
         })
         statuses["visual_pose"] += 1
         frame_audit.append({
@@ -362,7 +397,8 @@ def visual_measurements(
         "dataset_provenance_verified": False,
         "ground_truth_used": False,
         "uses_visual_pose_position_velocity_only": True,
-        "no_visual_orientation_filter_update": True,
+        "visual_orientation_available_for_native_filter": True,
+        "visual_orientation_uncertainty_empirically_calibrated": False,
         "first_camera_anchor_is_not_a_pose_measurement": True,
         "camera_source_hashes": synchronization["source_sensor_hashes"],
         "calibration_sha256": calibration["source_yaml_sha256"],
@@ -391,7 +427,7 @@ def visual_measurements(
         "limitations": [
             "visual scale is from stereo; initial IMU orientation and gravity not estimated",
             "visual pose uses sequential PnP, not loop closure or global map optimization",
-            "relative visual orientation is not injected into active/shadow estimator",
+            "visual attitude is derived from correlated sequential stereo PnP and may drift",
             "fixed observation uncertainty is not empirically calibrated",
             "no publisher EuRoC trajectory or ATE/RPE comparison was performed",
         ],
