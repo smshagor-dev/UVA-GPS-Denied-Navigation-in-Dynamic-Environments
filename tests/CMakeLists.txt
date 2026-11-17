@@ -445,3 +445,16 @@ add_test(NAME euroc_imu_native_replay_selftest
          COMMAND $<TARGET_FILE:euroc_imu_native_replay> --self-test)
 set_tests_properties(euroc_imu_native_replay_selftest PROPERTIES
     LABELS "integration;navigation;replay;euroc-imu-only")
+
+# Stereo VO -> native EKF/ESKF integration. In-memory synthetic inputs only;
+# the CTest smoke test cannot establish genuine EuRoC accuracy.
+add_executable(euroc_stereo_imu_native_fusion ../tools/euroc_stereo_imu_native_fusion.cpp)
+target_link_libraries(euroc_stereo_imu_native_fusion PRIVATE sensor_fusion_core Eigen3::Eigen)
+drone_apply_project_warnings(euroc_stereo_imu_native_fusion)
+drone_enable_coverage(euroc_stereo_imu_native_fusion)
+drone_enable_sanitizers(euroc_stereo_imu_native_fusion)
+drone_set_target_output_dirs(euroc_stereo_imu_native_fusion "tests" "tests" "tests")
+add_test(NAME euroc_stereo_imu_native_fusion_selftest
+         COMMAND $<TARGET_FILE:euroc_stereo_imu_native_fusion> --self-test)
+set_tests_properties(euroc_stereo_imu_native_fusion_selftest PROPERTIES
+    LABELS "integration;navigation;replay;euroc-visual-inertial")
