@@ -1,0 +1,97 @@
+"""Integrity tests for IEEE baseline reference and paired simulation statistics."""
+
+import unittest
+
+from research.experiments.cbaa_reference_study import (
+    auction,
+    exact_oracle,
+    outcome,
+    scores_for,
+    trial,
+)
+from research.experiments.swarm_stats import (
+    analyze,
+    bootstrap_ci,
+    exact_signflip,
+    exact_paired_sign_test,
+    paired_signflip,
+)
+
+
+class SwarmAdvancedEvidenceTests(unittest.TestCase):
+    def test_exact_assignment_oracle(self):
+        value, assignment = exact_oracle([[10.0, 1.0], [5.0, 9.0]])
+        self.assertEqual(value, 19.0)
+        self.assertEqual(assignment, (0, 1))
+
+    def test_healthy_connected_single_task_auction_converges(self):
+        bids = scores_for(8, 11)
+        assignments, overhead = auction(bids, "ring", 0.0, 11)
+        self.assertNotIn(None, assignments)
+        self.assertEqual(len(set(assignments)), 8)
+        self.assertLessEqual(overhead["rounds"], 96)
+
+    def test_conflict_adjusted_reward_never_exceeds_oracle(self):
+        for topology in ("ring", "complete", "partition"):
+            for seed in range(10):
+                row = trial(8, topology, 0.1, seed)
+                self.assertLessEqual(
+                    row["cbaa_style"]["conflict_adjusted_reward"],
+                    row["oracle_reward"] + 1e-4,
+                )
+
+    def test_duplicates_are_not_rewarded_as_distinct_tasks(self):
+        scores = [[10.0, 1.0], [9.0, 2.0]]
+        result = outcome(scores, [0, 0])
+        self.assertEqual(result["unique_tasks"], 1)
+        self.assertEqual(result["duplicate_claims"], 1)
+        self.assertEqual(result["conflict_adjusted_reward"], 10.0)
+
+    def test_exact_signflip_and_bootstrap_constant(self):
+        self.assertEqual(exact_signflip([0.0, 0.0]), 1.0)
+        self.assertEqual(exact_signflip([1.0] * 4), 0.125)
+        self.assertEqual(bootstrap_ci([2.0, 2.0], 7), [2.0, 2.0])
+
+    def test_large_pair_signflip_uses_reproducible_monte_carlo(self):
+        values = [1.0, -0.5, 0.75, 2.0, -1.0] * 5
+        first = paired_signflip(values, draws=512)
+        second = paired_signflip(values, draws=512)
+        self.assertEqual(first, second)
+        self.assertEqual(first[1], "monte_carlo")
+        self.assertEqual(first[2], 512)
+        self.assertGreaterEqual(first[0], 1 / 513)
+        self.assertLessEqual(first[0], 1.0)
+
+    def test_exact_small_pair_and_degenerate_large_pair(self):
+        self.assertEqual(paired_signflip([1.0] * 4), (0.125, "exact", 16))
+        self.assertEqual(
+            paired_signflip([0.0] * 25, draws=100),
+            (1.0, "monte_carlo_degenerate", 100),
+        )
+
+    def test_exact_sign_test_scales_without_monte_carlo_resolution_floor(self):
+        p, positives, negatives, informative = exact_paired_sign_test([-1.0] * 50)
+        self.assertAlmostEqual(p, 2 / (2**50))
+        self.assertEqual((positives, negatives, informative), (0, 50, 50))
+
+    def test_exact_sign_test_ignores_ties_and_is_two_sided(self):
+        self.assertEqual(exact_paired_sign_test([0.0, 0.0]), (1.0, 0, 0, 0))
+        self.assertEqual(exact_paired_sign_test([1.0, -1.0, 0.0]), (1.0, 1, 1, 2))
+        self.assertEqual(exact_paired_sign_test([1.0] * 4), (0.125, 4, 0, 4))
+
+    def test_unpaired_trial_is_rejected(self):
+        with self.assertRaises(ValueError):
+            analyze(
+                [
+                    {
+                        "uavs": 4,
+                        "scenario": "nominal",
+                        "seed": 0,
+                        "policy": "adaptive_freshness",
+                    }
+                ]
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()

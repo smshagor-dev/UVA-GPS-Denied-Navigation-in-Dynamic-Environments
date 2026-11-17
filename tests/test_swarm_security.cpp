@@ -12,6 +12,8 @@ using namespace drone::swarm;
 
 namespace {
 
+// The two integer fields represent distinct protocol fields, not interchangeable values.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 SwarmMessage make_message(uint32_t src, uint32_t seq,
                           SwarmMessage::Type type = SwarmMessage::Type::MISSION_SYNC) {
     SwarmMessage msg;
@@ -43,9 +45,12 @@ TEST(SwarmSecurity, SecureRoundTripWorks) {
     const auto opened = receiver.open(frame.data(), frame.size());
 
     ASSERT_TRUE(opened.has_value());
+    // ASSERT_TRUE stops the test before dereference; clang-tidy does not model that macro.
+    // NOLINTBEGIN(bugprone-unchecked-optional-access)
     EXPECT_EQ(opened->src_id, 1u);
     EXPECT_EQ(opened->seq_num, 1u);
     EXPECT_EQ(opened->type, SwarmMessage::Type::MISSION_SYNC);
+    // NOLINTEND(bugprone-unchecked-optional-access)
 }
 
 TEST(SwarmSecurity, TamperedFrameIsRejected) {
@@ -128,8 +133,64 @@ TEST(MotorSensor, ProducesHealthMeasurement) {
     sensor.poll();
     const auto measurement = sensor.latest();
     ASSERT_TRUE(measurement.has_value());
+    // See the checked optional assertion above.
+    // NOLINTBEGIN(bugprone-unchecked-optional-access)
     EXPECT_GT(measurement->average_health, 0.0f);
     EXPECT_LE(measurement->average_health, 1.0f);
+    // NOLINTEND(bugprone-unchecked-optional-access)
+}
+
+// Native controller checks: software geometry and command bounds, not flight safety.
+TEST(V2XFormation, NominalDiamondTargetsAreDistinct) {
+    LeaderFollowerController controller(2, {});
+    FormationCommand cmd;
+    cmd.shape = FormationCommand::Formation::DIAMOND;
+    cmd.spacing_m = 3.0f;
+    const Eigen::Vector3d leader(10.0, 20.0, 5.0);
+    const auto first = controller.compute_target(leader, cmd, 0);
+    const auto second = controller.compute_target(leader, cmd, 1);
+    EXPECT_NEAR(first.x(), 13.0, 1e-8);
+    EXPECT_NEAR(second.x(), 7.0, 1e-8);
+    EXPECT_NEAR(first.y(), 20.0, 1e-8);
+    EXPECT_NEAR(second.y(), 20.0, 1e-8);
+    EXPECT_GT((first - second).norm(), 5.9);
+}
+
+TEST(V2XFormation, VelocityCommandIsBoundedAndReducesNominalError) {
+    LeaderFollowerController controller(2, {});
+    const Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+    const Eigen::Vector3d goal(10.0, 2.0, 0.0);
+    const auto velocity = controller.velocity_command(origin, origin, goal, 1.5f, 2.0f);
+    EXPECT_LE(velocity.norm(), 2.0 + 1e-8);
+    EXPECT_LT((goal - velocity * 0.1).norm(), goal.norm());
+}
+
+TEST(V2XFormation, NearbyPeerProducesRepulsion) {
+    LeaderFollowerController controller(2, {});
+    PeerInfo peer;
+    peer.id = 3;
+    peer.reachable = true;
+    peer.position = Eigen::Vector3d(1.5, 0.0, 0.0);
+    peer.velocity = Eigen::Vector3d(-0.5, 0.0, 0.0);
+    const Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+    const std::vector<PeerInfo> peers{peer};
+    const auto velocity = controller.compute_avoidance_velocity(origin, origin, peers);
+    EXPECT_LT(velocity.x(), 0.0);
+    EXPECT_GT(velocity.norm(), 0.0);
+    EXPECT_LE(velocity.norm(), 3.0 + 1e-8);
+}
+
+TEST(V2XFormation, AvoidanceStillRespectsOverallCommandSpeedLimit) {
+    LeaderFollowerController controller(2, {});
+    PeerInfo peer;
+    peer.id = 3;
+    peer.reachable = true;
+    peer.position = Eigen::Vector3d(1.5, 0.0, 0.0);
+    const Eigen::Vector3d zero = Eigen::Vector3d::Zero();
+    const Eigen::Vector3d goal(20.0, 0.0, 0.0);
+    const std::vector<PeerInfo> peers{peer};
+    const auto command = controller.velocity_command(zero, zero, goal, peers, {}, 1.5f, 2.0f);
+    EXPECT_LE(command.norm(), 2.0 + 1e-8);
 }
 
 int main(int argc, char** argv) {

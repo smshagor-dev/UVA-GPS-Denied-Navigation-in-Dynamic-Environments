@@ -445,3 +445,21 @@ add_test(NAME euroc_imu_native_replay_selftest
          COMMAND $<TARGET_FILE:euroc_imu_native_replay> --self-test)
 set_tests_properties(euroc_imu_native_replay_selftest PROPERTIES
     LABELS "integration;navigation;replay;euroc-imu-only")
+
+# Research-only native controller replay. Samples the real C++ formation
+# controller using synthetic trajectories; does not represent physical flight.
+add_executable(swarm_native_formation_metrics swarm_native_formation_metrics.cpp)
+target_link_libraries(swarm_native_formation_metrics PRIVATE sensor_fusion_core Eigen3::Eigen)
+drone_apply_project_warnings(swarm_native_formation_metrics)
+drone_enable_coverage(swarm_native_formation_metrics)
+drone_enable_sanitizers(swarm_native_formation_metrics)
+drone_set_target_output_dirs(swarm_native_formation_metrics "tests" "tests" "tests")
+add_test(
+    NAME swarm_native_formation_metrics
+    COMMAND $<TARGET_FILE:swarm_native_formation_metrics>
+            "${PROJECT_BINARY_DIR}/swarm_native_formation_metrics.json"
+)
+set_tests_properties(swarm_native_formation_metrics PROPERTIES
+    LABELS "integration;swarm;simulation;research"
+    TIMEOUT 60
+)
