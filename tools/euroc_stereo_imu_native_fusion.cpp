@@ -300,16 +300,33 @@ Result replay(const std::vector<ImuSample>& imu, const std::vector<VisualSample>
             throw std::runtime_error("native visual pose update rejected at " +
                                      std::to_string(s.timestamp_ns));
         }
+        e.type = MeasurementType::VisualAttitude;
+        e.source_id = "euroc_stereo_pnp_attitude";
+        e.sequence_id = ++seq;
+        VisualAttitudeMeasurementPayload attitude;
+        attitude.world_from_imu = s.orientation;
+        attitude.sigma_orientation_rad = s.sigma_orientation_rad;
+        e.payload = attitude;
+        if (active.process_measurement(e) != EstimatorOperationResult::Accepted ||
+            shadow.process_measurement(e) != EstimatorOperationResult::Accepted) {
+            throw std::runtime_error("native visual attitude update rejected at " +
+                                     std::to_string(s.timestamp_ns));
+        }
         const auto a = active.snapshot();
         const auto b = shadow.snapshot();
         if (!a.initialized || !b.initialized || !a.position_m.allFinite() ||
-            !b.position_m.allFinite()) {
-            throw std::runtime_error("invalid fused estimator state");
+            !b.position_m.allFinite() || !a.orientation.coeffs().allFinite() ||
+            !b.orientation.coeffs().allFinite() ||
+            std::abs(a.orientation.squaredNorm() - 1.0) > 0.01 ||
+            std::abs(b.orientation.squaredNorm() - 1.0) > 0.01) {
+            throw std::runtime_error("invalid fused estimator state or quaternion");
         }
         active_csv << s.timestamp_ns << "," << a.position_m.x() << "," << a.position_m.y() << ","
-                   << a.position_m.z() << "\n";
+                   << a.position_m.z() << "," << a.orientation.w() << "," << a.orientation.x()
+                   << "," << a.orientation.y() << "," << a.orientation.z() << "\n";
         shadow_csv << s.timestamp_ns << "," << b.position_m.x() << "," << b.position_m.y() << ","
-                   << b.position_m.z() << "\n";
+                   << b.position_m.z() << "," << b.orientation.w() << "," << b.orientation.x()
+                   << "," << b.orientation.y() << "," << b.orientation.z() << "\n";
         ++result.visual_update_count;
     };
 
