@@ -175,9 +175,7 @@ def main():
     if not args.binary.is_file():
         parser.error("native binary must exist")
     NativeStereoImuCliTests.binary = str(args.binary.resolve())
-    suite = unittest.defaultTestLoader.loadTestsFromTestCase(
-        NativeStereoImuCliTests
-    )
+    suite = unittest.defaultTestLoader.loadTestsFromTestCase(NativeStereoImuCliTests)
     report = unittest.TextTestRunner(verbosity=2).run(suite)
     raise SystemExit(0 if report.wasSuccessful() else 1)
 
