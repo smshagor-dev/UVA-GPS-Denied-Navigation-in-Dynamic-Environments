@@ -85,7 +85,7 @@ class StereoVisualOdometryTests(unittest.TestCase):
             relative_camera_pnp(self.landmarks, pixels, self.K)
 
     def test_degenerate_correspondences_do_not_claim_pose(self):
-        with self.assertRaisesRegex(ValueError, "PnP failed|behind|RMSE"):
+        with self.assertRaisesRegex(ValueError, "degenerate|PnP failed|behind|RMSE"):
             relative_camera_pnp(
                 self.landmarks,
                 np.tile([100.0, 100.0], (self.landmarks.shape[0], 1)),
