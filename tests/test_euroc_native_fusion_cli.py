@@ -34,7 +34,7 @@ class NativeStereoImuCliTests(unittest.TestCase):
         self.workspace = tempfile.TemporaryDirectory()
         self.addCleanup(self.workspace.cleanup)
         root = Path(self.workspace.name)
-        self.imu = root / "mav0" / "imu0" / "data.csv"
+        self.imu = root / "source_sequence" / "mav0" / "imu0" / "data.csv"
         self.imu.parent.mkdir(parents=True)
         self.visual = root / "visual.csv"
         self.active = root / "active.csv"
@@ -147,6 +147,15 @@ class NativeStereoImuCliTests(unittest.TestCase):
         result = self.run_native()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.active.read_text(), "existing result\n")
+        self.assertFalse(self.shadow.exists())
+
+    def test_native_export_cannot_modify_original_sequence(self):
+        source_root = self.imu.parent.parent.parent
+        forbidden = source_root / "overwritten_estimator.csv"
+        result = self.run_native(active=forbidden)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("outside source sequence", result.stderr)
+        self.assertFalse(forbidden.exists())
         self.assertFalse(self.shadow.exists())
 
     def test_original_imu_source_with_nonfinite_value_is_rejected(self):
