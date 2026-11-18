@@ -43,7 +43,9 @@ def visual_timestamps(path: Path) -> list[int]:
     stamps = []
     with path.open("r", newline="", encoding="utf-8-sig") as stream:
         rows = csv.DictReader(stream)
-        require(rows.fieldnames == list(VISUAL_COLUMNS), "unsupported visual CSV schema")
+        require(
+            rows.fieldnames == list(VISUAL_COLUMNS), "unsupported visual CSV schema"
+        )
         for row in rows:
             require(
                 None not in row and None not in row.values(), "invalid visual CSV row"
