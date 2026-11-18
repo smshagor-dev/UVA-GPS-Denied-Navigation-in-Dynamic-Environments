@@ -201,8 +201,18 @@ TEST(Phase18Coordinator, ActiveEstimatorRemainsUnchangedWithShadowAutomaticZupt)
         const double timestamp = i * 0.01;
         ASSERT_EQ(active_only.process_measurement(imu_env(timestamp, static_cast<uint64_t>(i))),
                   with_shadow.process_measurement(imu_env(timestamp, static_cast<uint64_t>(i))));
+        // The worker is asynchronous and the queue is capped at 128 entries.
+        // Preserve every stationary IMU sample on slower CI runners (notably
+        // Windows) instead of unintentionally testing DropOldest behavior.
+        if ((i + 1) % 32 == 0) {
+            with_shadow.flush_shadow();
+        }
     }
     with_shadow.flush_shadow();
+    const auto delivery = with_shadow.diagnostics();
+    EXPECT_EQ(delivery.queue.dropped_count, 0u);
+    EXPECT_EQ(delivery.queue.processing_failure_count, 0u);
+    EXPECT_EQ(delivery.shadow_processed_count, 240u);
 
     const auto a = active_only.active_snapshot();
     const auto b = with_shadow.active_snapshot();
