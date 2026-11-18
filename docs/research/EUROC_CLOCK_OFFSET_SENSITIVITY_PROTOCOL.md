@@ -1,4 +1,4 @@
-# EuRoC Fixed Clock-Offset Sensitivity — Phase 83
+# EuRoC Fixed Evaluation Timestamp-Association Sensitivity — Phase 83
 
 **Evidence scope:** software implementation, synthetic fixtures only, no original
 EuRoC accuracy result. This is a stacked change on Phase 82; Phase 81 contains
@@ -6,10 +6,11 @@ the still-experimental producer of the native full-pose trajectories.
 
 ## Motivation and scientific boundary
 
-Small camera-to-IMU timestamp errors and nearest-neighbor GT association can
-change apparent trajectory accuracy. Reporting only the best-fitting offset
+Estimated-to-publisher-GT timestamp association offsets can change apparent
+trajectory accuracy. **This does not perturb camera-to-IMU sensor timestamps,
+rerun the native estimator, or measure physical sensor-clock calibration.** Reporting only the best-fitting offset
 from ground truth would leak test information into selection and bias the
-comparison. This tool requires the analyst to specify an **ordered clock-offset
+comparison. This tool requires the analyst to specify an **ordered evaluation timestamp-offset
 grid before looking at the independent publisher ground truth**, then evaluates
 every point and records failed points without filtering them. Grid predeclared
 means predeclared for this run, not independently preregistered with a third
@@ -32,7 +33,7 @@ failure artifact.**
 ## Reproducible invocation (after original EuRoC playback)
 
 Run Phase 81 native replay first on original camera/IMU data. The independent
-Phase 82 evaluator must be available. Choose the clock-offset grid before
+Phase 82 evaluator must be available. Choose the evaluation-association offset grid before
 opening the original publisher ground-truth file.
 
 ~~~bash
