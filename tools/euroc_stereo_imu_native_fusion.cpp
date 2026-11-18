@@ -34,8 +34,8 @@ using drone::vio::MeasurementEnvelope;
 using drone::vio::MeasurementFrame;
 using drone::vio::MeasurementType;
 using drone::vio::Phase17StateEstimatorAdapter;
-using drone::vio::VisualPoseMeasurementPayload;
 using drone::vio::VisualAttitudeMeasurementPayload;
+using drone::vio::VisualPoseMeasurementPayload;
 
 struct ImuSample {
     uint64_t timestamp_ns{0};
@@ -212,8 +212,8 @@ std::vector<VisualSample> load_visual(const fs::path& path) {
                                            finite_scalar(cells[13]), finite_scalar(cells[14]));
         s.sigma_orientation_rad = finite_scalar(cells[15]);
         if (!s.orientation.coeffs().array().isFinite().all() ||
-            std::abs(s.orientation.squaredNorm() - 1.0) > 0.02 ||
-            s.sigma_orientation_rad <= 0.0 || s.sigma_orientation_rad > 1.0) {
+            std::abs(s.orientation.squaredNorm() - 1.0) > 0.02 || s.sigma_orientation_rad <= 0.0 ||
+            s.sigma_orientation_rad > 1.0) {
             throw std::runtime_error("invalid visual orientation or attitude uncertainty");
         }
         s.orientation.normalize();
@@ -394,8 +394,7 @@ void self_test() {
         {start + 22000000ULL, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(), 0.5, 0.75, 36},
         {start + 50000000ULL, Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero(), 0.5, 0.75, 32},
     };
-    visual[1].orientation =
-        Eigen::Quaterniond(Eigen::AngleAxisd(0.12, Eigen::Vector3d::UnitZ()));
+    visual[1].orientation = Eigen::Quaterniond(Eigen::AngleAxisd(0.12, Eigen::Vector3d::UnitZ()));
     const auto good = replay(imu, visual);
     if (good.visual_update_count != 2 || good.interpolated_imu_count != 1 ||
         std::count(good.active_csv.begin(), good.active_csv.end(), '\n') != 3 ||

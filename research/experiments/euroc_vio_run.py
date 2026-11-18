@@ -85,12 +85,16 @@ def export_evaluator_positions(pose_csv: Path, position_csv: Path) -> dict:
     Orientation remains in the full 6-DoF trajectory, never inserted into
     source/ground truth files, and is not evaluated by position-only ATE.
     """
-    require(not position_csv.exists() and not position_csv.is_symlink(),
-            "refusing to overwrite position-only evaluator projection")
+    require(
+        not position_csv.exists() and not position_csv.is_symlink(),
+        "refusing to overwrite position-only evaluator projection",
+    )
     with pose_csv.open("r", newline="", encoding="utf-8") as source:
         reader = csv.DictReader(source)
-        require(reader.fieldnames == TRAJECTORY_COLUMNS,
-                "full pose schema must be validated before projection")
+        require(
+            reader.fieldnames == TRAJECTORY_COLUMNS,
+            "full pose schema must be validated before projection",
+        )
         with position_csv.open("x", newline="", encoding="utf-8") as target:
             writer = csv.DictWriter(
                 target, fieldnames=["timestamp_ns", "x_m", "y_m", "z_m"]
@@ -98,12 +102,15 @@ def export_evaluator_positions(pose_csv: Path, position_csv: Path) -> dict:
             writer.writeheader()
             count = 0
             for row in reader:
-                writer.writerow({
-                    key: row[key] for key in ("timestamp_ns", "x_m", "y_m", "z_m")
-                })
+                writer.writerow(
+                    {key: row[key] for key in ("timestamp_ns", "x_m", "y_m", "z_m")}
+                )
                 count += 1
-    return {"relative_file": position_csv.name, "sample_count": count,
-            "sha256": digest(position_csv)}
+    return {
+        "relative_file": position_csv.name,
+        "sample_count": count,
+        "sha256": digest(position_csv),
+    }
 
 
 def run(

@@ -379,8 +379,8 @@ void Phase17ESKFEstimator::update_visual_attitude(const Eigen::Quaterniond& obse
         note_rejection_locked(EstimatorOperationResult::RejectedInvalidQuaternion);
         return;
     }
-    if (!std::isfinite(sigma_orientation_rad) ||
-        sigma_orientation_rad <= 0.0 || sigma_orientation_rad > 1.0) {
+    if (!std::isfinite(sigma_orientation_rad) || sigma_orientation_rad <= 0.0 ||
+        sigma_orientation_rad > 1.0) {
         note_rejection_locked(EstimatorOperationResult::RejectedInvalidCovariance);
         return;
     }

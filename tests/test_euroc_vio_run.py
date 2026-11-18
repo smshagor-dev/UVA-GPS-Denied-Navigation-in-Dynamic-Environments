@@ -66,8 +66,26 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
             writer = csv.writer(file)
             writer.writerow(VISUAL_COLUMNS)
             for stamp in STAMPS:
-                writer.writerow([stamp, 0, 0, 0, 0, 0, 0, 0.5, 0.75, 25, 0.25,
-                                 1.0, 0.0, 0.0, 0.0, 0.25])
+                writer.writerow(
+                    [
+                        stamp,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0.5,
+                        0.75,
+                        25,
+                        0.25,
+                        1.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.25,
+                    ]
+                )
         manifest.write_text('{"scope":"synthetic"}\n', encoding="utf-8")
         audit = [{"timestamp_ns": stamp, "status": "visual_pose"} for stamp in STAMPS]
         return {
@@ -96,8 +114,9 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
         for file in (active, shadow):
             with file.open("w", newline="", encoding="utf-8") as stream:
                 writer = csv.writer(stream)
-                writer.writerow(["timestamp_ns", "x_m", "y_m", "z_m",
-                                 "qw", "qx", "qy", "qz"])
+                writer.writerow(
+                    ["timestamp_ns", "x_m", "y_m", "z_m", "qw", "qx", "qy", "qz"]
+                )
                 for stamp in STAMPS:
                     writer.writerow([stamp, 0, 0, 0, 1.0, 0.0, 0.0, 0.0])
         return subprocess.CompletedProcess(
@@ -145,7 +164,9 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
                 newline="", encoding="utf-8"
             ) as file:
                 reader = csv.DictReader(file)
-                self.assertEqual(reader.fieldnames, ["timestamp_ns", "x_m", "y_m", "z_m"])
+                self.assertEqual(
+                    reader.fieldnames, ["timestamp_ns", "x_m", "y_m", "z_m"]
+                )
                 self.assertEqual(len(list(reader)), 2)
         self.assertEqual(
             json.loads((self.output / "run_manifest.json").read_text())["status"],
@@ -181,8 +202,7 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
             done = self.native(argv, **kwargs)
             path = Path(argv[argv.index("--shadow-output") + 1])
             path.write_text(
-                "timestamp_ns,x_m,y_m,z_m,qw,qx,qy,qz\n"
-                f"{STAMPS[0]},0,0,0,1,0,0,0\n",
+                "timestamp_ns,x_m,y_m,z_m,qw,qx,qy,qz\n" f"{STAMPS[0]},0,0,0,1,0,0,0\n",
                 encoding="utf-8",
             )
             return done

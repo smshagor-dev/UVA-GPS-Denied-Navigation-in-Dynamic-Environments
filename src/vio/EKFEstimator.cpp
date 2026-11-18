@@ -311,6 +311,7 @@ void EKFEstimator::update_depth(double z_depth_m, double sigma_m) {
     }
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters) -- preserve the stable visual pose API.
 void EKFEstimator::update_visual_pose(const Eigen::Vector3d& observed_position,
                                       const Eigen::Vector3d& observed_velocity,
                                       double sigma_position_m, double sigma_velocity_mps) {
@@ -360,8 +361,8 @@ void EKFEstimator::update_visual_attitude(const Eigen::Quaterniond& observed_wor
         note_rejection_locked(EstimatorOperationResult::RejectedInvalidQuaternion);
         return;
     }
-    if (!std::isfinite(sigma_orientation_rad) ||
-        sigma_orientation_rad <= 0.0 || sigma_orientation_rad > 1.0) {
+    if (!std::isfinite(sigma_orientation_rad) || sigma_orientation_rad <= 0.0 ||
+        sigma_orientation_rad > 1.0) {
         note_rejection_locked(EstimatorOperationResult::RejectedInvalidCovariance);
         return;
     }
@@ -383,8 +384,7 @@ void EKFEstimator::update_visual_attitude(const Eigen::Quaterniond& observed_wor
     const Eigen::Matrix3d R_meas =
         Eigen::Matrix3d::Identity() * sigma_orientation_rad * sigma_orientation_rad;
     const auto result = apply_error_state_update_locked(
-        innovation, H, R_meas,
-        [](NominalStateSnapshot& candidate, const ErrorVec& dx) {
+        innovation, H, R_meas, [](NominalStateSnapshot& candidate, const ErrorVec& dx) {
             candidate.pos += dx.segment<3>(0);
             candidate.vel += dx.segment<3>(3);
             candidate.ba += dx.segment<3>(9);
