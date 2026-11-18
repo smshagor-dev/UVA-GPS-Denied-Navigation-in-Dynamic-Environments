@@ -47,7 +47,7 @@ class NativeStereoImuCliTests(unittest.TestCase):
         self.write_imu()
         self.write_visual()
 
-    def write_imu(self):
+    def write_imu(self, *, count=16, gyro=(0, 0, 0), accel=(0, 0, 9.81)):
         with self.imu.open("w", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)
             writer.writerow(
@@ -61,8 +61,8 @@ class NativeStereoImuCliTests(unittest.TestCase):
                     "a_RS_S_z [m s^-2]",
                 ]
             )
-            for n in range(16):
-                writer.writerow([START + n * 5_000_000, 0, 0, 0, 0, 0, 9.81])
+            for n in range(count):
+                writer.writerow([START + n * 5_000_000, *gyro, *accel])
 
     def write_visual(self, *, timestamp_offsets=None, bad_sigma=False):
         offsets = timestamp_offsets or [22_000_000, 50_000_000]
@@ -91,7 +91,7 @@ class NativeStereoImuCliTests(unittest.TestCase):
                     ]
                 )
 
-    def run_native(self, *, active=None, shadow=None):
+    def run_native(self, *, active=None, shadow=None, gravity_aligned=False):
         self.assertIsNotNone(self.binary)
         return subprocess.run(
             [
@@ -104,7 +104,11 @@ class NativeStereoImuCliTests(unittest.TestCase):
                 str(active or self.active),
                 "--shadow-output",
                 str(shadow or self.shadow),
-                "--assume-initial-imu-identity",
+                (
+                    "--require-stationary-gravity-alignment"
+                    if gravity_aligned
+                    else "--assume-initial-imu-identity"
+                ),
             ],
             check=False,
             capture_output=True,
@@ -131,6 +135,36 @@ class NativeStereoImuCliTests(unittest.TestCase):
                 )
                 self.assertAlmostEqual(float(row["qw"]), 1.0, places=3)
                 self.assertAlmostEqual(float(row["qx"]), 0.0, places=3)
+
+    def test_stationary_tilt_only_gravity_prior_succeeds_without_ground_truth(self):
+        # 200 Hz and >200 ms of stationary pre-roll before the first VO update.
+        # +30 degree tilted body: accel_body=(0,4.905,8.4957) in m/s^2.
+        self.write_imu(count=101, accel=(0, 4.905, 8.495709211))
+        self.write_visual(timestamp_offsets=[300_000_000, 400_000_000])
+        result = self.run_native(gravity_aligned=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("stationary-gravity-aligned; yaw unobservable", result.stdout)
+        for path in (self.active, self.shadow):
+            with path.open(newline="", encoding="utf-8") as file:
+                poses = list(csv.DictReader(file))
+            self.assertEqual(len(poses), 2)
+            self.assertGreater(abs(float(poses[-1]["qx"])), 0.10)
+
+    def test_gravity_prior_rejects_motion_without_generating_trajectories(self):
+        self.write_imu(count=101, gyro=(0.5, 0, 0))
+        self.write_visual(timestamp_offsets=[300_000_000, 400_000_000])
+        result = self.run_native(gravity_aligned=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("stationary gravity prior rejected motion", result.stderr)
+        self.assertFalse(self.active.exists())
+        self.assertFalse(self.shadow.exists())
+
+    def test_gravity_prior_rejects_short_imu_preroll(self):
+        result = self.run_native(gravity_aligned=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("at least 200 ms IMU pre-roll", result.stderr)
+        self.assertFalse(self.active.exists())
+        self.assertFalse(self.shadow.exists())
 
     def test_visual_out_of_order_is_rejected_without_outputs(self):
         self.write_visual(timestamp_offsets=[50_000_000, 22_000_000])

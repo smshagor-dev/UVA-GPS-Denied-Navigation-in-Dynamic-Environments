@@ -54,6 +54,8 @@ struct VisualSample {
     double sigma_orientation_rad{0.25};
 };
 
+enum class InitialAttitudeMode { Identity, StationaryGravity };
+
 struct Result {
     std::string active_csv{};
     std::string shadow_csv{};
@@ -228,7 +230,65 @@ std::vector<VisualSample> load_visual(const fs::path& path) {
     return result;
 }
 
-Result replay(const std::vector<ImuSample>& imu, const std::vector<VisualSample>& vision) {
+// The accelerometer measures +g at rest. Align that direction with world +Z,
+// matching the estimators' g_world=(0,0,-9.81). This is tilt-only: yaw remains
+// arbitrary. Require stationary IMU observations from the first IMU sample
+// THROUGH the first accepted visual pose, so the first camera anchor is
+// consistent with the inertial initial frame. No publisher GT is used.
+Eigen::Quaterniond stationary_gravity_prior(const std::vector<ImuSample>& imu,
+                                            uint64_t first_visual_ns) {
+    constexpr uint64_t kMinPrerollNs = 200000000ULL;
+    constexpr uint64_t kMaxImuGapNs = 25000000ULL;
+    constexpr double kGravityMps2 = 9.81;
+    if (imu.size() < 25 || first_visual_ns <= imu.front().timestamp_ns ||
+        first_visual_ns - imu.front().timestamp_ns < kMinPrerollNs) {
+        throw std::runtime_error("stationary gravity prior requires at least 200 ms IMU pre-roll");
+    }
+    Eigen::Vector3d sum = Eigen::Vector3d::Zero();
+    size_t count = 0;
+    uint64_t last = imu.front().timestamp_ns;
+    for (const auto& sample : imu) {
+        if (sample.timestamp_ns > first_visual_ns) {
+            break;
+        }
+        if (count && (sample.timestamp_ns <= last ||
+                      sample.timestamp_ns - last > kMaxImuGapNs)) {
+            throw std::runtime_error("stationary gravity prior has a discontinuous IMU window");
+        }
+        if (!sample.accel.allFinite() || !sample.gyro.allFinite() ||
+            sample.gyro.norm() > 0.15 ||
+            std::abs(sample.accel.norm() - kGravityMps2) > 0.55) {
+            throw std::runtime_error("stationary gravity prior rejected motion or acceleration");
+        }
+        sum += sample.accel;
+        last = sample.timestamp_ns;
+        ++count;
+    }
+    if (count < 25 || first_visual_ns - last > kMaxImuGapNs) {
+        throw std::runtime_error("stationary gravity prior has insufficient IMU coverage");
+    }
+    const Eigen::Vector3d mean = sum / static_cast<double>(count);
+    double squared_deviation = 0.0;
+    for (const auto& sample : imu) {
+        if (sample.timestamp_ns > first_visual_ns) {
+            break;
+        }
+        squared_deviation += (sample.accel - mean).squaredNorm();
+    }
+    if (std::sqrt(squared_deviation / static_cast<double>(count)) > 0.35 ||
+        std::abs(mean.norm() - kGravityMps2) > 0.35) {
+        throw std::runtime_error("stationary gravity prior rejected noisy/dynamic accelerometry");
+    }
+    const Eigen::Quaterniond initial =
+        Eigen::Quaterniond::FromTwoVectors(mean, Eigen::Vector3d::UnitZ());
+    if (!initial.coeffs().allFinite() || std::abs(initial.squaredNorm() - 1.0) > 1e-6) {
+        throw std::runtime_error("invalid tilt-only gravity alignment");
+    }
+    return initial.normalized();
+}
+
+Result replay(const std::vector<ImuSample>& imu, const std::vector<VisualSample>& vision,
+              InitialAttitudeMode mode = InitialAttitudeMode::Identity) {
     if (imu.size() < 2 || vision.empty()) {
         throw std::runtime_error("IMU and visual observations required");
     }
@@ -238,9 +298,15 @@ Result replay(const std::vector<ImuSample>& imu, const std::vector<VisualSample>
     }
     EKFStateEstimatorAdapter active;
     Phase17StateEstimatorAdapter shadow;
-    // Identity is a declared prior, not a GT-derived initial orientation.
-    active.reset(Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero());
-    shadow.reset(Eigen::Vector3d::Zero(), Eigen::Quaterniond::Identity(), Eigen::Vector3d::Zero());
+    // The frontend's VO world is anchored to the first IMU/camera pose. In
+    // stationary-gravity mode, rotate BOTH the inertial prior and all visual
+    // observations into a single tilt-aligned world; never mix coordinate frames.
+    const Eigen::Quaterniond initial =
+        mode == InitialAttitudeMode::StationaryGravity
+            ? stationary_gravity_prior(imu, vision.front().timestamp_ns)
+            : Eigen::Quaterniond::Identity();
+    active.reset(Eigen::Vector3d::Zero(), initial, Eigen::Vector3d::Zero());
+    shadow.reset(Eigen::Vector3d::Zero(), initial, Eigen::Vector3d::Zero());
 
     Result result;
     std::ostringstream active_csv;
@@ -290,8 +356,8 @@ Result replay(const std::vector<ImuSample>& imu, const std::vector<VisualSample>
         e.timestamp_s = timestamp_s(s.timestamp_ns);
         e.sequence_id = ++seq;
         VisualPoseMeasurementPayload payload;
-        payload.position_m = s.position;
-        payload.velocity_mps = s.velocity;
+        payload.position_m = initial * s.position;
+        payload.velocity_mps = initial * s.velocity;
         payload.sigma_position_m = s.sigma_position_m;
         payload.sigma_velocity_mps = s.sigma_velocity_mps;
         e.payload = payload;
@@ -304,7 +370,7 @@ Result replay(const std::vector<ImuSample>& imu, const std::vector<VisualSample>
         e.source_id = "euroc_stereo_pnp_attitude";
         e.sequence_id = ++seq;
         VisualAttitudeMeasurementPayload attitude;
-        attitude.world_from_imu = s.orientation;
+        attitude.world_from_imu = (initial * s.orientation).normalized();
         attitude.sigma_orientation_rad = s.sigma_orientation_rad;
         e.payload = attitude;
         if (active.process_measurement(e) != EstimatorOperationResult::Accepted ||
@@ -410,6 +476,41 @@ void self_test() {
     if (columns.size() != 8 || std::stod(columns[7]) < 0.001) {
         throw std::runtime_error("native fused visual orientation did not update");
     }
+    // Synthetic tilted, genuinely stationary IMU: the gravity prior must
+    // remove body tilt WITHOUT using any ground-truth position or orientation.
+    auto tilted_imu = imu;
+    tilted_imu.clear();
+    const Eigen::Quaterniond physical_tilt(
+        Eigen::AngleAxisd(0.5, Eigen::Vector3d::UnitX()));
+    const Eigen::Vector3d body_accel =
+        physical_tilt.inverse() * Eigen::Vector3d{0.0, 0.0, 9.81};
+    for (uint64_t n = 0; n <= 100; ++n) {
+        tilted_imu.push_back({start + n * 5000000ULL, Eigen::Vector3d::Zero(), body_accel});
+    }
+    auto tilted_visual = visual;
+    tilted_visual[0].timestamp_ns = start + 300000000ULL;
+    tilted_visual[1].timestamp_ns = start + 400000000ULL;
+    const Eigen::Quaterniond estimated_tilt =
+        stationary_gravity_prior(tilted_imu, tilted_visual.front().timestamp_ns);
+    if ((estimated_tilt * body_accel - Eigen::Vector3d{0.0, 0.0, 9.81}).norm() > 1e-6 ||
+        std::abs(estimated_tilt.w()) > 0.999) {
+        throw std::runtime_error("stationary gravity prior failed to correct synthetic tilt");
+    }
+    const auto aligned = replay(tilted_imu, tilted_visual, InitialAttitudeMode::StationaryGravity);
+    if (aligned.visual_update_count != 2) {
+        throw std::runtime_error("tilt-aligned synthetic fusion replay failed");
+    }
+    auto moving_imu = tilted_imu;
+    moving_imu[12].gyro.x() = 0.5;
+    bool motion_rejected = false;
+    try {
+        (void)replay(moving_imu, tilted_visual, InitialAttitudeMode::StationaryGravity);
+    } catch (const std::runtime_error&) {
+        motion_rejected = true;
+    }
+    if (!motion_rejected) {
+        throw std::runtime_error("moving IMU falsely accepted for stationary gravity alignment");
+    }
     auto invalid = visual;
     invalid[1].timestamp_ns = invalid[0].timestamp_ns - 1;
     try {
@@ -434,10 +535,12 @@ int main(int argc, char** argv) {
         if (argc != 10 || std::string(argv[1]) != "--imu-csv" ||
             std::string(argv[3]) != "--visual-csv" || std::string(argv[5]) != "--active-output" ||
             std::string(argv[7]) != "--shadow-output" ||
-            std::string(argv[9]) != "--assume-initial-imu-identity") {
+            (std::string(argv[9]) != "--assume-initial-imu-identity" &&
+             std::string(argv[9]) != "--require-stationary-gravity-alignment")) {
             std::cerr << "Usage: euroc_stereo_imu_native_fusion --imu-csv <imu0/data.csv> "
                          "--visual-csv <visual.csv> --active-output <active.csv> "
-                         "--shadow-output <shadow.csv> --assume-initial-imu-identity\n";
+                         "--shadow-output <shadow.csv> "
+                         "[--assume-initial-imu-identity|--require-stationary-gravity-alignment]\n";
             return 2;
         }
         const fs::path imu_path = argv[2];
@@ -470,7 +573,11 @@ int main(int argc, char** argv) {
         }
         const auto imu = load_imu(imu_path);
         const auto visual = load_visual(visual_path);
-        const auto output = replay(imu, visual);
+        const InitialAttitudeMode mode =
+            std::string(argv[9]) == "--require-stationary-gravity-alignment"
+                ? InitialAttitudeMode::StationaryGravity
+                : InitialAttitudeMode::Identity;
+        const auto output = replay(imu, visual, mode);
         try {
             {
                 std::ofstream a(active_path, std::ios::out | std::ios::trunc);
@@ -498,6 +605,11 @@ int main(int argc, char** argv) {
             fs::remove(shadow_path, cleanup_error);
             throw;
         }
+        std::cout << "Initial attitude prior: "
+                  << (mode == InitialAttitudeMode::StationaryGravity
+                          ? "stationary-gravity-aligned; yaw unobservable"
+                          : "identity-assumed; gravity unverified")
+                  << "\n";
         std::cout << "IMU: " << output.real_imu_count << " original rows; "
                   << output.interpolated_imu_count << " interpolated camera-time rows; "
                   << output.visual_update_count

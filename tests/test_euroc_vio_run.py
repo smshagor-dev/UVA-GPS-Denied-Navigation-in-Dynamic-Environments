@@ -119,10 +119,16 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
                 )
                 for stamp in STAMPS:
                     writer.writerow([stamp, 0, 0, 0, 1.0, 0.0, 0.0, 0.0])
+        prior = (
+            "stationary-gravity-aligned; yaw unobservable"
+            if argv[-1] == "--require-stationary-gravity-alignment"
+            else "identity-assumed; gravity unverified"
+        )
         return subprocess.CompletedProcess(
             argv,
             0,
-            stdout="IMU: 12 original rows; 1 interpolated camera-time rows; "
+            stdout=f"Initial attitude prior: {prior}\n"
+            "IMU: 12 original rows; 1 interpolated camera-time rows; "
             "2 visual updates accepted by both filters.\n",
             stderr="",
         )
@@ -171,6 +177,43 @@ class EuRoCExperimentRunnerTests(unittest.TestCase):
         self.assertEqual(
             json.loads((self.output / "run_manifest.json").read_text())["status"],
             "completed_unverified_software_replay",
+        )
+
+    def test_gravity_alignment_mode_is_recorded_and_passed_to_native(self):
+        patch_sync, patch_visual, patch_native = self.patches()
+        with patch_sync, patch_visual, patch_native:
+            result = run(
+                self.source,
+                self.output,
+                self.binary,
+                initial_attitude="stationary-gravity",
+            )
+        self.assertEqual(result["initial_attitude_mode"], "stationary-gravity")
+        self.assertFalse(result["identity_initial_imu_orientation"])
+        self.assertTrue(result["gravity_initialization_requires_stationary_imu"])
+        self.assertFalse(result["initial_yaw_observable"])
+        self.assertFalse(result["publishable_accuracy_evidence"])
+
+    def test_native_prior_attestation_mismatch_fails_closed(self):
+        def wrong_mode(argv, **kwargs):
+            done = self.native(argv, **kwargs)
+            return subprocess.CompletedProcess(
+                argv,
+                0,
+                stdout=done.stdout.replace(
+                    "identity-assumed; gravity unverified",
+                    "stationary-gravity-aligned; yaw unobservable",
+                ),
+                stderr="",
+            )
+
+        patch_sync, patch_visual, patch_native = self.patches(native=wrong_mode)
+        with patch_sync, patch_visual, patch_native:
+            with self.assertRaisesRegex(ValueError, "mode attestation missing"):
+                run(self.source, self.output, self.binary)
+        self.assertEqual(
+            json.loads((self.output / "run_manifest.json").read_text())["status"],
+            "failed",
         )
 
     def test_explicit_frame_limit_is_labelled_partial_not_complete(self):

@@ -121,6 +121,7 @@ def run(
     max_frames: int = 0,
     min_inliers: int = 12,
     timeout_s: int = 3600,
+    initial_attitude: str = "identity",
 ) -> dict:
     require(type(max_frames) is int and max_frames >= 0, "invalid frame limit")
     require(
@@ -129,6 +130,10 @@ def run(
     require(
         type(timeout_s) is int and timeout_s > 0,
         "timeout must be positive integer seconds",
+    )
+    require(
+        initial_attitude in ("identity", "stationary-gravity"),
+        "initial attitude must be identity or stationary-gravity",
     )
     source = sequence_root.resolve(strict=True)
     require(source.is_dir(), "EuRoC source must be a directory")
@@ -160,13 +165,17 @@ def run(
         "publishable_accuracy_evidence": False,
         "full_6dof_orientation_fused": True,
         "visual_orientation_uncertainty_empirically_calibrated": False,
-        "identity_initial_imu_orientation": True,
+        "identity_initial_imu_orientation": initial_attitude == "identity",
+        "initial_attitude_mode": initial_attitude,
+        "gravity_initialization_requires_stationary_imu": initial_attitude == "stationary-gravity",
+        "initial_yaw_observable": False,
         "frame_limit": max_frames,
         "limitations": [
             "no publisher dataset archive provenance verified",
             "no independent ground-truth ATE/RPE or SOTA comparison",
             "sequential stereo PnP attitude is fused but is temporally correlated",
-            "native EKF/ESKF initial attitude is unverified identity",
+            "initial attitude is unverified identity or a stationary-IMU tilt-only prior",
+            "stationary gravity mode rejects motion, insufficient IMU pre-roll and gaps",
             "partial camera trajectory fails closed by default",
         ],
     }
@@ -282,7 +291,11 @@ def run(
                 str(active_path),
                 "--shadow-output",
                 str(shadow_path),
-                "--assume-initial-imu-identity",
+                (
+                    "--require-stationary-gravity-alignment"
+                    if initial_attitude == "stationary-gravity"
+                    else "--assume-initial-imu-identity"
+                ),
             ],
             capture_output=True,
             text=True,
@@ -295,6 +308,15 @@ def run(
         require(
             process.returncode == 0,
             "native C++ estimator fusion failed; inspect run_manifest.json",
+        )
+        expected_prior = (
+            "stationary-gravity-aligned; yaw unobservable"
+            if initial_attitude == "stationary-gravity"
+            else "identity-assumed; gravity unverified"
+        )
+        require(
+            f"Initial attitude prior: {expected_prior}" in process.stdout,
+            "native initial attitude mode attestation missing",
         )
         matched = NATIVE_COUNTS.search(process.stdout)
         require(matched is not None, "native fusion counter contract missing")
@@ -342,6 +364,12 @@ def main() -> None:
     parser.add_argument("--max-frames", type=int, default=0)
     parser.add_argument("--min-inliers", type=int, default=12)
     parser.add_argument("--timeout-seconds", type=int, default=3600)
+    parser.add_argument(
+        "--initial-attitude",
+        choices=("identity", "stationary-gravity"),
+        default="identity",
+        help="stationary-gravity refuses dynamic/short start; never estimates yaw",
+    )
     args = parser.parse_args()
     result = run(
         args.sequence_root,
@@ -350,6 +378,7 @@ def main() -> None:
         max_frames=args.max_frames,
         min_inliers=args.min_inliers,
         timeout_s=args.timeout_seconds,
+        initial_attitude=args.initial_attitude,
     )
     print(
         "Completed unverified software VIO replay with "

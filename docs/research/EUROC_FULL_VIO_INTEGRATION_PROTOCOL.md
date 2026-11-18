@@ -11,7 +11,7 @@
 5. **New temporal VO** (`euroc_stereo_visual_odometry.py`) uses rectified left-camera optical flow and RANSAC PnP against the **previous frame's stereo-derived 3D points**. Its `T_Ccurrent_Cprevious` measurements are integrated into an IMU-anchored world coordinate frame using calibrated `T_I_Crect`. Source images and calibration are hashed; no ground truth is involved.
 6. **New native EKF/ESKF replay** (`euroc_stereo_imu_native_fusion.cpp`) reads genuine imu0/data.csv and the VO-generated visual.csv, enforces chronological and positive-quality input, and invokes the repository's existing `EKFStateEstimatorAdapter` and `Phase17StateEstimatorAdapter`. Visual pose and attitude observations update **position, velocity and a separately gated quaternion orientation**. Each native estimator emits `timestamp_ns,x_m,y_m,z_m,qw,qx,qy,qz`. The runner additionally exports immutable-position columns as `active_position_only.csv` and `shadow_position_only.csv` for the legacy independent ATE/RPE evaluator. If any active/shadow event is rejected, replay fails rather than silently producing a benchmark row.
 
-**Important method limitation:** The visual frontend now supplies right-handed `q_W_I` through a distinct `VisualAttitudeMeasurementPayload`; both EKF and ESKF perform a body-right quaternion error-state correction with a conservative outlier gate. This is **experimental 6-DoF software fusion, not validated robust 6-DoF VIO**: initial attitude is identity rather than estimated gravity alignment; sequential PnP orientation/position updates are temporally correlated; the 0.25 rad uncertainty is provisional and uncalibrated; absolute heading remains unobservable; and no authentic EuRoC ATE/RPE or orientation error evidence is reported. Do not claim genuine robustness, flight performance or accuracy on this basis.
+**Important method limitation:** The visual frontend now supplies right-handed `q_W_I` through a distinct `VisualAttitudeMeasurementPayload`; both EKF and ESKF perform a body-right quaternion error-state correction with a conservative outlier gate. This is **experimental 6-DoF software fusion, not validated robust 6-DoF VIO**: initial attitude defaults to identity (gravity unverified); the optional stationary-gravity mode estimates **tilt only** using a strict pre-motion IMU interval, rejects moving/short starts, and cannot estimate yaw; sequential PnP orientation/position updates are temporally correlated; the 0.25 rad uncertainty is provisional and uncalibrated; absolute heading remains unobservable; and no authentic EuRoC ATE/RPE or orientation error evidence is reported. Do not claim genuine robustness, flight performance or accuracy on this basis.
 
 ## Reproducibility (Linux)
 
@@ -114,3 +114,37 @@ Visual tracking intentionally **stops after the first tracking failure**. By def
 - [ ] Distinguish single-UAV MAV benchmark evidence from physical multi-UAV swarm/fault testing.
 
 **Do not call this phase a completed trustworthy VIO benchmark, physical GPS-denied UAV performance experiment or paper-ready scientific contribution.** The CI exercises synthetic source fixtures and synthetic camera geometry only.
+
+## Optional tilt-only stationary gravity initialization (synthetic-tested)
+
+The default remains `--assume-initial-imu-identity`, which is not an
+observed initial orientation. For a source sequence with a *genuinely stationary*
+200 Hz IMU segment extending from the very first IMU measurement through the
+first accepted visual pose, use the alternate prior:
+
+```bash
+python3 -m research.experiments.euroc_vio_run \\
+  --sequence-root /data/EuRoC/MH_01_easy \\
+  --native-binary build/linux-gcc-release/tests/euroc_stereo_imu_native_fusion \\
+  --output-dir /data/exports/MH_01_easy_gravity_trial01 \\
+  --initial-attitude stationary-gravity
+```
+
+This mode computes an accelerometer mean *without ground truth*, enforces
+at least 200 ms of preceding samples, verifies continuous IMU timestamps,
+angular rate <=0.15 rad/s, acceleration magnitude near 9.81 m/s² and small
+sample variability. If any check fails, the native replay **exits nonzero**
+before writing trajectories. A quaternion rotates body-measured specific
+force to world +Z (the estimator integrates gravity as world -Z). The exact
+same rotation is applied to the filter initial attitude and the visual VO
+position, velocity and orientation observations. It cannot estimate global
+yaw and cannot cure long-term PnP correlations, drift, outliers or
+uncalibrated covariance. An IMU segment that is dynamically accelerated but
+happens to satisfy these thresholds can still produce an incorrect prior;
+therefore this is an experimental diagnostic ablation, **not** proof of
+physically correct orientation, stationarity or robust GPS-denied flight.
+
+The runner's manifest records the commanded `initial_attitude_mode`, and
+requires the native executable's corresponding initial-attitude attestation.
+Both identity and gravity-aligned variants remain unverified software replays
+until evaluated using independently obtained genuine EuRoC data.
