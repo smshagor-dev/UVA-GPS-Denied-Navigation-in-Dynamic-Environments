@@ -52,7 +52,10 @@ def parse_offsets_ms(specification: str) -> list[int]:
         all(left < right for left, right in zip(offsets, offsets[1:])),
         "time-offset grid must be strictly increasing and unique",
     )
-    require(offsets[0] < 0 < offsets[-1] and 0 in offsets, "grid requires both signs and zero")
+    require(
+        offsets[0] < 0 < offsets[-1] and 0 in offsets,
+        "grid requires both signs and zero",
+    )
     return offsets
 
 
@@ -83,12 +86,16 @@ def compare_offsets(
         "active and shadow timestamps differ; refusing unpaired comparison",
     )
     require(
-        offsets_ns == parse_offsets_ms(
+        offsets_ns
+        == parse_offsets_ms(
             ",".join(str(Decimal(value) / 1_000_000) for value in offsets_ns)
         ),
         "invalid or unsorted offset specification",
     )
-    require(type(tolerance_ns) is int and 0 <= tolerance_ns <= 50_000_000, "invalid tolerance")
+    require(
+        type(tolerance_ns) is int and 0 <= tolerance_ns <= 50_000_000,
+        "invalid tolerance",
+    )
     require(type(min_pairs) is int and min_pairs >= 4, "invalid min_pairs")
     require(
         math.isfinite(min_overlap_s)
@@ -153,7 +160,9 @@ def compare_offsets(
             ),
             "relative_orientation_rmse_deg": (
                 active_result["full_se3_relative_pose_error"]["orientation"]["rmse_deg"]
-                - shadow_result["full_se3_relative_pose_error"]["orientation"]["rmse_deg"]
+                - shadow_result["full_se3_relative_pose_error"]["orientation"][
+                    "rmse_deg"
+                ]
             ),
         }
         records.append(record)
@@ -205,7 +214,9 @@ def main() -> None:
     require(bool(args.sequence.strip()), "sequence name required")
     source_root = args.sequence_root.resolve(strict=True)
     require(source_root.is_dir(), "original sequence root must be a directory")
-    ground_truth_path = source_root / "mav0" / "state_groundtruth_estimate0" / "data.csv"
+    ground_truth_path = (
+        source_root / "mav0" / "state_groundtruth_estimate0" / "data.csv"
+    )
     require(
         ground_truth_path.is_file() and not ground_truth_path.is_symlink(),
         "original EuRoC publisher ground truth not found",
