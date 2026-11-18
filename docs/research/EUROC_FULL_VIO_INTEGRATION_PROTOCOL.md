@@ -148,3 +148,29 @@ The runner's manifest records the commanded `initial_attitude_mode`, and
 requires the native executable's corresponding initial-attitude attestation.
 Both identity and gravity-aligned variants remain unverified software replays
 until evaluated using independently obtained genuine EuRoC data.
+
+## Predeclared paired initialization ablation (same sensor stream)
+
+Generate a single immutable VO CSV with `euroc_stereo_visual_odometry.py`
+and replay that exact file twice, once with an identity prior and once with
+the opt-in stationary-gravity tilt prior. The paired driver enforces input
+SHA-256 equality, exact active/shadow timestamps and identical native IMU/
+visual counters. **A gravity-mode stationarity rejection fails the paired
+study** rather than silently comparing unequal subsets.
+
+```bash
+python3 -m research.experiments.euroc_initialization_ablation \\
+  --sequence-root /data/EuRoC/MH_01_easy \\
+  --visual-csv /data/exports/MH_01_easy_visual.csv \\
+  --native-binary build/linux-gcc-release/tests/euroc_stereo_imu_native_fusion \\
+  --output-dir /data/exports/MH_01_easy_initialization_ablation
+```
+
+`ablation_manifest.json` contains two native trajectory pairs and
+paired **differences** in world-anchored position (meters) and quaternion
+geodesic orientation (radians), not ATE/RPE or correctness metrics. It has
+`ground_truth_used=false` and `publishable_accuracy_evidence=false`.
+Directly comparing each mode's different world-frame origins is only a
+numerical sensitivity diagnostic; a credible accuracy comparison needs the
+independent rigidly aligned evaluation protocol in #82 and timestamp sensitivity
+in #83 with original EuRoC source. No SOTA validation is inferred.
