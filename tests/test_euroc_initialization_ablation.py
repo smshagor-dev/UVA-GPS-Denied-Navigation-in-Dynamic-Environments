@@ -97,6 +97,79 @@ class PairedInitializationAblationTests(unittest.TestCase):
             "completed_unverified_paired_software_replay",
         )
 
+    def test_first_pose_alignment_removes_only_rigid_frame_gauge(self):
+        # The second pose follows the same trajectory in two different world
+        # frames: +90-degree global yaw and arbitrary translation.
+        def rigid_frame_replay(argv, **kwargs):
+            proc = self.fake_native(argv, **kwargs)
+            gravity = argv[-1] == "--require-stationary-gravity-alignment"
+            for index, field in enumerate(("--active-output", "--shadow-output")):
+                path = Path(argv[argv.index(field) + 1])
+                with path.open("w", newline="", encoding="utf-8") as stream:
+                    writer = csv.writer(stream)
+                    writer.writerow(
+                        ["timestamp_ns", "x_m", "y_m", "z_m", "qw", "qx", "qy", "qz"]
+                    )
+                    for i, stamp in enumerate((STAMP, STAMP + 20000000)):
+                        if gravity:
+                            writer.writerow(
+                                [stamp, 3, 2 + 0.4 * i, 0, 0.7071067811865476, 0, 0, 0.7071067811865476]
+                            )
+                        else:
+                            writer.writerow([stamp, 0.4 * i, 0, 0, 1, 0, 0, 0])
+            return proc
+
+        with mock.patch(
+            "research.experiments.euroc_initialization_ablation.subprocess.run",
+            side_effect=rigid_frame_replay,
+        ):
+            result = run(self.source, self.visual, Path(sys.executable), self.out)
+        for key in ("active", "shadow"):
+            metric = result["sensitivity"][key]
+            self.assertGreater(metric["position_difference_rms_m"], 1.0)
+            self.assertGreater(metric["orientation_difference_rms_rad"], 1.0)
+            self.assertLess(
+                metric["first_pose_aligned_position_difference_rms_m"], 1e-9
+            )
+            self.assertLess(
+                metric["first_pose_aligned_orientation_difference_rms_rad"], 1e-7
+            )
+            self.assertFalse(metric["is_accuracy_metric"])
+
+    def test_rigid_alignment_does_not_erase_true_relative_divergence(self):
+        def drifted_mode(argv, **kwargs):
+            proc = self.fake_native(argv, **kwargs)
+            gravity = argv[-1] == "--require-stationary-gravity-alignment"
+            if gravity:
+                path = Path(argv[argv.index("--active-output") + 1])
+                with path.open("w", newline="", encoding="utf-8") as stream:
+                    writer = csv.writer(stream)
+                    writer.writerow(
+                        ["timestamp_ns", "x_m", "y_m", "z_m", "qw", "qx", "qy", "qz"]
+                    )
+                    writer.writerow([STAMP, 0.1, 0, 0, 1, 0, 0, 0])
+                    writer.writerow([STAMP + 20000000, 0.5, 0, 0, 1, 0, 0, 0])
+            return proc
+
+        with mock.patch(
+            "research.experiments.euroc_initialization_ablation.subprocess.run",
+            side_effect=drifted_mode,
+        ):
+            result = run(self.source, self.visual, Path(sys.executable), self.out)
+        self.assertAlmostEqual(
+            result["sensitivity"]["active"][
+                "first_pose_aligned_position_difference_rms_m"
+            ],
+            (0.4**2 / 2) ** 0.5,
+            places=7,
+        )
+        self.assertLess(
+            result["sensitivity"]["shadow"][
+                "first_pose_aligned_position_difference_rms_m"
+            ],
+            1e-9,
+        )
+
     def test_stationarity_rejection_marks_entire_pair_failed(self):
         def reject_motion(argv, **kwargs):
             if argv[-1] == "--require-stationary-gravity-alignment":

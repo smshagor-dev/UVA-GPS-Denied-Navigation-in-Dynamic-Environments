@@ -68,13 +68,59 @@ def visual_timestamps(path: Path) -> list[int]:
     return stamps
 
 
+def quaternion_product(a: list[float], b: list[float]) -> list[float]:
+    """Scalar-first Hamilton product; matches native q_W_I orientation."""
+    w, x, y, z = a
+    v, i, j, k = b
+    return [
+        w * v - x * i - y * j - z * k,
+        w * i + x * v + y * k - z * j,
+        w * j - x * k + y * v + z * i,
+        w * k + x * j - y * i + z * v,
+    ]
+
+
+def quaternion_conjugate(q: list[float]) -> list[float]:
+    return [q[0], -q[1], -q[2], -q[3]]
+
+
+def unit_quaternion(row: dict[str, str]) -> list[float]:
+    q = [float(row[key]) for key in ("qw", "qx", "qy", "qz")]
+    norm = math.sqrt(sum(x * x for x in q))
+    require(math.isfinite(norm) and norm > 0, "invalid paired quaternion")
+    return [x / norm for x in q]
+
+
+def rotate_vector(q: list[float], point: list[float]) -> list[float]:
+    return quaternion_product(
+        quaternion_product(q, [0.0, *point]), quaternion_conjugate(q)
+    )[1:]
+
+
+def geodesic_angle(a: list[float], b: list[float]) -> float:
+    # abs(dot) accounts for the quaternion q / -q gauge.
+    dot = abs(sum(x * y for x, y in zip(a, b)))
+    return 2.0 * math.acos(max(0.0, min(1.0, dot)))
+
+
 def compare_native_streams(identity: Path, gravity: Path, expected: list[int]) -> dict:
-    """Differences are not errors: no ground truth or frame alignment is used."""
+    """Measure raw AND first-pose rigidly aligned paired differences, never accuracy.
+
+    Each estimator has a distinct world-frame gauge. A single relative SE(3)
+    transform, fixed using the FIRST pose only, removes that arbitrary frame
+    difference without using any ground truth or optimizing later samples.
+    Residual divergence after this alignment remains sensitivity, not error.
+    """
     count = 0
-    squared_position = 0.0
-    squared_attitude = 0.0
-    max_position = 0.0
-    max_attitude = 0.0
+    sums = {
+        "raw_position": 0.0,
+        "raw_orientation": 0.0,
+        "aligned_position": 0.0,
+        "aligned_orientation": 0.0,
+    }
+    peaks = {key: 0.0 for key in sums}
+    alignment_rotation = None
+    alignment_translation = None
     with identity.open(newline="", encoding="utf-8") as a, gravity.open(
         newline="", encoding="utf-8"
     ) as b:
@@ -84,38 +130,62 @@ def compare_native_streams(identity: Path, gravity: Path, expected: list[int]) -
             "inconsistent native pose schema",
         )
         for ra, rb in zip(left, right, strict=True):
+            require(count < len(expected), "unexpected extra paired pose row")
             require(
                 ra["timestamp_ns"] == rb["timestamp_ns"] == str(expected[count]),
                 "paired native output timestamps differ",
             )
             xyz_a = [float(ra[k]) for k in ("x_m", "y_m", "z_m")]
             xyz_b = [float(rb[k]) for k in ("x_m", "y_m", "z_m")]
-            delta = math.sqrt(sum((x - y) ** 2 for x, y in zip(xyz_a, xyz_b)))
-            qa = [float(ra[k]) for k in ("qw", "qx", "qy", "qz")]
-            qb = [float(rb[k]) for k in ("qw", "qx", "qy", "qz")]
-            dot = abs(sum(x * y for x, y in zip(qa, qb)))
-            dot /= math.sqrt(sum(x * x for x in qa) * sum(y * y for y in qb))
-            angular = 2.0 * math.acos(min(1.0, max(0.0, dot)))
-            require(
-                math.isfinite(delta) and math.isfinite(angular),
-                "nonfinite ablation discrepancy",
-            )
-            squared_position += delta * delta
-            squared_attitude += angular * angular
-            max_position = max(max_position, delta)
-            max_attitude = max(max_attitude, angular)
+            qa, qb = unit_quaternion(ra), unit_quaternion(rb)
+            if alignment_rotation is None:
+                alignment_rotation = quaternion_product(
+                    qa, quaternion_conjugate(qb)
+                )
+                mapped_first = rotate_vector(alignment_rotation, xyz_b)
+                alignment_translation = [
+                    x - y for x, y in zip(xyz_a, mapped_first)
+                ]
+            aligned_xyz_b = [
+                x + y
+                for x, y in zip(
+                    rotate_vector(alignment_rotation, xyz_b),
+                    alignment_translation,
+                )
+            ]
+            aligned_qb = quaternion_product(alignment_rotation, qb)
+            deltas = {
+                "raw_position": math.dist(xyz_a, xyz_b),
+                "raw_orientation": geodesic_angle(qa, qb),
+                "aligned_position": math.dist(xyz_a, aligned_xyz_b),
+                "aligned_orientation": geodesic_angle(qa, aligned_qb),
+            }
+            for key, delta in deltas.items():
+                require(math.isfinite(delta), "nonfinite paired pose discrepancy")
+                sums[key] += delta * delta
+                peaks[key] = max(peaks[key], delta)
             count += 1
-    require(count == len(expected), "paired native trajectory count mismatch")
+    require(count == len(expected) and count > 0, "paired native trajectory count mismatch")
     return {
         "sample_count": count,
-        "position_difference_rms_m": math.sqrt(squared_position / count),
-        "position_difference_max_m": max_position,
-        "orientation_difference_rms_rad": math.sqrt(squared_attitude / count),
-        "orientation_difference_max_rad": max_attitude,
+        "position_difference_rms_m": math.sqrt(sums["raw_position"] / count),
+        "position_difference_max_m": peaks["raw_position"],
+        "orientation_difference_rms_rad": math.sqrt(sums["raw_orientation"] / count),
+        "orientation_difference_max_rad": peaks["raw_orientation"],
+        "first_pose_aligned_position_difference_rms_m": math.sqrt(
+            sums["aligned_position"] / count
+        ),
+        "first_pose_aligned_position_difference_max_m": peaks["aligned_position"],
+        "first_pose_aligned_orientation_difference_rms_rad": math.sqrt(
+            sums["aligned_orientation"] / count
+        ),
+        "first_pose_aligned_orientation_difference_max_rad": peaks[
+            "aligned_orientation"
+        ],
+        "alignment": "one rigid SE3 transform fixed from first paired poses, no GT",
         "is_accuracy_metric": False,
         "ground_truth_used": False,
     }
-
 
 def run(
     sequence_root: Path,

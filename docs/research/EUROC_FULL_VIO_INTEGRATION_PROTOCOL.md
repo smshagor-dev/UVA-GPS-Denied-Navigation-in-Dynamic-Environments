@@ -170,7 +170,15 @@ python3 -m research.experiments.euroc_initialization_ablation \\
 paired **differences** in world-anchored position (meters) and quaternion
 geodesic orientation (radians), not ATE/RPE or correctness metrics. It has
 `ground_truth_used=false` and `publishable_accuracy_evidence=false`.
-Directly comparing each mode's different world-frame origins is only a
-numerical sensitivity diagnostic; a credible accuracy comparison needs the
-independent rigidly aligned evaluation protocol in #82 and timestamp sensitivity
-in #83 with original EuRoC source. No SOTA validation is inferred.
+Raw world-frame position and quaternion differences can primarily represent
+arbitrary initial coordinate-frame orientation and translation, rather than
+estimator drift. The ablation therefore ALSO reports **first-pose aligned**
+paired SE(3) residual differences. The single relative rigid transform is
+fixed using only the first pair of estimated poses, without ground truth,
+scale fitting or any subsequent trajectory optimization. Synthetic tests
+verify that a constant 90-degree yaw + translation disappears after alignment
+while subsequent relative motion disagreement remains. Neither raw nor
+aligned differences are GT accuracy metrics: publication-grade ATE/RPE needs
+the separate independent evaluator in #82 and prespecified time association
+in #83 on independently verified original EuRoC sequences. No SOTA validation
+is inferred.
