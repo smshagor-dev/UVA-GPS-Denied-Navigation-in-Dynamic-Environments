@@ -60,9 +60,7 @@ class EurocPoseSensitivityTests(unittest.TestCase):
             self.assertEqual(record["status"], "evaluated")
             self.assertEqual(record["active"]["matched_samples"], 12)
             self.assertEqual(record["shadow"]["matched_samples"], 12)
-            self.assertLess(
-                abs(record["active_minus_shadow"]["ate_rmse_m"]), 1e-12
-            )
+            self.assertLess(abs(record["active_minus_shadow"]["ate_rmse_m"]), 1e-12)
             self.assertLess(
                 abs(record["active_minus_shadow"]["relative_orientation_rmse_deg"]),
                 1e-12,
@@ -92,7 +90,9 @@ class EurocPoseSensitivityTests(unittest.TestCase):
         )
         baseline = result["records"][1]
         self.assertEqual(baseline["offset_ns"], 0)
-        self.assertLess(baseline["active"]["absolute_orientation_error"]["rmse_deg"], 1e-4)
+        self.assertLess(
+            baseline["active"]["absolute_orientation_error"]["rmse_deg"], 1e-4
+        )
         self.assertGreater(
             baseline["shadow"]["absolute_orientation_error"]["rmse_deg"], 1.0
         )
@@ -133,7 +133,9 @@ class EurocPoseSensitivityTests(unittest.TestCase):
             gt_csv = gt_dir / "data.csv"
             with gt_csv.open("w", newline="", encoding="utf-8") as file:
                 writer = csv.writer(file)
-                writer.writerow(["#timestamp", "p_x", "p_y", "p_z", "q_w", "q_x", "q_y", "q_z"])
+                writer.writerow(
+                    ["#timestamp", "p_x", "p_y", "p_z", "q_w", "q_x", "q_y", "q_z"]
+                )
                 for p in gt:
                     writer.writerow((p.timestamp_ns, *p.xyz, *p.q_wxyz))
             csv_paths = []
@@ -168,7 +170,9 @@ class EurocPoseSensitivityTests(unittest.TestCase):
                 "--output",
                 str(output),
             ]
-            success = subprocess.run(command, check=True, capture_output=True, text=True)
+            success = subprocess.run(
+                command, check=True, capture_output=True, text=True
+            )
             self.assertIn("5/5 prespecified offsets evaluated", success.stdout)
             data = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(data["status"], "completed")
