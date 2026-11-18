@@ -65,6 +65,35 @@ def make_transform(rotation: np.ndarray, translation: np.ndarray) -> np.ndarray:
     return result
 
 
+# Experimental conditioning gate for the generic EPNP solver, not a
+# validated physical accuracy threshold or a substitute for original EuRoC.
+MIN_PNP_3D_INLIER_SINGULAR_RATIO = 0.005
+
+
+def metric_pnp_spatial_conditioning(points_m: np.ndarray) -> float:
+    """Reject near-coplanar/collinear metric landmarks in unsupported EPNP."""
+    xyz = np.asarray(points_m, dtype=np.float64)
+    require(
+        xyz.ndim == 2 and xyz.shape[1] == 3 and xyz.shape[0] >= 8,
+        "insufficient 3D PnP landmarks",
+    )
+    require(np.all(np.isfinite(xyz)), "nonfinite PnP metric landmarks")
+    require(
+        np.all(xyz[:, 2] > 0.05), "PnP stereo landmarks require positive metric depth"
+    )
+    singular = np.linalg.svd(xyz - xyz.mean(axis=0), compute_uv=False)
+    require(
+        singular.shape == (3,) and singular[0] >= 0.05,
+        "degenerate PnP 3D landmark spread",
+    )
+    ratio = float(singular[-1] / singular[0])
+    require(
+        np.isfinite(ratio) and ratio >= MIN_PNP_3D_INLIER_SINGULAR_RATIO,
+        "degenerate PnP 3D landmark geometry; unsupported near-planar EPNP",
+    )
+    return ratio
+
+
 def relative_camera_pnp(
     points_prev_rect_m: np.ndarray,
     pixels_current_rect: np.ndarray,
@@ -101,6 +130,8 @@ def relative_camera_pnp(
         np.linalg.matrix_rank(np.cov(uv.T), tol=1e-8) == 2,
         "degenerate PnP image feature distribution",
     )
+    # Do not let a few spatial outliers rescue a degenerate inlier consensus.
+    metric_pnp_spatial_conditioning(xyz)
     cv2.setRNGSeed(2026)
     ok, rvec, tvec, inliers = cv2.solvePnPRansac(
         np.ascontiguousarray(xyz),
@@ -117,6 +148,7 @@ def relative_camera_pnp(
         "PnP failed inlier gate",
     )
     selected = inliers[:, 0]
+    spatial_ratio = metric_pnp_spatial_conditioning(xyz[selected])
     projected, _ = cv2.projectPoints(xyz[selected], rvec, tvec, K, None)
     errors = np.linalg.norm(projected.reshape(-1, 2) - uv[selected], axis=1)
     rmse = float(np.sqrt(np.mean(errors * errors)))
@@ -133,6 +165,7 @@ def relative_camera_pnp(
         "inliers": len(selected),
         "matches": xyz.shape[0],
         "rmse_px": rmse,
+        "pnp_inlier_3d_singular_ratio": spatial_ratio,
     }
 
 
@@ -440,6 +473,11 @@ def visual_measurements(
                 "pnp_inliers": stats["inliers"],
                 "pnp_reprojection_rmse_px": stats["rmse_px"],
                 "flow_tracks": stats["flow_tracks"],
+                **(
+                    {"pnp_inlier_3d_singular_ratio": stats["pnp_inlier_3d_singular_ratio"]}
+                    if "pnp_inlier_3d_singular_ratio" in stats
+                    else {}
+                ),
             }
         )
         world_imu = candidate

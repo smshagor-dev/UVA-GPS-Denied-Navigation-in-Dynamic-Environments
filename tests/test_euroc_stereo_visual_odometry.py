@@ -49,8 +49,40 @@ class StereoVisualOdometryTests(unittest.TestCase):
         self.assertEqual(diagnostics["matches"], 60)
         self.assertGreaterEqual(diagnostics["inliers"], 50)
         self.assertLess(diagnostics["rmse_px"], 0.01)
+        self.assertGreater(diagnostics["pnp_inlier_3d_singular_ratio"], 0.005)
         self.assertTrue(np.allclose(relative[:3, :3], self.rotation, atol=0.005))
         self.assertTrue(np.allclose(relative[:3, 3], self.translation, atol=0.02))
+
+    def test_planar_pnp_landmarks_rejected_despite_2d_image_spread(self):
+        # Exactly planar 3D input can still span both image coordinates.
+        planar = self.landmarks.copy()
+        planar[:, 2] = 5.0
+        transformed = planar @ self.rotation.T + self.translation
+        image = transformed @ self.K.T
+        pixels = image[:, :2] / image[:, 2:]
+        self.assertEqual(np.linalg.matrix_rank(np.cov(pixels.T)), 2)
+        with self.assertRaisesRegex(ValueError, "degenerate PnP 3D"):
+            relative_camera_pnp(planar, pixels, self.K)
+
+    def test_almost_planar_landmarks_are_not_mislabelled_6dof_evidence(self):
+        nearly = self.landmarks.copy()
+        nearly[:, 2] = 5.0 + 1e-6 * nearly[:, 0]
+        transformed = nearly @ self.rotation.T + self.translation
+        image = transformed @ self.K.T
+        pixels = image[:, :2] / image[:, 2:]
+        with self.assertRaisesRegex(ValueError, "degenerate PnP 3D"):
+            relative_camera_pnp(nearly, pixels, self.K)
+
+    def test_negative_metric_depth_rejected_before_cv2_pnp(self):
+        invalid = self.landmarks.copy()
+        invalid[:, 2] = -1
+        with mock.patch(
+            "research.experiments.euroc_stereo_visual_odometry.cv2.solvePnPRansac",
+            side_effect=AssertionError("must not solve from negative depth"),
+        ) as solver:
+            with self.assertRaisesRegex(ValueError, "positive metric depth"):
+                relative_camera_pnp(invalid, self.current_pixels, self.K)
+            solver.assert_not_called()
 
     def test_right_handed_visual_quaternion_from_pnp_rotation(self):
         quaternion = rotation_to_quaternion_wxyz(self.rotation)

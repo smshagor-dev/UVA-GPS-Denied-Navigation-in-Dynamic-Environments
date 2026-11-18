@@ -182,3 +182,16 @@ aligned differences are GT accuracy metrics: publication-grade ATE/RPE needs
 the separate independent evaluator in #82 and prespecified time association
 in #83 on independently verified original EuRoC sequences. No SOTA validation
 is inferred.
+
+## Draft follow-up: experimental 3D PnP scene conditioning (#85)
+
+The 2D image covariance rank, RANSAC consensus and low reprojection error
+alone cannot certify that a set of stereo-derived 3D points is well conditioned
+for generic EPNP. The follow-up branch checks the absolute scene spread and
+normalized smallest/largest centered 3D singular values **both before** and
+**after** RANSAC, refuses negative depths and near-coplanar/collinear inliers,
+and stores the inlier conditioning ratio in accepted frame audits. The
+predeclared 0.005 ratio is a conservative *experimental* rejection threshold,
+not an optimized cutoff. A planar-specialized PnP solver is not implemented.
+This may reject legitimate data; authentic EuRoC dropout coverage, ablation
+and independent accuracy are required before asserting research benefit.
