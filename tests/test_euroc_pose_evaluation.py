@@ -57,9 +57,7 @@ def write_inputs(directory, gt, est):
             writer.writerow((pose.timestamp_ns, *pose.xyz, *pose.q_wxyz))
     with est_path.open("w", encoding="utf-8", newline="") as out:
         writer = csv.writer(out)
-        writer.writerow(
-            ["timestamp_ns", "x_m", "y_m", "z_m", "qw", "qx", "qy", "qz"]
-        )
+        writer.writerow(["timestamp_ns", "x_m", "y_m", "z_m", "qw", "qx", "qy", "qz"])
         for pose in est:
             writer.writerow((pose.timestamp_ns, *pose.xyz, *pose.q_wxyz))
     return gt_path, est_path
@@ -73,9 +71,7 @@ class EuRoCPoseEvaluationTests(unittest.TestCase):
         self.assertLess(result["ate_translation"]["rmse_m"], 1e-10)
         self.assertLess(result["absolute_orientation_error"]["rmse_deg"], 2e-5)
         relative = result["full_se3_relative_pose_error"]
-        self.assertLess(
-            relative["translation_in_first_body_frame"]["rmse_m"], 1e-10
-        )
+        self.assertLess(relative["translation_in_first_body_frame"]["rmse_m"], 1e-10)
         self.assertLess(relative["orientation"]["rmse_deg"], 2e-5)
         self.assertEqual(relative["lag_s"], 1.0)
         self.assertFalse(result["ground_truth_used_for_estimator"])
@@ -84,15 +80,14 @@ class EuRoCPoseEvaluationTests(unittest.TestCase):
     def test_cannot_fit_metric_scale_away(self):
         gt, _ = trajectories()
         est = [
-            Pose(p.timestamp_ns, tuple(1.1 * v for v in p.xyz), p.q_wxyz)
-            for p in gt
+            Pose(p.timestamp_ns, tuple(1.1 * v for v in p.xyz), p.q_wxyz) for p in gt
         ]
         result = evaluate(gt, est)
         self.assertGreater(result["ate_translation"]["rmse_m"], 0.05)
         self.assertGreater(
-            result["full_se3_relative_pose_error"][
-                "translation_in_first_body_frame"
-            ]["rmse_m"],
+            result["full_se3_relative_pose_error"]["translation_in_first_body_frame"][
+                "rmse_m"
+            ],
             0.05,
         )
 
@@ -102,9 +97,7 @@ class EuRoCPoseEvaluationTests(unittest.TestCase):
             Pose(
                 p.timestamp_ns,
                 p.xyz,
-                yaw_quaternion(
-                    0.07 * index - math.pi / 2 + 0.025 * index
-                ),
+                yaw_quaternion(0.07 * index - math.pi / 2 + 0.025 * index),
             )
             for index, p in enumerate(est)
         ]
@@ -173,9 +166,7 @@ class EuRoCPoseEvaluationTests(unittest.TestCase):
             self.assertEqual(len(load_ground_truth(gt_path)), 12)
             self.assertEqual(len(load_estimated(est_path)), 12)
             with est_path.open("a", encoding="utf-8") as stream:
-                stream.write(
-                    f"{est[-1].timestamp_ns},0,0,0,1,0,0,0\n"
-                )
+                stream.write(f"{est[-1].timestamp_ns},0,0,0,1,0,0,0\n")
             with self.assertRaisesRegex(ValueError, "strictly increasing"):
                 load_estimated(est_path)
             est_path.write_text(
@@ -184,9 +175,7 @@ class EuRoCPoseEvaluationTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "exact eight-column"):
                 load_estimated(est_path)
-            gt_path.write_text(
-                f"#header\n{START_NS},0,0,0,0,0,0,0\n", encoding="utf-8"
-            )
+            gt_path.write_text(f"#header\n{START_NS},0,0,0,0,0,0,0\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "non-unit"):
                 load_ground_truth(gt_path)
 
@@ -216,7 +205,9 @@ class EuRoCPoseEvaluationTests(unittest.TestCase):
             result = subprocess.run(cmd, check=True, capture_output=True, text=True)
             self.assertIn("12 poses", result.stdout)
             data = json.loads(output.read_text(encoding="utf-8"))
-            self.assertEqual(data["source_sha256"].keys(), {"ground_truth", "estimated"})
+            self.assertEqual(
+                data["source_sha256"].keys(), {"ground_truth", "estimated"}
+            )
             self.assertEqual(data["frame_agreement_assertion"], "same-imu-body")
             self.assertFalse(data["publisher_archive_provenance_verified"])
             duplicate = subprocess.run(cmd, capture_output=True, text=True)
