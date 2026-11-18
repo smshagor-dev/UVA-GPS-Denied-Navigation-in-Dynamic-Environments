@@ -60,7 +60,9 @@ jobs:
   linux-gcc-werror:
     name: GCC Strict Warnings
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # This lane installs the full PCL/OpenCV stack before running -Werror.
+    # Avoid falsely failing validation if hosted apt mirrors are temporarily slow.
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-linux-deps
