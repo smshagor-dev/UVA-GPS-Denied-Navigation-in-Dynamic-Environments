@@ -139,13 +139,9 @@ def compare_native_streams(identity: Path, gravity: Path, expected: list[int]) -
             xyz_b = [float(rb[k]) for k in ("x_m", "y_m", "z_m")]
             qa, qb = unit_quaternion(ra), unit_quaternion(rb)
             if alignment_rotation is None:
-                alignment_rotation = quaternion_product(
-                    qa, quaternion_conjugate(qb)
-                )
+                alignment_rotation = quaternion_product(qa, quaternion_conjugate(qb))
                 mapped_first = rotate_vector(alignment_rotation, xyz_b)
-                alignment_translation = [
-                    x - y for x, y in zip(xyz_a, mapped_first)
-                ]
+                alignment_translation = [x - y for x, y in zip(xyz_a, mapped_first)]
             aligned_xyz_b = [
                 x + y
                 for x, y in zip(
@@ -165,7 +161,9 @@ def compare_native_streams(identity: Path, gravity: Path, expected: list[int]) -
                 sums[key] += delta * delta
                 peaks[key] = max(peaks[key], delta)
             count += 1
-    require(count == len(expected) and count > 0, "paired native trajectory count mismatch")
+    require(
+        count == len(expected) and count > 0, "paired native trajectory count mismatch"
+    )
     return {
         "sample_count": count,
         "position_difference_rms_m": math.sqrt(sums["raw_position"] / count),
@@ -186,6 +184,7 @@ def compare_native_streams(identity: Path, gravity: Path, expected: list[int]) -
         "is_accuracy_metric": False,
         "ground_truth_used": False,
     }
+
 
 def run(
     sequence_root: Path,

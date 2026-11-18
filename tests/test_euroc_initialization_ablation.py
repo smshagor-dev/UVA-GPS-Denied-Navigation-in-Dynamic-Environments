@@ -113,7 +113,16 @@ class PairedInitializationAblationTests(unittest.TestCase):
                     for i, stamp in enumerate((STAMP, STAMP + 20000000)):
                         if gravity:
                             writer.writerow(
-                                [stamp, 3, 2 + 0.4 * i, 0, 0.7071067811865476, 0, 0, 0.7071067811865476]
+                                [
+                                    stamp,
+                                    3,
+                                    2 + 0.4 * i,
+                                    0,
+                                    0.7071067811865476,
+                                    0,
+                                    0,
+                                    0.7071067811865476,
+                                ]
                             )
                         else:
                             writer.writerow([stamp, 0.4 * i, 0, 0, 1, 0, 0, 0])
