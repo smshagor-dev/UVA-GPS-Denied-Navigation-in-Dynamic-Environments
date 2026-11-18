@@ -15,8 +15,8 @@ runs:
         for sources in /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do
           if [[ -f "$sources" ]]; then
             sudo sed -E -i \
-              -e 's@https?://azure\\.archive\\.ubuntu\\.com/ubuntu@https://archive.ubuntu.com/ubuntu@g' \
-              -e 's@https?://[[:alnum:]-]+\\.ec2\\.archive\\.ubuntu\\.com/ubuntu@https://archive.ubuntu.com/ubuntu@g' \
+              -e 's@https?://azure\.archive\.ubuntu\.com/ubuntu@https://archive.ubuntu.com/ubuntu@g' \
+              -e 's@https?://[[:alnum:]-]+\.ec2\.archive\.ubuntu\.com/ubuntu@https://archive.ubuntu.com/ubuntu@g' \
               "$sources"
           fi
         done
