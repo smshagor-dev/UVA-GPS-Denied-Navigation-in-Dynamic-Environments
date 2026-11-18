@@ -1,7 +1,7 @@
-"""Prespecified EuRoC time-offset sensitivity, never a GT-tuned clock correction.
+"""Prespecified EuRoC evaluation timestamp-association sensitivity, not sensor timing.
 
 Use only independent full-pose estimates. This offline tool compares *both*
-native estimators at every fixed clock offset, reports failures, and never
+native estimators at every fixed estimator-to-GT timestamp offset, reports failures, and never
 selects the offset with the smallest ground-truth error.
 """
 
@@ -169,7 +169,7 @@ def compare_offsets(
     zero = next(entry for entry in records if entry["offset_ns"] == 0)
     successful = sum(entry["status"] == "evaluated" for entry in records)
     return {
-        "scope": "offline_prespecified_clock_offset_sensitivity_not_calibration",
+        "scope": "offline_gt_association_offset_sensitivity_not_sensor_calibration",
         "grid_predeclared_for_this_run": True,
         "independent_preregistration_verified": False,
         "best_offset_selected": False,
@@ -187,7 +187,8 @@ def compare_offsets(
         "active_shadow_timestamp_parity": True,
         "records": records,
         "limitations": [
-            "clock offsets must be declared before examining publisher ground truth",
+            "evaluation offsets must be declared before examining publisher ground truth",
+            "does not rerun camera/IMU fusion with altered sensor timestamps",
             "do not select best offset using these error curves",
             "different offsets can match different numbers of ground-truth poses",
             "only original archive and external provenance verification can validate source",
