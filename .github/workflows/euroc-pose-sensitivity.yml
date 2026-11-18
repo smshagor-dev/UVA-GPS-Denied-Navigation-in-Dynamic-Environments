@@ -1,4 +1,4 @@
-name: EuRoC Clock Offset Sensitivity Regression
+name: EuRoC Evaluation Timestamp Association Sensitivity Regression
 
 on:
   pull_request:
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   prespecified-clock-offset-sensitivity:
-    name: EuRoC prespecified clock offset analysis synthetic regression
+    name: EuRoC fixed evaluation timestamp offset synthetic regression
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -38,5 +38,5 @@ jobs:
       - name: Evidence provenance boundary
         run: |
           echo "Tests use synthetic trajectories only, NOT an original EuRoC archive."
-          echo "Clock offsets remain fixed inputs, never optimized by ground truth."
-          echo "No physical navigation, sensor synchronization or SOTA claims."
+          echo "GT association offsets remain fixed, never optimized by ground truth."
+          echo "No sensor-time perturbation, physical flight or SOTA claims."
