@@ -73,6 +73,26 @@ class StereoVisualOdometryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "degenerate PnP 3D"):
             relative_camera_pnp(nearly, pixels, self.K)
 
+    def test_ransac_consensus_itself_requires_metric_depth_diversity(self):
+        # Diverse outliers cannot rescue a planar subset selected as inliers.
+        xyz = self.landmarks.copy()
+        xyz[:48, 2] = 5.0
+        transformed = xyz @ self.rotation.T + self.translation
+        image = transformed @ self.K.T
+        pixels = image[:, :2] / image[:, 2:]
+        with mock.patch(
+            "research.experiments.euroc_stereo_visual_odometry.cv2.solvePnPRansac",
+            return_value=(
+                True,
+                np.zeros((3, 1)),
+                np.zeros((3, 1)),
+                np.arange(48, dtype=np.int32).reshape(-1, 1),
+            ),
+        ) as solver:
+            with self.assertRaisesRegex(ValueError, "degenerate PnP 3D"):
+                relative_camera_pnp(xyz, pixels, self.K)
+            solver.assert_called_once()
+
     def test_negative_metric_depth_rejected_before_cv2_pnp(self):
         invalid = self.landmarks.copy()
         invalid[:, 2] = -1
