@@ -251,12 +251,10 @@ Eigen::Quaterniond stationary_gravity_prior(const std::vector<ImuSample>& imu,
         if (sample.timestamp_ns > first_visual_ns) {
             break;
         }
-        if (count && (sample.timestamp_ns <= last ||
-                      sample.timestamp_ns - last > kMaxImuGapNs)) {
+        if (count && (sample.timestamp_ns <= last || sample.timestamp_ns - last > kMaxImuGapNs)) {
             throw std::runtime_error("stationary gravity prior has a discontinuous IMU window");
         }
-        if (!sample.accel.allFinite() || !sample.gyro.allFinite() ||
-            sample.gyro.norm() > 0.15 ||
+        if (!sample.accel.allFinite() || !sample.gyro.allFinite() || sample.gyro.norm() > 0.15 ||
             std::abs(sample.accel.norm() - kGravityMps2) > 0.55) {
             throw std::runtime_error("stationary gravity prior rejected motion or acceleration");
         }
@@ -480,10 +478,8 @@ void self_test() {
     // remove body tilt WITHOUT using any ground-truth position or orientation.
     auto tilted_imu = imu;
     tilted_imu.clear();
-    const Eigen::Quaterniond physical_tilt(
-        Eigen::AngleAxisd(0.5, Eigen::Vector3d::UnitX()));
-    const Eigen::Vector3d body_accel =
-        physical_tilt.inverse() * Eigen::Vector3d{0.0, 0.0, 9.81};
+    const Eigen::Quaterniond physical_tilt(Eigen::AngleAxisd(0.5, Eigen::Vector3d::UnitX()));
+    const Eigen::Vector3d body_accel = physical_tilt.inverse() * Eigen::Vector3d{0.0, 0.0, 9.81};
     for (uint64_t n = 0; n <= 100; ++n) {
         tilted_imu.push_back({start + n * 5000000ULL, Eigen::Vector3d::Zero(), body_accel});
     }

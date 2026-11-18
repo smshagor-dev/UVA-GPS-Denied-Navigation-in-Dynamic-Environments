@@ -167,7 +167,8 @@ def run(
         "visual_orientation_uncertainty_empirically_calibrated": False,
         "identity_initial_imu_orientation": initial_attitude == "identity",
         "initial_attitude_mode": initial_attitude,
-        "gravity_initialization_requires_stationary_imu": initial_attitude == "stationary-gravity",
+        "gravity_initialization_requires_stationary_imu": initial_attitude
+        == "stationary-gravity",
         "initial_yaw_observable": False,
         "frame_limit": max_frames,
         "limitations": [
