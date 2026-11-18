@@ -134,7 +134,9 @@ def rotation_error_rad(left: np.ndarray, right: np.ndarray) -> float:
 
 def summarize(values: list[float], unit: str) -> dict:
     samples = np.asarray(values, dtype=np.float64)
-    _fail(samples.size > 0 and np.isfinite(samples).all(), "missing finite error samples")
+    _fail(
+        samples.size > 0 and np.isfinite(samples).all(), "missing finite error samples"
+    )
     return {
         f"rmse_{unit}": float(np.sqrt(np.mean(samples * samples))),
         f"mean_{unit}": float(np.mean(samples)),
@@ -157,7 +159,9 @@ def evaluate(
 ) -> dict:
     validate_order(ground_truth, "ground truth")
     validate_order(estimated, "estimated trajectory")
-    _fail(type(tolerance_ns) is int and tolerance_ns >= 0, "invalid timestamp tolerance")
+    _fail(
+        type(tolerance_ns) is int and tolerance_ns >= 0, "invalid timestamp tolerance"
+    )
     _fail(type(time_offset_ns) is int, "time offset must be integer nanoseconds")
     _fail(type(min_pairs) is int and min_pairs >= 4, "minimum matched pairs < 4")
     _fail(
@@ -178,7 +182,9 @@ def evaluate(
 
     gt_positions = np.asarray([gt.xyz for gt, _ in pairs], dtype=np.float64)
     est_positions = np.asarray([est.xyz for _, est in pairs], dtype=np.float64)
-    aligned_positions, row_rotation, translation = rigid_align(est_positions, gt_positions)
+    aligned_positions, row_rotation, translation = rigid_align(
+        est_positions, gt_positions
+    )
     # Existing evaluator uses row-vector estimated @ R + t = GT.
     # Body-to-world quaternion matrices use column vectors: R_align = R_row.T.
     world_alignment = row_rotation.T
@@ -262,9 +268,7 @@ def main() -> None:
     parser.add_argument("--ground-truth", type=Path, required=True)
     parser.add_argument("--estimated", type=Path, required=True)
     parser.add_argument("--sequence", required=True)
-    parser.add_argument(
-        "--frame-agreement", choices=("same-imu-body",), required=True
-    )
+    parser.add_argument("--frame-agreement", choices=("same-imu-body",), required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--tolerance-ms", type=float, default=20.0)
     parser.add_argument("--min-pairs", type=int, default=10)
@@ -278,7 +282,8 @@ def main() -> None:
         "invalid tolerance",
     )
     _fail(
-        args.output.resolve() not in (
+        args.output.resolve()
+        not in (
             args.ground_truth.resolve(),
             args.estimated.resolve(),
         ),
