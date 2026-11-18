@@ -26,7 +26,11 @@ from research.experiments.euroc_vio_run import (
 
 
 MODES = (
-    ("identity", "--assume-initial-imu-identity", "identity-assumed; gravity unverified"),
+    (
+        "identity",
+        "--assume-initial-imu-identity",
+        "identity-assumed; gravity unverified",
+    ),
     (
         "stationary_gravity",
         "--require-stationary-gravity-alignment",
@@ -39,13 +43,19 @@ def visual_timestamps(path: Path) -> list[int]:
     stamps = []
     with path.open("r", newline="", encoding="utf-8-sig") as stream:
         rows = csv.DictReader(stream)
-        require(rows.fieldnames == VISUAL_COLUMNS, "unsupported visual CSV schema")
+        require(rows.fieldnames == list(VISUAL_COLUMNS), "unsupported visual CSV schema")
         for row in rows:
-            require(None not in row and None not in row.values(), "invalid visual CSV row")
+            require(
+                None not in row and None not in row.values(), "invalid visual CSV row"
+            )
             stamp = row["timestamp_ns"]
-            require(stamp.isascii() and stamp.isdecimal(), "non-integer visual timestamp")
+            require(
+                stamp.isascii() and stamp.isdecimal(), "non-integer visual timestamp"
+            )
             value = int(stamp)
-            require(not stamps or value > stamps[-1], "visual timestamps not increasing")
+            require(
+                not stamps or value > stamps[-1], "visual timestamps not increasing"
+            )
             require(
                 all(math.isfinite(float(row[k])) for k in VISUAL_COLUMNS[1:]),
                 "nonfinite visual measurement",
@@ -243,9 +253,7 @@ def run(
         manifest["failure_reason"] = str(error)
         raise
     finally:
-        with (output / "ablation_manifest.json").open(
-            "x", encoding="utf-8"
-        ) as writer:
+        with (output / "ablation_manifest.json").open("x", encoding="utf-8") as writer:
             json.dump(manifest, writer, indent=2, sort_keys=True)
             writer.write("\n")
     return manifest

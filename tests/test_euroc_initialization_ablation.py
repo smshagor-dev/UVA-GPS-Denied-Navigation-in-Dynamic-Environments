@@ -109,7 +109,9 @@ class PairedInitializationAblationTests(unittest.TestCase):
             "research.experiments.euroc_initialization_ablation.subprocess.run",
             side_effect=reject_motion,
         ):
-            with self.assertRaisesRegex(ValueError, "stationary_gravity native replay failed"):
+            with self.assertRaisesRegex(
+                ValueError, "stationary_gravity native replay failed"
+            ):
                 run(self.source, self.visual, Path(sys.executable), self.out)
         result = json.loads((self.out / "ablation_manifest.json").read_text())
         self.assertEqual(result["status"], "failed")
@@ -122,8 +124,7 @@ class PairedInitializationAblationTests(unittest.TestCase):
             if argv[-1] == "--require-stationary-gravity-alignment":
                 shadow = Path(argv[argv.index("--shadow-output") + 1])
                 shadow.write_text(
-                    "timestamp_ns,x_m,y_m,z_m,qw,qx,qy,qz\n"
-                    f"{STAMP},0,0,0,1,0,0,0\n",
+                    "timestamp_ns,x_m,y_m,z_m,qw,qx,qy,qz\n" f"{STAMP},0,0,0,1,0,0,0\n",
                     encoding="utf-8",
                 )
             return proc
@@ -132,9 +133,7 @@ class PairedInitializationAblationTests(unittest.TestCase):
             "research.experiments.euroc_initialization_ablation.subprocess.run",
             side_effect=shorten_shadow,
         ):
-            with self.assertRaisesRegex(
-                ValueError, "lost, duplicated or reordered"
-            ):
+            with self.assertRaisesRegex(ValueError, "lost, duplicated or reordered"):
                 run(self.source, self.visual, Path(sys.executable), self.out)
         self.assertEqual(
             json.loads((self.out / "ablation_manifest.json").read_text())["status"],
