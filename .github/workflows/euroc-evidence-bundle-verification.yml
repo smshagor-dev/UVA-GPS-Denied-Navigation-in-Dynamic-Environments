@@ -1,0 +1,38 @@
+name: EuRoC Post-run Evidence Bundle Consistency
+
+on:
+  pull_request:
+    paths:
+      - "research/experiments/euroc_evidence_bundle_verification.py"
+      - "tests/test_euroc_evidence_bundle_verification.py"
+      - "research/experiments/euroc_visual_coverage_audit.py"
+      - ".github/workflows/euroc-evidence-bundle-verification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consistency-contract:
+    name: EuRoC post-run evidence hash and timestamp integrity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install pinned formatter
+        run: python -m pip install black==24.10.0
+      - name: Verify formatting
+        run: python -m black --check --diff research/experiments/euroc_evidence_bundle_verification.py tests/test_euroc_evidence_bundle_verification.py
+      - name: Run post-run bundle and visual coverage regression
+        run: |
+          python -m unittest tests.test_euroc_evidence_bundle_verification -v
+          python -m unittest tests.test_euroc_visual_coverage_audit -v
+      - name: Bytecode compile
+        run: |
+          python -m py_compile research/experiments/euroc_evidence_bundle_verification.py
+          python -m py_compile tests/test_euroc_evidence_bundle_verification.py
+      - name: Evidence scope
+        run: echo "These checks contain only synthetic fixtures. No publisher EuRoC data, ATE/RPE, or real flight evidence."
