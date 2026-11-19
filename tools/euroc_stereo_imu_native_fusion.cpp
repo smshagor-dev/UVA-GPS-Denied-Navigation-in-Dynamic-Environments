@@ -286,8 +286,8 @@ Eigen::Quaterniond stationary_gravity_prior(const std::vector<ImuSample>& imu,
     const double dot = std::clamp(direction.z(), -1.0, 1.0);
     Eigen::Quaterniond initial;
     if (dot < -1.0 + 1e-12) {
-        initial = Eigen::Quaterniond(Eigen::AngleAxisd(
-            3.14159265358979323846, Eigen::Vector3d::UnitX()));
+        initial =
+            Eigen::Quaterniond(Eigen::AngleAxisd(3.14159265358979323846, Eigen::Vector3d::UnitX()));
     } else {
         const Eigen::Vector3d cross = direction.cross(Eigen::Vector3d::UnitZ());
         initial = Eigen::Quaterniond(1.0 + dot, cross.x(), cross.y(), cross.z()).normalized();
@@ -516,8 +516,8 @@ void self_test() {
     const Eigen::Quaterniond inverted =
         stationary_gravity_prior(inverted_imu, tilted_visual.front().timestamp_ns);
     if (!inverted.coeffs().allFinite() ||
-        (inverted * Eigen::Vector3d{0.0, 0.0, -9.81} -
-         Eigen::Vector3d{0.0, 0.0, 9.81}).norm() > 1e-6) {
+        (inverted * Eigen::Vector3d{0.0, 0.0, -9.81} - Eigen::Vector3d{0.0, 0.0, 9.81}).norm() >
+            1e-6) {
         throw std::runtime_error("antiparallel gravity prior failed");
     }
     auto moving_imu = tilted_imu;
