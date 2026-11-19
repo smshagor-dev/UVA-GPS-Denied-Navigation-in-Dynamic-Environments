@@ -57,6 +57,30 @@ class VisualCoverageAuditTests(unittest.TestCase):
         self.assertEqual(report["terminal_failure_status"], "failed_temporal_tracking")
         self.assertFalse(report["complete_camera_sequence_examined"])
 
+    def test_sync_discontinuity_preserves_dual_status_accounting(self):
+        data = fixture(
+            total=5,
+            statuses=("anchor", "visual_pose", "failed_sync_discontinuity"),
+        )
+        data["frame_audit"][-1]["sync_rejection"] = "missing_cam1"
+        data["frame_audit_sha256"] = hashlib.sha256(
+            json.dumps(
+                data["frame_audit"], sort_keys=True, separators=(",", ":")
+            ).encode()
+        ).hexdigest()
+        data["visual_status_counts"] = {
+            "anchor": 1,
+            "visual_pose": 1,
+            "sync_missing_cam1": 1,
+            "failed_sync_discontinuity": 1,
+        }
+        data["frame_limit_truncated"] = False
+        data["tracking_failure_truncated"] = True
+        data["failed_closed_on_tracking_loss"] = True
+        report = audit_coverage(data)
+        self.assertEqual(report["terminal_failure_status"], "failed_sync_discontinuity")
+        self.assertEqual(report["pre_anchor_or_sync_rejections"], 1)
+
     def test_invalid_ledger_and_missing_truncation_fail_closed(self):
         data = fixture()
         variants = []
