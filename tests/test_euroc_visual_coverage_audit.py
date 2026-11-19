@@ -35,8 +35,12 @@ class VisualCoverageAuditTests(unittest.TestCase):
         report = audit_coverage(fixture())
         self.assertEqual(report["visual_updates_accepted"], 1)
         self.assertEqual(report["camera_frames_total"], 5)
-        self.assertAlmostEqual(report["visual_update_fraction_of_all_camera_frames"], 0.2)
-        self.assertAlmostEqual(report["visual_update_fraction_of_examined_frames"], 1 / 3)
+        self.assertAlmostEqual(
+            report["visual_update_fraction_of_all_camera_frames"], 0.2
+        )
+        self.assertAlmostEqual(
+            report["visual_update_fraction_of_examined_frames"], 1 / 3
+        )
         self.assertFalse(report["complete_camera_sequence_examined"])
         self.assertFalse(report["ground_truth_used"])
 
@@ -48,7 +52,9 @@ class VisualCoverageAuditTests(unittest.TestCase):
         self.assertEqual(report["scope"], "visual_tracking_coverage_not_accuracy")
 
     def test_terminal_failure_is_reported_not_hidden(self):
-        data = fixture(total=5, statuses=("anchor", "visual_pose", "failed_temporal_tracking"))
+        data = fixture(
+            total=5, statuses=("anchor", "visual_pose", "failed_temporal_tracking")
+        )
         data["frame_limit_truncated"] = False
         data["tracking_failure_truncated"] = True
         data["failed_closed_on_tracking_loss"] = True
@@ -88,7 +94,9 @@ class VisualCoverageAuditTests(unittest.TestCase):
         wrong_digest["frame_audit_sha256"] = "0" * 64
         variants.append(wrong_digest)
         duplicated = deepcopy(data)
-        duplicated["frame_audit"][1]["timestamp_ns"] = duplicated["frame_audit"][0]["timestamp_ns"]
+        duplicated["frame_audit"][1]["timestamp_ns"] = duplicated["frame_audit"][0][
+            "timestamp_ns"
+        ]
         variants.append(duplicated)
         missing_flag = deepcopy(data)
         missing_flag["frame_limit_truncated"] = False
