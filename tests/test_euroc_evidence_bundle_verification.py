@@ -76,10 +76,7 @@ class EvidenceBundleTests(unittest.TestCase):
         self.write_csv("visual_odometry.csv", VISUAL_COLUMNS, visual)
         ledger = [
             {"timestamp_ns": 1_000_000_000, "status": "anchor"},
-            *[
-                {"timestamp_ns": stamp, "status": "visual_pose"}
-                for stamp in stamps
-            ],
+            *[{"timestamp_ns": stamp, "status": "visual_pose"} for stamp in stamps],
         ]
         visual_manifest = {
             "frame_audit": ledger,
@@ -184,7 +181,9 @@ class EvidenceBundleTests(unittest.TestCase):
             path.read_text(encoding="utf-8").replace("1.0", "3.0"),
             encoding="utf-8",
         )
-        self.update_declared_sha("shadow_evaluator_positions", "shadow_position_only.csv")
+        self.update_declared_sha(
+            "shadow_evaluator_positions", "shadow_position_only.csv"
+        )
         with self.assertRaisesRegex(ValueError, "position projection differs"):
             verify_bundle(self.root)
 

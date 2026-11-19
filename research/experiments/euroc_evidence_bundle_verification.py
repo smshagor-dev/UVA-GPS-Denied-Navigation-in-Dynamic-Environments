@@ -19,9 +19,21 @@ from research.experiments.euroc_visual_coverage_audit import audit_coverage, req
 POSE_COLUMNS = ("timestamp_ns", "x_m", "y_m", "z_m", "qw", "qx", "qy", "qz")
 POSITION_COLUMNS = POSE_COLUMNS[:4]
 VISUAL_COLUMNS = (
-    "timestamp_ns", "x_m", "y_m", "z_m", "vx_mps", "vy_mps", "vz_mps",
-    "sigma_position_m", "sigma_velocity_mps", "pnp_inliers",
-    "pnp_reprojection_rmse_px", "qw", "qx", "qy", "qz",
+    "timestamp_ns",
+    "x_m",
+    "y_m",
+    "z_m",
+    "vx_mps",
+    "vy_mps",
+    "vz_mps",
+    "sigma_position_m",
+    "sigma_velocity_mps",
+    "pnp_inliers",
+    "pnp_reprojection_rmse_px",
+    "qw",
+    "qx",
+    "qy",
+    "qz",
     "sigma_orientation_rad",
 )
 
@@ -38,7 +50,10 @@ def safe_file(root: Path, name: str) -> Path:
     """Forbid symlinks and any manifest-driven path traversal."""
     require(name and Path(name).name == name, "unsafe bundle artifact name")
     path = root / name
-    require(path.is_file() and not path.is_symlink(), f"missing or symlinked artifact: {name}")
+    require(
+        path.is_file() and not path.is_symlink(),
+        f"missing or symlinked artifact: {name}",
+    )
     return path
 
 
@@ -50,12 +65,16 @@ def checked_json(root: Path, name: str) -> dict:
 
 def matched_hash(root: Path, name: str, expected: str) -> None:
     require(
-        isinstance(expected, str) and len(expected) == 64 and sha256(safe_file(root, name)) == expected,
+        isinstance(expected, str)
+        and len(expected) == 64
+        and sha256(safe_file(root, name)) == expected,
         f"SHA-256 mismatch for {name}",
     )
 
 
-def checked_csv(root: Path, name: str, columns: tuple[str, ...]) -> list[dict[str, str]]:
+def checked_csv(
+    root: Path, name: str, columns: tuple[str, ...]
+) -> list[dict[str, str]]:
     with safe_file(root, name).open(newline="", encoding="utf-8-sig") as stream:
         reader = csv.DictReader(stream)
         require(reader.fieldnames == list(columns), f"unsupported CSV schema: {name}")
@@ -88,7 +107,9 @@ def checked_csv(root: Path, name: str, columns: tuple[str, ...]) -> list[dict[st
     return rows
 
 
-def check_pose_artifact(root: Path, declared: dict, name: str, rows: list[dict]) -> None:
+def check_pose_artifact(
+    root: Path, declared: dict, name: str, rows: list[dict]
+) -> None:
     require(declared["relative_file"] == name, f"trajectory name mismatch: {name}")
     matched_hash(root, name, declared["sha256"])
     require(declared["sample_count"] == len(rows), f"trajectory count mismatch: {name}")
@@ -105,7 +126,8 @@ def verify_bundle(root: Path, *, allow_partial: bool = False) -> dict:
     require(root.is_dir(), "bundle root is not a directory")
     run = checked_json(root, "run_manifest.json")
     require(
-        run.get("status") in (
+        run.get("status")
+        in (
             "completed_unverified_software_replay",
             "completed_unverified_partial_software_replay",
         ),
@@ -117,7 +139,9 @@ def verify_bundle(root: Path, *, allow_partial: bool = False) -> dict:
         and run.get("publishable_accuracy_evidence") is False,
         "unexpected ground-truth/provenance/accuracy declaration",
     )
-    require(run.get("native_exit_code") == 0, "native estimator exit was not successful")
+    require(
+        run.get("native_exit_code") == 0, "native estimator exit was not successful"
+    )
     required_files = (
         ("synchronization", "manifest_sha256", "synchronization_manifest.json"),
         ("synchronization", "events_sha256", "synchronized_frames.jsonl"),
@@ -136,7 +160,8 @@ def verify_bundle(root: Path, *, allow_partial: bool = False) -> dict:
         and declared["frame_audit_sha256"] == coverage["frame_audit_sha256"]
         and declared["visual_status_counts"] == visual["visual_status_counts"]
         and declared["frame_limit_truncated"] is coverage["frame_limit_truncated"]
-        and declared["tracking_failure_truncated"] is coverage["tracking_failure_truncated"],
+        and declared["tracking_failure_truncated"]
+        is coverage["tracking_failure_truncated"],
         "run/visual manifest coverage disagreement",
     )
     require(
@@ -148,11 +173,14 @@ def verify_bundle(root: Path, *, allow_partial: bool = False) -> dict:
         run["status"]
         == (
             "completed_unverified_partial_software_replay"
-            if partial else "completed_unverified_software_replay"
+            if partial
+            else "completed_unverified_software_replay"
         ),
         "run completion status inconsistent with coverage",
     )
-    require(not partial or allow_partial, "partial camera sequence requires --allow-partial")
+    require(
+        not partial or allow_partial, "partial camera sequence requires --allow-partial"
+    )
 
     visual_rows = checked_csv(root, "visual_odometry.csv", VISUAL_COLUMNS)
     timestamps = [row["timestamp_ns"] for row in visual_rows]
@@ -185,10 +213,7 @@ def verify_bundle(root: Path, *, allow_partial: bool = False) -> dict:
             f"{estimator} timestamps differ from visual observations",
         )
         require(
-            [
-                {key: row[key] for key in POSITION_COLUMNS}
-                for row in pose_rows
-            ]
+            [{key: row[key] for key in POSITION_COLUMNS} for row in pose_rows]
             == position_rows,
             f"{estimator} position projection differs from native pose",
         )
