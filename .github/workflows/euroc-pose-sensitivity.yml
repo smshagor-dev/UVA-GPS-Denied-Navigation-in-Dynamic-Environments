@@ -1,0 +1,42 @@
+name: EuRoC Evaluation Timestamp Association Sensitivity Regression
+
+on:
+  pull_request:
+    paths:
+      - "research/experiments/euroc_pose_sensitivity.py"
+      - "tests/test_euroc_pose_sensitivity.py"
+      - "docs/research/EUROC_CLOCK_OFFSET_SENSITIVITY_PROTOCOL.md"
+      - ".github/workflows/euroc-pose-sensitivity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prespecified-clock-offset-sensitivity:
+    name: EuRoC fixed evaluation timestamp offset synthetic regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install numerical/formatting test dependencies
+        run: python -m pip install "numpy>=2.3,<3" black==24.10.0
+      - name: Check formatting
+        run: python -m black --check --diff research/experiments/euroc_pose_sensitivity.py tests/test_euroc_pose_sensitivity.py
+      - name: Verify independent pose and offset sensitivity contracts
+        run: |
+          python -m unittest tests.test_euroc_trajectory_evaluation -v
+          python -m unittest tests.test_euroc_pose_evaluation -v
+          python -m unittest tests.test_euroc_pose_sensitivity -v
+      - name: Check Python syntax
+        run: |
+          python -m py_compile research/experiments/euroc_pose_sensitivity.py
+          python -m py_compile tests/test_euroc_pose_sensitivity.py
+      - name: Evidence provenance boundary
+        run: |
+          echo "Tests use synthetic trajectories only, NOT an original EuRoC archive."
+          echo "GT association offsets remain fixed, never optimized by ground truth."
+          echo "No sensor-time perturbation, physical flight or SOTA claims."
