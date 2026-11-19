@@ -18,6 +18,7 @@ from research.experiments.euroc_stereo_visual_odometry import (
     make_transform,
     relative_camera_pnp,
     rectified_left,
+    require_pnp_conditioning_audit,
     rotation_to_quaternion_wxyz,
     visual_measurements,
 )
@@ -42,6 +43,24 @@ class StereoVisualOdometryTests(unittest.TestCase):
         pixels = p @ self.K.T
         self.current_pixels = pixels[:, :2] / pixels[:, 2:]
 
+    def test_missing_or_invalid_spatial_gate_audit_fails_closed(self):
+        for diagnostics in (
+            {},
+            {"pnp_inlier_3d_singular_ratio": 0.0},
+            {"pnp_inlier_3d_singular_ratio": float("nan")},
+            {"pnp_inlier_3d_singular_ratio": float("inf")},
+            {"pnp_inlier_3d_singular_ratio": 1.1},
+            {"pnp_inlier_3d_singular_ratio": True},
+            {"pnp_inlier_3d_singular_ratio": "0.2"},
+        ):
+            with self.subTest(diagnostics=diagnostics):
+                with self.assertRaisesRegex(ValueError, "conditioning audit"):
+                    require_pnp_conditioning_audit(diagnostics)
+        self.assertEqual(
+            require_pnp_conditioning_audit({"pnp_inlier_3d_singular_ratio": 0.2}),
+            0.2,
+        )
+
     def test_pnp_recovers_synthetic_metric_relative_pose(self):
         relative, diagnostics = relative_camera_pnp(
             self.landmarks, self.current_pixels, self.K
@@ -49,8 +68,60 @@ class StereoVisualOdometryTests(unittest.TestCase):
         self.assertEqual(diagnostics["matches"], 60)
         self.assertGreaterEqual(diagnostics["inliers"], 50)
         self.assertLess(diagnostics["rmse_px"], 0.01)
+        self.assertGreater(diagnostics["pnp_inlier_3d_singular_ratio"], 0.005)
         self.assertTrue(np.allclose(relative[:3, :3], self.rotation, atol=0.005))
         self.assertTrue(np.allclose(relative[:3, 3], self.translation, atol=0.02))
+
+    def test_planar_pnp_landmarks_rejected_despite_2d_image_spread(self):
+        # Exactly planar 3D input can still span both image coordinates.
+        planar = self.landmarks.copy()
+        planar[:, 2] = 5.0
+        transformed = planar @ self.rotation.T + self.translation
+        image = transformed @ self.K.T
+        pixels = image[:, :2] / image[:, 2:]
+        self.assertEqual(np.linalg.matrix_rank(np.cov(pixels.T)), 2)
+        with self.assertRaisesRegex(ValueError, "degenerate PnP 3D"):
+            relative_camera_pnp(planar, pixels, self.K)
+
+    def test_almost_planar_landmarks_are_not_mislabelled_6dof_evidence(self):
+        nearly = self.landmarks.copy()
+        nearly[:, 2] = 5.0 + 1e-6 * nearly[:, 0]
+        transformed = nearly @ self.rotation.T + self.translation
+        image = transformed @ self.K.T
+        pixels = image[:, :2] / image[:, 2:]
+        with self.assertRaisesRegex(ValueError, "degenerate PnP 3D"):
+            relative_camera_pnp(nearly, pixels, self.K)
+
+    def test_ransac_consensus_itself_requires_metric_depth_diversity(self):
+        # Diverse outliers cannot rescue a planar subset selected as inliers.
+        xyz = self.landmarks.copy()
+        xyz[:48, 2] = 5.0
+        transformed = xyz @ self.rotation.T + self.translation
+        image = transformed @ self.K.T
+        pixels = image[:, :2] / image[:, 2:]
+        with mock.patch(
+            "research.experiments.euroc_stereo_visual_odometry.cv2.solvePnPRansac",
+            return_value=(
+                True,
+                np.zeros((3, 1)),
+                np.zeros((3, 1)),
+                np.arange(48, dtype=np.int32).reshape(-1, 1),
+            ),
+        ) as solver:
+            with self.assertRaisesRegex(ValueError, "degenerate PnP 3D"):
+                relative_camera_pnp(xyz, pixels, self.K)
+            solver.assert_called_once()
+
+    def test_negative_metric_depth_rejected_before_cv2_pnp(self):
+        invalid = self.landmarks.copy()
+        invalid[:, 2] = -1
+        with mock.patch(
+            "research.experiments.euroc_stereo_visual_odometry.cv2.solvePnPRansac",
+            side_effect=AssertionError("must not solve from negative depth"),
+        ) as solver:
+            with self.assertRaisesRegex(ValueError, "positive metric depth"):
+                relative_camera_pnp(invalid, self.current_pixels, self.K)
+            solver.assert_not_called()
 
     def test_right_handed_visual_quaternion_from_pnp_rotation(self):
         quaternion = rotation_to_quaternion_wxyz(self.rotation)
@@ -245,6 +316,7 @@ class StereoVisualOdometryTests(unittest.TestCase):
                 "inliers": 24,
                 "rmse_px": 0.4,
                 "flow_tracks": 27,
+                "pnp_inlier_3d_singular_ratio": 0.23,
             }
             with (
                 mock.patch(
@@ -290,6 +362,10 @@ class StereoVisualOdometryTests(unittest.TestCase):
             )
             self.assertEqual(manifest["frame_audit"][1]["pnp_inliers"], 24)
             self.assertEqual(manifest["frame_audit"][1]["flow_tracks"], 27)
+            self.assertEqual(
+                manifest["frame_audit"][1]["pnp_inlier_3d_singular_ratio"],
+                0.23,
+            )
             self.assertTrue(manifest["frame_limit_truncated"])
             self.assertFalse(manifest["tracking_failure_truncated"])
             self.assertFalse(manifest["failed_closed_on_tracking_loss"])
