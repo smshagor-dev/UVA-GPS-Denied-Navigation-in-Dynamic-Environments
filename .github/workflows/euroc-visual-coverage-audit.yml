@@ -1,0 +1,27 @@
+name: EuRoC Visual Tracking Coverage Integrity
+
+on:
+  pull_request:
+    paths:
+      - "research/experiments/euroc_visual_coverage_audit.py"
+      - "tests/test_euroc_visual_coverage_audit.py"
+      - ".github/workflows/euroc-visual-coverage-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage-contract:
+    name: EuRoC coverage audit synthetic integrity tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: python -m pip install black==24.10.0
+      - run: python -m black --check --diff research/experiments/euroc_visual_coverage_audit.py tests/test_euroc_visual_coverage_audit.py
+      - run: python -m unittest tests.test_euroc_visual_coverage_audit -v
+      - run: python -m py_compile research/experiments/euroc_visual_coverage_audit.py
