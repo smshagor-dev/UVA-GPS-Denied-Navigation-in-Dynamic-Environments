@@ -474,7 +474,11 @@ def visual_measurements(
                 "pnp_reprojection_rmse_px": stats["rmse_px"],
                 "flow_tracks": stats["flow_tracks"],
                 **(
-                    {"pnp_inlier_3d_singular_ratio": stats["pnp_inlier_3d_singular_ratio"]}
+                    {
+                        "pnp_inlier_3d_singular_ratio": stats[
+                            "pnp_inlier_3d_singular_ratio"
+                        ]
+                    }
                     if "pnp_inlier_3d_singular_ratio" in stats
                     else {}
                 ),
