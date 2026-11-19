@@ -195,3 +195,13 @@ predeclared 0.005 ratio is a conservative *experimental* rejection threshold,
 not an optimized cutoff. A planar-specialized PnP solver is not implemented.
 This may reject legitimate data; authentic EuRoC dropout coverage, ablation
 and independent accuracy are required before asserting research benefit.
+
+### Audit integrity gate
+
+An accepted `visual_pose` ledger row **must contain** a finite,
+unit-interval RANSAC inlier 3D singular-value ratio that exceeds the
+predeclared conditioning threshold. A missing, malformed or below-threshold
+ratio now terminates tracking fail-closed instead of silently omitting
+conditioning evidence. Synthetic regression covers missing, nonfinite,
+out-of-range and valid ratios. This confirms the *audit contract*, not
+real-world 6-DoF accuracy or the optimality of the experimental threshold.

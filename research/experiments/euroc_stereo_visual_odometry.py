@@ -94,6 +94,18 @@ def metric_pnp_spatial_conditioning(points_m: np.ndarray) -> float:
     return ratio
 
 
+def require_pnp_conditioning_audit(diagnostics: dict) -> float:
+    """An accepted PnP update must prove the inlier spatial gate was run."""
+    value = diagnostics.get("pnp_inlier_3d_singular_ratio")
+    require(
+        isinstance(value, (float, np.floating))
+        and np.isfinite(value)
+        and MIN_PNP_3D_INLIER_SINGULAR_RATIO <= value <= 1.0,
+        "missing or invalid PnP inlier spatial conditioning audit",
+    )
+    return float(value)
+
+
 def relative_camera_pnp(
     points_prev_rect_m: np.ndarray,
     pixels_current_rect: np.ndarray,
@@ -421,6 +433,9 @@ def visual_measurements(
                 min_inliers=min_inliers,
             )
             candidate = integrate_camera_motion(world_imu, delta, T_imu_cam_rect)
+            # A missing or nonsensical inlier conditioning metric must not
+            # silently pass as successful visual trajectory evidence.
+            inlier_spatial_ratio = require_pnp_conditioning_audit(stats)
         except (ValueError, cv2.error, np.linalg.LinAlgError):
             statuses["failed_temporal_tracking"] += 1
             frame_audit.append(
@@ -473,15 +488,7 @@ def visual_measurements(
                 "pnp_inliers": stats["inliers"],
                 "pnp_reprojection_rmse_px": stats["rmse_px"],
                 "flow_tracks": stats["flow_tracks"],
-                **(
-                    {
-                        "pnp_inlier_3d_singular_ratio": stats[
-                            "pnp_inlier_3d_singular_ratio"
-                        ]
-                    }
-                    if "pnp_inlier_3d_singular_ratio" in stats
-                    else {}
-                ),
+                "pnp_inlier_3d_singular_ratio": inlier_spatial_ratio,
             }
         )
         world_imu = candidate

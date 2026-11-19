@@ -18,6 +18,7 @@ from research.experiments.euroc_stereo_visual_odometry import (
     make_transform,
     relative_camera_pnp,
     rectified_left,
+    require_pnp_conditioning_audit,
     rotation_to_quaternion_wxyz,
     visual_measurements,
 )
@@ -41,6 +42,24 @@ class StereoVisualOdometryTests(unittest.TestCase):
         p = self.landmarks @ self.rotation.T + self.translation
         pixels = p @ self.K.T
         self.current_pixels = pixels[:, :2] / pixels[:, 2:]
+
+    def test_missing_or_invalid_spatial_gate_audit_fails_closed(self):
+        for diagnostics in (
+            {},
+            {"pnp_inlier_3d_singular_ratio": 0.0},
+            {"pnp_inlier_3d_singular_ratio": float("nan")},
+            {"pnp_inlier_3d_singular_ratio": float("inf")},
+            {"pnp_inlier_3d_singular_ratio": 1.1},
+            {"pnp_inlier_3d_singular_ratio": True},
+            {"pnp_inlier_3d_singular_ratio": "0.2"},
+        ):
+            with self.subTest(diagnostics=diagnostics):
+                with self.assertRaisesRegex(ValueError, "conditioning audit"):
+                    require_pnp_conditioning_audit(diagnostics)
+        self.assertEqual(
+            require_pnp_conditioning_audit({"pnp_inlier_3d_singular_ratio": 0.2}),
+            0.2,
+        )
 
     def test_pnp_recovers_synthetic_metric_relative_pose(self):
         relative, diagnostics = relative_camera_pnp(
@@ -297,6 +316,7 @@ class StereoVisualOdometryTests(unittest.TestCase):
                 "inliers": 24,
                 "rmse_px": 0.4,
                 "flow_tracks": 27,
+                "pnp_inlier_3d_singular_ratio": 0.23,
             }
             with (
                 mock.patch(
@@ -342,6 +362,10 @@ class StereoVisualOdometryTests(unittest.TestCase):
             )
             self.assertEqual(manifest["frame_audit"][1]["pnp_inliers"], 24)
             self.assertEqual(manifest["frame_audit"][1]["flow_tracks"], 27)
+            self.assertEqual(
+                manifest["frame_audit"][1]["pnp_inlier_3d_singular_ratio"],
+                0.23,
+            )
             self.assertTrue(manifest["frame_limit_truncated"])
             self.assertFalse(manifest["tracking_failure_truncated"])
             self.assertFalse(manifest["failed_closed_on_tracking_loss"])
