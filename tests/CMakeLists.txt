@@ -463,3 +463,29 @@ set_tests_properties(swarm_native_formation_metrics PROPERTIES
     LABELS "integration;swarm;simulation;research"
     TIMEOUT 60
 )
+
+# Stereo VO -> native EKF/ESKF integration. In-memory synthetic inputs only;
+# the CTest smoke test cannot establish genuine EuRoC accuracy.
+add_executable(euroc_stereo_imu_native_fusion ../tools/euroc_stereo_imu_native_fusion.cpp)
+target_link_libraries(euroc_stereo_imu_native_fusion PRIVATE sensor_fusion_core Eigen3::Eigen)
+drone_apply_project_warnings(euroc_stereo_imu_native_fusion)
+drone_enable_coverage(euroc_stereo_imu_native_fusion)
+drone_enable_sanitizers(euroc_stereo_imu_native_fusion)
+drone_set_target_output_dirs(euroc_stereo_imu_native_fusion "tests" "tests" "tests")
+add_test(NAME euroc_stereo_imu_native_fusion_selftest
+         COMMAND $<TARGET_FILE:euroc_stereo_imu_native_fusion> --self-test)
+set_tests_properties(euroc_stereo_imu_native_fusion_selftest PROPERTIES
+    LABELS "integration;navigation;replay;euroc-visual-inertial")
+
+if(Python3_Interpreter_FOUND)
+    add_test(
+        NAME euroc_stereo_imu_native_fusion_cli_regression
+        COMMAND "${Python3_EXECUTABLE}"
+                "${PROJECT_SOURCE_DIR}/tests/test_euroc_native_fusion_cli.py"
+                --binary "$<TARGET_FILE:euroc_stereo_imu_native_fusion>"
+    )
+    set_tests_properties(euroc_stereo_imu_native_fusion_cli_regression PROPERTIES
+        LABELS "integration;navigation;replay;euroc-visual-inertial"
+        TIMEOUT 120
+    )
+endif()

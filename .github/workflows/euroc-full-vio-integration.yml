@@ -1,0 +1,141 @@
+name: EuRoC Stereo Visual-Inertial Fusion Regression
+
+on:
+  pull_request:
+    paths:
+      - "research/experiments/euroc_stereo_visual_odometry.py"
+      - "tests/test_euroc_stereo_visual_odometry.py"
+      - "tests/test_euroc_vio_run.py"
+      - "research/experiments/euroc_vio_run.py"
+      - "research/experiments/euroc_initialization_ablation.py"
+      - "tests/test_euroc_initialization_ablation.py"
+      - "tests/test_euroc_native_fusion_cli.py"
+      - "tools/euroc_stereo_imu_native_fusion.cpp"
+      - "tests/CMakeLists.txt"
+      - ".github/workflows/navigation-validation.yml"
+      - "docs/research/EUROC_FULL_VIO_INTEGRATION_PROTOCOL.md"
+      - ".github/workflows/euroc-full-vio-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pnp-and-calibration-contract:
+    name: EuRoC stereo temporal PnP and fusion contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install pinned-range open-source visual odometry dependencies
+        run: python -m pip install "numpy>=2.3,<3" "PyYAML>=6.0.3,<7" "opencv-python-headless>=4.10,<6"
+      - name: Run sensor, calibration, stereo and PnP regression suites
+        run: |
+          python -m unittest tests.test_euroc_sensor_intake -v
+          python -m unittest tests.test_euroc_calibration_validation -v
+          python -m unittest tests.test_euroc_stereo_frontend -v
+          python -m unittest tests.test_euroc_stereo_imu_synchronization -v
+          python -m unittest tests.test_euroc_stereo_visual_odometry -v
+          python -m unittest tests.test_euroc_vio_run -v
+          python -m unittest tests.test_euroc_initialization_ablation -v
+      - name: Compile Python sources and test modules
+        run: |
+          python -m py_compile research/experiments/euroc_stereo_visual_odometry.py
+          python -m py_compile tests/test_euroc_stereo_visual_odometry.py
+          python -m py_compile research/experiments/euroc_vio_run.py
+          python -m py_compile tests/test_euroc_vio_run.py
+          python -m py_compile research/experiments/euroc_initialization_ablation.py
+          python -m py_compile tests/test_euroc_initialization_ablation.py
+      - name: Provenance boundary
+        run: |
+          echo "Synthetic geometry and sensor fixtures only; no authentic EuRoC run."
+          echo "C++ native fusion self-test executes through navigation-validation CI."
+          echo "No publisher ground truth, estimated benchmark ATE or flight evidence."
+
+  native-fusion-release:
+    name: Native EuRoC active EKF and shadow ESKF fusion regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-linux-deps
+      - name: Configure native estimator and fusion target
+        run: cmake --preset linux-gcc-release
+      - name: Build native visual and inertial fusion
+        run: cmake --build --preset linux-gcc-release --target euroc_stereo_imu_native_fusion -- -j2
+      - name: Run in-memory and original-format synthetic CSV replay
+        run: ctest --preset linux-gcc-release -R '^euroc_stereo_imu_native_fusion_(selftest|cli_regression)$' --output-on-failure
+      - name: Mark evidence scope
+        run: |
+          echo "Only synthetic IMU and visual pose CSV cases."
+          echo "No independent original EuRoC dataset or physical flight experiment."
+
+  integration-format:
+    name: Phase 81 Python and native C++ formatting
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install repository formatters
+        run: python -m pip install black==24.10.0 clang-format==19.1.7
+      - name: Check all Python regression sources
+        run: python -m black --check --diff tests/test_euroc_stereo_visual_odometry.py tests/test_euroc_native_fusion_cli.py tests/test_euroc_vio_run.py tests/test_euroc_initialization_ablation.py research/experiments/euroc_initialization_ablation.py research/experiments/euroc_vio_run.py research/experiments/euroc_stereo_visual_odometry.py
+      - name: Check native C++ fusion source
+        run: clang-format --dry-run --Werror tools/euroc_stereo_imu_native_fusion.cpp
+      - name: Emit canonical formatter outputs for repair
+        if: failure()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64
+          import pathlib
+          import subprocess
+          import sys
+
+          sources = (
+              "tools/euroc_stereo_imu_native_fusion.cpp",
+              "include/vio/MeasurementEnvelope.hpp",
+              "src/vio/MeasurementEnvelope.cpp",
+              "include/vio/EKFEstimator.hpp",
+              "include/vio/Phase17ESKFEstimator.hpp",
+              "src/vio/EKFStateEstimatorAdapter.cpp",
+              "src/vio/EKFEstimator.cpp",
+              "src/vio/Phase17ESKFEstimator.cpp",
+          )
+          py_sources = (
+              "tests/test_euroc_stereo_visual_odometry.py",
+              "tests/test_euroc_native_fusion_cli.py",
+              "tests/test_euroc_vio_run.py",
+              "tests/test_euroc_initialization_ablation.py",
+              "research/experiments/euroc_initialization_ablation.py",
+              "research/experiments/euroc_vio_run.py",
+              "research/experiments/euroc_stereo_visual_odometry.py",
+          )
+          for file in sources:
+              original = pathlib.Path(file).read_bytes()
+              canonical = subprocess.check_output(["clang-format", file])
+              if canonical == original:
+                  continue
+              encoded = base64.b64encode(canonical).decode("ascii")
+              print("FORMAT_CANONICAL_BEGIN:" + file)
+              for i in range(0, len(encoded), 4096):
+                  print(encoded[i:i+4096])
+              print("FORMAT_CANONICAL_END:" + file)
+          for file in py_sources:
+              original = pathlib.Path(file).read_bytes()
+              subprocess.run([sys.executable, "-m", "black", "--quiet", file], check=True)
+              canonical = pathlib.Path(file).read_bytes()
+              if canonical == original:
+                  continue
+              encoded = base64.b64encode(canonical).decode("ascii")
+              print("FORMAT_CANONICAL_BEGIN:" + file)
+              for i in range(0, len(encoded), 4096):
+                  print(encoded[i:i+4096])
+              print("FORMAT_CANONICAL_END:" + file)
+          PY

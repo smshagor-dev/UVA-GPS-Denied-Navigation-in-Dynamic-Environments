@@ -32,7 +32,7 @@ jobs:
       - name: Configure
         run: cmake --preset linux-gcc-release
       - name: Build
-        run: cmake --build --preset linux-gcc-release --target test_ekf test_phase16_shadow test_phase17_eskf test_phase18_zupt test_phase19_fej test_phase20_msckf test_phase21_triangulation test_phase22_msckf_update ekf_phase15_replay ekf_phase16_replay ekf_phase17_replay ekf_phase18_replay ekf_phase19_replay ekf_phase20_replay ekf_phase21_replay ekf_phase22_replay test_visual_feature_track_manager test_visual_feature_track_ingest visual_feature_track_ingest_replay test_localization_metadata_fail_closed euroc_imu_native_replay -- -j2
+        run: cmake --build --preset linux-gcc-release --target test_ekf test_phase16_shadow test_phase17_eskf test_phase18_zupt test_phase19_fej test_phase20_msckf test_phase21_triangulation test_phase22_msckf_update ekf_phase15_replay ekf_phase16_replay ekf_phase17_replay ekf_phase18_replay ekf_phase19_replay ekf_phase20_replay ekf_phase21_replay ekf_phase22_replay test_visual_feature_track_manager test_visual_feature_track_ingest visual_feature_track_ingest_replay test_localization_metadata_fail_closed euroc_imu_native_replay euroc_stereo_imu_native_fusion -- -j2
       - name: Navigation regression tests
         shell: bash
         run: ctest --preset linux-gcc-release -L 'navigation|phase16|phase17|phase18|phase19|phase20|phase21|phase22' --output-on-failure
@@ -60,6 +60,8 @@ jobs:
   linux-gcc-werror:
     name: GCC Strict Warnings
     runs-on: ubuntu-24.04
+    # This lane installs the full PCL/OpenCV stack before running -Werror.
+    # Avoid falsely failing validation if hosted apt mirrors are temporarily slow.
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v7
