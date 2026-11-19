@@ -55,6 +55,15 @@ def audit_coverage(manifest: dict) -> dict:
         )
         timestamps.append(stamp)
         counts[status] += 1
+        if status == "failed_sync_discontinuity":
+            rejection = row.get("sync_rejection")
+            require(
+                isinstance(rejection, str) and bool(rejection),
+                "missing synchronization rejection reason",
+            )
+            # The producer counts the underlying sync rejection and the
+            # terminal discontinuity separately for this single frame.
+            counts["sync_" + rejection] += 1
     require(
         dict(counts) == {
             key: val for key, val in manifest["visual_status_counts"].items() if val
