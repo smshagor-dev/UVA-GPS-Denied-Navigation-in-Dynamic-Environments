@@ -95,8 +95,8 @@ def audit_coverage(manifest: dict) -> dict:
     )
     require(not (failed and limited), "tracking failure mislabeled as frame limit")
     require(
-        not failure_truncated or (failed and examined < total),
-        "invalid tracking failure truncation",
+        failure_truncated is (failed and examined < total),
+        "tracking failure truncation inconsistent with examined camera frames",
     )
     require(
         not limited or (examined < total and not failed),

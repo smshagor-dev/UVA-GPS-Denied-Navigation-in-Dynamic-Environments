@@ -101,6 +101,13 @@ class VisualCoverageAuditTests(unittest.TestCase):
         missing_flag = deepcopy(data)
         missing_flag["frame_limit_truncated"] = False
         variants.append(missing_flag)
+        suppressed_failure = fixture(
+            total=5,
+            statuses=("anchor", "visual_pose", "failed_temporal_tracking"),
+        )
+        suppressed_failure["frame_limit_truncated"] = False
+        suppressed_failure["failed_closed_on_tracking_loss"] = True
+        variants.append(suppressed_failure)
         wrong_count = deepcopy(data)
         wrong_count["visual_measurement_count"] = 2
         variants.append(wrong_count)
