@@ -25,7 +25,9 @@ def audit_coverage(manifest: dict) -> dict:
         type(examined) is int and 0 < examined <= total,
         "invalid examined camera count",
     )
-    require(type(accepted) is int and 0 <= accepted <= examined, "invalid accepted count")
+    require(
+        type(accepted) is int and 0 <= accepted <= examined, "invalid accepted count"
+    )
     require(
         isinstance(ledger, list)
         and len(ledger) == examined == manifest["frame_audit_count"],
@@ -65,22 +67,28 @@ def audit_coverage(manifest: dict) -> dict:
             # terminal discontinuity separately for this single frame.
             counts["sync_" + rejection] += 1
     require(
-        dict(counts) == {
-            key: val for key, val in manifest["visual_status_counts"].items() if val
-        },
+        dict(counts)
+        == {key: val for key, val in manifest["visual_status_counts"].items() if val},
         "frame status counts inconsistent with ledger",
     )
     require(counts["visual_pose"] == accepted, "accepted count mismatch")
-    failures = [i for i, row in enumerate(ledger) if row["status"].startswith("failed_")]
+    failures = [
+        i for i, row in enumerate(ledger) if row["status"].startswith("failed_")
+    ]
     require(len(failures) <= 1, "more than one terminal tracking failure")
-    require(not failures or failures[0] == examined - 1, "failure must terminate tracking")
+    require(
+        not failures or failures[0] == examined - 1, "failure must terminate tracking"
+    )
     if accepted:
         require(counts["anchor"] == 1, "accepted measurements need exactly one anchor")
     require(counts["anchor"] <= 1, "multiple camera anchors")
     failed = bool(failures)
     limited = manifest["frame_limit_truncated"]
     failure_truncated = manifest["tracking_failure_truncated"]
-    require(type(limited) is bool and type(failure_truncated) is bool, "invalid truncation flags")
+    require(
+        type(limited) is bool and type(failure_truncated) is bool,
+        "invalid truncation flags",
+    )
     require(
         manifest["failed_closed_on_tracking_loss"] is failed,
         "tracking-failure declaration inconsistent with ledger",
@@ -140,7 +148,9 @@ def main() -> None:
         not args.output.exists() and not args.output.is_symlink(),
         "refusing to overwrite existing audit output",
     )
-    report = audit_coverage(json.loads(args.visual_manifest.read_text(encoding="utf-8")))
+    report = audit_coverage(
+        json.loads(args.visual_manifest.read_text(encoding="utf-8"))
+    )
     report["source_visual_manifest_sha256"] = hashlib.sha256(
         args.visual_manifest.read_bytes()
     ).hexdigest()
