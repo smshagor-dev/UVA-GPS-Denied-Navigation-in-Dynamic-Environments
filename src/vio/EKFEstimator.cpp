@@ -311,6 +311,7 @@ void EKFEstimator::update_depth(double z_depth_m, double sigma_m) {
     }
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters) -- preserve the stable visual pose API.
 void EKFEstimator::update_visual_pose(const Eigen::Vector3d& observed_position,
                                       const Eigen::Vector3d& observed_velocity,
                                       double sigma_position_m, double sigma_velocity_mps) {
@@ -339,6 +340,56 @@ void EKFEstimator::update_visual_pose(const Eigen::Vector3d& observed_position,
             candidate.vel += dx.segment<3>(3);
             candidate.ba += dx.segment<3>(9);
             candidate.bg += dx.segment<3>(12);
+        });
+    if (result == EstimatorOperationResult::Accepted) {
+        last_vision_update_ts_ = timestamp_;
+    }
+}
+
+// Visual attitude is estimated by temporal stereo PnP in the anchored IMU frame.
+// This is a *correlated VO observation*; its fixed sigma is not yet calibrated.
+void EKFEstimator::update_visual_attitude(const Eigen::Quaterniond& observed_world_from_imu,
+                                          double sigma_orientation_rad) {
+    std::lock_guard lock(mtx_);
+    if (!initialized_) {
+        note_rejection_locked(EstimatorOperationResult::RejectedNotInitialized);
+        return;
+    }
+    if (!observed_world_from_imu.coeffs().array().isFinite().all() ||
+        !std::isfinite(observed_world_from_imu.squaredNorm()) ||
+        std::abs(observed_world_from_imu.squaredNorm() - 1.0) > 0.02) {
+        note_rejection_locked(EstimatorOperationResult::RejectedInvalidQuaternion);
+        return;
+    }
+    if (!std::isfinite(sigma_orientation_rad) || sigma_orientation_rad <= 0.0 ||
+        sigma_orientation_rad > 1.0) {
+        note_rejection_locked(EstimatorOperationResult::RejectedInvalidCovariance);
+        return;
+    }
+    Eigen::Quaterniond measured = observed_world_from_imu.normalized();
+    if (measured.dot(q_) < 0.0) {
+        measured.coeffs() *= -1.0; // q and -q represent the same orientation.
+    }
+    const Eigen::Quaterniond delta = (q_.conjugate() * measured).normalized();
+    const Eigen::AngleAxisd angle_axis(delta);
+    // Reject grossly inconsistent stereo orientations instead of forcing an
+    // unobservable attitude jump into the inertial state.
+    if (!std::isfinite(angle_axis.angle()) || angle_axis.angle() > 0.78539816339) {
+        note_rejection_locked(EstimatorOperationResult::RejectedInvalidQuaternion);
+        return;
+    }
+    const Eigen::Vector3d innovation = angle_axis.axis() * angle_axis.angle();
+    Eigen::Matrix<double, 3, 15> H = Eigen::Matrix<double, 3, 15>::Zero();
+    H.block<3, 3>(0, 6) = Eigen::Matrix3d::Identity();
+    const Eigen::Matrix3d R_meas =
+        Eigen::Matrix3d::Identity() * sigma_orientation_rad * sigma_orientation_rad;
+    const auto result = apply_error_state_update_locked(
+        innovation, H, R_meas, [](NominalStateSnapshot& candidate, const ErrorVec& dx) {
+            candidate.pos += dx.segment<3>(0);
+            candidate.vel += dx.segment<3>(3);
+            candidate.ba += dx.segment<3>(9);
+            candidate.bg += dx.segment<3>(12);
+            candidate.q = (candidate.q * rotvec_to_quat(dx.segment<3>(6))).normalized();
         });
     if (result == EstimatorOperationResult::Accepted) {
         last_vision_update_ts_ = timestamp_;
