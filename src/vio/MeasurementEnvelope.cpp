@@ -30,6 +30,15 @@ bool is_measurement_payload_finite(const MeasurementEnvelope& envelope) {
                finite_quat_sigma(payload.sigma_position_m) &&
                finite_quat_sigma(payload.sigma_velocity_mps);
     }
+    case MeasurementType::VisualAttitude: {
+        const auto& payload = std::get<VisualAttitudeMeasurementPayload>(envelope.payload);
+        const auto& q = payload.world_from_imu;
+        const double norm_squared = q.squaredNorm();
+        return q.coeffs().array().isFinite().all() && std::isfinite(norm_squared) &&
+               norm_squared >= 0.99 * 0.99 && norm_squared <= 1.01 * 1.01 &&
+               finite_quat_sigma(payload.sigma_orientation_rad) &&
+               payload.sigma_orientation_rad <= 1.0;
+    }
     case MeasurementType::VisualFeatures: {
         const auto& payload = std::get<VisualFeatureMeasurementPayload>(envelope.payload);
         if (!payload.K.array().isFinite().all() ||
