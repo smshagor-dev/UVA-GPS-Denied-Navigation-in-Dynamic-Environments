@@ -277,8 +277,21 @@ Eigen::Quaterniond stationary_gravity_prior(const std::vector<ImuSample>& imu,
         std::abs(mean.norm() - kGravityMps2) > 0.35) {
         throw std::runtime_error("stationary gravity prior rejected noisy/dynamic accelerometry");
     }
-    const Eigen::Quaterniond initial =
-        Eigen::Quaterniond::FromTwoVectors(mean, Eigen::Vector3d::UnitZ());
+    // Avoid Eigen::FromTwoVectors here: Eigen 3.4's 2x3 JacobiSVD path
+    // triggers GCC 13 -Wmaybe-uninitialized under -O3 -Werror. This
+    // closed-form shortest-arc quaternion is equivalent for unit vectors.
+    // The almost-antiparallel case has an undefined yaw axis: select +X
+    // deterministically and keep the limitation explicit.
+    const Eigen::Vector3d direction = mean.normalized();
+    const double dot = std::clamp(direction.z(), -1.0, 1.0);
+    Eigen::Quaterniond initial;
+    if (dot < -1.0 + 1e-12) {
+        initial =
+            Eigen::Quaterniond(Eigen::AngleAxisd(3.14159265358979323846, Eigen::Vector3d::UnitX()));
+    } else {
+        const Eigen::Vector3d cross = direction.cross(Eigen::Vector3d::UnitZ());
+        initial = Eigen::Quaterniond(1.0 + dot, cross.x(), cross.y(), cross.z()).normalized();
+    }
     if (!initial.coeffs().allFinite() || std::abs(initial.squaredNorm() - 1.0) > 1e-6) {
         throw std::runtime_error("invalid tilt-only gravity alignment");
     }
@@ -495,6 +508,17 @@ void self_test() {
     const auto aligned = replay(tilted_imu, tilted_visual, InitialAttitudeMode::StationaryGravity);
     if (aligned.visual_update_count != 2) {
         throw std::runtime_error("tilt-aligned synthetic fusion replay failed");
+    }
+    auto inverted_imu = tilted_imu;
+    for (auto& sample : inverted_imu) {
+        sample.accel = {0.0, 0.0, -9.81};
+    }
+    const Eigen::Quaterniond inverted =
+        stationary_gravity_prior(inverted_imu, tilted_visual.front().timestamp_ns);
+    if (!inverted.coeffs().allFinite() ||
+        (inverted * Eigen::Vector3d{0.0, 0.0, -9.81} - Eigen::Vector3d{0.0, 0.0, 9.81}).norm() >
+            1e-6) {
+        throw std::runtime_error("antiparallel gravity prior failed");
     }
     auto moving_imu = tilted_imu;
     moving_imu[12].gyro.x() = 0.5;
